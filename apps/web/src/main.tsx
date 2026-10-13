@@ -13,6 +13,8 @@ import { createBrowserRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { AppProviders } from './app/AppProviders.tsx'
 import { routes } from './app/routes.tsx'
+import { DataSourceContext } from './data/DataSourceContext.ts'
+import { selectDataSource } from './data/select.ts'
 
 const container = document.getElementById('root')
 if (container === null) throw new Error('index.html has no #root element')
@@ -20,10 +22,14 @@ if (container === null) throw new Error('index.html has no #root element')
 // The pseudo-locale build is served from a directory of its own, so the router starts at the base the app was built for.
 const router = createBrowserRouter(routes, { basename: import.meta.env.BASE_URL })
 
+const dataSource = await selectDataSource()
+
 createRoot(container).render(
   <StrictMode>
-    <AppProviders>
-      <RouterProvider router={router} />
-    </AppProviders>
+    <DataSourceContext value={dataSource}>
+      <AppProviders>
+        <RouterProvider router={router} />
+      </AppProviders>
+    </DataSourceContext>
   </StrictMode>,
 )
