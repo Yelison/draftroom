@@ -1,0 +1,22 @@
+.field {
+  margin-block-end: var(--space-24);
+}
+
+/* The title is set in the document's own type and reads as part of the sheet, not as a form control. */
+.title {
+  min-height: var(--space-48);
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  font: var(--font-doc-title);
+  text-overflow: ellipsis;
+}
+
+.title:hover:not(:focus, [readonly]) {
+  background: transparent;
+}
+
+.title[readonly] {
+  border-style: solid;
+  background: transparent;
+}
