@@ -1,0 +1,3449 @@
+openapi: 3.1.0
+info:
+  title: Draftroom API
+  version: 1.0.0
+  summary: The REST API of Draftroom, a collaborative document editor.
+  description: |-
+    Metadata, permissions, comments, versions and history. Document content is a Yjs document: it travels over the collaboration connection and never over REST.
+
+    Every request after sign-in carries the `dr_session` cookie; requests that change state also carry the `X-CSRF-Token` header. Every error is `application/problem+json` with a stable `code`.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: /
+    description: The same origin as the app; every path starts with `/api`.
+tags:
+  - name: Session
+    description: Who is signed in, sign-up, sign-in and sign-out.
+  - name: Workspaces
+    description: The workspaces a person belongs to.
+  - name: Members
+    description: Who belongs to a workspace, and as what.
+  - name: Folders
+    description: Flat folders that group documents.
+  - name: Documents
+    description: 'Document metadata and lifecycle: the content is not served here.'
+  - name: Pins and shared
+    description: A person's pinned documents and the ones shared with them.
+  - name: Access
+    description: Who can open a document, and as what.
+  - name: Comments
+    description: Threads anchored to ranges of a document, and their comments.
+  - name: Versions
+    description: Checkpoints of a document and restoring one.
+  - name: Activity
+    description: The workspace history and the history of one document.
+  - name: Templates
+    description: Built-in starting points for new documents.
+  - name: Health
+    description: Probes for the process and its dependencies.
+paths:
+  /api/me:
+    get:
+      operationId: getMe
+      tags:
+        - Session
+      summary: Get the signed-in person
+      description: Any signed-in person.
+      responses:
+        '200':
+          description: The person behind the session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              examples:
+                default:
+                  $ref: '#/components/examples/User'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: session
+  /api/auth/sign-up:
+    post:
+      operationId: signUp
+      tags:
+        - Session
+      summary: Create an account and sign in
+      description: |-
+        Starts a session: the response sets the `dr_session` cookie and the `dr_csrf` cookie. A workspace member added by this email while it had no account becomes active.
+
+        No sign-in needed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+            examples:
+              default:
+                value:
+                  email: marta@harborpine.example
+                  password: correct horse battery staple
+                  name: Marta Ruiz
+      responses:
+        '201':
+          description: The account was created and the session started.
+          headers:
+            Set-Cookie:
+              description: Sets `dr_session` (HttpOnly) and `dr_csrf` (readable by the client, echoed in `X-CSRF-Token`).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              examples:
+                default:
+                  $ref: '#/components/examples/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security: []
+      x-draftroom-roles:
+        scope: public
+  /api/auth/sign-in:
+    post:
+      operationId: signIn
+      tags:
+        - Session
+      summary: Sign in
+      description: |-
+        Rotates the session. Wrong email and wrong password get the same `401 unauthenticated`, so the response never says which accounts exist.
+
+        No sign-in needed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInRequest'
+            examples:
+              default:
+                value:
+                  email: marta@harborpine.example
+                  password: correct horse battery staple
+      responses:
+        '200':
+          description: The session started.
+          headers:
+            Set-Cookie:
+              description: Sets `dr_session` (HttpOnly) and `dr_csrf` (readable by the client, echoed in `X-CSRF-Token`).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              examples:
+                default:
+                  $ref: '#/components/examples/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security: []
+      x-draftroom-roles:
+        scope: public
+  /api/auth/sign-out:
+    post:
+      operationId: signOut
+      tags:
+        - Session
+      summary: Sign out
+      description: |-
+        Ends the session on the server and clears both cookies. Open collaboration connections of the session close.
+
+        Any signed-in person.
+      responses:
+        '204':
+          description: The session ended.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: session
+  /api/workspaces:
+    get:
+      operationId: listWorkspaces
+      tags:
+        - Workspaces
+      summary: List the caller's workspaces
+      description: Any signed-in person.
+      responses:
+        '200':
+          description: The workspaces the caller belongs to.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceList'
+              examples:
+                default:
+                  value:
+                    items:
+                      - id: 0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01
+                        name: Harbor & Pine
+                        role: owner
+                        createdAt: 2026-10-13T14:00:00Z
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: session
+  /api/workspaces/{workspaceId}:
+    get:
+      operationId: getWorkspace
+      tags:
+        - Workspaces
+      summary: Get a workspace
+      description: 'Required workspace role. Read the workspace, its members, folders and lists: member, owner.'
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: The workspace.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+              examples:
+                default:
+                  $ref: '#/components/examples/Workspace'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: workspace-read
+            roles:
+              - member
+              - owner
+    patch:
+      operationId: updateWorkspace
+      tags:
+        - Workspaces
+      summary: Rename a workspace
+      description: 'Required workspace role. Rename the workspace: owner.'
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkspaceRequest'
+            examples:
+              default:
+                value:
+                  name: Harbor & Pine Studio
+      responses:
+        '200':
+          description: The renamed workspace.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+              examples:
+                default:
+                  value:
+                    id: 0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01
+                    name: Harbor & Pine Studio
+                    role: owner
+                    createdAt: 2026-10-13T14:00:00Z
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: rename-workspace
+            roles:
+              - owner
+  /api/workspaces/{workspaceId}/members:
+    get:
+      operationId: listMembers
+      tags:
+        - Members
+      summary: List the members of a workspace
+      description: |-
+        Includes pending members.
+
+        Required workspace role. Read the workspace, its members, folders and lists: member, owner.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: The members.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberList'
+              examples:
+                default:
+                  value:
+                    items:
+                      - userId: 7c2e9d41-6a8b-4f03-b5d7-2e4a8c1f9b22
+                        email: daniel@harborpine.example
+                        name: Daniel Okafor
+                        role: member
+                        status: active
+                        createdAt: 2026-10-13T14:00:00Z
+                      - userId: 2a4c6e8f-1b3d-4f5a-8c7e-9b1d3f5a7c44
+                        email: lucia@harborpine.example
+                        name: null
+                        role: member
+                        status: pending
+                        createdAt: 2026-10-13T15:30:00Z
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: workspace-read
+            roles:
+              - member
+              - owner
+    post:
+      operationId: addMember
+      tags:
+        - Members
+      summary: Add a member by email
+      description: |-
+        The member is `pending` until that email signs up. Adding an email that already belongs to the workspace is a `409 conflict`.
+
+        Required workspace role. Add, change role or remove members: owner.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddMemberRequest'
+            examples:
+              default:
+                value:
+                  email: lucia@harborpine.example
+                  role: member
+      responses:
+        '201':
+          description: The new member.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+              examples:
+                default:
+                  $ref: '#/components/examples/PendingMember'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: manage-members
+            roles:
+              - owner
+  /api/workspaces/{workspaceId}/members/{userId}:
+    patch:
+      operationId: updateMember
+      tags:
+        - Members
+      summary: Change a member's role
+      description: |-
+        Demoting the last owner is a `409 last-owner`.
+
+        Required workspace role. Add, change role or remove members: owner.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRequest'
+            examples:
+              default:
+                value:
+                  role: owner
+      responses:
+        '200':
+          description: The member with the new role.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+              examples:
+                default:
+                  $ref: '#/components/examples/Member'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/LastOwner'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: manage-members
+            roles:
+              - owner
+    delete:
+      operationId: removeMember
+      tags:
+        - Members
+      summary: Remove a member
+      description: |-
+        The person loses access to every document of the workspace and their open collaboration connections close. Removing the last owner is a `409 last-owner`.
+
+        Required workspace role. Add, change role or remove members: owner.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '204':
+          description: The member was removed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/LastOwner'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: manage-members
+            roles:
+              - owner
+  /api/workspaces/{workspaceId}/folders:
+    get:
+      operationId: listFolders
+      tags:
+        - Folders
+      summary: List the folders of a workspace
+      description: 'Required workspace role. Read the workspace, its members, folders and lists: member, owner.'
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: The folders, by name.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FolderList'
+              examples:
+                default:
+                  value:
+                    items:
+                      - id: a3d5c7e9-1b2f-4a6c-8d0e-3f5a7c9e1b33
+                        workspaceId: 0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01
+                        name: Launch
+                        revision: 2
+                        createdAt: 2026-10-13T14:00:00Z
+                        updatedAt: 2026-10-13T15:30:00Z
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: workspace-read
+            roles:
+              - member
+              - owner
+    post:
+      operationId: createFolder
+      tags:
+        - Folders
+      summary: Create a folder
+      description: 'Required workspace role. Create documents and folders: member, owner.'
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFolderRequest'
+            examples:
+              default:
+                value:
+                  name: Launch
+      responses:
+        '201':
+          description: The new folder.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Folder'
+              examples:
+                default:
+                  $ref: '#/components/examples/Folder'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: create-content
+            roles:
+              - member
+              - owner
+  /api/folders/{folderId}:
+    patch:
+      operationId: updateFolder
+      tags:
+        - Folders
+      summary: Rename a folder
+      description: |-
+        A stale `revision` is a `409 revision-conflict` carrying the current folder.
+
+        Required workspace role. Rename and delete folders: member, owner.
+      parameters:
+        - $ref: '#/components/parameters/FolderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFolderRequest'
+            examples:
+              default:
+                value:
+                  name: Launch 2026
+                  revision: 2
+      responses:
+        '200':
+          description: The renamed folder.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Folder'
+              examples:
+                default:
+                  $ref: '#/components/examples/Folder'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/FolderStale'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: manage-folders
+            roles:
+              - member
+              - owner
+    delete:
+      operationId: deleteFolder
+      tags:
+        - Folders
+      summary: Delete an empty folder
+      description: |-
+        A folder that still holds documents, archived ones included, is a `409 conflict`.
+
+        Required workspace role. Rename and delete folders: member, owner.
+      parameters:
+        - $ref: '#/components/parameters/FolderId'
+      responses:
+        '204':
+          description: The folder was deleted.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: manage-folders
+            roles:
+              - member
+              - owner
+  /api/workspaces/{workspaceId}/documents:
+    get:
+      operationId: listDocuments
+      tags:
+        - Documents
+      summary: List and search documents
+      description: |-
+        Only documents the caller can read. With `archived=true`, the archived documents the caller owns. Ordered by `updatedAt` descending, then `id` descending.
+
+        Required workspace role. Read the workspace, its members, folders and lists: member, owner.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: query
+          in: query
+          required: false
+          description: Matches the title and the excerpt.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+          example: launch
+        - name: folderId
+          in: query
+          required: false
+          description: Only the documents of this folder.
+          schema:
+            $ref: '#/components/schemas/Id'
+        - name: archived
+          in: query
+          required: false
+          description: List archived documents instead of live ones.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: A page of documents.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentPage'
+              examples:
+                default:
+                  value:
+                    items:
+                      - id: c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44
+                        workspaceId: 0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01
+                        folderId: a3d5c7e9-1b2f-4a6c-8d0e-3f5a7c9e1b33
+                        title: Autumn launch plan
+                        excerpt: The launch moves to the second week of November so the workshop can run first.
+                        revision: 3
+                        role: owner
+                        generalAccess: none
+                        pinned: true
+                        createdBy:
+                          id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
+                          name: Marta Ruiz
+                        createdAt: 2026-10-13T14:00:00Z
+                        updatedAt: 2026-10-13T15:30:00Z
+                        archivedAt: null
+                    nextCursor: eyJ0IjoiMjAyNi0xMC0xM1QxNTozMDowMFoiLCJpIjoiYzRlNmE4YjAifQ
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: workspace-read
+            roles:
+              - member
+              - owner
+    post:
+      operationId: createDocument
+      tags:
+        - Documents
+      summary: Create a document
+      description: |-
+        The caller gets an explicit `owner` grant and `generalAccess` starts at `none`. With `templateId`, the document starts from that template in the language of the template list.
+
+        Required workspace role. Create documents and folders: member, owner.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentRequest'
+            examples:
+              default:
+                value:
+                  title: Autumn launch plan
+                  folderId: a3d5c7e9-1b2f-4a6c-8d0e-3f5a7c9e1b33
+                  templateId: meeting-notes
+      responses:
+        '201':
+          description: The new document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+              examples:
+                default:
+                  $ref: '#/components/examples/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: create-content
+            roles:
+              - member
+              - owner
+  /api/documents/{documentId}:
+    get:
+      operationId: getDocument
+      tags:
+        - Documents
+      summary: Get a document's metadata
+      description: |-
+        A document the caller cannot read is a `404 not-found`, identical to a missing one. An archived document is readable only by its owners.
+
+        Required document role. Read metadata and content: viewer, commenter, editor, owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: The document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+              examples:
+                default:
+                  $ref: '#/components/examples/Document'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: read
+            roles:
+              - viewer
+              - commenter
+              - editor
+              - owner
+    patch:
+      operationId: updateDocument
+      tags:
+        - Documents
+      summary: Rename or move a document
+      description: |-
+        Send the `revision` you last read. A stale one is a `409 revision-conflict` carrying the current document. `folderId: null` moves the document out of its folder.
+
+        Required document role. Rename, move to folder: editor, owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentRequest'
+            examples:
+              default:
+                value:
+                  title: Autumn launch plan v2
+                  revision: 3
+      responses:
+        '200':
+          description: The updated document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+              examples:
+                default:
+                  $ref: '#/components/examples/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/DocumentStale'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: rename-move
+            roles:
+              - editor
+              - owner
+    delete:
+      operationId: deleteDocument
+      tags:
+        - Documents
+      summary: Delete an archived document permanently
+      description: |-
+        A document that is not archived is a `409 conflict`. Its content, versions, threads and access rows go with it.
+
+        Required document role. Archive, restore from archive, delete permanently: owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '204':
+          description: The document was deleted.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: archive-delete
+            roles:
+              - owner
+  /api/documents/{documentId}/archive:
+    post:
+      operationId: archiveDocument
+      tags:
+        - Documents
+      summary: Archive a document
+      description: |-
+        Idempotent. Connected editors are told the document was archived.
+
+        Required document role. Archive, restore from archive, delete permanently: owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: The archived document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+              examples:
+                default:
+                  $ref: '#/components/examples/Document'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: archive-delete
+            roles:
+              - owner
+  /api/documents/{documentId}/restore:
+    post:
+      operationId: restoreDocument
+      tags:
+        - Documents
+      summary: Restore a document from the archive
+      description: |-
+        Idempotent.
+
+        Required document role. Archive, restore from archive, delete permanently: owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: The restored document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+              examples:
+                default:
+                  $ref: '#/components/examples/Document'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: archive-delete
+            roles:
+              - owner
+  /api/documents/{documentId}/pin:
+    put:
+      operationId: pinDocument
+      tags:
+        - Pins and shared
+      summary: Pin a document for the caller
+      description: |-
+        Pins are personal. Idempotent.
+
+        Required document role. Pin (personal): viewer, commenter, editor, owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '204':
+          description: The document is pinned.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: pin
+            roles:
+              - viewer
+              - commenter
+              - editor
+              - owner
+    delete:
+      operationId: unpinDocument
+      tags:
+        - Pins and shared
+      summary: Unpin a document for the caller
+      description: |-
+        Idempotent.
+
+        Required document role. Pin (personal): viewer, commenter, editor, owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '204':
+          description: The document is not pinned.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: pin
+            roles:
+              - viewer
+              - commenter
+              - editor
+              - owner
+  /api/workspaces/{workspaceId}/pinned:
+    get:
+      operationId: listPinnedDocuments
+      tags:
+        - Pins and shared
+      summary: List the caller's pinned documents
+      description: |-
+        Only documents the caller can still read.
+
+        Required workspace role. Read the workspace, its members, folders and lists: member, owner.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: The pinned documents, most recently updated first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentList'
+              examples:
+                default:
+                  value:
+                    items:
+                      - id: c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44
+                        workspaceId: 0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01
+                        folderId: a3d5c7e9-1b2f-4a6c-8d0e-3f5a7c9e1b33
+                        title: Autumn launch plan
+                        excerpt: The launch moves to the second week of November so the workshop can run first.
+                        revision: 3
+                        role: owner
+                        generalAccess: none
+                        pinned: true
+                        createdBy:
+                          id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
+                          name: Marta Ruiz
+                        createdAt: 2026-10-13T14:00:00Z
+                        updatedAt: 2026-10-13T15:30:00Z
+                        archivedAt: null
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: workspace-read
+            roles:
+              - member
+              - owner
+  /api/workspaces/{workspaceId}/shared:
+    get:
+      operationId: listSharedDocuments
+      tags:
+        - Pins and shared
+      summary: List the documents shared with the caller
+      description: |-
+        The documents the caller can read without owning them, by explicit grant or general access. `access` keeps only those where the caller's role is `editor` (`edit`), `commenter` (`comment`) or `viewer` (`view`).
+
+        Required workspace role. Read the workspace, its members, folders and lists: member, owner.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: access
+          in: query
+          required: false
+          description: Filter by the caller's role.
+          schema:
+            type: string
+            enum:
+              - edit
+              - comment
+              - view
+      responses:
+        '200':
+          description: The shared documents, most recently updated first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentList'
+              examples:
+                default:
+                  value:
+                    items:
+                      - id: c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44
+                        workspaceId: 0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01
+                        folderId: a3d5c7e9-1b2f-4a6c-8d0e-3f5a7c9e1b33
+                        title: Autumn launch plan
+                        excerpt: The launch moves to the second week of November so the workshop can run first.
+                        revision: 3
+                        role: editor
+                        generalAccess: none
+                        pinned: false
+                        createdBy:
+                          id: 7c2e9d41-6a8b-4f03-b5d7-2e4a8c1f9b22
+                          name: Daniel Okafor
+                        createdAt: 2026-10-13T14:00:00Z
+                        updatedAt: 2026-10-13T15:30:00Z
+                        archivedAt: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: workspace-read
+            roles:
+              - member
+              - owner
+  /api/documents/{documentId}/access:
+    get:
+      operationId: listAccess
+      tags:
+        - Access
+      summary: List who can open a document
+      description: 'Required document role. Read and change access, general access: owner.'
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: The explicit grants and the general access.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessList'
+              examples:
+                default:
+                  value:
+                    items:
+                      - userId: 7c2e9d41-6a8b-4f03-b5d7-2e4a8c1f9b22
+                        email: daniel@harborpine.example
+                        name: Daniel Okafor
+                        role: editor
+                        createdAt: 2026-10-13T15:30:00Z
+                    generalAccess: none
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: manage-access
+            roles:
+              - owner
+  /api/documents/{documentId}/access/{userId}:
+    put:
+      operationId: setAccess
+      tags:
+        - Access
+      summary: Grant or change a member's role on a document
+      description: |-
+        The person must belong to the workspace, pending members included. Lowering the last explicit owner is a `409 last-owner`. A role change closes the person's open connection so they reconnect in the new mode.
+
+        Required document role. Read and change access, general access: owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetAccessRequest'
+            examples:
+              default:
+                value:
+                  role: editor
+      responses:
+        '200':
+          description: The grant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessEntry'
+              examples:
+                default:
+                  $ref: '#/components/examples/AccessEntry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/LastOwner'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: manage-access
+            roles:
+              - owner
+    delete:
+      operationId: removeAccess
+      tags:
+        - Access
+      summary: Remove a member's explicit grant
+      description: |-
+        The person keeps whatever the general access gives them. Their open connection closes. Removing the last explicit owner is a `409 last-owner`.
+
+        Required document role. Read and change access, general access: owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '204':
+          description: The grant was removed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/LastOwner'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: manage-access
+            roles:
+              - owner
+  /api/documents/{documentId}/general-access:
+    put:
+      operationId: setGeneralAccess
+      tags:
+        - Access
+      summary: Set the general access of a document
+      description: |-
+        Applies to every workspace member without an explicit grant.
+
+        Required document role. Read and change access, general access: owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeneralAccessSetting'
+            examples:
+              default:
+                value:
+                  generalAccess: viewer
+      responses:
+        '200':
+          description: The new setting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneralAccessSetting'
+              examples:
+                default:
+                  value:
+                    generalAccess: viewer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: manage-access
+            roles:
+              - owner
+  /api/documents/{documentId}/threads:
+    get:
+      operationId: listThreads
+      tags:
+        - Comments
+      summary: List the comment threads of a document
+      description: 'Required document role. List and read comments: viewer, commenter, editor, owner.'
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - name: status
+          in: query
+          required: false
+          description: Only threads with this status; both when omitted.
+          schema:
+            $ref: '#/components/schemas/ThreadStatus'
+      responses:
+        '200':
+          description: The threads with their comments, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreadList'
+              examples:
+                default:
+                  value:
+                    items:
+                      - id: d5f7b9c1-3e4a-4c6b-8d8f-5b7d9f1c3e55
+                        documentId: c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44
+                        status: open
+                        anchor:
+                          start: AbL6hNcDAQ==
+                          end: AbL6hNcDCw==
+                        quote: second week of November
+                        createdBy:
+                          id: 7c2e9d41-6a8b-4f03-b5d7-2e4a8c1f9b22
+                          name: Daniel Okafor
+                        createdAt: 2026-10-13T15:30:00Z
+                        resolvedAt: null
+                        resolvedBy: null
+                        comments:
+                          - id: e6a8c0d2-4f5b-4d7c-9e9a-6c8e0a2d4f66
+                            threadId: d5f7b9c1-3e4a-4c6b-8d8f-5b7d9f1c3e55
+                            author:
+                              id: 7c2e9d41-6a8b-4f03-b5d7-2e4a8c1f9b22
+                              name: Daniel Okafor
+                            body: Does the workshop fit before then?
+                            createdAt: 2026-10-13T15:30:00Z
+                            updatedAt: 2026-10-13T15:30:00Z
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: read-comments
+            roles:
+              - viewer
+              - commenter
+              - editor
+              - owner
+    post:
+      operationId: createThread
+      tags:
+        - Comments
+      summary: Start a thread on a range of the document
+      description: 'Required document role. Create thread, reply, resolve, reopen: commenter, editor, owner.'
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateThreadRequest'
+            examples:
+              default:
+                value:
+                  anchor:
+                    start: AbL6hNcDAQ==
+                    end: AbL6hNcDCw==
+                  quote: second week of November
+                  body: Does the workshop fit before then?
+      responses:
+        '201':
+          description: The new thread with its first comment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+              examples:
+                default:
+                  $ref: '#/components/examples/Thread'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: write-comments
+            roles:
+              - commenter
+              - editor
+              - owner
+  /api/threads/{threadId}/replies:
+    post:
+      operationId: replyToThread
+      tags:
+        - Comments
+      summary: Reply to a thread
+      description: 'Required document role. Create thread, reply, resolve, reopen: commenter, editor, owner.'
+      parameters:
+        - $ref: '#/components/parameters/ThreadId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+            examples:
+              default:
+                value:
+                  body: Yes, it runs on the 4th.
+      responses:
+        '201':
+          description: The new comment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+              examples:
+                default:
+                  $ref: '#/components/examples/Comment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: write-comments
+            roles:
+              - commenter
+              - editor
+              - owner
+  /api/threads/{threadId}/resolve:
+    post:
+      operationId: resolveThread
+      tags:
+        - Comments
+      summary: Resolve a thread
+      description: |-
+        Idempotent. An orphaned thread can still be resolved.
+
+        Required document role. Create thread, reply, resolve, reopen: commenter, editor, owner.
+      parameters:
+        - $ref: '#/components/parameters/ThreadId'
+      responses:
+        '200':
+          description: The resolved thread.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+              examples:
+                default:
+                  $ref: '#/components/examples/Thread'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: write-comments
+            roles:
+              - commenter
+              - editor
+              - owner
+  /api/threads/{threadId}/reopen:
+    post:
+      operationId: reopenThread
+      tags:
+        - Comments
+      summary: Reopen a resolved thread
+      description: |-
+        Idempotent.
+
+        Required document role. Create thread, reply, resolve, reopen: commenter, editor, owner.
+      parameters:
+        - $ref: '#/components/parameters/ThreadId'
+      responses:
+        '200':
+          description: The reopened thread.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+              examples:
+                default:
+                  $ref: '#/components/examples/Thread'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: write-comments
+            roles:
+              - commenter
+              - editor
+              - owner
+  /api/comments/{commentId}:
+    patch:
+      operationId: updateComment
+      tags:
+        - Comments
+      summary: Edit a comment
+      description: |-
+        Only the author. Anyone else who can read the thread gets `403 forbidden`.
+
+        Required document role. Edit or delete own comment: commenter, editor, owner (author only).
+      parameters:
+        - $ref: '#/components/parameters/CommentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCommentRequest'
+            examples:
+              default:
+                value:
+                  body: Yes, it runs on the 4th of November.
+      responses:
+        '200':
+          description: The edited comment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+              examples:
+                default:
+                  $ref: '#/components/examples/Comment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: edit-own-comment
+            roles:
+              - commenter
+              - editor
+              - owner
+            condition: author
+    delete:
+      operationId: deleteComment
+      tags:
+        - Comments
+      summary: Delete a comment
+      description: |-
+        The author can delete their own comment; a document owner can delete anyone's. A thread left without comments is deleted with it.
+
+        Required document role. Edit or delete own comment: commenter, editor, owner (author only). Delete another person's comment: owner.
+      parameters:
+        - $ref: '#/components/parameters/CommentId'
+      responses:
+        '204':
+          description: The comment was deleted.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: edit-own-comment
+            roles:
+              - commenter
+              - editor
+              - owner
+            condition: author
+          - row: delete-any-comment
+            roles:
+              - owner
+  /api/documents/{documentId}/versions:
+    get:
+      operationId: listVersions
+      tags:
+        - Versions
+      summary: List the versions of a document
+      description: |-
+        Ordered by `createdAt` descending, then `id` descending.
+
+        Required document role. List and preview versions: viewer, commenter, editor, owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of versions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionPage'
+              examples:
+                default:
+                  value:
+                    items:
+                      - id: 08c0e2f4-6b7d-4f9e-9abc-8e0a2c4f6b88
+                        documentId: c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44
+                        kind: manual
+                        label: Before the workshop edits
+                        createdBy:
+                          id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
+                          name: Marta Ruiz
+                        createdAt: 2026-10-13T15:30:00Z
+                        sizeBytes: 2048
+                    nextCursor: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: read-versions
+            roles:
+              - viewer
+              - commenter
+              - editor
+              - owner
+    post:
+      operationId: createVersion
+      tags:
+        - Versions
+      summary: Save a named version
+      description: |-
+        Captures the live document as a `manual` version. The body may be omitted.
+
+        Required document role. Create a version (manual): editor, owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVersionRequest'
+            examples:
+              default:
+                value:
+                  label: Before the workshop edits
+      responses:
+        '201':
+          description: The new version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Version'
+              examples:
+                default:
+                  $ref: '#/components/examples/Version'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: create-version
+            roles:
+              - editor
+              - owner
+  /api/versions/{versionId}/content:
+    get:
+      operationId: getVersionContent
+      tags:
+        - Versions
+      summary: Download a version's content
+      description: |-
+        The bytes are a Yjs update. The client loads them into a fresh `Y.Doc` to preview; nothing touches the live document.
+
+        Required document role. List and preview versions: viewer, commenter, editor, owner.
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      responses:
+        '200':
+          description: The version's Yjs update.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: read-versions
+            roles:
+              - viewer
+              - commenter
+              - editor
+              - owner
+  /api/versions/{versionId}/restore:
+    post:
+      operationId: restoreVersion
+      tags:
+        - Versions
+      summary: Restore a version
+      description: |-
+        Saves a `pre-restore` version of the current state, replaces the live content in one transaction and saves a `restore` version. Edits made meanwhile merge on top; none is dropped silently.
+
+        Required document role. Restore a version: owner.
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      responses:
+        '200':
+          description: The `restore` version the operation created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Version'
+              examples:
+                default:
+                  value:
+                    id: 08c0e2f4-6b7d-4f9e-9abc-8e0a2c4f6b88
+                    documentId: c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44
+                    kind: restore
+                    label: null
+                    createdBy:
+                      id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
+                      name: Marta Ruiz
+                    createdAt: 2026-10-13T15:30:00Z
+                    sizeBytes: 2048
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: restore-version
+            roles:
+              - owner
+  /api/workspaces/{workspaceId}/activity:
+    get:
+      operationId: listWorkspaceActivity
+      tags:
+        - Activity
+      summary: List the workspace history
+      description: |-
+        Only events of documents the caller can read at the time of the request. Ordered by `createdAt` descending, then `id` descending.
+
+        Required workspace role. Read the workspace, its members, folders and lists: member, owner.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: documentId
+          in: query
+          required: false
+          description: Only events of this document.
+          schema:
+            $ref: '#/components/schemas/Id'
+        - name: actorId
+          in: query
+          required: false
+          description: Only events by this person.
+          schema:
+            $ref: '#/components/schemas/Id'
+        - name: from
+          in: query
+          required: false
+          description: Only events at or after this instant.
+          schema:
+            $ref: '#/components/schemas/Timestamp'
+        - name: to
+          in: query
+          required: false
+          description: Only events before this instant.
+          schema:
+            $ref: '#/components/schemas/Timestamp'
+      responses:
+        '200':
+          description: A page of events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityPage'
+              examples:
+                default:
+                  value:
+                    items:
+                      - id: 19d1f3a5-7c8e-4a0f-8bcd-9f1b3d5a7c99
+                        type: access.granted
+                        createdAt: 2026-10-13T15:30:00Z
+                        actor:
+                          id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
+                          name: Marta Ruiz
+                        document:
+                          id: c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44
+                          title: Autumn launch plan
+                        targetUser:
+                          id: 7c2e9d41-6a8b-4f03-b5d7-2e4a8c1f9b22
+                          name: Daniel Okafor
+                    nextCursor: eyJ0IjoiMjAyNi0xMC0xM1QxNTozMDowMFoiLCJpIjoiYzRlNmE4YjAifQ
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: workspace
+        rules:
+          - row: workspace-read
+            roles:
+              - member
+              - owner
+  /api/documents/{documentId}/activity:
+    get:
+      operationId: listDocumentActivity
+      tags:
+        - Activity
+      summary: List the activity of a document
+      description: |-
+        Ordered by `createdAt` descending, then `id` descending.
+
+        Required document role. Read metadata and content: viewer, commenter, editor, owner.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityPage'
+              examples:
+                default:
+                  value:
+                    items:
+                      - id: 19d1f3a5-7c8e-4a0f-8bcd-9f1b3d5a7c99
+                        type: access.granted
+                        createdAt: 2026-10-13T15:30:00Z
+                        actor:
+                          id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
+                          name: Marta Ruiz
+                        document:
+                          id: c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44
+                          title: Autumn launch plan
+                        targetUser:
+                          id: 7c2e9d41-6a8b-4f03-b5d7-2e4a8c1f9b22
+                          name: Daniel Okafor
+                    nextCursor: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: read
+            roles:
+              - viewer
+              - commenter
+              - editor
+              - owner
+  /api/templates:
+    get:
+      operationId: listTemplates
+      tags:
+        - Templates
+      summary: List the built-in templates
+      description: |-
+        Names and descriptions come back in the requested language: templates are product content, not user content.
+
+        Any signed-in person.
+      parameters:
+        - name: locale
+          in: query
+          required: false
+          description: The language of the template names and descriptions.
+          schema:
+            type: string
+            enum:
+              - en
+              - es
+            default: en
+      responses:
+        '200':
+          description: The templates.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateList'
+              examples:
+                default:
+                  value:
+                    items:
+                      - id: meeting-notes
+                        name: Meeting notes
+                        description: Agenda, decisions and follow-ups for a team meeting.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+      x-draftroom-roles:
+        scope: session
+  /api/health/live:
+    get:
+      operationId: getLiveness
+      tags:
+        - Health
+      summary: Check that the process is up
+      description: No sign-in needed.
+      responses:
+        '200':
+          description: The process answers.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiveStatus'
+              examples:
+                default:
+                  value:
+                    status: ok
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security: []
+      x-draftroom-roles:
+        scope: public
+  /api/health/ready:
+    get:
+      operationId: getReadiness
+      tags:
+        - Health
+      summary: Check that the server can serve requests
+      description: |-
+        Succeeds when the database is reachable and the migrations are current. Otherwise `503 unavailable`.
+
+        No sign-in needed.
+      responses:
+        '200':
+          description: The server is ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyStatus'
+              examples:
+                default:
+                  value:
+                    status: ok
+                    database: up
+                    migrations: current
+        '503':
+          $ref: '#/components/responses/Unavailable'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security: []
+      x-draftroom-roles:
+        scope: public
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: dr_session
+      description: The server-side session, set at sign-in or sign-up. HttpOnly.
+    csrf:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Echo of the `dr_csrf` cookie (double submit). Required on every method that changes state.
+  parameters:
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Id'
+    FolderId:
+      name: folderId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Id'
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Id'
+    ThreadId:
+      name: threadId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Id'
+    CommentId:
+      name: commentId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Id'
+    VersionId:
+      name: versionId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Id'
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Id'
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Where the previous page ended.
+      schema:
+        $ref: '#/components/schemas/Cursor'
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: The most items to return.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+  schemas:
+    Id:
+      type: string
+      format: uuid
+    NullableId:
+      type:
+        - string
+        - 'null'
+      format: uuid
+    Timestamp:
+      type: string
+      format: date-time
+    NullableTimestamp:
+      type:
+        - string
+        - 'null'
+      format: date-time
+    Email:
+      type: string
+      format: email
+      maxLength: 254
+    PersonName:
+      type: string
+      minLength: 1
+      maxLength: 80
+    Password:
+      type: string
+      minLength: 12
+      maxLength: 128
+    WorkspaceName:
+      type: string
+      minLength: 1
+      maxLength: 80
+    FolderName:
+      type: string
+      minLength: 1
+      maxLength: 80
+    DocumentTitle:
+      type: string
+      minLength: 1
+      maxLength: 200
+    CommentBody:
+      type: string
+      minLength: 1
+      maxLength: 5000
+    Quote:
+      type: string
+      minLength: 1
+      maxLength: 500
+      description: The selected text the thread was anchored to, kept so an orphaned thread still shows what it was about.
+    VersionLabel:
+      type: string
+      minLength: 1
+      maxLength: 100
+    Revision:
+      type: integer
+      minimum: 1
+      description: Starts at 1 and grows by one with every change to the resource's metadata.
+    Cursor:
+      type: string
+      minLength: 1
+      maxLength: 512
+      pattern: ^[A-Za-z0-9_-]+$
+      description: Opaque. Clients pass back exactly what `nextCursor` returned.
+    NextCursor:
+      type:
+        - string
+        - 'null'
+      minLength: 1
+      maxLength: 512
+      pattern: ^[A-Za-z0-9_-]+$
+      description: Pass it as `cursor` to read the next page; `null` when this was the last page.
+    WorkspaceRole:
+      type: string
+      enum:
+        - owner
+        - member
+    DocumentRole:
+      type: string
+      enum:
+        - viewer
+        - commenter
+        - editor
+        - owner
+    GeneralAccess:
+      type: string
+      enum:
+        - none
+        - viewer
+        - commenter
+        - editor
+      description: The role every workspace member has on a document without an explicit grant.
+    MemberStatus:
+      type: string
+      enum:
+        - pending
+        - active
+      description: A member added by email is `pending` until that email signs up.
+    ThreadStatus:
+      type: string
+      enum:
+        - open
+        - resolved
+    VersionKind:
+      type: string
+      enum:
+        - auto
+        - manual
+        - pre-restore
+        - restore
+    ActivityType:
+      type: string
+      enum:
+        - document.created
+        - document.renamed
+        - document.moved
+        - document.archived
+        - document.restored
+        - access.granted
+        - access.changed
+        - access.revoked
+        - general-access.changed
+        - thread.created
+        - thread.replied
+        - thread.resolved
+        - thread.reopened
+        - version.created
+        - version.restored
+    ErrorCode:
+      type: string
+      enum:
+        - validation-failed
+        - not-found
+        - forbidden
+        - unauthenticated
+        - csrf
+        - revision-conflict
+        - last-owner
+        - rate-limited
+        - too-large
+        - conflict
+        - internal-error
+        - unavailable
+      description: Stable, machine-readable. Clients map it to a message in the person's language; the server never sends translated text.
+    FieldErrorCode:
+      type: string
+      enum:
+        - required
+        - too-short
+        - too-long
+        - invalid-format
+        - invalid-value
+        - unknown-field
+    FieldError:
+      type: object
+      description: One invalid field of a request. Carries a code, never a message.
+      additionalProperties: false
+      required:
+        - pointer
+        - code
+      properties:
+        pointer:
+          type: string
+          pattern: ^/
+          description: A JSON Pointer into the request body (`/title`), or `/query/<name>` or `/path/<name>` for parameters.
+        code:
+          $ref: '#/components/schemas/FieldErrorCode'
+    Problem:
+      type: object
+      description: An RFC 9457 problem. `errors` lists the invalid fields of a `validation-failed` or `too-large` response.
+      additionalProperties: false
+      required:
+        - type
+        - title
+        - status
+        - code
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    DocumentRevisionConflict:
+      type: object
+      description: 'Returned when `revision` no longer matches: `current` is the document as the server holds it, so the client can reconcile and retry.'
+      additionalProperties: false
+      required:
+        - type
+        - title
+        - status
+        - code
+        - current
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          const: 409
+        code:
+          type: string
+          const: revision-conflict
+        current:
+          $ref: '#/components/schemas/Document'
+    FolderRevisionConflict:
+      type: object
+      description: 'Returned when `revision` no longer matches: `current` is the folder as the server holds it, so the client can reconcile and retry.'
+      additionalProperties: false
+      required:
+        - type
+        - title
+        - status
+        - code
+        - current
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          const: 409
+        code:
+          type: string
+          const: revision-conflict
+        current:
+          $ref: '#/components/schemas/Folder'
+    User:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - email
+        - name
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        email:
+          $ref: '#/components/schemas/Email'
+        name:
+          $ref: '#/components/schemas/PersonName'
+    UserRef:
+      type: object
+      description: Enough of a person to label them.
+      additionalProperties: false
+      required:
+        - id
+        - name
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          $ref: '#/components/schemas/PersonName'
+    Workspace:
+      type: object
+      description: "`role` is the caller's role in the workspace."
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - role
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          $ref: '#/components/schemas/WorkspaceName'
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+    Member:
+      type: object
+      description: 'A pending member already has a `userId`: the account created at sign-up keeps it.'
+      additionalProperties: false
+      required:
+        - userId
+        - email
+        - name
+        - role
+        - status
+        - createdAt
+      properties:
+        userId:
+          $ref: '#/components/schemas/Id'
+        email:
+          $ref: '#/components/schemas/Email'
+        name:
+          type:
+            - string
+            - 'null'
+          minLength: 1
+          maxLength: 80
+          description: '`null` while the member is pending.'
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+        status:
+          $ref: '#/components/schemas/MemberStatus'
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+    Folder:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - workspaceId
+        - name
+        - revision
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        workspaceId:
+          $ref: '#/components/schemas/Id'
+        name:
+          $ref: '#/components/schemas/FolderName'
+        revision:
+          $ref: '#/components/schemas/Revision'
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+        updatedAt:
+          $ref: '#/components/schemas/Timestamp'
+    Document:
+      type: object
+      description: 'Metadata only: the content is a Yjs document that travels over the collaboration connection, never over REST.'
+      additionalProperties: false
+      required:
+        - id
+        - workspaceId
+        - folderId
+        - title
+        - excerpt
+        - revision
+        - role
+        - generalAccess
+        - pinned
+        - createdBy
+        - createdAt
+        - updatedAt
+        - archivedAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        workspaceId:
+          $ref: '#/components/schemas/Id'
+        folderId:
+          $ref: '#/components/schemas/NullableId'
+        title:
+          $ref: '#/components/schemas/DocumentTitle'
+        excerpt:
+          type:
+            - string
+            - 'null'
+          maxLength: 300
+          description: The start of the first paragraph, or `null` for an empty document.
+        revision:
+          $ref: '#/components/schemas/Revision'
+        role:
+          $ref: '#/components/schemas/DocumentRole'
+          description: The caller's effective role on this document.
+        generalAccess:
+          $ref: '#/components/schemas/GeneralAccess'
+        pinned:
+          type: boolean
+          description: Whether the caller pinned it.
+        createdBy:
+          $ref: '#/components/schemas/UserRef'
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+        updatedAt:
+          $ref: '#/components/schemas/Timestamp'
+        archivedAt:
+          $ref: '#/components/schemas/NullableTimestamp'
+    DocumentRef:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        title:
+          $ref: '#/components/schemas/DocumentTitle'
+    Template:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - description
+      properties:
+        id:
+          type: string
+          pattern: ^[a-z0-9-]{1,64}$
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 300
+    AccessEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - email
+        - name
+        - role
+        - createdAt
+      properties:
+        userId:
+          $ref: '#/components/schemas/Id'
+        email:
+          $ref: '#/components/schemas/Email'
+        name:
+          type:
+            - string
+            - 'null'
+          minLength: 1
+          maxLength: 80
+        role:
+          $ref: '#/components/schemas/DocumentRole'
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+    AccessList:
+      type: object
+      description: The explicit grants and the general access, together, so the sharing panel loads in one request. Workspace owners hold an implicit `owner` role and are not listed.
+      additionalProperties: false
+      required:
+        - items
+        - generalAccess
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessEntry'
+        generalAccess:
+          $ref: '#/components/schemas/GeneralAccess'
+    GeneralAccessSetting:
+      type: object
+      additionalProperties: false
+      required:
+        - generalAccess
+      properties:
+        generalAccess:
+          $ref: '#/components/schemas/GeneralAccess'
+    Anchor:
+      type: object
+      description: The server stores both ends as given and never decodes them.
+      additionalProperties: false
+      required:
+        - start
+        - end
+      properties:
+        start:
+          type: string
+          pattern: ^[A-Za-z0-9+/]+={0,2}$
+          maxLength: 256
+          description: Base64 `Y.encodeRelativePosition` with `assoc = 0`.
+        end:
+          type: string
+          pattern: ^[A-Za-z0-9+/]+={0,2}$
+          maxLength: 256
+          description: Base64 `Y.encodeRelativePosition` with `assoc = -1`.
+    Comment:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - threadId
+        - author
+        - body
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        threadId:
+          $ref: '#/components/schemas/Id'
+        author:
+          $ref: '#/components/schemas/UserRef'
+        body:
+          $ref: '#/components/schemas/CommentBody'
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+        updatedAt:
+          $ref: '#/components/schemas/Timestamp'
+    Thread:
+      type: object
+      description: Whether a thread is orphaned is decided by the client when it resolves the anchor; the server has no such state.
+      additionalProperties: false
+      required:
+        - id
+        - documentId
+        - status
+        - anchor
+        - quote
+        - createdBy
+        - createdAt
+        - resolvedAt
+        - resolvedBy
+        - comments
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        documentId:
+          $ref: '#/components/schemas/Id'
+        status:
+          $ref: '#/components/schemas/ThreadStatus'
+        anchor:
+          $ref: '#/components/schemas/Anchor'
+        quote:
+          $ref: '#/components/schemas/Quote'
+        createdBy:
+          $ref: '#/components/schemas/UserRef'
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+        resolvedAt:
+          $ref: '#/components/schemas/NullableTimestamp'
+        resolvedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+          description: Oldest first.
+    Version:
+      type: object
+      description: '`createdBy` is `null` for versions the server created on its own.'
+      additionalProperties: false
+      required:
+        - id
+        - documentId
+        - kind
+        - label
+        - createdBy
+        - createdAt
+        - sizeBytes
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        documentId:
+          $ref: '#/components/schemas/Id'
+        kind:
+          $ref: '#/components/schemas/VersionKind'
+        label:
+          type:
+            - string
+            - 'null'
+          minLength: 1
+          maxLength: 100
+        createdBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+        sizeBytes:
+          type: integer
+          minimum: 0
+    ActivityEvent:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - type
+        - createdAt
+        - actor
+        - document
+        - targetUser
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        type:
+          $ref: '#/components/schemas/ActivityType'
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+        actor:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+        document:
+          $ref: '#/components/schemas/DocumentRef'
+        targetUser:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          description: The person an access change is about.
+    LiveStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+    ReadyStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - database
+        - migrations
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+        database:
+          type: string
+          enum:
+            - up
+        migrations:
+          type: string
+          enum:
+            - current
+    SignUpRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        password:
+          $ref: '#/components/schemas/Password'
+        name:
+          $ref: '#/components/schemas/PersonName'
+    SignInRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+    UpdateWorkspaceRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          $ref: '#/components/schemas/WorkspaceName'
+    AddMemberRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - role
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+    UpdateMemberRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - role
+      properties:
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+    CreateFolderRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          $ref: '#/components/schemas/FolderName'
+    UpdateFolderRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - revision
+      properties:
+        name:
+          $ref: '#/components/schemas/FolderName'
+        revision:
+          $ref: '#/components/schemas/Revision'
+    CreateDocumentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+      properties:
+        title:
+          $ref: '#/components/schemas/DocumentTitle'
+        folderId:
+          $ref: '#/components/schemas/NullableId'
+        templateId:
+          type: string
+          pattern: ^[a-z0-9-]{1,64}$
+    UpdateDocumentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - revision
+      minProperties: 2
+      properties:
+        title:
+          $ref: '#/components/schemas/DocumentTitle'
+        folderId:
+          $ref: '#/components/schemas/NullableId'
+        revision:
+          $ref: '#/components/schemas/Revision'
+    SetAccessRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - role
+      properties:
+        role:
+          $ref: '#/components/schemas/DocumentRole'
+    CreateThreadRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - anchor
+        - quote
+        - body
+      properties:
+        anchor:
+          $ref: '#/components/schemas/Anchor'
+        quote:
+          $ref: '#/components/schemas/Quote'
+        body:
+          $ref: '#/components/schemas/CommentBody'
+    CreateCommentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - body
+      properties:
+        body:
+          $ref: '#/components/schemas/CommentBody'
+    UpdateCommentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - body
+      properties:
+        body:
+          $ref: '#/components/schemas/CommentBody'
+    CreateVersionRequest:
+      type: object
+      additionalProperties: false
+      required: []
+      properties:
+        label:
+          $ref: '#/components/schemas/VersionLabel'
+    WorkspaceList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Workspace'
+    MemberList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Member'
+    FolderList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Folder'
+    DocumentList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+    ThreadList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Thread'
+    TemplateList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Template'
+    DocumentPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+        nextCursor:
+          $ref: '#/components/schemas/NextCursor'
+    VersionPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Version'
+        nextCursor:
+          $ref: '#/components/schemas/NextCursor'
+    ActivityPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivityEvent'
+        nextCursor:
+          $ref: '#/components/schemas/NextCursor'
+  responses:
+    BadRequest:
+      description: The request is malformed or breaks a rule of the contract. `errors` says which fields.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation-failed:
+              value:
+                type: /problems/validation-failed
+                title: The request is not valid.
+                status: 400
+                code: validation-failed
+                errors:
+                  - pointer: /title
+                    code: required
+    Unauthenticated:
+      description: There is no valid session, or the credentials are wrong.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            unauthenticated:
+              value:
+                type: /problems/unauthenticated
+                title: Authentication is required.
+                status: 401
+                code: unauthenticated
+    Forbidden:
+      description: The caller can see the resource but may not do this (`forbidden`), or the `X-CSRF-Token` header is missing or wrong (`csrf`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            forbidden:
+              value:
+                type: /problems/forbidden
+                title: This role cannot do that.
+                status: 403
+                code: forbidden
+            csrf:
+              value:
+                type: /problems/csrf
+                title: The CSRF token is missing or wrong.
+                status: 403
+                code: csrf
+    NotFound:
+      description: There is no such resource, or the caller cannot read it. The two are indistinguishable on purpose.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            not-found:
+              value:
+                type: /problems/not-found
+                title: Not found.
+                status: 404
+                code: not-found
+    Conflict:
+      description: The request conflicts with the current state of the resource.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            conflict:
+              value:
+                type: /problems/conflict
+                title: The request conflicts with the current state.
+                status: 409
+                code: conflict
+    LastOwner:
+      description: A workspace or a document always keeps at least one owner.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            last-owner:
+              value:
+                type: /problems/last-owner
+                title: The last owner cannot be removed or demoted.
+                status: 409
+                code: last-owner
+    DocumentStale:
+      description: The `revision` sent is stale.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/DocumentRevisionConflict'
+          examples:
+            revision-conflict:
+              value:
+                type: /problems/revision-conflict
+                title: The document changed since it was read.
+                status: 409
+                code: revision-conflict
+                current:
+                  id: c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44
+                  workspaceId: 0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01
+                  folderId: a3d5c7e9-1b2f-4a6c-8d0e-3f5a7c9e1b33
+                  title: Autumn launch plan
+                  excerpt: The launch moves to the second week of November so the workshop can run first.
+                  revision: 3
+                  role: owner
+                  generalAccess: none
+                  pinned: true
+                  createdBy:
+                    id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
+                    name: Marta Ruiz
+                  createdAt: 2026-10-13T14:00:00Z
+                  updatedAt: 2026-10-13T15:30:00Z
+                  archivedAt: null
+    FolderStale:
+      description: The `revision` sent is stale.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/FolderRevisionConflict'
+          examples:
+            revision-conflict:
+              value:
+                type: /problems/revision-conflict
+                title: The folder changed since it was read.
+                status: 409
+                code: revision-conflict
+                current:
+                  id: a3d5c7e9-1b2f-4a6c-8d0e-3f5a7c9e1b33
+                  workspaceId: 0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01
+                  name: Launch
+                  revision: 2
+                  createdAt: 2026-10-13T14:00:00Z
+                  updatedAt: 2026-10-13T15:30:00Z
+    TooLarge:
+      description: A value is longer than its limit, or the body is bigger than the server accepts. A value below its minimum is a `400 validation-failed` instead.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            too-large:
+              value:
+                type: /problems/too-large
+                title: A value exceeds its limit.
+                status: 413
+                code: too-large
+                errors:
+                  - pointer: /title
+                    code: too-long
+    RateLimited:
+      description: Too many attempts. Retry after the delay in `Retry-After`.
+      headers:
+        Retry-After:
+          description: Seconds to wait.
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            rate-limited:
+              value:
+                type: /problems/rate-limited
+                title: Too many requests.
+                status: 429
+                code: rate-limited
+    Unavailable:
+      description: The database is unreachable or the migrations are not current.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            unavailable:
+              value:
+                type: /problems/unavailable
+                title: The server is not ready.
+                status: 503
+                code: unavailable
+    Unexpected:
+      description: Any other failure. Unhandled errors are `internal-error`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            internal-error:
+              value:
+                type: /problems/internal-error
+                title: Something went wrong.
+                status: 500
+                code: internal-error
+  examples:
+    User:
+      summary: A person
+      value:
+        id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
+        email: marta@harborpine.example
+        name: Marta Ruiz
+    Workspace:
+      summary: A workspace the caller owns
+      value:
+        id: 0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01
+        name: Harbor & Pine
+        role: owner
+        createdAt: 2026-10-13T14:00:00Z
+    Member:
+      summary: An active member
+      value:
+        userId: 7c2e9d41-6a8b-4f03-b5d7-2e4a8c1f9b22
+        email: daniel@harborpine.example
+        name: Daniel Okafor
+        role: member
+        status: active
+        createdAt: 2026-10-13T14:00:00Z
+    PendingMember:
+      summary: A member added by email who has not signed up yet
+      value:
+        userId: 2a4c6e8f-1b3d-4f5a-8c7e-9b1d3f5a7c44
+        email: lucia@harborpine.example
+        name: null
+        role: member
+        status: pending
+        createdAt: 2026-10-13T15:30:00Z
+    Folder:
+      summary: A folder
+      value:
+        id: a3d5c7e9-1b2f-4a6c-8d0e-3f5a7c9e1b33
+        workspaceId: 0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01
+        name: Launch
+        revision: 2
+        createdAt: 2026-10-13T14:00:00Z
+        updatedAt: 2026-10-13T15:30:00Z
+    Document:
+      summary: A pinned document the caller owns
+      value:
+        id: c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44
+        workspaceId: 0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01
+        folderId: a3d5c7e9-1b2f-4a6c-8d0e-3f5a7c9e1b33
+        title: Autumn launch plan
+        excerpt: The launch moves to the second week of November so the workshop can run first.
+        revision: 3
+        role: owner
+        generalAccess: none
+        pinned: true
+        createdBy:
+          id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
+          name: Marta Ruiz
+        createdAt: 2026-10-13T14:00:00Z
+        updatedAt: 2026-10-13T15:30:00Z
+        archivedAt: null
+    AccessEntry:
+      summary: An editor grant
+      value:
+        userId: 7c2e9d41-6a8b-4f03-b5d7-2e4a8c1f9b22
+        email: daniel@harborpine.example
+        name: Daniel Okafor
+        role: editor
+        createdAt: 2026-10-13T15:30:00Z
+    Thread:
+      summary: An open thread with one comment
+      value:
+        id: d5f7b9c1-3e4a-4c6b-8d8f-5b7d9f1c3e55
+        documentId: c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44
+        status: open
+        anchor:
+          start: AbL6hNcDAQ==
+          end: AbL6hNcDCw==
+        quote: second week of November
+        createdBy:
+          id: 7c2e9d41-6a8b-4f03-b5d7-2e4a8c1f9b22
+          name: Daniel Okafor
+        createdAt: 2026-10-13T15:30:00Z
+        resolvedAt: null
+        resolvedBy: null
+        comments:
+          - id: e6a8c0d2-4f5b-4d7c-9e9a-6c8e0a2d4f66
+            threadId: d5f7b9c1-3e4a-4c6b-8d8f-5b7d9f1c3e55
+            author:
+              id: 7c2e9d41-6a8b-4f03-b5d7-2e4a8c1f9b22
+              name: Daniel Okafor
+            body: Does the workshop fit before then?
+            createdAt: 2026-10-13T15:30:00Z
+            updatedAt: 2026-10-13T15:30:00Z
+    Comment:
+      summary: A reply
+      value:
+        id: f7b9d1e3-5a6c-4e8d-8fab-7d9f1b3e5a77
+        threadId: d5f7b9c1-3e4a-4c6b-8d8f-5b7d9f1c3e55
+        author:
+          id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
+          name: Marta Ruiz
+        body: Yes, it runs on the 4th.
+        createdAt: 2026-10-13T15:30:00Z
+        updatedAt: 2026-10-13T15:30:00Z
+    Version:
+      summary: A manual version
+      value:
+        id: 08c0e2f4-6b7d-4f9e-9abc-8e0a2c4f6b88
+        documentId: c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44
+        kind: manual
+        label: Before the workshop edits
+        createdBy:
+          id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
+          name: Marta Ruiz
+        createdAt: 2026-10-13T15:30:00Z
+        sizeBytes: 2048

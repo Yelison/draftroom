@@ -1,0 +1,14 @@
+# Lint configuration for openapi.yaml. Run it through `npm run api:lint`.
+extends:
+  - recommended
+
+rules:
+  # The health probes have no client error to report. The contract tests check the 4xx responses of every other
+  # operation instead.
+  operation-4xx-response: off
+  # Every error is an RFC 9457 problem document (plan §4.1).
+  operation-4xx-problem-details-rfc7807: error
+  # Examples are part of the contract: they must validate against their schemas.
+  no-invalid-media-type-examples: error
+  no-invalid-schema-examples: error
+  no-invalid-parameter-examples: error
