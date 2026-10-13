@@ -42,7 +42,7 @@ These are the inputs no single task's happy path exercises and the ones most lik
 2. **A viewer or commenter sends a hand-crafted Yjs update over the WebSocket**: the server rejects it, does not apply, persist or broadcast it, and other clients never see it. Pinned in T2.1 (raw WebSocket client test) and T4.1 (access matrix over WebSocket).
 3. **The commented text is deleted or rewritten by another user**: the thread shows as orphaned with its original quote, no highlight lands on unrelated text, and replying or resolving still works. Pinned in T3.2 (anchor resolution unit tests with remote deletions) and T3.1 (server keeps the thread).
 4. **Access is revoked while the person has the document open with unsynced offline edits**: the live connection closes, the local edits are not uploaded later, the offline copy is purged, and the screen says access was removed. Pinned in T4.1 (connection close on revoke) and T2.3 (no upload after a failed re-authentication).
-5. **The owner restores a version while others are editing**: the result is defined (the restore is one transaction on the live document, edits after it apply on top), a pre-restore version is created automatically, and nothing is silently lost. Pinned in T5.1 (concurrent restore integration test).
+5. **The owner restores a version while others are editing**: the result is defined (the restore is one transaction on the live document, edits after it apply on top) and a pre-restore version keeps everything stored before it. Edits in flight inside the replaced content are lost, as with any concurrent deletion; the protocol (§11.4) states the bound and the restore replaces by diff to keep it minimal. Pinned in T5.1 (concurrent restore integration test).
 
 ---
 
@@ -208,6 +208,8 @@ Versions: `npm view <package> version dist-tags engines peerDependencies license
 
 ## 4. Contracts
 
+> **Normative source:** the merged REST contract (`packages/contract/openapi.yaml`, `docs/api/README.md`, ADR 0005) refines this section after its independent review: access settings and access events are visible only to owners; `createDocument` takes a `locale` with `templateId`; a document always keeps an explicit owner grant and `removeMember` transfers sole-owner grants to the acting workspace owner; folders are renamed by any member and deleted by workspace owners; checks run in a fixed order; cursors are bound to their filters. Where this section and the contract differ, the contract wins.
+
 ### 4.1 REST API (owner: T0.2; file `packages/contract/openapi.yaml`)
 
 Base path `/api`. Cookie session. Unsafe methods require `X-CSRF-Token`. Every 4xx/5xx is `application/problem+json` with `type`, `title`, `status`, `code` and optional `errors[]` for validation.
@@ -273,6 +275,8 @@ Workspace roles: `owner`, `member`. Document roles: `viewer`, `commenter`, `edit
 Workspace operations: members list (any member); add, change role or remove members, rename the workspace (owner); a workspace and a document always keep at least one owner (`409 last-owner`). Creating documents and folders: any member.
 
 ## 5. Collaboration and CRDT
+
+> **Normative source:** `docs/collab/protocol.md` (with ADRs 0006 and 0007) supersedes the details below after its independent review against the published code of Hocuspocus 4.7.1 and Yjs 13.6.33: `stored` carries a Yjs snapshot (state vector and delete set), not a state vector; one WebSocket per document, closed by the server with its code; messages above 2 MiB close with 1009 and only documents above 5 MiB use 4413, refusing just the updates that add content; a failed store is retried and the document is never unloaded while a store is unconfirmed; anchors start at `from + 1` with `assoc = 0` and end with `assoc = -1`; the client owns its reconnect back-off. Where this section and the protocol differ, the protocol wins.
 
 ### 5.1 Connection protocol (owner: T0.3; file `docs/collab/protocol.md`, schemas in `packages/contract/src/collab.ts`)
 
@@ -424,7 +428,7 @@ Every task is expanded into a self-contained brief (files, interfaces, tests, ac
 **Objective:** Hocuspocus 4.7.1 per §5.1–§5.3: authentication from the session, read-only by role, persistence in `document_states`, durable `stored` acknowledgement, awareness guard, limits, close codes, graceful shutdown that stores pending documents.
 **Dependencies:** T0.3, T1.1. **Files:** `src/collab/{server.ts,authenticate.ts,persistence.ts,durableAck.ts,awarenessGuard.ts,limits.ts}`, `test/collab/*.test.ts` (raw `ws` client and `HocuspocusProvider` client in Node).
 **Dependencies added:** `@hocuspocus/server` 4.7.1, `@hocuspocus/provider` 4.7.1 (tests), `ws`.
-**Tests:** no cookie or no access → rejected before any document data is sent; viewer and commenter connections are read-only (`authorizedScope === 'readonly'`) and a raw update they send is neither applied, persisted nor broadcast; an editor's update is stored and followed by a `stored` event whose state vector covers it; server restart loads the stored binary state (no JSON path exists); spoofed awareness `user.id` is dropped; oversize message closes with `4413`.
+**Tests:** no cookie or no access → rejected before any document data is sent; viewer and commenter connections are read-only (`authorizedScope === 'readonly'`) and a raw update they send is neither applied, persisted nor broadcast; an editor's update is stored and followed by a `stored` event whose state vector covers it; server restart loads the stored binary state (no JSON path exists); spoofed awareness `user.id` is dropped; message above 2 MiB closes with `1009`; a document above 5 MiB refuses updates that add content with `4413` and stays readable.
 **Acceptance:** the field used for read-only is asserted by behaviour, not by name.
 
 #### T2.2 · Client collaboration and sync states (L, high, lane B)
