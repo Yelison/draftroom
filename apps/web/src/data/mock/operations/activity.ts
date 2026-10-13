@@ -5,6 +5,7 @@ import { caller, documentOf, workspaceOf, type Context } from '../guards.ts'
 import { paginate, readPage } from '../pagination.ts'
 import { invalid } from '../problems.ts'
 import { documentRole } from '../roles.ts'
+import { isDateTime } from '../text.ts'
 import { activityView } from '../views.ts'
 
 type ActivityOperations = Pick<DataSource, 'listWorkspaceActivity' | 'listDocumentActivity'>
@@ -14,8 +15,6 @@ const newestFirst = {
   id: (row: ActivityRecord) => row.id,
   direction: 'desc',
 } as const
-
-const isInstant = (value: string) => !Number.isNaN(Date.parse(value))
 
 export function activityOperations(ctx: Context): ActivityOperations {
   const { world } = ctx
@@ -39,7 +38,7 @@ export function activityOperations(ctx: Context): ActivityOperations {
       const user = caller(ctx)
       for (const name of ['from', 'to'] as const) {
         const value = query[name]
-        if (value !== undefined && !isInstant(value))
+        if (value !== undefined && !isDateTime(value))
           throw invalid({ pointer: `/query/${name}`, code: 'invalid-format' })
       }
       const { documentId, actorId, from, to } = query

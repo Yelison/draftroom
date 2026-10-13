@@ -117,8 +117,10 @@ export function threadOperations(ctx: Context): ThreadOperations {
     updateComment: async ({ params: { path }, body }) => {
       const user = caller(ctx)
       checkTexts(['/body', body.body, textLimits.commentBody])
-      const { thread, comment } = commentOf(path.commentId)
-      // Only the author edits; anyone else who can read the thread is refused, not told it is missing.
+      const { thread, comment, role } = commentOf(path.commentId)
+      // Writing comments needs a role that allows it, even for the author of one written when theirs was higher; and
+      // only the author edits: anyone else who can read the thread is refused, not told it is missing.
+      requireRole(role, 'commenter')
       if (comment.authorId !== user.id) throw forbidden()
       comment.body = body.body
       comment.updatedAt = world.now()
@@ -128,6 +130,7 @@ export function threadOperations(ctx: Context): ThreadOperations {
     deleteComment: async ({ params: { path } }) => {
       const user = caller(ctx)
       const { thread, comment, role } = commentOf(path.commentId)
+      requireRole(role, 'commenter')
       if (comment.authorId !== user.id) requireRole(role, 'owner')
       thread.comments.splice(thread.comments.indexOf(comment), 1)
       // A thread left without comments goes with it.

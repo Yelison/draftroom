@@ -36,3 +36,10 @@ export function checkParameterText(pointer: string, value: string, { min, max }:
   if (length > max) throw invalid({ pointer, code: 'too-long' })
   if (length < min) throw invalid({ pointer, code: 'too-short' })
 }
+
+/** An RFC 3339 `date-time`, the format of the contract's `Timestamp`: `Date.parse` alone also takes `2026` or `October 13, 2026`. */
+export function isDateTime(value: string): boolean {
+  return (
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/i.test(value) && !Number.isNaN(Date.parse(value))
+  )
+}

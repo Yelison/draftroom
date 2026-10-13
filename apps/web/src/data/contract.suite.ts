@@ -2,6 +2,7 @@ import type { ErrorCode, Schema } from '@draftroom/contract'
 import { describe, expect, it } from 'vitest'
 import type { DataSource } from './DataSource.ts'
 import { ApiError, isApiError } from './errors.ts'
+import { isNewestFirst } from './testing/ordering.ts'
 
 /**
  * One battery of behaviour for any `DataSource`: pagination, the rule of 404 against 403, revisions, limits, sharing and
@@ -13,7 +14,13 @@ import { ApiError, isApiError } from './errors.ts'
  * travels over the collaboration connection.
  */
 
-/** The people and the workspace a test of the suite works in, provided fresh for each test by whoever runs it. */
+/**
+ * The people and the workspace a test of the suite works in, provided by whoever runs it. **It is new for every test**:
+ * a workspace with no documents, folders or history of its own that a test did not make, so a test may count what it
+ * created but never what the server keeps or records by itself (the events of creating a document, the versions it
+ * makes on its own). The tests below filter by the rows they created and by what an event is about, and leave those
+ * decisions to the server.
+ */
 export interface Scenario {
   workspaceId: string
   /** Owner of the workspace. */
@@ -57,16 +64,6 @@ const unique = () => crypto.randomUUID()
 const emoji = (length: number) => '😀'.repeat(length)
 
 type Document = Schema<'Document'>
-
-/** Whether rows are in the order of a newest-first list: by instant, as time and not as text, then by id. */
-function isNewestFirst(rows: readonly { instant: string; id: string }[]): boolean {
-  return rows.every((row, index) => {
-    const previous = rows[index - 1]
-    if (previous === undefined) return true
-    const difference = Date.parse(previous.instant) - Date.parse(row.instant)
-    return difference > 0 || (difference === 0 && previous.id > row.id)
-  })
-}
 
 export function describeDataSourceContract(name: string, harness: Harness) {
   describe(`DataSource contract: ${name}`, () => {
@@ -212,22 +209,27 @@ export function describeDataSourceContract(name: string, harness: Harness) {
           params: { path: { workspaceId }, query: { documentId: created.id } },
         })
 
-        expect(seenByOwner.items.map((event) => event.type)).toContain('access.granted')
-        expect(seenByOwner.items.find((event) => event.type === 'access.granted')?.targetUser?.id).toBe(memberId)
-        expect(seenByMember.items.map((event) => event.type)).toEqual(['document.created'])
-        expect(workspaceSeenByMember.items.map((event) => event.type)).toEqual(['document.created'])
+        const sharing = ['access.granted', 'access.changed', 'access.revoked', 'general-access.changed']
+        const grantToMember = (event: Schema<'ActivityEvent'>) =>
+          event.type === 'access.granted' && event.targetUser?.id === memberId
+        expect(seenByOwner.items.some(grantToMember)).toBe(true)
+        expect(seenByMember.items.map((event) => event.type)).toContain('document.created')
+        expect(seenByMember.items.filter((event) => sharing.includes(event.type))).toEqual([])
+        expect(workspaceSeenByMember.items.filter((event) => sharing.includes(event.type))).toEqual([])
+        expect(workspaceSeenByMember.items.map((event) => event.type)).toContain('document.created')
       })
 
-      it('records one access.granted event for each document handed over', async () => {
+      it('records an access.granted event for each document handed over', async () => {
         const { owner, ownerId, member, memberId, workspaceId } = await harness.scenario()
         const theirs = await member.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Handed over' } })
 
         await owner.removeMember({ params: { path: { workspaceId, userId: memberId } } })
 
         const { items } = await owner.listDocumentActivity(document(theirs.id))
-        const handOvers = items.filter((event) => event.type === 'access.granted')
+        const handOvers = items.filter(
+          (event) => event.type === 'access.granted' && event.actor?.id === ownerId && event.targetUser?.id === ownerId,
+        )
         expect(handOvers).toHaveLength(1)
-        expect(handOvers[0]).toMatchObject({ actor: { id: ownerId }, targetUser: { id: ownerId } })
       })
 
       it('keeps a workspace with an owner', async () => {
@@ -280,12 +282,24 @@ export function describeDataSourceContract(name: string, harness: Harness) {
         expect(isNewestFirst(seen.map((row) => ({ instant: row.updatedAt, id: row.id })))).toBe(true)
       })
 
-      it('says there is no next page when everything fits in one', async () => {
+      it('ends a list with a null nextCursor', async () => {
         const { owner, workspaceId } = await harness.scenario()
+        const created = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Last page' } })
 
-        const page = await owner.listDocuments({ params: { path: { workspaceId }, query: { limit: 100 } } })
+        const ids: string[] = []
+        let cursor: string | undefined
+        let pages = 0
+        do {
+          const page = await owner.listDocuments({
+            params: { path: { workspaceId }, query: { limit: 100, ...(cursor === undefined ? {} : { cursor }) } },
+          })
+          ids.push(...page.items.map((row) => row.id))
+          cursor = page.nextCursor ?? undefined
+          pages += 1
+        } while (cursor !== undefined && pages < 50)
 
-        expect(page.nextCursor).toBeNull()
+        expect(cursor).toBeUndefined()
+        expect(ids).toContain(created.id)
       })
 
       it.each([[0], [101], [-1], [1.5]])('refuses a limit of %s', async (limit) => {
@@ -319,22 +333,61 @@ export function describeDataSourceContract(name: string, harness: Harness) {
         )
       })
 
-      it('pages the versions of a document', async () => {
+      it('pages the versions of a document, newest first', async () => {
         const { owner, workspaceId } = await harness.scenario()
         const created = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Versioned' } })
-        for (const label of ['One', 'Two', 'Three']) {
-          await owner.createVersion({ ...document(created.id), body: { label } })
-        }
+        const labels = ['One', 'Two', 'Three']
+        for (const label of labels) await owner.createVersion({ ...document(created.id), body: { label } })
 
-        const first = await owner.listVersions({ params: { path: { documentId: created.id }, query: { limit: 2 } } })
-        const second = await owner.listVersions({
-          params: { path: { documentId: created.id }, query: { limit: 2, cursor: first.nextCursor ?? '' } },
+        const seen: Schema<'Version'>[] = []
+        let cursor: string | undefined
+        do {
+          const page = await owner.listVersions({
+            params: {
+              path: { documentId: created.id },
+              query: { limit: 2, ...(cursor === undefined ? {} : { cursor }) },
+            },
+          })
+          expect(page.items.length).toBeLessThanOrEqual(2)
+          seen.push(...page.items)
+          cursor = page.nextCursor ?? undefined
+        } while (cursor !== undefined)
+
+        // The versions the server makes on its own, if any, are among these: only the ones this test made are compared.
+        expect(seen.map((row) => row.label).filter((label) => labels.includes(label ?? ''))).toEqual([
+          'Three',
+          'Two',
+          'One',
+        ])
+        expect(isNewestFirst(seen.map((row) => ({ instant: row.createdAt, id: row.id })))).toBe(true)
+      })
+
+      it.each([['2026'], ['October 13, 2026'], ['2026-10-13'], ['2026-10-13T25:00:00Z']])(
+        'refuses %j as a time bound of the workspace history',
+        async (value) => {
+          const { owner, workspaceId } = await harness.scenario()
+
+          await expectRefusal(
+            owner.listWorkspaceActivity({ params: { path: { workspaceId }, query: { from: value } } }),
+            'validation-failed',
+            '/query/from',
+          )
+          await expectRefusal(
+            owner.listWorkspaceActivity({ params: { path: { workspaceId }, query: { to: value } } }),
+            'validation-failed',
+            '/query/to',
+          )
+        },
+      )
+
+      it('takes an RFC 3339 time bound with an offset', async () => {
+        const { owner, workspaceId } = await harness.scenario()
+
+        const { items } = await owner.listWorkspaceActivity({
+          params: { path: { workspaceId }, query: { from: '2020-01-01T00:00:00+02:00', to: '2099-01-01T00:00:00.5Z' } },
         })
 
-        expect(first.items).toHaveLength(2)
-        expect(second.items).toHaveLength(1)
-        expect(second.nextCursor).toBeNull()
-        expect([...first.items, ...second.items].map((row) => row.label)).toEqual(['Three', 'Two', 'One'])
+        expect(Array.isArray(items)).toBe(true)
       })
 
       it('lists folders by name, with the id as tie-breaker', async () => {
@@ -653,6 +706,25 @@ export function describeDataSourceContract(name: string, harness: Harness) {
 
         const left = await owner.listThreads(document(created.id))
         expect(left.items[0]?.comments.map((comment) => comment.id)).toEqual([ownerComment])
+      })
+
+      it('stops a viewer from editing or deleting the comment they wrote when they could still comment', async () => {
+        const { owner, member, memberId, workspaceId } = await harness.scenario()
+        const created = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Demoted author' } })
+        const access = { params: { path: { documentId: created.id, userId: memberId } } }
+        await owner.setAccess({ ...access, body: { role: 'commenter' } })
+        const thread = await member.createThread({
+          ...document(created.id),
+          body: { anchor, quote: 'q', body: 'Written as a commenter' },
+        })
+        const commentId = thread.comments[0]?.id ?? ''
+        await owner.setAccess({ ...access, body: { role: 'viewer' } })
+
+        await expectRefusal(
+          member.updateComment({ params: { path: { commentId } }, body: { body: 'Edited as a viewer' } }),
+          'forbidden',
+        )
+        await expectRefusal(member.deleteComment({ params: { path: { commentId } } }), 'forbidden')
       })
 
       it('removes a thread together with its last comment', async () => {
