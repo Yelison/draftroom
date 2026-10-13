@@ -72,7 +72,7 @@ Verified from the published tarball: MIT, ESM, `sideEffects: ["*.css"]`, `engine
 
 ### 1.3 Screens, routes and components [proposed]
 
-Desktop layout at 1440 × 900: rail 88 px, explorer 272 px, work area 1080 px; header 64, toolbar 56, footer 40; document sheet 708 × 716 with a 48 px reading margin; collaboration panel 328 × 716. Overview screens use a 208 px rail with icon and label.
+Desktop layout at 1440 × 900: rail 88 px, explorer 272 px, work area 1080 px; header 64, toolbar 56, footer 40; document sheet 708 × 716 with a 48 px reading margin; collaboration panel 328 × 716. Overview screens use a 224 px rail with icon and label.
 
 | Area | Content | Route |
 | --- | --- | --- |
@@ -104,7 +104,7 @@ Product components and their variants: Button (from Forma UI); Presence (Online,
 | D7 | `/settings` opens Profile; inviting a member is a workspace dialog in Members, separate from document sharing |
 | D8 | 1280–1440 px behaviour (T6.5): the document width adapts, explorer and comments keep useful widths, the comments panel can be closed and reopened |
 | D9 | Spacing, radii and control heights come from Forma UI tokens; product-only values live in the product token layer (T0.8) |
-| D10 | A product colour that differs from a Forma UI token is never resolved silently: either Forma UI's value is adopted or a change is requested from Forma UI (Q3) |
+| D10 | A product colour that differs from a Forma UI token is never resolved silently. Decided (Q3): Forma UI's values are adopted; text that would use `brand` uses `blue-ink` (AA in both themes); avatars use Forma UI's tones; body and caption text use Forma UI's regular weights; tabs are pills; controls are 42 px with an 8 px radius |
 | D11 | Demo and seed content reads as real user content; no developer-voice or filler text |
 | D12 | Rename, trash, restore confirmation, invite dialog, search results and collaborator carets are built with Forma UI Dialog and the existing patterns; each task lists them |
 
@@ -375,7 +375,7 @@ Every task is expanded into a self-contained brief (files, interfaces, tests, ac
 
 #### T0.6 · App shell, routes and desktop guard (M, medium, lane B)
 
-**Objective:** the route table of §1.3 with layouts: overview layout (208 px rail with labels) and editor layout (88 px rail, explorer, work area), active section rule, desktop requirement screen below 1280 px, not-found route.
+**Objective:** the route table of §1.3 with layouts: overview layout (224 px rail with labels) and editor layout (88 px rail, explorer, work area), active section rule, desktop requirement screen below 1280 px, not-found route.
 **Dependencies:** T0.5. **Owner of:** `apps/web/src/app/routes.tsx` (later UI tasks add routes one at a time).
 **Files:** `src/app/routes.tsx`, `src/app/layouts/{OverviewLayout,EditorLayout}.tsx`, `src/components/NavRail/`, `src/app/DesktopGuard.tsx`.
 **Tests:** the active rail item for each route; keyboard order (skip link, rail, main); focus moves to the main heading on navigation and never stays on `body`; guard at 1279/1280 px.
