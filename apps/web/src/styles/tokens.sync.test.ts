@@ -36,16 +36,21 @@ describe('forma-tokens.css', () => {
 
 describe("Draftroom's own stylesheets never redeclare a token of the package", () => {
   const packageNames = declaredNames(packageTokens)
-  const ownFiles = readdirSync(stylesDirectory).filter((file) => file.endsWith('.css') && file !== 'forma-tokens.css')
+  // Every stylesheet under src/, CSS Modules included: the screens of the product arrive as modules.
+  const srcDirectory = join(stylesDirectory, '..')
+  const ownFiles = readdirSync(srcDirectory, { recursive: true, encoding: 'utf8' })
+    .filter((file) => file.endsWith('.css') && file !== join('styles', 'forma-tokens.css'))
+    .sort()
 
   it('has the package tokens to compare against', () => {
     // Without this a pattern that finds nothing would make the next test pass on an empty set.
     expect(packageNames).toContain('--color-bg')
-    expect(ownFiles).toContain('global.css')
+    expect(ownFiles).toContain(join('styles', 'global.css'))
+    expect(ownFiles.some((file) => file.endsWith('.module.css'))).toBe(true)
   })
 
   it.each(ownFiles)('%s', (file) => {
-    const declared = declaredNames(readFileSync(join(stylesDirectory, file), 'utf8'))
+    const declared = declaredNames(readFileSync(join(srcDirectory, file), 'utf8'))
 
     expect([...declared].filter((name) => packageNames.has(name))).toEqual([])
   })

@@ -12,8 +12,27 @@ describe('the shipped catalogues', () => {
   })
 })
 
+interface Row {
+  case: string
+  english: Record<string, unknown>
+  spanish: Record<string, unknown>
+  problem: string
+}
+
 describe('catalogueProblems', () => {
-  it.each([
+  it.each<Row>([
+    {
+      case: 'a key the translation lacks that Object.prototype has',
+      english: { constructor: 'A' },
+      spanish: {},
+      problem: 'es.json: missing "constructor"',
+    },
+    {
+      case: 'a key only the translation has that Object.prototype has',
+      english: {},
+      spanish: { constructor: 'A' },
+      problem: 'es.json: "constructor" is not in en.json',
+    },
     {
       case: 'a key the translation lacks',
       english: { a: 'A', b: 'B' },

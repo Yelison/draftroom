@@ -65,10 +65,10 @@ export function catalogueProblems(source: Catalogue, translation: Catalogue): st
   const problems = [...parsedSource.problems, ...parsedTranslation.problems]
 
   for (const id of Object.keys(source.messages)) {
-    if (!(id in translation.messages)) problems.push(`${translation.file}: missing "${id}"`)
+    if (!Object.hasOwn(translation.messages, id)) problems.push(`${translation.file}: missing "${id}"`)
   }
   for (const id of Object.keys(translation.messages)) {
-    if (!(id in source.messages)) problems.push(`${translation.file}: "${id}" is not in ${source.file}`)
+    if (!Object.hasOwn(source.messages, id)) problems.push(`${translation.file}: "${id}" is not in ${source.file}`)
   }
 
   for (const [id, expected] of parsedSource.argumentsById) {
