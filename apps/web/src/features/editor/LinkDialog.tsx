@@ -1,5 +1,5 @@
 import { Button, Dialog, Input, useFormaStrings } from '@yelison/forma-ui'
-import { useId, useState, type FormEvent } from 'react'
+import { useId, useRef, useState, type FormEvent } from 'react'
 import { useIntl } from 'react-intl'
 import { linkAddressFrom } from './linkAddress.ts'
 import styles from './LinkDialog.module.css'
@@ -66,17 +66,21 @@ function LinkForm({ id, initialAddress, onSubmit }: LinkFormProps) {
   const intl = useIntl()
   const [typed, setTyped] = useState(initialAddress)
   const [invalid, setInvalid] = useState(false)
+  const field = useRef<HTMLInputElement>(null)
 
   function submit(event: FormEvent) {
     event.preventDefault()
     const address = linkAddressFrom(typed)
     setInvalid(address === null)
-    if (address !== null) onSubmit(address)
+    // The button that was pressed has the focus; the message is about the field, so the focus goes back to it.
+    if (address === null) field.current?.focus()
+    else onSubmit(address)
   }
 
   return (
     <form id={id} className={styles.form} onSubmit={submit} noValidate>
       <Input
+        ref={field}
         label={intl.formatMessage({ id: 'editor.link.address' })}
         hint={intl.formatMessage({ id: 'editor.link.hint' })}
         error={invalid ? intl.formatMessage({ id: 'editor.link.invalid' }) : undefined}
