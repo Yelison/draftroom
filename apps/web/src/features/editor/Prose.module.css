@@ -30,6 +30,11 @@
   font: var(--font-section);
 }
 
+/* A heading that opens the document needs no space above it: the sheet's padding is already there. */
+.prose > :first-child {
+  margin-block-start: 0;
+}
+
 .prose ul,
 .prose ol {
   padding-inline-start: var(--space-24);
