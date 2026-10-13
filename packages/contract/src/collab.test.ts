@@ -277,7 +277,7 @@ describe('docs/collab/protocol.md', () => {
     expect(protocolText).toContain(`\`${name}\``)
   })
 
-  it.each(authDeniedReasons)('documents the authentication refusal reason %s in §3.3', (reason) => {
-    expect(section('### 3.3')).toContain(`\`${reason}\``)
+  it.each(authDeniedReasons)('documents the authentication refusal reason %s in the table of §3.3', (reason) => {
+    expect(section('### 3.3')).toContain(`| \`${reason}\` `)
   })
 })
