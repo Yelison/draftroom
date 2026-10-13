@@ -12,7 +12,7 @@ describe('resolveLocale', () => {
       browser: ['fr-FR', 'es', 'en'],
       expected: 'es',
     },
-    { case: 'a regional tag is its language', stored: null, browser: ['EN-gb'], expected: 'en' },
+    { case: 'a regional tag is its language, in any case', stored: null, browser: ['ES-mx'], expected: 'es' },
     { case: 'an unsupported browser falls back to English', stored: null, browser: ['fr-FR', 'de'], expected: 'en' },
     { case: 'no browser languages fall back to English', stored: null, browser: [], expected: 'en' },
     { case: 'an unknown stored value is ignored', stored: 'fr', browser: ['es'], expected: 'es' },
