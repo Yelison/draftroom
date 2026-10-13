@@ -8,7 +8,7 @@
 
 **Tech Stack (versions verified on 2026-10-13 against the npm registry and official docs):** Node.js 24 LTS (`.nvmrc` `24`); TypeScript 6.0.3; React 19.3.0; Vite 8.3.4 with `@vitejs/plugin-react` 6.1.2; Vitest 5.0.4; Playwright 1.64.0; Tiptap 3.31.4 for every `@tiptap/*` package; Yjs 13.6.33 with `@tiptap/y-tiptap`; `@hocuspocus/server` and `@hocuspocus/provider` 4.7.1; Fastify 5.12.7; Kysely 0.29.6 with `pg` 8.23.1; Zod 4.6.7; `openapi-typescript` 7.13.0 with `openapi-fetch`; `react-intl` (FormatJS); `y-indexeddb` 9.0.12; `@node-rs/argon2` 2.2.2; Testcontainers 12.2.1; `@yelison/forma-ui` 0.3.0.
 
-**Spec:** the product, design and validation requirements this plan argues from are summarised in §1 and §2 (the design handoff, product spec, architecture notes and validation checklist provided by the owner, plus the v4 design file). Where this plan and the design disagree, §1.4 lists the contradiction and the decision.
+**Spec:** the product requirements this plan argues from are stated in §1.3, §1.4 and §2 (screens, routes, components, states and acceptance criteria), and the collaboration and validation requirements in §4, §5 and §9.
 
 ## How to read this plan
 
@@ -22,7 +22,7 @@
 - TypeScript `6.0.3` pinned (TypeScript 7 is outside `openapi-typescript` 7.13's peer range); `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`.
 - Every `@tiptap/*` package pinned to exactly `3.31.4` (`@tiptap/react` 3.31.4 peers `@tiptap/core` 3.31.4 exactly). Never install `@tiptap-pro/*` (paid licence, private registry). Never mix `y-prosemirror` with Tiptap v3: use `@tiptap/y-tiptap`.
 - `@yelison/forma-ui` pinned to exactly `0.3.0`. Draftroom never redefines a Forma UI token; product tokens live in their own file (§3.6). Missing generic components or tokens are requested from Forma UI, not built ad hoc.
-- Desktop only, no mobile: design and verify from 1280 px; below 1280 px show the desktop requirement screen. Keyboard, focus, zoom to 200 % and screen-reader obligations still apply.
+- Desktop only, no mobile: build and verify from 1280 px; below 1280 px show the desktop requirement screen. Keyboard, focus, zoom to 200 % and screen-reader obligations still apply.
 - Bilingual: every visible string, `aria-label`, title, live-region announcement and error message exists in English and Spanish, added together, with ICU plurals and `Intl` for dates and numbers. No sentence built by concatenation. User content is never translated.
 - No visible text in a developer voice: no "coming soon", no data provenance, no explanations of how to read a screen. Those go in docs and reports.
 - Never call local-only state "saved" or "synced": "Synced" means the server stored the change durably (§5.2).
@@ -56,8 +56,8 @@ Reviewed commit: `3ed163a` on `main` of `github.com/Yelison/draftroom` (2026-10-
 | --- | --- | --- |
 | Frontend, editor, server, database, CI | pending | no files at `3ed163a` |
 | Contracts (REST, collaboration protocol) | pending | this plan defines them (§4, §5); T0.2 and T0.3 write them |
-| Design | partial | v4 design file with 74 frames; gaps in §1.4 |
-| Design-to-code tokens | pending | the design specification export is produced outside this repository; only generated token files enter it (T0.8) |
+| UI specification | defined here | screens, routes and components in §1.3, UI decisions in §1.4, states in §2.3 |
+| Product tokens | pending | only the generated token file enters this repository (T0.8) |
 | Deployment | decided, pending | real backend packaged for deployment; public demo is static with a simulated API (§10) |
 
 ### 1.2 Forma UI 0.3.0 [existing]
@@ -68,45 +68,45 @@ Verified from the published tarball: MIT, ESM, `sideEffects: ["*.css"]`, `engine
 - Theme: `createThemeStore({ storageKey, attribute })`, `useTheme`, `themeScript` (inline head script); dark theme by `data-theme` on `<html>` plus `prefers-color-scheme`, "system" removes the attribute.
 - Strings: `FormaProvider strings={…}` with two keys, `buttonLoading` and `dialogClose`; `Dialog` has no built-in close button.
 - Tokens: 26 colour tokens per theme (`--color-bg`, `surface`, `surface-hover`, `ink`, `muted`, `line`, `disabled`, `overlay`, `nav*`, `brand`, `brand-hover`, `on-brand`, `link`, `focus`, `progress-track`, `{blue,green,amber,red}-{bg,ink}`), typography shorthands (`--font-caption`, `body`, `label`, `strong`, `section`, `title`…), spacing `--space-0…64`, radii, control sizes, motion, z-index.
-- Not provided and needed by Draftroom (to request from Forma UI after T0.8's matrix): Avatar, Menu/Popover, Select or Listbox, Toast, Checkbox or Switch, Skeleton, Table styles. Draftroom-specific pieces stay in Draftroom: Presence, SyncStatus, DocumentRow, CommentCard, Permission.
+- Not provided and needed by Draftroom (to request from Forma UI): Avatar, Menu/Popover, Select or Listbox, Toast, Checkbox or Switch, Skeleton, Table styles. Draftroom-specific pieces stay in Draftroom: Presence, SyncStatus, DocumentRow, CommentCard, Permission.
 
-### 1.3 Design inventory [existing]
+### 1.3 Screens, routes and components [proposed]
 
-The v4 design file has the pages Guide, Components, Editor light/dark (8 state references each) and Product light/dark (29 connected views each). Layout reference at 1440 × 900: rail 88 px, explorer 272 px, work area 1080 px; header 64, toolbar 56, footer 40; document sheet 708 × 716 with a 48 px reading margin; collaboration panel 328 × 716. Overview screens use a 208 px rail with icon and label.
+Desktop layout at 1440 × 900: rail 88 px, explorer 272 px, work area 1080 px; header 64, toolbar 56, footer 40; document sheet 708 × 716 with a 48 px reading margin; collaboration panel 328 × 716. Overview screens use a 208 px rail with icon and label.
 
-| Area | Screens (design) | Route [proposed] |
+| Area | Content | Route |
 | --- | --- | --- |
 | Home | pinned documents with excerpts, recent activity | `/` |
 | Documents | groups of document and folder cards | `/documents` |
-| Team folders | Work plan, Resources, Meetings | `/folders/:folderId` |
-| Document editor | 13 documents, explorer, toolbar, sheet, comments/activity panel | `/documents/:documentId` |
+| Team folders | the documents of a team folder | `/folders/:folderId` |
+| Document editor | explorer, toolbar, document sheet, comments and activity panel | `/documents/:documentId` |
 | New document | create then open | `/documents/new` → redirect |
 | Share | sharing panel over the editor | `/documents/:documentId/share` (dialog route) |
 | Document versions | version list, preview, restore | `/documents/:documentId/versions` |
-| Templates | three templates | `/templates/:templateId` |
+| Templates | built-in templates | `/templates/:templateId` |
 | Shared with me | table with owner, permission, activity, preview | `/shared` (`?access=&selected=`) |
 | Workspace history | timeline across documents | `/history` (`?document=&person=&range=`) |
 | Settings | Profile, Workspace, Members, Appearance | `/settings/profile` (default), `/workspace`, `/members`, `/appearance` |
-| Trash, search results | not designed | `/trash`, `/search?q=` |
+| Trash, search results | archived documents; results of a search | `/trash`, `/search?q=` |
 
-Components (variants as designed): Button (Primary, Secondary, Ghost, Focus, Disabled, Loading); Presence (Online, Away, Offline); SyncStatus (Synced, Saving, Offline, Error); DocumentRow (Default, Selected, Focus, Archived, Folder); CommentCard (Open, Resolved, Orphaned); Permission (Viewer, Commenter, Editor, Owner). Text styles: Caption 12/17, Body 14/20, Label 14/20 medium, Strong 14/20 semibold, Section 17/24, Title 30/42, DocumentBody 16/24, DocTitle 38/48, DocHeading 23/32 (Inter). Icons: home, doc, people, clock, settings, folder, search, plus, check, link, list, comment, chevron, close, upload, align (24 grid, 1.7 stroke).
+Product components and their variants: Button (from Forma UI); Presence (Online, Away, Offline); SyncStatus (Synced, Synchronising, Offline with local copy, Reconnecting, Error, Read-only); DocumentRow (Default, Selected, Focus, Archived, Folder); CommentCard (Open, Resolved, Orphaned); Permission (Viewer, Commenter, Editor, Owner). Typography scale: Caption 12/17, Body 14/20, Label 14/20 medium, Strong 14/20 semibold, Section 17/24, Title 30/42, DocumentBody 16/24, DocTitle 38/48, DocHeading 23/32 (Inter). Icons: 24 px grid, 1.7 px stroke, from Forma UI where it has them.
 
-### 1.4 Gaps and contradictions in the design, with decisions [proposed]
+### 1.4 UI decisions [proposed]
 
-| # | Finding | Decision |
-| --- | --- | --- |
-| G1 | Mandatory states not designed: initial load, empty, document not found, access denied, reconnecting, permission revoked | Built in code from existing components and tokens, reviewed in screenshots; the design is a reference, not the full state list |
-| G2 | Offline and error references still say "Saved" in the header | Code follows the durability rule (§5.2); the header shows the SyncStatus state, never "Saved" for local copies |
-| G3 | Read-only reference keeps the toolbar, Resolve/Reply and Share active | Viewer: no toolbar, no comment actions; commenter: comment actions only |
-| G4 | No "Reconnecting" SyncStatus variant | Added in code (amber), with its own strings |
-| G5 | Presence and Permission/Viewer never placed in screens; Shared tags and Appearance radios drawn as text | Code uses the real components everywhere |
-| G6 | Versions panel titled "History"; rail says "Ajustes" for "Configuración" | "Version history" vs "Workspace history" are distinct terms in both languages; the rail label matches the page title (Settings / Configuración) |
-| G7 | Settings lands on Appearance; "Invite member" opens the document share panel | `/settings` redirects to Profile; inviting a member is a workspace dialog in Members |
-| G8 | Only the 1440 layout exists | T6.5 defines 1280–1440 behaviour: the document width adapts, explorer and comments keep useful widths, the comments panel can be closed and reopened |
-| G9 | No spacing variables bound in the design; radii and control heights vary (36/40/44) | Code uses Forma UI spacing and size tokens; differences are recorded in the token matrix (T0.8), not copied |
-| G10 | Dark `brand` is `#4779ff` in the design and `#3068ff` in Forma UI | Not resolved silently: T0.8's matrix lists each clash; the owner decides between adopting Forma UI's value or requesting a change from Forma UI |
-| G11 | Developer-voice copy and generic filler in mockups ("Restore requires confirmation", "Validate semantics…", the Guide page) | Never shipped; demo content is written as real user content |
-| G12 | Not designed: rename, trash, restore confirmation, invite dialog, search results, collaborator carets | Built with Forma UI Dialog and existing patterns; listed in each task |
+| # | Decision |
+| --- | --- |
+| D1 | Every mandatory state (initial load, empty, document not found, access denied, reconnecting, access revoked) has its own screen state, built from the product components and tokens and shown in screenshots in each delivery |
+| D2 | The editor header shows the SyncStatus state; a local copy is never labelled "Saved" (§5.2) |
+| D3 | Viewer: no formatting toolbar and no comment actions; commenter: comment actions only |
+| D4 | SyncStatus includes Reconnecting (amber) and Read-only, each with its own strings |
+| D5 | Presence, Permission (all four roles), avatars, tags and radio choices are real components, never text stand-ins |
+| D6 | "Version history" (one document) and "Workspace history" (all documents) are distinct terms in both languages; each rail label matches its page title |
+| D7 | `/settings` opens Profile; inviting a member is a workspace dialog in Members, separate from document sharing |
+| D8 | 1280–1440 px behaviour (T6.5): the document width adapts, explorer and comments keep useful widths, the comments panel can be closed and reopened |
+| D9 | Spacing, radii and control heights come from Forma UI tokens; product-only values live in the product token layer (T0.8) |
+| D10 | A product colour that differs from a Forma UI token is never resolved silently: either Forma UI's value is adopted or a change is requested from Forma UI (Q3) |
+| D11 | Demo and seed content reads as real user content; no developer-voice or filler text |
+| D12 | Rename, trash, restore confirmation, invite dialog, search results and collaborator carets are built with Forma UI Dialog and the existing patterns; each task lists them |
 
 ### 1.5 Verified facts that shape the architecture [existing]
 
@@ -194,7 +194,7 @@ Default: email and password accounts with Argon2id (`@node-rs/argon2`), server-s
 
 `react-intl` with ICU messages in `apps/web/src/i18n/en.json` and `es.json`, precompiled at build time. URLs and slugs are English and identical in both languages; the language is resolved as stored preference → browser → English, applied before first paint by an inline head script that also sets `<html lang>`. `check:messages` fails if the catalogues differ in keys or arguments. A pseudo-locale build (`en-XA`) is used by e2e to catch untranslated strings and overflow. The server never returns translated text: errors carry a stable `code` that the client maps to messages. Built-in templates are localised product content; user documents are never translated. Forma UI's two internal strings are passed through `FormaProvider`.
 
-### 3.6 Design tokens
+### 3.6 Tokens
 
 `apps/web/src/styles/forma-tokens.css` is a byte-for-byte copy of the package's `tokens.css`, regenerated by `npm run sync:forma-tokens` and checked by a test (pattern from Resolve). `draftroom-tokens.css` holds product-only tokens (editor typography: DocTitle, DocHeading, DocumentBody; layout widths: rail, explorer, sheet, panel; presence colours), generated from the product token source decided in T0.8 and checked by a test that it redeclares no Forma UI token. Theme switching uses Forma UI's `createThemeStore` and `themeScript`.
 
@@ -347,7 +347,7 @@ Every task is expanded into a self-contained brief (files, interfaces, tests, ac
 **Files:** `packages/contract/openapi.yaml`, `packages/contract/src/schema.ts` (generated, Prettier-ignored), `packages/contract/scripts/generate.mjs`, `docs/api/README.md`, `docs/decisions/0001-architecture-and-stack.md`, `0002-adopt-forma-ui.md`, `0003-internationalisation.md`, `0005-data-model-and-permissions.md`.
 **Dependencies added:** openapi-typescript 7.13.0, `@redocly/cli` (lint only).
 **Tests:** `api:lint` (Redocly); `api:types` + `git diff --exit-code` in **Static checks**; a test that every operation declares `operationId`, a `problem+json` default response and a security requirement (except health and sign-in/up).
-**Acceptance:** each row of §4.3 maps to operations; ADRs record decisions and alternatives; no references to private design material or internal tooling.
+**Acceptance:** each row of §4.3 maps to operations; ADRs record decisions and alternatives; no references to private material or internal tooling.
 
 #### T0.3 · Collaboration protocol contract (M, high, lane C)
 
@@ -388,10 +388,10 @@ Every task is expanded into a self-contained brief (files, interfaces, tests, ac
 **Tests:** the contract suite passes on the mock; mock responses validated at runtime against the OpenAPI schemas in tests (Resolve only checked them at compile time); a production build contains no mock module or fixture string.
 **Acceptance:** an unhandled mock route fails loudly; the HTTP implementation compiles against generated types only.
 
-#### T0.8 · Product token layer from the design export (M, medium, lane B)
+#### T0.8 · Product token layer (M, medium, lane B)
 
-**Objective:** `draftroom-tokens.css` generated from the product token source decided with the design matrix (Figma ↔ Forma UI), with a test that it redeclares no Forma UI token; the list of clashes (G9, G10) resolved by the owner or requested from Forma UI.
-**Dependencies:** T0.5 and the design matrix (produced outside the repository from the design export). **Files:** `apps/web/src/styles/draftroom-tokens.css` (generated), `apps/web/scripts/build-product-tokens.mjs` or the decided generator, `apps/web/src/styles/draftroom-tokens.test.ts`, `docs/decisions/0008-product-tokens.md`.
+**Objective:** `draftroom-tokens.css` generated from the product token source (kept outside this repository; only the generated file is committed), with a test that it redeclares no Forma UI token, and every product colour that differs from Forma UI resolved by Q3 (D9, D10).
+**Dependencies:** T0.5 and the product token source. **Files:** `apps/web/src/styles/draftroom-tokens.css` (generated, with a header naming its generator), `apps/web/src/styles/draftroom-tokens.test.ts`, `docs/decisions/0008-product-tokens.md`.
 **Acceptance:** no token resolved silently; contrast pairs for every text/background pair pass WCAG AA in both themes.
 
 ### Phase 1 · Local editor
@@ -529,7 +529,7 @@ Archived documents of the caller (owners), restore and permanent delete with con
 
 #### T6.5 · Desktop adaptation and accessibility pass (M, medium, lane B)
 
-1280–1440 behaviour (G8), closable comments panel, zoom 200 %, axe on every route in both themes and languages, pseudo-locale overflow check, reduced motion. Depends on all screens.
+1280–1440 behaviour (D8), closable comments panel, zoom 200 %, axe on every route in both themes and languages, pseudo-locale overflow check, reduced motion. Depends on all screens.
 **Files:** `apps/web/src/app/layouts/EditorLayout.tsx` (panel state), `apps/web/e2e/a11y.spec.ts`, `apps/web/e2e/overflow.spec.ts`, `apps/web/e2e/routes.ts` (one list of routes and states).
 **Tests:** axe and overflow over the route list in 2 themes × 2 languages × 1280/1440; panel toggle keeps focus and announces.
 **Risks:** run time: the matrix runs in CI only; locally one theme and language.
@@ -577,7 +577,7 @@ Security headers and CSP (hash of the single inline script), CORS by `ALLOWED_OR
 | T0.5 | T0.1 | B |
 | T0.6 | T0.5 | B |
 | T0.7 | T0.2, T0.5 | B |
-| T0.8 | T0.5, design matrix | B |
+| T0.8 | T0.5, product token source | B |
 | T1.1 | T0.4 | A |
 | T1.2 | T0.6, T0.7 | B |
 | T1.3 | T0.7, T1.1 | B |
@@ -603,7 +603,7 @@ Security headers and CSP (hash of the single inline script), CORS by `ALLOWED_OR
 | T8.2 | T0.7, screens | B + C |
 | T8.3 | T8.1, T8.2 | C |
 
-**Safe batches** (at most two implementers working at a time, one on the server lane): {T0.1} → {T0.2, T0.5} → {T0.3, T0.6} → {T0.4, T0.7} → {T1.1, T1.2} → {T2.1, T1.3} → {T2.2, T3.1} → {T2.3, T4.1} → {T2.4, T3.2} → {T5.1, T4.2} → {T5.3, T5.2} → {T6.2, T6.1} → {T6.3, T6.4} → {T7.1, T6.5} → {T7.2, T8.2} → {T8.1} → {T8.3}. T0.8 slots in as soon as the design matrix exists.
+**Safe batches** (at most two implementers working at a time, one on the server lane): {T0.1} → {T0.2, T0.5} → {T0.3, T0.6} → {T0.4, T0.7} → {T1.1, T1.2} → {T2.1, T1.3} → {T2.2, T3.1} → {T2.3, T4.1} → {T2.4, T3.2} → {T5.1, T4.2} → {T5.3, T5.2} → {T6.2, T6.1} → {T6.3, T6.4} → {T7.1, T6.5} → {T7.2, T8.2} → {T8.1} → {T8.3}. T0.8 slots in as soon as the product token source exists.
 
 ### 8.2 Single owners
 
@@ -678,8 +678,8 @@ The code is read as much as it is used. Each task is reviewed for: small single-
 | # | Question | Default if unanswered | Blocks |
 | --- | --- | --- | --- |
 | Q1 | Authentication: own email and password accounts, or OIDC with an identity provider (Keycloak, as in Resolve)? | Email and password with Argon2id (§3.4) | T7.1 (earlier tasks use the development identity) |
-| Q2 | Missing states and screens (G1, G12): build them in code from existing components, or update the design first? | Build in code; screenshots in each delivery | Phase 1 onwards |
-| Q3 | Token clashes between the design and Forma UI (G10): adopt Forma UI's values, or request changes from Forma UI? | Adopt Forma UI's values; product-only tokens in Draftroom's layer | T0.8 |
+| Q2 | States and screens without a visual reference yet (D1, D12): build them in code from the product components, or wait for a reference? | Build in code; screenshots in each delivery | Phase 1 onwards |
+| Q3 | Product colours that differ from Forma UI tokens (D10): adopt Forma UI's values, or request changes from Forma UI? | Adopt Forma UI's values; product-only tokens in Draftroom's layer | T0.8 |
 | Q4 | Default general access of a new document: private (`none`) or workspace members as viewers/editors? | `none` (explicit sharing) | T1.1 |
 | Q5 | Who restores versions and who archives: owners only (current), or also editors? | Owners only | T5.1 |
 | Q6 | Language of the demo content and seed data | Both: content follows the language chosen in the demo; the server seed has one English and one Spanish workspace | T1.1 seed, T8.2 |
