@@ -37,4 +37,4 @@ Forma UI 0.3.0 provides `Button`, `IconButton`, `Icon`, `Badge`, `Field`, `Input
 
 ## Amendments
 
-- 2026-10-13: Forma UI moves to exactly `0.4.0`, superseding the `0.3.0` pin above. Draftroom adopts its `clock` icon (replacing the one drawn in the app) and the regenerated token copy; the new Avatar, SearchField, hidden-label Input and native Select, and the other new icons and tokens, stay available for the screens that need them.
+- 2026-10-13: Forma UI moves to exactly `0.4.0`, superseding the `0.3.0` pin above. Draftroom adopts its `clock` icon (replacing the one drawn in the app) and the regenerated token copy; the new Avatar, SearchField, hidden-label Input and native Select, and the other new icons and tokens, stay available for the screens that need them. The avatar and the select are therefore no longer among the gaps listed in the context: screens use Forma UI's instead of building their own, as the "Missing generic pieces" decision above would otherwise suggest.
