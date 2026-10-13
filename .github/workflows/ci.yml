@@ -29,4 +29,6 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
+      - run: npm run api:lint
+      - run: npm run api:types && git diff --exit-code packages/contract/src/schema.ts
       - run: npm test

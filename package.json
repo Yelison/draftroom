@@ -15,7 +15,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "api:lint": "redocly lint --config packages/contract/redocly.yaml packages/contract/openapi.yaml",
+    "api:types": "node packages/contract/scripts/generate.mjs"
   },
   "devDependencies": {
     "oxlint": "1.88.0",
