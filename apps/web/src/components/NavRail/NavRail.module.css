@@ -50,7 +50,8 @@
 
 /* The label sits under the icon in 88 px, so the item uses nearly all of it: "Configuración" has to fit on one line
  * in a fallback font that is wider than Inter. A longer word (the pseudo-locale builds them) is hyphenated at a syllable
- * of the page's language, not cut anywhere. */
+ * of the page's language when it can be, and cut only when it cannot: `anywhere`, unlike `break-word`, lets the label
+ * shrink below the width of its longest word, so a word never spills out of the rail. */
 .compact {
   padding-inline: var(--space-2);
 }
@@ -65,5 +66,5 @@
 .compact .label {
   font: var(--font-caption);
   hyphens: auto;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
 }
