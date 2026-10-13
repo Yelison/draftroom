@@ -52,19 +52,10 @@ export function loadContract(): Contract {
 
   // Strict mode stays on, so a keyword the validator does not know is an error, not a silently ignored constraint.
   // The document as a whole is not a schema: its parts are reached by pointer and `$ref`, so its top-level members are
-  // declared as annotations, and so are OpenAPI's `example` and the contract's own extension. None constrains a value.
+  // declared as annotations, and so is the contract's own extension, `x-draftroom-restricted`. None constrains a value.
   const ajv = new Ajv2020({ strict: true, allErrors: true })
   addFormats(ajv)
-  for (const keyword of [
-    'openapi',
-    'info',
-    'servers',
-    'tags',
-    'paths',
-    'components',
-    'example',
-    'x-draftroom-restricted',
-  ]) {
+  for (const keyword of ['openapi', 'info', 'servers', 'tags', 'paths', 'components', 'x-draftroom-restricted']) {
     ajv.addKeyword(keyword)
   }
   ajv.addSchema({ $id: root, ...document })
