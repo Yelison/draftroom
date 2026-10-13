@@ -66,34 +66,41 @@ function buildProductionBundle(outDirectory: string) {
   })
 }
 
+// Built once for the tests of a worker, on first use: the tests are independent, so each one reports its own failure.
+let built: { directory: string; files: { name: string; content: string }[] } | undefined
+
+function productionBundle() {
+  if (built === undefined) {
+    const directory = mkdtempSync(join(tmpdir(), 'draftroom-production-'))
+    buildProductionBundle(directory)
+    built = { directory, files: filesOf(directory) }
+  }
+  return built.files
+}
+
 test.describe('the production bundle', () => {
-  test.describe.configure({ mode: 'serial' })
-
-  let output: string
-  let production: { name: string; content: string }[]
-
-  test.beforeAll(() => {
-    test.setTimeout(180_000)
-    output = mkdtempSync(join(tmpdir(), 'draftroom-production-'))
-    buildProductionBundle(output)
-    production = filesOf(output)
-  })
+  test.setTimeout(180_000)
 
   test.afterAll(() => {
-    if (output !== undefined) rmSync(output, { recursive: true, force: true })
+    if (built !== undefined) rmSync(built.directory, { recursive: true, force: true })
+    built = undefined
   })
 
   test('has files to look at', () => {
-    expect(production.some(({ name }) => name.endsWith('.js'))).toBe(true)
+    expect(productionBundle().some(({ name }) => name.endsWith('.js'))).toBe(true)
     expect(fixtureTexts.length).toBeGreaterThan(40)
   })
 
   test('emits no module of the mock', () => {
-    expect(production.map(({ name }) => name).filter((name) => /mock|fixture/i.test(name))).toEqual([])
+    expect(
+      productionBundle()
+        .map(({ name }) => name)
+        .filter((name) => /mock|fixture/i.test(name)),
+    ).toEqual([])
   })
 
   test('contains no person, document or text of the fixtures', () => {
-    const found = production.flatMap(({ name, content }) =>
+    const found = productionBundle().flatMap(({ name, content }) =>
       fixtureTexts.filter((text) => content.includes(text)).map((text) => `${name}: ${text}`),
     )
 
@@ -101,7 +108,7 @@ test.describe('the production bundle', () => {
   })
 
   test('contains no trace of the mock mode or of the test tooling', () => {
-    const found = production.flatMap(({ name, content }) =>
+    const found = productionBundle().flatMap(({ name, content }) =>
       forbiddenMarkers.filter((marker) => content.includes(marker)).map((marker) => `${name}: ${marker}`),
     )
 
