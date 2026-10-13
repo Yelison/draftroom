@@ -19,8 +19,8 @@ Separately, ending a connection is not what the plan assumed (see Decision 4).
 
 1. **The server acknowledges storage with a snapshot.** In `onStoreDocument`, in one synchronous run, it captures the state (`Y.encodeStateAsUpdate`) and its snapshot (`Y.encodeSnapshot(Y.snapshot(doc))`, the state vector plus the delete set), writes the state, and in `afterStoreDocument` broadcasts `stored` with **that** snapshot to writable connections only. It never recomputes the snapshot after the write, because an update applied during the write is acknowledged but not stored.
 2. **The client decides with containment, not clocks.** It keeps `pending`, the merge of everything it changed (all of a local copy at open). On `stored` it checks `Y.snapshotContainsUpdate(snapshot, pending)`. It shows Synced only when the scope is read-write, the handshake completed, `unsyncedChanges` is 0 **and** `pending` is empty. A timer of 15 seconds without a covering event ends in `error`, never in Synced.
-3. **The server retries a failed write by itself** (back-off up to 30 seconds), and sends the last stored snapshot to each writable connection when it connects.
-4. **A connection ends by closing its WebSocket, one per document.** `Connection.close` and `closeConnections` only send an in-band message with the reason text; the provider reports code 1000 and does not reconnect, so the numeric codes of the plan (4401, 4403, 4409, 4413, 4429) would never reach the client. The server closes the socket itself, after setting `connection.readOnly = true` so writes stop at once. An authentication refusal cannot close the socket (the hook has no handle to it), so it answers `PermissionDenied` with `unauthenticated` or `not-found`, and the client disconnects. An oversize message is closed by `ws` with 1009, not 4413, and is handled the same way.
+3. **The server retries a failed write by itself** (back-off up to 30 seconds), keeps the document loaded while a write is unconfirmed (`beforeUnloadDocument` throws), waits for pending retries at shutdown, assigns the snapshot slot only after the write has committed, and sends the last stored snapshot to each writable connection when it connects.
+4. **A connection ends by closing its WebSocket, one per document.** `Connection.close` and `closeConnections` only send an in-band message with the reason text; the provider reports code 1000 and does not reconnect, so the numeric codes of the plan (4401, 4403, 4409, 4413, 4429) would never reach the client. The server closes the socket itself, after setting `connection.readOnly = true` so writes stop at once. An authentication refusal cannot close the socket (the hook has no handle to it), so it answers `PermissionDenied` with `unauthenticated` or `not-found`, and the client disconnects. An oversize message is closed by `ws` with 1009, not 4413, and is handled the same way; the client offers "discard my local changes and reload" for both, never a retry. After a close by the server, the client reconnects with its own back-off, because the provider's does not grow once a connection was established.
 
 ## Consequences
 
@@ -29,7 +29,8 @@ Separately, ending a connection is not what the plan assumed (see Decision 4).
 - The client does one containment check per `stored` event while `pending` is not empty. A reopened document with a large local copy pays that once.
 - T2.4 can assert the rule end to end: with the server stopped, Synced never appears.
 - Viewers and commenters need no acknowledgement and never see `unsynced`.
-- The retry loop is server code Hocuspocus does not provide; a failed-write test belongs to T2.1.
+- The retry loop and the unload guard are server code Hocuspocus does not provide: without the guard, a failed write is lost as soon as the last client leaves. Tests for both belong to T2.1.
+- `error` (`store-timeout`) is transient, not a sink: a `stored` that covers the pending changes returns the client to Synced, and a revocation or a denial still acts from it.
 
 ## Alternatives considered
 

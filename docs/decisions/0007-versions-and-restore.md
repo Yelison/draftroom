@@ -19,11 +19,12 @@ The plan says a restore is one transaction, creates a `pre-restore` version, and
 2. **Automatic versions:** after 10 minutes without an update and with edits since the newest version, at most one `auto` version per 30 minutes; when the interval has not passed, the version is deferred to the end of it rather than dropped. Taken from the live document, or from the stored state when nobody has it open.
 3. **Restore (owner only), in this order, holding the document's store mutex from the second step to the commit:**
    1. read the version and convert it to JSON in a throwaway document;
-   2. take the mutex, capture the current state and its snapshot, and commit the `pre-restore` version from that capture;
+   2. take the mutex, capture the current state and its snapshot, and write the `pre-restore` version from that capture (one row per restore: later passes overwrite it, and a `409` deletes it);
    3. in one synchronous run, verify the live snapshot still equals the capture (otherwise recapture, at most 3 times, then `409 conflict`), replace the live fragment's content with origin `restore`, and capture the result;
    4. in one database transaction, write the `restore` version, the activity event and the document state with the same capture-and-write function the store hook uses.
 4. **The content is replaced by diffing** against the live fragment, so nodes the restore keeps keep their identity and so do the edits and comment anchors on them.
-5. **The mutex is mandatory.** A store that captured the old state before the restore can otherwise finish its write after the restore's and bring the old content back.
+5. **The direct connection is closed after the mutex is released.** `DirectConnection.disconnect()` awaits a store, which takes the mutex; the restore changes the document with `live.transact`, never `DirectConnection.transact`.
+6. **The mutex is mandatory.** A store that captured the old state before the restore can otherwise finish its write after the restore's and bring the old content back.
 
 ## Consequences
 

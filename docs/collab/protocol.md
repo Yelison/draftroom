@@ -294,71 +294,82 @@ sequenceDiagram
 
 ## 8. Client sync-state machine
 
-The machine is implemented by T2.2; its types are `SyncState`, `SyncEvent` and `SyncErrorCause` in `collab.ts`. Beyond the state it tracks these facts: `scope`, `handshakeDone`, `unsyncedChanges`, `pending` (§7.4), `online`, `hasBeenAuthorized` (true once this editor session, or the local copy, was authorised).
+The machine is implemented by T2.2; its types are `SyncState`, `SyncEvent` and `SyncErrorCause` in `collab.ts`. Beyond the state it tracks these facts: `scope`, `handshakeDone`, `unsyncedChanges`, `pending` (§7.4), `online`, `hasLocalCopy`, `hasBeenAuthorized` (true once this editor session, or the local copy, was authorised). `connection-closed` resets `handshakeDone` and `unsyncedChanges` and stops the timer of §7.5.
 
 ### 8.1 States
 
-| State           | Meaning                                                                                                                       | Shown as                           |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| `connecting`    | Opening and authenticating for the first time in this session.                                                                | loading                            |
-| `synchronising` | Authorised read-write; the handshake is running, or changes are not yet stored.                                               | Synchronising                      |
-| `synced`        | The rule of §7.4 holds.                                                                                                       | Synced                             |
-| `offline-local` | No connection and the browser is offline. Changes are kept in the local copy, not on the server.                              | Offline with local copy            |
-| `reconnecting`  | No connection but the browser is online (server unreachable or restarting). Retrying.                                         | Reconnecting                       |
-| `error`         | Recoverable problem; a retry is offered. Carries a `SyncErrorCause`.                                                          | Error                              |
-| `revoked`       | Access was removed. Terminal for this editor session.                                                                         | Access removed                     |
-| `read-only`     | Authorised read-only, including archived documents. Never unsynced.                                                           | Read-only                          |
+| State           | Meaning                                                                                                            | Shown as                | Editor                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------- | ------------------------------------- |
+| `connecting`    | Opening and authenticating for the first time in this session.                                                     | loading                 | not editable                          |
+| `synchronising` | Authorised read-write; the handshake is running, or changes are not yet stored.                                    | Synchronising           | editable                              |
+| `synced`        | The rule of §7.4 holds.                                                                                            | Synced                  | editable                              |
+| `offline-local` | No connection and the browser is offline. Changes are kept in the local copy, not on the server.                   | Offline with local copy | editable (a reader sees the same label, has no local changes, and the editor stays read-only) |
+| `reconnecting`  | No connection but the browser is online (server unreachable or restarting). Retrying.                              | Reconnecting            | editable                              |
+| `error`         | A problem, with a `SyncErrorCause`. `store-timeout` is *transient*: the connection stays up and the state ends as soon as a covering `stored` arrives. The other causes (`unauthenticated`, `not-found`, `document-too-large`) are *stopped*: the connection is closed. | Error                   | editable for `store-timeout`, not editable for the stopped causes |
+| `revoked`       | Access was removed. Terminal for this editor session.                                                              | Access removed          | not editable                          |
+| `read-only`     | Authorised read-only, including archived documents. Never unsynced.                                                | Read-only               | not editable                          |
+
+The action offered in `error` is a retry (`open`; `pending` survives) for every cause except `document-too-large`: there the offer is "discard my local changes and reload", which purges the local copy and then sends `open`. A retry would send the same oversize message again (§5.1, §12.5). Whenever the editor is not editable, edits are not accepted at all rather than accepted and lost.
 
 ### 8.2 Transitions
 
-"Settle" means: if the guard of §7.4 holds, go to `synced`, else stay in `synchronising`. An event not listed for a state is ignored in that state. `revoked` ignores everything.
+"Settle" means: if the guard of §7.4 holds, go to `synced`, else stay in (or go to) `synchronising`. "Any state" means any state except `revoked`, which ignores everything. `error` is not a sink: the first three groups below act from it, `store-timeout` also takes the events of the live states, and a stopped error ignores all the rest until the next `open`. An event not listed for a state is ignored in that state.
 
-| Event                                             | From                                                                 | Guard or detail                                         | To                                                                                   |
-| ------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `open`                                            | initial                                                              |                                                         | `connecting`                                                                         |
-| `open` (retry)                                    | `error`                                                              | reopen the provider                                     | `connecting`                                                                         |
-| `authenticated`                                   | `connecting`, `reconnecting`, `offline-local`                        | `scope = 'read-write'`                                  | `synchronising`, then settle                                                         |
-| `authenticated`                                   | `connecting`, `reconnecting`, `offline-local`                        | `scope = 'readonly'`                                    | `read-only` (§12.4 if changes were pending)                                          |
-| `authentication-denied`                           | `connecting`, `reconnecting`, `offline-local`                        | `reason = 'unauthenticated'`                            | `error` (cause `unauthenticated`)                                                    |
-| `authentication-denied`                           | same                                                                 | `reason = 'not-found'` and `hasBeenAuthorized`          | `revoked`                                                                            |
-| `authentication-denied`                           | same                                                                 | `reason = 'not-found'` and not `hasBeenAuthorized`      | `error` (cause `not-found`)                                                          |
-| `handshake-completed`                             | `synchronising`                                                      |                                                         | settle                                                                               |
-| `local-change`                                    | `synced`                                                             | `pending` becomes set                                   | `synchronising`                                                                      |
-| `local-change`                                    | `synchronising`, `reconnecting`, `offline-local`                     | recorded in `pending`                                   | same state                                                                           |
-| `unsynced-changes-changed`                        | `synced`                                                             | `count > 0`                                             | `synchronising`                                                                      |
-| `unsynced-changes-changed`                        | `synchronising`                                                      |                                                         | settle                                                                               |
-| `stored`                                          | `synchronising`                                                      | `coversLocalChanges`                                    | settle                                                                               |
-| `stored`                                          | `synchronising`                                                      | not `coversLocalChanges`                                | same state                                                                           |
-| `stored-ack-timeout`                              | `synchronising`                                                      |                                                         | `error` (cause `store-timeout`)                                                      |
-| `document-too-large`                              | `synchronising`, `synced`                                            |                                                         | `error` (cause `document-too-large`); stop reconnecting                              |
-| `connection-closed`                               | any live state                                                       | `code = 4403`                                           | `revoked`                                                                            |
-| `connection-closed`                               | any live state                                                       | `code = 4401`                                           | `error` (cause `unauthenticated`)                                                    |
-| `connection-closed`                               | any live state                                                       | `code = 4413` or `1009`                                 | `error` (cause `document-too-large`)                                                 |
-| `connection-closed`                               | `synchronising`, `synced`, `read-only`, `reconnecting`               | any other code or `null`, `online`                      | `reconnecting`                                                                       |
-| `connection-closed`                               | the same, and `connecting`, `offline-local`                          | any other code or `null`, not `online`                  | `offline-local`                                                                      |
-| `connection-closed`                               | `connecting`                                                         | any other code or `null`, `online`                      | `connecting`                                                                         |
-| `network-changed`                                 | `synchronising`, `synced`, `read-only`, `reconnecting`               | `online = false`                                        | `offline-local`                                                                      |
-| `network-changed`                                 | `offline-local`                                                      | `online = true`                                         | `reconnecting`                                                                       |
+| Event                      | From                                                                       | Guard or detail                                    | To                                                         |
+| -------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------- |
+| `open`                     | initial                                                                    |                                                    | `connecting`                                               |
+| `open`                     | `error`                                                                    | retry, or after the discard of §8.1                | `connecting`                                               |
+| `authenticated`            | `connecting`, `reconnecting`, `offline-local`                              | `scope = 'read-write'`                             | `synchronising`, then settle                               |
+| `authenticated`            | `connecting`, `reconnecting`, `offline-local`                              | `scope = 'readonly'`                               | `read-only` (§12.4 if changes were pending)                |
+| `authentication-denied`    | any state                                                                  | `reason = 'unauthenticated'`                       | `error` (cause `unauthenticated`)                          |
+| `authentication-denied`    | any state                                                                  | `reason = 'not-found'` and `hasBeenAuthorized`     | `revoked`                                                  |
+| `authentication-denied`    | any state                                                                  | `reason = 'not-found'` and not `hasBeenAuthorized` | `error` (cause `not-found`)                                |
+| `document-too-large`       | any state                                                                  |                                                    | `error` (cause `document-too-large`); stop reconnecting    |
+| `connection-closed`        | any state                                                                  | `code = 4403`                                      | `revoked`                                                  |
+| `connection-closed`        | any state                                                                  | `code = 4401`                                      | `error` (cause `unauthenticated`)                          |
+| `connection-closed`        | any state                                                                  | `code = 4413` or `1009`                            | `error` (cause `document-too-large`)                       |
+| `connection-closed`        | `synchronising`, `synced`, `read-only`, `reconnecting`, `error` (`store-timeout`) | any other code or `null`, `online`          | `reconnecting`                                             |
+| `connection-closed`        | the same, and `offline-local`                                              | any other code or `null`, not `online`             | `offline-local`                                            |
+| `connection-closed`        | `offline-local`                                                            | any other code or `null`, `online`                 | `reconnecting`                                             |
+| `connection-closed`        | `connecting`                                                               | any other code or `null`, `online`, or no `hasLocalCopy` | `connecting`                                         |
+| `connection-closed`        | `connecting`                                                               | any other code or `null`, not `online`, `hasLocalCopy` | `offline-local`                                       |
+| `network-changed`          | `synchronising`, `synced`, `read-only`, `reconnecting`, `error` (`store-timeout`) | `online = false`                            | `offline-local`                                            |
+| `network-changed`          | `connecting`                                                               | `online = false` and `hasLocalCopy`                | `offline-local`                                            |
+| `network-changed`          | `offline-local`                                                            | `online = true`                                    | `reconnecting`                                             |
+| `handshake-completed`      | `synchronising`                                                            |                                                    | settle                                                     |
+| `local-change`             | `synced`                                                                   | `pending` becomes set                              | `synchronising`                                            |
+| `local-change`             | `synchronising`, `reconnecting`, `offline-local`, `error` (`store-timeout`) | recorded in `pending`                             | same state                                                 |
+| `unsynced-changes-changed` | `synced`                                                                   | `count > 0`                                        | `synchronising`                                            |
+| `unsynced-changes-changed` | `synchronising`                                                            |                                                    | settle                                                     |
+| `stored`                   | `synchronising`, `error` (`store-timeout`)                                 | `coversLocalChanges`                               | settle (from `error`: `synced` when the guard holds, otherwise `synchronising`) |
+| `stored`                   | `synchronising`, `error` (`store-timeout`)                                 | not `coversLocalChanges`                           | same state                                                 |
+| `stored-ack-timeout`       | `synchronising`                                                            |                                                    | `error` (cause `store-timeout`)                            |
 
-The "live states" are `connecting`, `synchronising`, `synced`, `read-only`, `reconnecting` and `offline-local`. `error` ignores `connection-closed` and `network-changed` until the next `open`.
+A `stored` that arrives in a state that does not settle (`connecting`, `reconnecting`, `offline-local`) is remembered through `pending` and takes effect when the state reaches `synchronising`.
 
 ### 8.3 Cases the T2.2 table MUST contain
 
-| Case                                                                       | Expected                                                                                                   |
-| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `stored` arrives before the provider's acknowledgement                     | stays `synchronising`; becomes `synced` when the count reaches 0                                           |
-| A write fails: no covering `stored` for 15 s                               | `error` (`store-timeout`); never `synced`                                                                  |
-| A second local change while the timer runs                                 | the timer restarts; `pending` includes both                                                                |
-| A deletion-only change followed by a `stored` taken before it              | not covered: stays `synchronising`                                                                         |
-| A `stored` whose snapshot contains the change                              | `synced`                                                                                                   |
-| A viewer or commenter: the provider's counter stays above 0                | `read-only`, never `synchronising`                                                                         |
-| Connection lost with pending changes, browser offline / online             | `offline-local` / `reconnecting`; `pending` kept; after reconnection `synchronising`, then `synced` only after a covering `stored` |
-| Reconnection authorised as `readonly` after offline edits                  | `read-only` and the discard of §12.4                                                                       |
-| Close `4403`, or `not-found` on re-authentication of a known document      | `revoked`; no upload                                                                                       |
+| Case                                                                          | Expected                                                                                                   |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `stored` arrives before the provider's acknowledgement                        | stays `synchronising`; becomes `synced` when the count reaches 0                                           |
+| A write fails: no covering `stored` for 15 s                                  | `error` (`store-timeout`); never `synced`; the editor stays editable                                       |
+| `error` (`store-timeout`), then the server's retry stores and a covering `stored` arrives | `synced`, without the person pressing retry                                               |
+| `error` (`store-timeout`), then close `4403`                                  | `revoked`; the copy is purged                                                                              |
+| `error` (`store-timeout`), then the network is lost                           | `offline-local`                                                                                            |
+| `error` (`unauthenticated`), then close `4403`                                | `revoked`                                                                                                  |
+| A second local change while the timer runs                                    | the timer restarts; `pending` includes both                                                                |
+| A deletion-only change followed by a `stored` taken before it                 | not covered: stays `synchronising`                                                                         |
+| A `stored` whose snapshot contains the change                                 | `synced`                                                                                                   |
+| A viewer or commenter: the provider's counter stays above 0                   | `read-only`, never `synchronising`                                                                         |
+| Connection lost with pending changes, browser offline / online                | `offline-local` / `reconnecting`; `pending` kept; after reconnection `synchronising`, then `synced` only after a covering `stored` |
+| Reconnection authorised as `readonly` after offline edits                     | `read-only` and the discard of §12.4                                                                       |
+| Close `4403`, or `not-found` on re-authentication of a known document         | `revoked`; no upload                                                                                       |
+| Close `4413` or `1009`                                                        | `error` (`document-too-large`) offering only "discard my local changes and reload"                         |
+| In-band close (`1000`) with the socket open                                   | `reconnecting`, and `disconnect()` then `connect()` (§6.5)                                                 |
 
 ### 8.4 Effects
 
-Entering `revoked` purges the local copy and never uploads (§12). Entering `error` with cause `document-too-large`, `unauthenticated` or `not-found` calls `disconnect()` so the provider stops retrying. Announcing a state in a live region is done once per change of state, never per keystroke.
+Entering `revoked` purges the local copy and never uploads (§12). Entering a stopped `error` (`document-too-large`, `unauthenticated`, `not-found`) calls `disconnect()` so the provider stops retrying. Reconnection after a close by the server follows §6.5. Announcing a state in a live region is done once per change of state, never per keystroke.
 
 ## 9. Stateless events
 
@@ -376,6 +387,8 @@ Server to client only, on the stateless channel of the document, as JSON validat
 
 Only `stored` and `document-too-large` are machine events; the others only invalidate queries. Clients never send stateless messages (§5.4).
 
+**Compatibility rule.** Parsing is strict, so a field added to an existing event makes every tab still running the previous bundle drop that event: for `stored` that means never reaching Synced and ending in `store-timeout`. Therefore **an existing event never gains fields**: a change in meaning is a new event type. A client ignores a type it does not know (`parseStatelessEvent` returns `null`), so a server may emit new types before every client understands them. (The alternative, tolerant parsing, was rejected: it would hide a violation of this rule instead of failing the schema tests.)
+
 ## 10. Comment anchors
 
 ### 10.1 Format
@@ -388,18 +401,35 @@ A thread anchors a range with `anchor = { start, end }` (`anchorSchema`) and the
 
 ### 10.2 Creation
 
-On the client, from the editor selection `from`/`to` (ProseMirror positions), with the sync binding's `mapping` (`ySyncPluginKey.getState(view.state).binding.mapping`):
+On the client, from the editor selection `from`/`to` (ProseMirror positions), with the sync binding's `mapping` (`ySyncPluginKey.getState(view.state).binding.mapping`). The helper comes from `@tiptap/y-tiptap`, never from `y-prosemirror` (the two must not be mixed).
 
 ```ts
 import { absolutePositionToRelativePosition } from '@tiptap/y-tiptap'
 import * as Y from 'yjs'
 
-const encode = (position: number) =>
-  toBase64(Y.encodeRelativePosition(absolutePositionToRelativePosition(position, fragment, mapping)))
-const anchor = { start: encode(from), end: encode(to) }
+const positionAt = (position: number) => absolutePositionToRelativePosition(position, fragment, mapping)
+
+// The helper uses assoc = -1 for every text position (F12) and has no parameter to change it.
+// The start is wanted with assoc = 0, which is the position the helper makes at from + 1 once assoc is set to 0 (F13).
+function startOf(from: number): Y.RelativePosition {
+  const here = positionAt(from)
+  const next = positionAt(from + 1)
+  const a = Y.createAbsolutePositionFromRelativePosition(here, ydoc)
+  const b = Y.createAbsolutePositionFromRelativePosition(next, ydoc)
+  const sameText = a !== null && b !== null && a.type === b.type && a.type instanceof Y.XmlText && b.index === a.index + 1
+  if (!sameText) return here
+  next.assoc = 0
+  return next
+}
+
+const anchor = { start: toBase64(Y.encodeRelativePosition(startOf(from))), end: toBase64(Y.encodeRelativePosition(positionAt(to))) }
 ```
 
-The helper comes from `@tiptap/y-tiptap`, never from `y-prosemirror` (the two must not be mixed). **Deviation from the plan:** the plan asks for `assoc = 0` at the start and `-1` at the end. The helper has no such parameter and uses `-1` for every text position (F12), and a position cannot be re-associated afterwards (F13). So both ends use `assoc = -1`: the range follows the character on its left. Observable consequence (tested in Yjs): text typed exactly at the start boundary falls **inside** the range, and text typed exactly at the end boundary falls outside. T3.2 pins this in its "inserts before, inside and after" tests. No client may change `assoc` after creation.
+The start has `assoc = 0` and the end `assoc = -1`, as the plan asks. The result: text typed immediately before the commented text, and text typed immediately after it, both fall **outside** the range, and the range keeps covering the characters it covered. This is verified with Yjs (§16: typing at both boundaries leaves the range `"cd"`).
+
+**When the range does not start before a character of the same text node** (it starts at the end of a text node, or at a node boundary such as before an image or a new paragraph), `startOf` returns the helper's position at `from` unchanged. At a node boundary the helper already returns a position with no association (`assoc` 0 by default). At the end of a text node it is a text position with `assoc = -1`: text typed at the end of that node then joins the range. This is a rare edge and it is accepted; T3.2 pins both behaviours with tests.
+
+Anchors are stored, so what a position means cannot change afterwards: no client may alter `assoc` of an existing anchor, and a change to this recipe is a protocol change that needs a migration.
 
 ### 10.3 Resolution
 
@@ -444,11 +474,11 @@ The server-side sequence for `POST /api/versions/{versionId}/restore`. "Mutex" i
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
 | 1   | Authorise: owner of the document, which is not archived; the version belongs to the document. Otherwise `404` or `403` as the access matrix says.                                                                                                                                                                                                                      | no         |
 | 2   | Read the version's update and convert it with `yUpdateToJson` in a throwaway `Y.Doc`; validate the JSON against the editor schema. Failure ends here: nothing has touched the live document.                                                                                                                                                                          | no         |
-| 3   | Open the live document (`openDirectConnection`, which loads it when nobody is connected). Acquire the mutex. This waits for a store in flight and makes later stores wait.                                                                                                                                                                                              | acquires   |
-| 4   | Capture `pre = Y.encodeStateAsUpdate(live)` and `preSnapshot = Y.snapshot(live)`. In the database insert the `pre-restore` version from `pre`. This `await` is the only one before the change.                                                                                                                                                                       | yes        |
-| 5   | **Verify and apply, in one synchronous run:** if `Y.equalSnapshots(Y.snapshot(live), preSnapshot)` is false (an edit arrived during step 4), do not apply: go back to step 4 with a fresh capture, at most 3 times, then fail with `409 conflict`. If it is true, `live.transact(() => replace the fragment content with the converted JSON, 'restore')`, then `post = Y.encodeStateAsUpdate(live)`. | yes        |
+| 3   | Open the live document (`openDirectConnection`, which loads it when nobody is connected) and keep the `DirectConnection` handle. Acquire the mutex. This waits for a store in flight and makes later stores wait.                                                                                                                                                                                              | acquires   |
+| 4   | Capture `pre = Y.encodeStateAsUpdate(live)` and `preSnapshot = Y.snapshot(live)`. In the database write the **one** `pre-restore` version of this restore from `pre`: insert it the first time, overwrite its `state` on every later pass. This `await` is the only one before the change.                                                                                                                                                                       | yes        |
+| 5   | **Verify and apply, in one synchronous run:** if `Y.equalSnapshots(Y.snapshot(live), preSnapshot)` is false (an edit arrived during step 4), do not apply: go back to step 4 with a fresh capture, at most 3 times, then delete the `pre-restore` row and fail with `409 conflict`. If it is true, `live.transact(() => replace the fragment content with the converted JSON, 'restore')` on the `Document` itself, never `DirectConnection.transact`, then `post = Y.encodeStateAsUpdate(live)`. | yes        |
 | 6   | In **one database transaction**: insert the `restore` version from `post`, insert the activity event, and write the document state with the same capture-and-write function the store hook uses (§7.2). Commit. On failure retry it (idempotent by restore request id) up to 3 times; the content is already restored in memory and the store retry of §7.2 persists it.     | yes        |
-| 7   | Release the mutex; broadcast `versions-changed`; answer the request. Connected editors have already received the change as a normal update (origin `restore`).                                                                                                                                                                                                       | released   |
+| 7   | Release the mutex. **Then** call `directConnection.disconnect()`; broadcast `versions-changed`; answer the request. Connected editors have already received the change as a normal update (origin `restore`).                                                                                                                                                                                                       | released   |
 
 ```mermaid
 sequenceDiagram
@@ -461,15 +491,17 @@ sequenceDiagram
     S->>DB: read version, convert to JSON (no live access)
     S->>L: acquire mutex (waits for a store in flight)
     S->>L: capture pre + snapshot
-    S->>DB: insert pre-restore version(pre)
+    S->>DB: write the pre-restore version (insert, or overwrite on a later pass)
     S->>L: snapshot unchanged? (else recapture, max 3)
     S->>L: transact 'restore': replace content; capture post
     L-->>E: normal update broadcast
     S->>DB: one transaction: restore version(post), activity, document state
-    S->>L: release mutex
+    S->>L: release mutex, then close the direct connection
     S-->>E: versions-changed
     S-->>O: 200
 ```
+
+**Two traps.** `DirectConnection.disconnect()` awaits `storeDocumentHooks(…, true)`, which takes the mutex: called while the restore still holds it, it waits for itself forever, so the connection is closed only after the mutex is released. And a retry must not leave one `pre-restore` version per pass, which is why step 4 rewrites a single row and a `409` deletes it.
 
 **Why the shape.** The check and the change in step 5 are one synchronous run, so no edit can slip between "the state I saved as `pre-restore`" and "the state I replace": the `pre-restore` version is exactly what was replaced. The mutex is what keeps a store that captured the old state from writing it **after** the restore's write and bringing the old content back. Two restores, a restore and a version, and a restore and a store are serialised by the same mutex.
 
@@ -494,9 +526,11 @@ sequenceDiagram
 | Sign-out                                       | every copy whose name starts with `draftroom:<userId>:`            |
 | Account switch                                 | every copy of the previous account                                 |
 
+A copy may hold changes the server never stored, and a purge would destroy them. Each copy therefore carries an `unsynced` marker: set when `pending` becomes non-empty, cleared when a covering `stored` empties it. **Sign-out and account switch** check the markers first: if any copy has one, the app waits (bounded, a few seconds) for the copies to store while online; if some remain, it names how many documents have changes that were never stored and asks for confirmation before purging. Without a marker, or after confirmation, it purges. A revocation purges without asking, because nothing may be uploaded after it.
+
 ### 12.3 No pre-authentication backlog
 
-By F9 and F10 the provider flushes everything it queued while offline the instant the socket opens, before the server has authenticated anything, and the queue is private and unbounded. An offline stretch of a few hundred edits would exceed the 64-message limit of §5.1, the server would close with `4205`, and the provider would resend the same queue forever. The client MUST therefore prevent offline edits from accumulating in the transport queue: while the connection is down the provider must not enqueue document updates, because the reconnection handshake (SyncStep1 and SyncStep2 by state vector) resends every change anyway. The mechanism (for example detaching the provider while disconnected) belongs to T2.2 and is pinned by a test with 2 000 offline edits followed by a reconnection that completes. The server keeps its small limits.
+By F9 and F10 the provider flushes everything it queued while offline when the first server message arrives, the server holds it in the pre-load buffer, and the provider's queue is private and unbounded. An offline stretch of a few hundred edits (or typing while the document is still loading) would exceed the 64-message limit of §5.1, the server would close with `4205`, and the provider would resend the same queue forever. The client MUST therefore prevent offline edits from accumulating in the transport queue: while the connection is down the provider must not enqueue document updates, because the reconnection handshake (SyncStep1 and SyncStep2 by state vector) resends every change anyway. The mechanism (for example detaching the provider while disconnected) belongs to T2.2 and is pinned by a test with 2 000 offline edits followed by a reconnection against a server whose `onLoadDocument` takes 300 ms, which must complete. The server keeps its small limits.
 
 ### 12.4 Re-authentication after an outage
 
@@ -510,6 +544,15 @@ Nothing is applied before authentication finishes (F9), so a refusal or a downgr
 
 A removed account's `PermissionDenied` is `not-found`, never a distinct "forbidden" (§3.3), so the client treats `not-found` after a prior authorisation as removal.
 
+### 12.5 Size of what is unsent
+
+The handshake after a reconnection sends everything the server lacks in one SyncStep2, and a message above `MAX_MESSAGE_BYTES` makes the transport close with 1009 (§5.1), which a retry would repeat. So the client keeps the unsent part below a budget:
+
+- It measures the unsent part as `Y.encodeStateAsUpdate(doc, stateVectorOf(lastStoredSnapshot)).byteLength`, where `lastStoredSnapshot` is the last `stored` snapshot it received (its state vector is the server's, as of that store).
+- When it exceeds `MAX_UNSENT_BYTES` (1.5 MiB), the editor stops accepting edits (not editable, §8.1) until a covering `stored` brings it back under the budget.
+- Paste and drop handlers refuse content whose text is larger than a third of the budget, which leaves room for markup and Yjs overhead.
+- If a 1009 or `4413` happens anyway, the way out is "discard my local changes and reload" (§8.1), never a retry.
+
 ## 13. Undo
 
 `StarterKit.configure({ undoRedo: false })`, with the Collaboration extension's undo. Its undo manager tracks only transactions with the local sync origin (F15), so `Mod-Z` reverts only the person's own edits. Remote edits and a restore (origin `restore`) are never tracked, so nobody can undo someone else's work or a restore. The protocol does not clear the undo stack after a restore: an entry whose content the restore removed has nothing to act on, and an entry may re-insert the person's own earlier deletion if its container still exists.
@@ -520,13 +563,128 @@ A removed account's `PermissionDenied` is `not-found`, never a distinct "forbidd
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `stored` payload                   | a snapshot instead of a state vector (§7)                                                                       | F11                                                              |
 | Closing a connection               | close the WebSocket, one per document, flip `readOnly` first (§6)                                                | F5, F6                                                           |
-| Oversize message                   | transport close `1009`, handled like `4413` (§5.1)                                                              | F7                                                               |
+| Oversize message                   | transport close `1009`, handled like `4413`, with "discard and reload" instead of a retry (§5.1, §8.1)          | F7                                                               |
+| Oversized document                 | refuse only writes that add content; reads and deletions pass (§5.2)                                            | every client sends a SyncStep2 at the handshake (F16)            |
 | Authentication refusal reasons     | `unauthenticated` and `not-found` only (§3.3)                                                                   | no id probing                                                    |
-| Connection context                 | `{ userId, workspaceId, role, displayName }`                                                                    | awareness name rewrite (§5.3)                                    |
+| Connection context                 | `{ userId, workspaceId, role, displayName, sessionId }`                                                         | awareness name rewrite (§5.3), session end (§6.3)                |
 | `stored` on connection             | send the last stored snapshot (§7.3)                                                                            | a reopen with nothing new would never become Synced              |
-| Failed store                       | the server retries with back-off (§7.2)                                                                         | F4                                                               |
-| Anchor `assoc`                     | `-1` at both ends (§10.2)                                                                                       | F12, F13                                                         |
+| Snapshot slot                      | assigned after the commit, from variables captured before the `await` (§7.2)                                   | a failed write must not look stored                              |
+| Failed store                       | the server retries with back-off, keeps the document loaded and waits for retries at shutdown (§7.2)           | F4, F18                                                          |
+| `error`                            | not a sink: `store-timeout` is transient and the revocation, denial and size signals act from every state (§8.2) | a revocation must purge the copy                                 |
+| Reconnection after server closes   | the client's own back-off, and `disconnect()` + `connect()` after an in-band close (§6.5)                       | F6, F17                                                          |
+| Anchor `assoc`                     | start `0` (helper at `from + 1`, then `assoc = 0`), end `-1` (§10.2)                                            | F12, F13                                                         |
 | Quote and title length             | counted in Unicode code points                                                                                  | match JSON Schema `maxLength`                                    |
-| Restore                            | persist `pre-restore` first, verify and apply synchronously, hold the store mutex until committed (§11.4)       | exact `pre-restore`, no regression of the stored state           |
+| Restore                            | one `pre-restore` row per restore, verify and apply synchronously, hold the store mutex until committed, close the direct connection after releasing it (§11.4) | exact `pre-restore`, no regression of the stored state, no deadlock |
 | Downgrade after offline edits      | `read-only` with a notice, not `revoked` (§12.4)                                                                 | the person still has read access                                 |
-| Pre-authentication backlog         | the client must not queue offline edits (§12.3)                                                                  | F10                                                              |
+| Pre-authentication backlog         | the client must not queue offline edits (§12.3)                                                                  | F9, F10                                                          |
+| Unsent changes                     | a budget of `MAX_UNSENT_BYTES`; the editor stops above it (§12.5)                                               | F7                                                               |
+| Sign-out with unstored changes     | markers on copies, wait, then confirm (§12.2)                                                                    | a purge would destroy changes the server never stored            |
+| Stateless compatibility            | an existing event never gains fields; a new type instead (§9)                                                    | strict parsing in older tabs                                     |
+
+## 15. Tests this protocol requires
+
+**T2.1 (server)**
+
+1. No cookie, or no access: refused before any document data is sent; an unknown document and a forbidden one give the same `not-found`.
+2. A viewer or commenter sends a hand-made update: not applied, not stored, not broadcast.
+3. An editor's update is stored and followed by a `stored` event whose snapshot contains it; a deletion-only update is covered only by a snapshot taken after it.
+4. A restart loads the stored binary state.
+5. Awareness: a spoofed `user.id` is dropped, `user.name` is rewritten, a client id owned by another connection is dropped, and another client's removal is ignored.
+6. A message above `MAX_MESSAGE_BYTES` closes the socket with `1009`.
+7. **A read-write editor with no changes, a commenter and a viewer open a document above `MAX_DOCUMENT_STATE_BYTES` and read it;** a deletion-only update is applied; an update that adds content is refused with `document-too-large` and `4413`.
+8. A write fails: no `stored` is sent, the retry succeeds without a new edit, and a client that connects meanwhile receives the previous snapshot, not the unwritten one.
+9. **A write fails and the last client leaves: the document stays loaded and ends up stored.**
+10. Shutdown waits for a pending retry and stores it.
+11. Revocation: `readOnly` is set before the close, an update sent in between is not applied, and the code is `4403` or `4409` as §6.3 says.
+12. The rate limit closes with `4429`; the pre-load buffer limit closes with `4205`.
+13. A hook that throws produces an in-band close with the socket still open (the behaviour the client rule of §6.5 answers).
+14. A session that ends closes only the connections with its `sessionId`, with `4401`.
+
+**T2.2 (client)**
+
+1. The state machine as a table of states and events, including every row of §8.3 (`error` is not a sink).
+2. **The reconnect back-off with fake timers:** repeated `4429` closes wait 1, 2, 4, … 30 s, return to 1 s after a connection that stayed up for 60 s, and a first `4409` after a stable connection reconnects at once.
+3. 2 000 offline edits and then a reconnection against a slow `onLoadDocument` complete (§12.3).
+4. The `stored` rule: a deletion-only change is not covered by a snapshot taken before it.
+5. An in-band close makes the client call `disconnect()` and then `connect()`.
+6. `1009` and `4413` offer "discard my local changes and reload", never a retry.
+7. Above `MAX_UNSENT_BYTES` the editor stops accepting edits.
+
+**T3.2 (anchors)**
+
+Text typed before, at the start boundary, inside, at the end boundary and after the range leaves it covering the same characters; the fallback cases of §10.2; a range deleted whole is orphaned; half of it keeps the rest.
+
+**T5.1 (restore)**
+
+A retried restore leaves one `pre-restore` version; a `409` leaves none; the direct connection is closed after the mutex is released (no deadlock); the concurrent restore test of the plan.
+
+## 16. Reproducing the Yjs facts
+
+All of these were verified with `yjs@13.6.33` (`npm i yjs@13.6.33`, then `node file.mjs`).
+
+```js
+import * as Y from 'yjs'
+
+// F11: a deletion does not change the state vector; a snapshot tells it apart.
+const a = new Y.Doc()
+a.getText('t').insert(0, 'hello world')
+const server = new Y.Doc()
+Y.applyUpdate(server, Y.encodeStateAsUpdate(a))
+const before = Y.encodeStateVector(a)
+a.getText('t').delete(0, 5)
+console.log(Buffer.from(before).equals(Buffer.from(Y.encodeStateVector(a)))) // true
+const pending = Y.encodeStateAsUpdate(a, Y.encodeStateVector(server))
+console.log(Y.snapshotContainsUpdate(Y.snapshot(server), pending)) // false
+Y.applyUpdate(server, pending)
+console.log(Y.snapshotContainsUpdate(Y.snapshot(server), pending)) // true
+
+// F16: a pure deletion has no structs.
+let last
+a.on('update', (update) => { last = update })
+a.getText('t').delete(0, 1)
+console.log(Y.parseUpdateMeta(last).to.size) // 0
+a.getText('t').insert(0, 'x')
+console.log(Y.parseUpdateMeta(last).to.size) // 1
+
+// F13 and §10.2: the start made at from + 1 with assoc = 0, and typing at both boundaries.
+const doc = new Y.Doc()
+const paragraph = new Y.XmlElement('paragraph')
+const text = new Y.XmlText('abcdef')
+paragraph.insert(0, [text])
+doc.getXmlFragment('default').insert(0, [paragraph])
+const helper = (index) => Y.createRelativePositionFromTypeIndex(text, index, -1) // what the y-tiptap helper returns
+const start = helper(3) // from = 2, one past the start
+start.assoc = 0
+console.log(JSON.stringify(start) === JSON.stringify(Y.createRelativePositionFromTypeIndex(text, 2, 0))) // true
+const end = helper(4)
+const at = (position) => Y.createAbsolutePositionFromRelativePosition(position, doc).index
+text.insert(2, 'S') // typed at the start boundary
+text.insert(at(end), 'E') // typed at the end boundary
+console.log(text.toString().slice(at(start), at(end))) // "cd"
+
+// F14: an update in flight onto a node the restore removed is dropped with gc: true, kept with gc: false.
+for (const gc of [true, false]) {
+  const make = () => {
+    const d = new Y.Doc({ gc })
+    const p = new Y.XmlElement('paragraph')
+    p.insert(0, [new Y.XmlText('hello')])
+    d.getXmlFragment('default').insert(0, [p])
+    return d
+  }
+  const live = make()
+  const peer = new Y.Doc({ gc })
+  Y.applyUpdate(peer, Y.encodeStateAsUpdate(live))
+  let inFlight
+  peer.on('update', (update) => { inFlight = update })
+  peer.getXmlFragment('default').get(0).get(0).insert(5, ' WORLD')
+  live.transact(() => {
+    const fragment = live.getXmlFragment('default')
+    fragment.delete(0, 1)
+    const p = new Y.XmlElement('paragraph')
+    p.insert(0, [new Y.XmlText('restored')])
+    fragment.insert(0, [p])
+  }, 'restore')
+  Y.applyUpdate(live, inFlight)
+  console.log(gc, Buffer.from(Y.encodeStateAsUpdate(live)).toString('utf8').includes('WORLD')) // true false, false true
+}
+```
