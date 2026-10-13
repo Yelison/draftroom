@@ -1,0 +1,65 @@
+.rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: var(--space-16) var(--space-12);
+  background: var(--color-nav);
+  color: var(--color-nav-text);
+  overflow-y: auto;
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-height: var(--button-height);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-control);
+  color: inherit;
+  font: var(--font-label);
+  text-decoration: none;
+}
+
+.item:hover {
+  color: var(--color-nav-ink);
+}
+
+.item[aria-current='page'] {
+  background: var(--color-nav-active);
+  color: var(--color-nav-ink);
+}
+
+/* The ring sits inside the item, so the rail's own scrolling never clips it. */
+.item:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.item svg {
+  flex: none;
+}
+
+.compact {
+  padding-inline: var(--space-4);
+}
+
+.compact .item {
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--space-2);
+  text-align: center;
+}
+
+.compact .label {
+  font: var(--font-caption);
+  overflow-wrap: anywhere;
+}

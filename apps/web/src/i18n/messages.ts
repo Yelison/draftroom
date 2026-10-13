@@ -7,3 +7,6 @@ import type { Locale } from './locale.ts'
  * (`scripts/messages-ast.ts`), which react-intl accepts in the same place as the strings the tests and the dev server use.
  */
 export const messages: Record<Locale, Record<string, string>> = { en, es }
+
+/** The id of a message. Typing it from the English catalogue makes a mistyped id a compile error, not a blank in a page. */
+export type MessageId = keyof typeof en

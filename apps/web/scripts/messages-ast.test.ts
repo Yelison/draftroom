@@ -17,7 +17,7 @@ describe('catalogueModule', () => {
     const trees = exported(module?.code ?? '')
 
     expect(Object.keys(trees).sort()).toEqual(Object.keys(en).sort())
-    expect(trees['home.title']).toEqual([{ type: 0, value: en['home.title'] }])
+    expect(trees['nav.documents']).toEqual([{ type: 0, value: en['nav.documents'] }])
   })
 
   it('keeps the arguments of a message as nodes', () => {
@@ -40,8 +40,8 @@ describe('catalogueModule', () => {
     const text = (tree: unknown[]) => JSON.stringify(tree)
 
     expect(Object.keys(pseudo).sort()).toEqual(Object.keys(real).sort())
-    expect(text(pseudo['home.title'] ?? [])).toMatch(/\P{ASCII}/u)
-    expect(text(pseudo['home.title'] ?? []).length).toBeGreaterThan(text(real['home.title'] ?? []).length)
+    expect(text(pseudo['nav.documents'] ?? [])).toMatch(/\P{ASCII}/u)
+    expect(text(pseudo['nav.documents'] ?? []).length).toBeGreaterThan(text(real['nav.documents'] ?? []).length)
     expect(pseudo['preferences.language.announcement']).toContainEqual({ type: 1, value: 'language' })
   })
 })

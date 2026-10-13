@@ -1,0 +1,17 @@
+.link {
+  position: absolute;
+  top: var(--space-8);
+  left: var(--space-8);
+  z-index: var(--z-overlay);
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: var(--font-label);
+  transform: translateY(calc(-100% - var(--space-8)));
+}
+
+.link:focus-visible {
+  outline: var(--focus-ring);
+  transform: none;
+}

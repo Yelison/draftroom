@@ -1,0 +1,105 @@
+import { screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { localeStorageKey } from '../i18n/locale.ts'
+import { renderApp } from '../test/renderApp.tsx'
+
+/** The rail item that is current on each route, the headline of the page and the rail of the layout it opens in. */
+const routeCases = [
+  { path: '/', active: 'Home', heading: 'Home', rail: 'expanded' },
+  { path: '/documents', active: 'Documents', heading: 'Documents', rail: 'expanded' },
+  { path: '/folders/design-team', active: 'Documents', heading: 'Folder', rail: 'expanded' },
+  { path: '/templates/meeting-notes', active: 'Documents', heading: 'Template', rail: 'expanded' },
+  { path: '/shared', active: 'Shared', heading: 'Shared', rail: 'expanded' },
+  { path: '/shared?access=editor&selected=d1', active: 'Shared', heading: 'Shared', rail: 'expanded' },
+  { path: '/history', active: 'History', heading: 'History', rail: 'expanded' },
+  { path: '/settings/profile', active: 'Settings', heading: 'Settings', rail: 'expanded' },
+  { path: '/settings/workspace', active: 'Settings', heading: 'Settings', rail: 'expanded' },
+  { path: '/settings/members', active: 'Settings', heading: 'Settings', rail: 'expanded' },
+  { path: '/settings/appearance', active: 'Settings', heading: 'Settings', rail: 'expanded' },
+  { path: '/trash', active: 'Documents', heading: 'Trash', rail: 'expanded' },
+  { path: '/search?q=budget', active: 'Documents', heading: 'Search results', rail: 'expanded' },
+  { path: '/documents/new', active: 'Documents', heading: 'New document', rail: 'compact' },
+  { path: '/documents/d1', active: 'Documents', heading: 'Document', rail: 'compact' },
+  { path: '/documents/d1/share', active: 'Documents', heading: 'Share', rail: 'compact' },
+  { path: '/documents/d1/versions', active: 'Documents', heading: 'Version history', rail: 'compact' },
+  { path: '/no/such/page', active: undefined, heading: 'Page not found', rail: 'expanded' },
+] as const
+
+describe('the route table', () => {
+  it.each(routeCases)('$path: one current item ($active), headline "$heading"', ({ path, active, heading, rail }) => {
+    renderApp(path)
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveAccessibleName(heading)
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass(rail)
+    const current = screen.queryAllByRole('link', { current: 'page' }).map((link) => link.textContent)
+    expect(current).toEqual(active === undefined ? [] : [active])
+  })
+
+  it('opens Profile from /settings', async () => {
+    const { router } = renderApp('/settings')
+
+    expect(await screen.findByRole('link', { current: 'page' })).toHaveTextContent('Settings')
+    expect(router.state.location.pathname).toBe('/settings/profile')
+  })
+
+  it('titles the tab after the page, in the language of the app', () => {
+    renderApp('/documents/d1/versions')
+
+    expect(document.title).toBe('Version history · Draftroom')
+  })
+
+  it.each(['/documents/d1', '/search?q=budget', '/trash'])('leaves the Settings item alone on %s', (path) => {
+    renderApp(path)
+
+    expect(screen.getByRole('link', { name: 'Settings' })).not.toHaveAttribute('aria-current')
+  })
+})
+
+describe('the texts of the shell in both languages', () => {
+  const railLabels = [
+    { path: '/', english: 'Home', spanish: 'Inicio' },
+    { path: '/documents', english: 'Documents', spanish: 'Documentos' },
+    { path: '/shared', english: 'Shared', spanish: 'Compartidos' },
+    { path: '/history', english: 'History', spanish: 'Historial' },
+    { path: '/settings/profile', english: 'Settings', spanish: 'Configuración' },
+  ]
+
+  it.each(
+    railLabels.flatMap(({ path, english, spanish }) => [
+      { locale: 'en', path, label: english },
+      { locale: 'es', path, label: spanish },
+    ]),
+  )('$locale: the rail item "$label" is the headline of $path', ({ locale, path, label }) => {
+    localStorage.setItem(localeStorageKey, locale)
+
+    renderApp(path)
+
+    expect(screen.getByRole('link', { current: 'page' })).toHaveAccessibleName(label)
+    expect(screen.getByRole('heading', { level: 1 })).toHaveAccessibleName(label)
+  })
+
+  it('names every item of the rail in Spanish, with the navigation and the skip link', () => {
+    localStorage.setItem(localeStorageKey, 'es')
+
+    renderApp('/')
+
+    const rail = screen.getByRole('navigation', { name: 'Navegación principal' })
+    expect(rail).toHaveTextContent('InicioDocumentosCompartidosHistorialConfiguración')
+    expect(screen.getByRole('link', { name: 'Saltar al contenido' })).toBeInTheDocument()
+    expect(document.title).toBe('Inicio · Draftroom')
+  })
+
+  it.each([
+    { path: '/documents/d1/versions', title: 'Historial de versiones' },
+    { path: '/documents/d1/share', title: 'Compartir' },
+    { path: '/documents/new', title: 'Nuevo documento' },
+    { path: '/no/such/page', title: 'Página no encontrada' },
+  ])('titles $path "$title" in Spanish, in the page and in the tab', ({ path, title }) => {
+    localStorage.setItem(localeStorageKey, 'es')
+
+    renderApp(path)
+
+    expect(screen.getByRole('heading', { level: 1, name: title })).toBeInTheDocument()
+    expect(document.title).toBe(`${title} · Draftroom`)
+  })
+})
