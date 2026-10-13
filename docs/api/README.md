@@ -113,7 +113,11 @@ Paginating by `updatedAt` while documents are edited can skip or repeat a docume
 
 Documents and folders carry an integer `revision`, starting at 1 and growing by one with every change to their metadata (title, folder, archive, restore). Content edits do not change it. `PATCH` takes the `revision` the client last read; if it is stale the server answers `409 revision-conflict` with the **current** resource in `current`, so the client can reconcile and retry without another request.
 
-Archive, restore, pin, resolve and reopen are idempotent and take no revision.
+Archive, restore, pin, resolve and reopen are idempotent and take no revision. Removing a grant that does not exist (`removeAccess`) is not idempotent: it is `404`.
+
+**Access list.** `listAccess` returns every explicit grant on the document, the creator's `owner` grant included, and the explicit grant of a workspace owner if one exists; owners who are owners only through the workspace are not listed, because their access is implicit.
+
+**Archived documents.** An archived document is readable only by its owners: `getDocument` and the document lists with `archived=true`, plus `restoreDocument` and `deleteDocument`. Every other operation on it, its threads, versions and activity included, is `404` for everyone, owners too, until it is restored.
 
 ## Limits
 
