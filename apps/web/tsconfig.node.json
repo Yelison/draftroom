@@ -9,7 +9,7 @@
     "outDir": null,
     "tsBuildInfoFile": "${configDir}/node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
-  // The build tooling and its tests, the browser specs, plus the few modules of `src` that the Vite configuration reads.
+  // The build tooling and its tests, the browser specs, plus the few modules of `src` that the Vite configuration reads and the fixtures that the bundle guard searches for.
   "include": [
     "vite.config.ts",
     "scripts",
@@ -17,6 +17,8 @@
     "src/i18n/locale.ts",
     "src/i18n/localeScript.ts",
     "src/i18n/*.json",
-    "src/theme.ts"
+    "src/theme.ts",
+    "src/data/mock/fixtures",
+    "src/data/mock/ids.ts"
   ]
 }

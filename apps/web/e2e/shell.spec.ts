@@ -1,16 +1,8 @@
-/* Walks the navigation of the production build with the keyboard. There is no Playwright configuration yet (the mocked
- * e2e gate brings it), so the build is served on the port of this checkout and this file alone is run:
- *
- *   npm run build -w @draftroom/web
- *   PLAYWRIGHT_PORT=<port> npm run preview -w @draftroom/web &
- *   PLAYWRIGHT_PORT=<port> npx playwright test e2e/shell.spec.ts --workers=2
- */
-import { expect, test, type Page } from '@playwright/test'
+/* Walks the navigation of the production build with the keyboard. */
+import type { Page } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 
-const port = process.env.PLAYWRIGHT_PORT
-if (port === undefined) throw new Error('PLAYWRIGHT_PORT is not set: it is the port `vite preview` serves the build on')
-
-test.use({ baseURL: `http://localhost:${port}`, locale: 'en-US', colorScheme: 'light' })
+test.use({ locale: 'en-US', colorScheme: 'light' })
 
 const railItems = ['Home', 'Documents', 'Shared', 'History', 'Settings']
 

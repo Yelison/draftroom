@@ -7,6 +7,7 @@
     "build": "vite build",
     "build:pseudo": "vite build --mode pseudo",
     "preview": "vite preview",
+    "test:e2e": "playwright test",
     "sync:forma-tokens": "node scripts/sync-forma-tokens.mjs"
   },
   "dependencies": {
