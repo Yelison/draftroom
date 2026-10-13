@@ -335,7 +335,7 @@ Every task is expanded into a self-contained brief (files, interfaces, tests, ac
 **Objective:** a repository where `npm ci`, `npm run lint`, `npm run format:check`, `npm run typecheck` and `npm test` pass on empty packages, with the first required CI job.
 **Dependencies:** none. **Owner of:** `package-lock.json`, root configs.
 **Files:** create `package.json` (workspaces `apps/*`, `packages/*`, `engines.node`), `.nvmrc`, `.npmrc` (official registry), `.editorconfig`, `.prettierrc.json`, `.prettierignore`, `oxlint` config, `tsconfig.base.json`, `apps/web/package.json`, `apps/server/package.json`, `packages/contract/package.json` (each with an empty typed entry and one smoke test), `.github/workflows/ci.yml` (job **Static checks**), `.github/pull_request_template.md`, `CONTRIBUTING.md`, `.github/dependabot.yml` (npm and actions, grouped minor and patch).
-**Dependencies added:** typescript 6.0.3, vitest 5.0.4, oxlint, prettier.
+**Dependencies added:** typescript 6.0.3, vitest 5.0.4, oxlint, prettier, and the contract tooling of T0.2 and T0.3 (openapi-typescript 7.13.0, `@redocly/cli`, zod 4.6.7 in `packages/contract`), so that T0.2, T0.3 and T0.5 can run in parallel without sharing the lockfile.
 **Tests:** a smoke test per package; the CI job runs on the PR and is green.
 **Acceptance:** `npm ci` without `--legacy-peer-deps`; actions pinned by SHA; `permissions: contents: read`; `concurrency` per ref; job timeouts.
 **Risks:** peer conflicts later (TypeScript 6 vs `openapi-typescript` peer `^5`): T0.2 verifies and records the outcome.
@@ -345,7 +345,7 @@ Every task is expanded into a self-contained brief (files, interfaces, tests, ac
 **Objective:** `packages/contract/openapi.yaml` covering every operation in §4.1 with schemas, examples and error responses; generated types; `docs/api/README.md` with the roles matrix (§4.3), error codes, pagination and concurrency rules.
 **Dependencies:** T0.1. **Owner of:** the REST contract (later changes go through this owner, §8.2).
 **Files:** `packages/contract/openapi.yaml`, `packages/contract/src/schema.ts` (generated, Prettier-ignored), `packages/contract/scripts/generate.mjs`, `docs/api/README.md`, `docs/decisions/0001-architecture-and-stack.md`, `0002-adopt-forma-ui.md`, `0003-internationalisation.md`, `0005-data-model-and-permissions.md`.
-**Dependencies added:** openapi-typescript 7.13.0, `@redocly/cli` (lint only).
+**Dependencies added:** none (the contract tooling is installed by T0.1).
 **Tests:** `api:lint` (Redocly); `api:types` + `git diff --exit-code` in **Static checks**; a test that every operation declares `operationId`, a `problem+json` default response and a security requirement (except health and sign-in/up).
 **Acceptance:** each row of §4.3 maps to operations; ADRs record decisions and alternatives; no references to private material or internal tooling.
 
@@ -603,7 +603,7 @@ Security headers and CSP (hash of the single inline script), CORS by `ALLOWED_OR
 | T8.2 | T0.7, screens | B + C |
 | T8.3 | T8.1, T8.2 | C |
 
-**Safe batches** (at most two implementers working at a time, one on the server lane): {T0.1} → {T0.2, T0.5} → {T0.3, T0.6} → {T0.4, T0.7} → {T1.1, T1.2} → {T2.1, T1.3} → {T2.2, T3.1} → {T2.3, T4.1} → {T2.4, T3.2} → {T5.1, T4.2} → {T5.3, T5.2} → {T6.2, T6.1} → {T6.3, T6.4} → {T7.1, T6.5} → {T7.2, T8.2} → {T8.1} → {T8.3}. T0.8 slots in as soon as the product token source exists.
+**Safe batches** (at most three implementers working at a time, at most one of them adding dependencies): {T0.1} → {T0.2, T0.3, T0.5} → {T0.4, T0.6} → {T0.7} → {T1.1, T1.2} → {T2.1, T1.3} → {T2.2, T3.1} → {T2.3, T4.1} → {T2.4, T3.2} → {T5.1, T4.2} → {T5.3, T5.2} → {T6.2, T6.1} → {T6.3, T6.4} → {T7.1, T6.5} → {T7.2, T8.2} → {T8.1} → {T8.3}. T0.8 slots in as soon as the product token source exists.
 
 ### 8.2 Single owners
 
