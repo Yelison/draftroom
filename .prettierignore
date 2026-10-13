@@ -8,3 +8,6 @@ package-lock.json
 
 # Markdown is written for reading, not for a formatter's line width.
 *.md
+
+# Generated product tokens: copied byte for byte, never reformatted.
+apps/web/src/styles/draftroom-tokens.css

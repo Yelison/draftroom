@@ -46,6 +46,7 @@ describe("Draftroom's own stylesheets never redeclare a token of the package", (
     // Without this a pattern that finds nothing would make the next test pass on an empty set.
     expect(packageNames).toContain('--color-bg')
     expect(ownFiles).toContain(join('styles', 'global.css'))
+    expect(ownFiles).toContain(join('styles', 'draftroom-tokens.css'))
     expect(ownFiles.some((file) => file.endsWith('.module.css'))).toBe(true)
   })
 

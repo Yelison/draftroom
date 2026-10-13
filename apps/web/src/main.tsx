@@ -2,7 +2,7 @@
 // after it: a `className` has the same specificity as the component's rule, so the later stylesheet wins. This module
 // imports before any component, which is what puts the rules of the package ahead of the CSS of the components.
 import './styles/forma-tokens.css'
-import './styles/layout-tokens.css'
+import './styles/draftroom-tokens.css'
 import '@yelison/forma-ui/styles.css'
 import '@yelison/forma-ui/base.css'
 import './styles/global.css'
