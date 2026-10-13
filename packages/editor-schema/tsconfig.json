@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    // No DOM lib on purpose: the server imports this package, so a reference to `document` must not compile. Node's
+    // types give the `URL` that checks a link and the typed arrays of a Yjs update.
+    "types": ["node"]
+  },
+  "include": ["src"]
+}
