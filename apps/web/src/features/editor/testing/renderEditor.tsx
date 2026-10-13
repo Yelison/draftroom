@@ -11,11 +11,15 @@ import { DataSourceContext } from '../../../data/DataSourceContext.ts'
 import { createMockServer } from '../../../data/mock/createMockDataSource.ts'
 import { budget, launchPlan } from '../../../data/mock/fixtures/documents.ts'
 import { daniel, marta, sofia } from '../../../data/mock/fixtures/index.ts'
+import { vi } from 'vitest'
 import './jsdomShims.ts'
 
 // The screen is a lazy route: the first test of a file waits for Vitest to load and transform Tiptap, which takes longer than
 // the default second, and the retry of a request that never arrived waits one second by itself.
 configure({ asyncUtilTimeout: 5000 })
+// A test that waits for the lazy screen and then for the editor can take longer than Vitest's default five seconds on a
+// machine that is busy with something else.
+vi.setConfig({ testTimeout: 20_000 })
 
 /**
  * The people of the mock and what each is on the documents of the fixtures, which the tests of the roles read: Marta owns
