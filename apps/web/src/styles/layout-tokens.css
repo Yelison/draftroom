@@ -1,0 +1,9 @@
+/* The measures of the app's two layouts, at the reference width of 1440 px. They are the product's own: Forma UI has
+ * no layout tokens, and none of its tokens is declared here. The work area takes what the rails leave, so from 1280 px
+ * only it changes. */
+:root {
+  --layout-rail-width: 224px;
+  --layout-rail-compact-width: 88px;
+  --layout-explorer-width: 272px;
+  --layout-notice-width: 480px;
+}

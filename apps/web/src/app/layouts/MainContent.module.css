@@ -1,0 +1,5 @@
+/* A container that only a script or the skip link focuses does not need a ring around the whole work area. */
+.main {
+  min-width: 0;
+  outline: none;
+}

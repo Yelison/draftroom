@@ -1,13 +1,21 @@
-import { screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { localeStorageKey } from '../../i18n/locale.ts'
-import { renderApp } from '../../test/renderApp.tsx'
+import { AppProviders } from '../../app/AppProviders.tsx'
 import { themeStorageKey } from '../../theme.ts'
+import { PreferencesPanel } from './PreferencesPanel.tsx'
+
+const renderPanel = () =>
+  render(
+    <AppProviders>
+      <PreferencesPanel />
+    </AppProviders>,
+  )
 
 describe('the language choice', () => {
   it('is a labelled group with each language named in itself', () => {
-    renderApp()
+    renderPanel()
 
     const group = screen.getByRole('group', { name: 'Language' })
     expect(group).toBeInTheDocument()
@@ -16,20 +24,19 @@ describe('the language choice', () => {
     expect(screen.getByText('Español')).toHaveAttribute('lang', 'es')
   })
 
-  it('switches the page, <html lang> and the choice kept for next time', async () => {
-    renderApp()
+  it('switches the language of the page, <html lang> and the choice kept for next time', async () => {
+    renderPanel()
 
     await userEvent.click(screen.getByRole('radio', { name: 'Español' }))
 
     expect(screen.getByRole('radio', { name: 'Español' })).toHaveFocus()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Escribe en equipo')
     expect(screen.getByRole('group', { name: 'Idioma' })).toBeInTheDocument()
     expect(document.documentElement.lang).toBe('es')
     expect(localStorage.getItem(localeStorageKey)).toBe('es')
   })
 
   it('says the change in the new language', async () => {
-    renderApp()
+    renderPanel()
 
     await userEvent.click(screen.getByRole('radio', { name: 'Español' }))
 
@@ -37,7 +44,7 @@ describe('the language choice', () => {
   })
 
   it('can be used with the keyboard', async () => {
-    renderApp()
+    renderPanel()
 
     await userEvent.tab()
     expect(screen.getByRole('radio', { name: 'English' })).toHaveFocus()
@@ -50,7 +57,7 @@ describe('the language choice', () => {
 
 describe('the theme choice', () => {
   it('offers light, dark and the system theme, with the system one chosen at first', () => {
-    renderApp()
+    renderPanel()
 
     expect(screen.getByRole('group', { name: 'Theme' })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'System' })).toBeChecked()
@@ -62,7 +69,7 @@ describe('the theme choice', () => {
     { choice: 'Dark', theme: 'dark', announcement: 'Dark theme on' },
     { choice: 'Light', theme: 'light', announcement: 'Light theme on' },
   ])('applies the $theme theme, keeps it and says so', async ({ choice, theme, announcement }) => {
-    renderApp()
+    renderPanel()
 
     await userEvent.click(screen.getByRole('radio', { name: choice }))
 
@@ -72,7 +79,7 @@ describe('the theme choice', () => {
   })
 
   it('goes back to the system theme by removing the attribute', async () => {
-    renderApp()
+    renderPanel()
     await userEvent.click(screen.getByRole('radio', { name: 'Dark' }))
 
     await userEvent.click(screen.getByRole('radio', { name: 'System' }))
@@ -83,7 +90,7 @@ describe('the theme choice', () => {
 
   it('names its options and says its change in Spanish', async () => {
     localStorage.setItem(localeStorageKey, 'es')
-    renderApp()
+    renderPanel()
 
     await userEvent.click(screen.getByRole('radio', { name: 'Oscuro' }))
 
@@ -94,7 +101,7 @@ describe('the theme choice', () => {
 
 describe('the live region', () => {
   it('is on the page and empty before anything changes', () => {
-    renderApp()
+    renderPanel()
 
     expect(screen.getByRole('status')).toBeEmptyDOMElement()
   })
