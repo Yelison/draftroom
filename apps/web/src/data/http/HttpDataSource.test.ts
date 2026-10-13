@@ -261,11 +261,16 @@ describe('HttpDataSource answers', () => {
     await expect(source.getMe()).rejects.toMatchObject({ status: 200 })
   })
 
-  it('takes a JSON type with parameters, such as a charset', async () => {
-    const { source } = connect(() => json({ id: 'x', email: 'a@b.example', name: 'A' }))
+  it.each([['application/json'], ['application/json; charset=utf-8'], ['Application/JSON']])(
+    'takes %s as JSON',
+    async (type) => {
+      const { source } = connect(
+        () => new Response('{"id":"x","email":"a@b.example","name":"A"}', { headers: { 'Content-Type': type } }),
+      )
 
-    await expect(source.getMe()).resolves.toMatchObject({ id: 'x' })
-  })
+      await expect(source.getMe()).resolves.toMatchObject({ id: 'x' })
+    },
+  )
 
   it.each([
     ['a call that returns JSON', (source: ReturnType<typeof connect>['source']) => source.getMe()],

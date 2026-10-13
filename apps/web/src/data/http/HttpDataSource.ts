@@ -79,7 +79,7 @@ export function createHttpDataSource({
     onResponse({ response, schemaPath }) {
       const hasBody = response.status !== 204 && response.headers.get('Content-Length') !== '0'
       const expected = schemaPath === download ? 'application/octet-stream' : 'application/json'
-      if (response.ok && hasBody && response.headers.get('Content-Type')?.includes(expected) !== true) {
+      if (response.ok && hasBody && response.headers.get('Content-Type')?.toLowerCase().startsWith(expected) !== true) {
         throw new TransportError(response.status)
       }
     },
