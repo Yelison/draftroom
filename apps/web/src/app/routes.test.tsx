@@ -1,5 +1,5 @@
 import { screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { localeStorageKey } from '../i18n/locale.ts'
 import { renderApp } from '../test/renderApp.tsx'
 
@@ -56,6 +56,17 @@ describe('the route table', () => {
 })
 
 describe('the texts of the shell in both languages', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('opens in the language of the browser when nothing was chosen', () => {
+    vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['es-MX'])
+
+    renderApp('/documents')
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Documentos' })).toBeInTheDocument()
+    expect(document.documentElement.lang).toBe('es')
+  })
+
   const railLabels = [
     { path: '/', english: 'Home', spanish: 'Inicio' },
     { path: '/documents', english: 'Documents', spanish: 'Documentos' },

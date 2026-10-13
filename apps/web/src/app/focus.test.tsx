@@ -6,6 +6,7 @@ import { RouterProvider } from 'react-router/dom'
 import { describe, expect, it } from 'vitest'
 import { renderApp } from '../test/renderApp.tsx'
 import { AppFrame } from './AppFrame.tsx'
+import { EditorLayout } from './layouts/EditorLayout.tsx'
 import { OverviewLayout } from './layouts/OverviewLayout.tsx'
 import { AppProviders } from './AppProviders.tsx'
 
@@ -110,29 +111,36 @@ describe('a page whose headline cannot take the focus', () => {
 
 describe('the order of the Tab key', () => {
   // The pages hold no control yet, so a probe in the work area shows where the content falls in the order.
-  const routes: RouteObject[] = [
-    {
-      Component: AppFrame,
-      children: [{ Component: OverviewLayout, children: [{ index: true, element: <button>Probe</button> }] }],
-    },
+  const layouts = [
+    { layout: 'overview', Component: OverviewLayout },
+    { layout: 'editor', Component: EditorLayout },
   ]
 
-  it('goes from the skip link through the rail to the page', async () => {
-    const user = userEvent.setup()
-    render(
-      <StrictMode>
-        <AppProviders>
-          <RouterProvider router={createMemoryRouter(routes)} />
-        </AppProviders>
-      </StrictMode>,
-    )
+  it.each(layouts)(
+    'goes from the skip link through the rail to the page in the $layout layout',
+    async ({ Component }) => {
+      const user = userEvent.setup()
+      const routes: RouteObject[] = [
+        {
+          Component: AppFrame,
+          children: [{ Component, children: [{ index: true, element: <button>Probe</button> }] }],
+        },
+      ]
+      render(
+        <StrictMode>
+          <AppProviders>
+            <RouterProvider router={createMemoryRouter(routes)} />
+          </AppProviders>
+        </StrictMode>,
+      )
 
-    const visited: string[] = []
-    for (let stop = 0; stop < 7; stop++) {
-      await user.tab()
-      visited.push(document.activeElement?.textContent ?? '')
-    }
+      const visited: string[] = []
+      for (let stop = 0; stop < 7; stop++) {
+        await user.tab()
+        visited.push(document.activeElement?.textContent ?? '')
+      }
 
-    expect(visited).toEqual(['Skip to content', 'Home', 'Documents', 'Shared', 'History', 'Settings', 'Probe'])
-  })
+      expect(visited).toEqual(['Skip to content', 'Home', 'Documents', 'Shared', 'History', 'Settings', 'Probe'])
+    },
+  )
 })

@@ -5,7 +5,7 @@
  *   PLAYWRIGHT_PORT=<port> npm run preview -w @draftroom/web &
  *   PLAYWRIGHT_PORT=<port> npx playwright test e2e/shell.spec.ts --workers=2
  */
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 const port = process.env.PLAYWRIGHT_PORT
 if (port === undefined) throw new Error('PLAYWRIGHT_PORT is not set: it is the port `vite preview` serves the build on')
@@ -14,8 +14,14 @@ test.use({ baseURL: `http://localhost:${port}`, locale: 'en-US', colorScheme: 'l
 
 const railItems = ['Home', 'Documents', 'Shared', 'History', 'Settings']
 
+/** Opens a page and waits until it is on screen: a key pressed while the app is still mounting would be lost. */
+async function open(page: Page, path: string) {
+  await page.goto(path)
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+}
+
 test('reaches the skip link and then each item of the rail with the Tab key, with a visible ring', async ({ page }) => {
-  await page.goto('/')
+  await open(page, '/')
 
   await page.keyboard.press('Tab')
   await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused()
@@ -29,7 +35,7 @@ test('reaches the skip link and then each item of the rail with the Tab key, wit
 })
 
 test('moves the focus to the headline of the page opened from the rail', async ({ page }) => {
-  await page.goto('/')
+  await open(page, '/')
   for (let stop = 0; stop < 5; stop++) await page.keyboard.press('Tab')
   await expect(page.getByRole('link', { name: 'History' })).toBeFocused()
 
@@ -45,7 +51,7 @@ test('moves the focus to the headline of the page opened from the rail', async (
 })
 
 test('takes the skip link to the work area without changing the address', async ({ page }) => {
-  await page.goto('/documents')
+  await open(page, '/documents')
 
   await page.keyboard.press('Tab')
   await page.keyboard.press('Enter')

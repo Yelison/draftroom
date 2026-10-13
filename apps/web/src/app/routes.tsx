@@ -4,11 +4,12 @@ import type { MessageId } from '../i18n/messages.ts'
 import { AppFrame } from './AppFrame.tsx'
 import { EditorLayout } from './layouts/EditorLayout.tsx'
 import { OverviewLayout } from './layouts/OverviewLayout.tsx'
-import type { Section } from './sections.ts'
+import type { RouteHandle, Section } from './sections.ts'
 
 /** A route for a screen that has not arrived yet: its headline and nothing else, in the section it belongs to. */
 function screen(titleId: MessageId, section?: Section): Pick<RouteObject, 'element' | 'handle'> {
-  return { element: <PageTitle titleId={titleId} />, handle: { section } }
+  const handle: RouteHandle = { section }
+  return { element: <PageTitle titleId={titleId} />, handle }
 }
 
 /**
