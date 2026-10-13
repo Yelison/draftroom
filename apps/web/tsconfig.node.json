@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "emitDeclarationOnly": false,
+    "outDir": null,
+    "tsBuildInfoFile": "${configDir}/node_modules/.tmp/tsconfig.node.tsbuildinfo"
+  },
+  // The build tooling and its tests, plus the few modules of `src` that the Vite configuration reads.
+  "include": [
+    "vite.config.ts",
+    "scripts",
+    "src/i18n/locale.ts",
+    "src/i18n/localeScript.ts",
+    "src/i18n/*.json",
+    "src/theme.ts"
+  ]
+}
