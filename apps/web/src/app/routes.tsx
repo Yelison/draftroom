@@ -1,5 +1,6 @@
 import { redirect, type RouteObject } from 'react-router'
 import { PageTitle } from '../components/PageTitle/PageTitle.tsx'
+import { EditorSkeleton } from '../features/editor/EditorSkeleton.tsx'
 import type { MessageId } from '../i18n/messages.ts'
 import { AppFrame } from './AppFrame.tsx'
 import { EditorLayout } from './layouts/EditorLayout.tsx'
@@ -49,7 +50,16 @@ export const routes: RouteObject[] = [
         Component: EditorLayout,
         children: [
           { path: 'documents/new', ...screen('screen.newDocument', 'documents') },
-          { path: 'documents/:documentId', ...screen('screen.document', 'documents') },
+          {
+            path: 'documents/:documentId',
+            // The editor brings Tiptap, ProseMirror and Yjs, which no other screen needs: its own chunk, fetched when a
+            // document is first opened. The router waits for it before it shows the route, so the screen is never
+            // half there and the focus that navigation puts on its headline finds it. When the app opens on a document,
+            // the layout is already on screen and the skeleton the screen itself uses stands in the work area.
+            HydrateFallback: EditorSkeleton,
+            lazy: async () => ({ Component: (await import('../features/editor/EditorScreen.tsx')).EditorScreen }),
+            handle: { section: 'documents' } satisfies RouteHandle,
+          },
           { path: 'documents/:documentId/share', ...screen('screen.share', 'documents') },
           { path: 'documents/:documentId/versions', ...screen('screen.versions', 'documents') },
         ],

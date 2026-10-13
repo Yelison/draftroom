@@ -1,0 +1,30 @@
+/*
+ * The work area of a document: a column the width of the sheet (708 px at 1440, narrower when the area is), with the
+ * toolbar's band above the sheet. The band is there for everyone, so a reader's screen is laid out like an editor's and
+ * nothing moves when the document arrives and says which one this person is.
+ */
+.column {
+  display: flex;
+  flex-direction: column;
+  width: min(var(--layout-sheet-width), 100%);
+  margin-inline: auto;
+}
+
+.toolbarBand {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  flex-shrink: 0;
+  height: var(--layout-toolbar-height);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  background: var(--color-surface);
+}
+
+.sheet {
+  padding: var(--space-48);
+  border: 1px solid var(--color-line);
+  border-block-start: 0;
+  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+  background: var(--color-surface);
+}

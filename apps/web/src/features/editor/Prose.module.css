@@ -1,0 +1,58 @@
+/* The text of a document. Its measures are the document tokens of the product layer and the type tokens of Forma UI. */
+.prose {
+  min-height: calc(var(--space-64) * 4);
+  outline: none;
+  font: var(--font-doc-body);
+  overflow-wrap: anywhere;
+}
+
+.prose:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--space-8);
+  border-radius: var(--radius-small);
+}
+
+.prose > * {
+  margin: 0;
+}
+
+.prose > * + * {
+  margin-block-start: var(--space-16);
+}
+
+.prose h2 {
+  margin-block-start: var(--space-32);
+  font: var(--font-doc-heading);
+}
+
+.prose h3 {
+  margin-block-start: var(--space-24);
+  font: var(--font-section);
+}
+
+.prose ul,
+.prose ol {
+  padding-inline-start: var(--space-24);
+}
+
+.prose li > * + * {
+  margin-block-start: var(--space-8);
+}
+
+.prose li > p {
+  margin: 0;
+}
+
+.prose a {
+  color: var(--color-link);
+  text-decoration: underline;
+}
+
+/* Forma UI has no monospace family token yet: the generic family keeps the code apart from the text around it. */
+.prose code {
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-small);
+  background: var(--color-surface-hover);
+  font-family: monospace;
+  font-size: inherit;
+}
