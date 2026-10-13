@@ -1,4 +1,4 @@
-/* Generated from `@yelison/forma-ui@0.3.0` (the version of the last sync): do not edit by hand.
+/* Generated from `@yelison/forma-ui@0.4.0` (the version of the last sync): do not edit by hand.
  * Run `npm run sync:forma-tokens -w @draftroom/web` to regenerate it. Below is the package's `tokens.css`,
  * unchanged. Draftroom's own tokens live in their own files, never here. `tokens.sync.test.ts` fails when the
  * content differs from the installed package. */
@@ -67,8 +67,12 @@
   --radius-small: 4px;
   --radius-round: 999px;
   --control-height: 40px;
+  --control-icon-size: 20px;
   --button-height: 42px;
   --touch-target: 44px;
+  --avatar-size-small: 28px;
+  --avatar-size-medium: 36px;
+  --avatar-size-large: 48px;
   --badge-min-height: 28px;
   --choice-min-height: 36px;
   --icon-button-glyph-size: 20px;
