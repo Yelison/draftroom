@@ -1,3 +1,5 @@
+// Generated from openapi.yaml by scripts/generate.mjs (`npm run api:types`). Do not edit by hand.
+
 export interface paths {
     "/api/me": {
         parameters: {
@@ -30,7 +32,7 @@ export interface paths {
         put?: never;
         /**
          * Create an account and sign in
-         * @description Starts a session: the response sets the `dr_session` cookie and the `dr_csrf` cookie. A workspace member added by this email while it had no account becomes active.
+         * @description Starts a session: the response sets the `dr_session` cookie and the `dr_csrf` cookie. The account **claims** the pending membership row of this email, if there is one: it keeps the same `userId`, becomes an active member and inherits the document grants given to it. Only an email that already has a signed-up account is a `409 conflict`.
          *
          *     No sign-in needed.
          */
@@ -94,7 +96,9 @@ export interface paths {
         };
         /**
          * List the caller's workspaces
-         * @description Any signed-in person.
+         * @description Ordered by `name`, then `id`, ascending.
+         *
+         *     Any signed-in person.
          */
         get: operations["listWorkspaces"];
         put?: never;
@@ -138,7 +142,7 @@ export interface paths {
         };
         /**
          * List the members of a workspace
-         * @description Includes pending members.
+         * @description Includes pending members. Ordered by `createdAt`, then `userId`, ascending.
          *
          *     Required workspace role. Read the workspace, its members, folders and lists: member, owner.
          */
@@ -169,7 +173,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a member
-         * @description The person loses access to every document of the workspace and their open collaboration connections close. Removing the last owner is a `409 last-owner`.
+         * @description The person loses access to every document of the workspace and their open collaboration connections close. A document always keeps at least one explicit owner grant, so when the person holds the only one of some documents, those grants are transferred to the workspace owner who makes the request (when an owner removes themselves, to the longest-standing remaining owner) and one `access.granted` event is recorded per document; the removal is not blocked. Removing the last owner of the workspace is a `409 last-owner`.
          *
          *     Required workspace role. Add, change role or remove members: owner.
          */
@@ -194,7 +198,9 @@ export interface paths {
         };
         /**
          * List the folders of a workspace
-         * @description Required workspace role. Read the workspace, its members, folders and lists: member, owner.
+         * @description Ordered by `name`, then `id`, ascending.
+         *
+         *     Required workspace role. Read the workspace, its members, folders and lists: member, owner.
          */
         get: operations["listFolders"];
         put?: never;
@@ -221,9 +227,9 @@ export interface paths {
         post?: never;
         /**
          * Delete an empty folder
-         * @description A folder that still holds documents, archived ones included, is a `409 conflict`.
+         * @description Only workspace owners: they can read every document, so they can always empty a folder first. A folder that still holds documents, archived ones included, is a `409 conflict`.
          *
-         *     Required workspace role. Rename and delete folders: member, owner.
+         *     Required workspace role. Delete folders: owner.
          */
         delete: operations["deleteFolder"];
         options?: never;
@@ -232,7 +238,7 @@ export interface paths {
          * Rename a folder
          * @description A stale `revision` is a `409 revision-conflict` carrying the current folder.
          *
-         *     Required workspace role. Rename and delete folders: member, owner.
+         *     Required workspace role. Rename folders: member, owner.
          */
         patch: operations["updateFolder"];
         trace?: never;
@@ -254,7 +260,7 @@ export interface paths {
         put?: never;
         /**
          * Create a document
-         * @description The caller gets an explicit `owner` grant and `generalAccess` starts at `none`. With `templateId`, the document starts from that template in the language of the template list.
+         * @description The caller gets an explicit `owner` grant and `generalAccess` starts at `none`. With `templateId`, the document starts with that template's content in `locale` (`en` when omitted); `locale` without `templateId` is a `400 validation-failed`. A `folderId` or a `templateId` that is unknown, or belongs to another workspace, is a `400 validation-failed` with `invalid-value` at its pointer, the same in both cases.
          *
          *     Required workspace role. Create documents and folders: member, owner.
          */
@@ -292,7 +298,7 @@ export interface paths {
         head?: never;
         /**
          * Rename or move a document
-         * @description Send the `revision` you last read. A stale one is a `409 revision-conflict` carrying the current document. `folderId: null` moves the document out of its folder.
+         * @description Send the `revision` you last read. A stale one is a `409 revision-conflict` carrying the current document. `folderId: null` moves the document out of its folder; a `folderId` that is unknown, or belongs to another workspace, is a `400 validation-failed` with `invalid-value` at `/folderId`.
          *
          *     Required document role. Rename, move to folder: editor, owner.
          */
@@ -380,7 +386,7 @@ export interface paths {
         };
         /**
          * List the caller's pinned documents
-         * @description Only documents the caller can still read.
+         * @description Only documents the caller can still read. Ordered by `updatedAt` descending, then `id` descending.
          *
          *     Required workspace role. Read the workspace, its members, folders and lists: member, owner.
          */
@@ -402,7 +408,7 @@ export interface paths {
         };
         /**
          * List the documents shared with the caller
-         * @description The documents the caller can read without owning them, by explicit grant or general access. `access` keeps only those where the caller's role is `editor` (`edit`), `commenter` (`comment`) or `viewer` (`view`).
+         * @description The documents the caller can read without owning them, by explicit grant or general access. `access` keeps only those where the caller's role is `editor` (`edit`), `commenter` (`comment`) or `viewer` (`view`). Ordered by `updatedAt` descending, then `id` descending.
          *
          *     Required workspace role. Read the workspace, its members, folders and lists: member, owner.
          */
@@ -424,7 +430,9 @@ export interface paths {
         };
         /**
          * List who can open a document
-         * @description Required document role. Read and change access, general access: owner.
+         * @description Ordered by `createdAt`, then `userId`, ascending.
+         *
+         *     Required document role. Read and change access, general access: owner.
          */
         get: operations["listAccess"];
         put?: never;
@@ -445,7 +453,7 @@ export interface paths {
         get?: never;
         /**
          * Grant or change a member's role on a document
-         * @description The person must belong to the workspace, pending members included. Lowering the last explicit owner is a `409 last-owner`. A role change closes the person's open connection so they reconnect in the new mode.
+         * @description The person must belong to the workspace, pending members included; anyone else is a `404 not-found`. A document always keeps at least one explicit owner grant: lowering the last one is a `409 last-owner`. A role change closes the person's open connection so they reconnect in the new mode.
          *
          *     Required document role. Read and change access, general access: owner.
          */
@@ -453,7 +461,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a member's explicit grant
-         * @description The person keeps whatever the general access gives them. Their open connection closes. Removing the last explicit owner is a `409 last-owner`.
+         * @description The person keeps whatever the general access gives them. Their open connection closes. Removing the last explicit owner grant is a `409 last-owner`.
          *
          *     Required document role. Read and change access, general access: owner.
          */
@@ -494,7 +502,9 @@ export interface paths {
         };
         /**
          * List the comment threads of a document
-         * @description Required document role. List and read comments: viewer, commenter, editor, owner.
+         * @description Ordered by `createdAt`, then `id`, ascending; the comments of a thread in the same order.
+         *
+         *     Required document role. List and read comments: viewer, commenter, editor, owner.
          */
         get: operations["listThreads"];
         put?: never;
@@ -726,7 +736,7 @@ export interface paths {
         };
         /**
          * List the built-in templates
-         * @description Names and descriptions come back in the requested language: templates are product content, not user content.
+         * @description Names and descriptions come back in the requested language: templates are product content, not user content. Ordered by `id` ascending.
          *
          *     Any signed-in person.
          */
@@ -806,7 +816,7 @@ export interface components {
         VersionLabel: string;
         /** @description Starts at 1 and grows by one with every change to the resource's metadata. */
         Revision: number;
-        /** @description Opaque. Clients pass back exactly what `nextCursor` returned. */
+        /** @description Opaque. Clients pass back exactly what `nextCursor` returned. A cursor is bound to the filters of the request that produced it: using it with other filters is a `400 validation-failed` at `/query/cursor`. */
         Cursor: string;
         /** @description Pass it as `cursor` to read the next page; `null` when this was the last page. */
         NextCursor: string | null;
@@ -896,7 +906,7 @@ export interface components {
             userId: components["schemas"]["Id"];
             email: components["schemas"]["Email"];
             /** @description `null` while the member is pending. */
-            name: string | null;
+            name: components["schemas"]["PersonName"] | null;
             role: components["schemas"]["WorkspaceRole"];
             status: components["schemas"]["MemberStatus"];
             createdAt: components["schemas"]["Timestamp"];
@@ -920,7 +930,8 @@ export interface components {
             revision: components["schemas"]["Revision"];
             /** @description The caller's effective role on this document. */
             role: components["schemas"]["DocumentRole"];
-            generalAccess: components["schemas"]["GeneralAccess"];
+            /** @description How the document is shared with the workspace. Only the document's effective owners get it; for everyone else it is `null`, because the matrix keeps the sharing settings to owners. */
+            generalAccess: components["schemas"]["GeneralAccess"] | null;
             /** @description Whether the caller pinned it. */
             pinned: boolean;
             createdBy: components["schemas"]["UserRef"];
@@ -940,7 +951,7 @@ export interface components {
         AccessEntry: {
             userId: components["schemas"]["Id"];
             email: components["schemas"]["Email"];
-            name: string | null;
+            name: components["schemas"]["PersonName"] | null;
             role: components["schemas"]["DocumentRole"];
             createdAt: components["schemas"]["Timestamp"];
         };
@@ -986,11 +997,12 @@ export interface components {
             id: components["schemas"]["Id"];
             documentId: components["schemas"]["Id"];
             kind: components["schemas"]["VersionKind"];
-            label: string | null;
+            label: components["schemas"]["VersionLabel"] | null;
             createdBy: components["schemas"]["UserRef"] | null;
             createdAt: components["schemas"]["Timestamp"];
             sizeBytes: number;
         };
+        /** @description Events that reveal how a document is shared (`access.granted`, `access.changed`, `access.revoked`, `general-access.changed`), with their `targetUser`, reach only the effective owners of that document. */
         ActivityEvent: {
             id: components["schemas"]["Id"];
             type: components["schemas"]["ActivityType"];
@@ -1042,6 +1054,11 @@ export interface components {
             title: components["schemas"]["DocumentTitle"];
             folderId?: components["schemas"]["NullableId"];
             templateId?: string;
+            /**
+             * @description The language of the template's content; `en` when omitted. Only valid together with `templateId`.
+             * @enum {string}
+             */
+            locale?: "en" | "es";
         };
         UpdateDocumentRequest: {
             title?: components["schemas"]["DocumentTitle"];
@@ -1375,7 +1392,6 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             default: components["responses"]["Unexpected"];
         };
@@ -1433,7 +1449,6 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             default: components["responses"]["Unexpected"];
         };
@@ -1541,7 +1556,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The folders, by name. */
+            /** @description The folders. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1551,7 +1566,6 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             default: components["responses"]["Unexpected"];
         };
@@ -1658,7 +1672,7 @@ export interface operations {
                  * @example launch
                  */
                 query?: string;
-                /** @description Only the documents of this folder. */
+                /** @description Only the documents of this folder. A folder that is unknown, or belongs to another workspace, is a `400 validation-failed` at `/query/folderId`. */
                 folderId?: components["schemas"]["Id"];
                 /** @description List archived documents instead of live ones. */
                 archived?: boolean;
@@ -1682,7 +1696,6 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             default: components["responses"]["Unexpected"];
         };
@@ -1740,7 +1753,6 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             default: components["responses"]["Unexpected"];
         };
@@ -1914,7 +1926,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The pinned documents, most recently updated first. */
+            /** @description The pinned documents. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1924,7 +1936,6 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             default: components["responses"]["Unexpected"];
         };
@@ -1943,7 +1954,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The shared documents, most recently updated first. */
+            /** @description The shared documents. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1954,7 +1965,6 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             default: components["responses"]["Unexpected"];
         };
@@ -2089,7 +2099,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The threads with their comments, oldest first. */
+            /** @description The threads with their comments. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2100,7 +2110,6 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             default: components["responses"]["Unexpected"];
         };
@@ -2304,7 +2313,6 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             default: components["responses"]["Unexpected"];
         };
@@ -2362,7 +2370,6 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             default: components["responses"]["Unexpected"];
         };
@@ -2428,7 +2435,6 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             default: components["responses"]["Unexpected"];
         };
@@ -2460,7 +2466,6 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             default: components["responses"]["Unexpected"];
         };

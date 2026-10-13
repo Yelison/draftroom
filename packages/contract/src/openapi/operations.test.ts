@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { loadOpenApi } from './document.ts'
+import { asSchema, loadOpenApi } from './document.ts'
 
-const { operations } = loadOpenApi()
+const document = loadOpenApi()
+const { operations, schemas } = document
 
 // The table of plan §4.1, one entry per operation. A forgotten or invented operation fails here first.
 const planOperations = [
@@ -86,6 +87,34 @@ describe('operations', () => {
 
     expect(mediaTypes.filter((entry) => !entry.endsWith(': application/json'))).toEqual([
       'getVersionContent: application/octet-stream',
+    ])
+  })
+
+  // Two lists that tie on the sort key must come back in the same order every time, so each one names an `id` tie-breaker.
+  it('state the order of every list, down to an id tie-breaker', () => {
+    const lists = operations.filter((operation) => {
+      const success = operation.responses['200']
+      const body =
+        success === undefined || '$ref' in success ? undefined : success.content?.['application/json']?.schema
+      return /(List|Page)$/.test(document.referencedName(body) ?? '')
+    })
+    const unordered = lists.filter((operation) => !/Ordered by [^.]*`(userId|id)`/.test(operation.description ?? ''))
+
+    expect({ lists: lists.length, unordered: unordered.map((operation) => operation.id) }).toEqual({
+      lists: 12,
+      unordered: [],
+    })
+  })
+
+  // `locale` has no schema default on purpose: a validator that fills defaults would add it to a body without a template.
+  it('accept a template language only together with a template', () => {
+    const request = asSchema(schemas['CreateDocumentRequest'])
+    const locale = asSchema(request.properties?.['locale'])
+
+    expect([locale.enum, 'default' in locale, request['dependentRequired']]).toEqual([
+      ['en', 'es'],
+      false,
+      { locale: ['templateId'] },
     ])
   })
 })

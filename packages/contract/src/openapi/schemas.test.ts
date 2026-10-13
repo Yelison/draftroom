@@ -57,4 +57,18 @@ describe('schemas', () => {
 
     expect(missing).toEqual([])
   })
+
+  // A document the caller does not own shows no general access, in the examples too: they are what mocks copy.
+  it('show no general access in the examples of documents the caller does not own', () => {
+    const documents = [...objectsIn(raw, '')].filter(
+      ([path, node]) =>
+        !path.startsWith('/components/schemas') && 'generalAccess' in node && 'workspaceId' in node && 'role' in node,
+    )
+    const leaking = documents.filter(([, node]) => node['role'] !== 'owner' && node['generalAccess'] !== null)
+
+    expect({ documents: documents.length > 0, leaking: leaking.map(([path]) => path) }).toEqual({
+      documents: true,
+      leaking: [],
+    })
+  })
 })

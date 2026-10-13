@@ -83,6 +83,29 @@ describe('length limits', () => {
       without: [],
     })
   })
+
+  // A limit written inline would stay behind when the named schema changes: a name valid at sign-up must stay valid when
+  // listed, and the other way round.
+  it.each([
+    ['User', 'name', ['PersonName']],
+    ['UserRef', 'name', ['PersonName']],
+    ['SignUpRequest', 'name', ['PersonName']],
+    ['Member', 'name', ['PersonName', 'null']],
+    ['AccessEntry', 'name', ['PersonName', 'null']],
+    ['Version', 'label', ['VersionLabel', 'null']],
+  ])('take %s.%s from the named schema', (schema, property, expected) => {
+    const node = schemaNamed(schema).properties?.[property]
+    const found = expected.includes('null') ? document.alternativesOf(node) : [document.referencedName(node)]
+
+    expect(found).toEqual(expected)
+  })
+
+  // Signing in accepts whatever sign-up could have stored, no more: the maximum is the one of `Password`.
+  it('let sign-in take passwords as long as sign-up allows', () => {
+    const signIn = asSchema(schemaNamed('SignInRequest').properties?.['password'])
+
+    expect(signIn.maxLength).toBe(schemaNamed('Password').maxLength)
+  })
 })
 
 describe('pagination', () => {
@@ -111,6 +134,18 @@ describe('pagination', () => {
     expect(paginated.filter((operation) => !takes(operation, 'Limit'))).toEqual([])
   })
 
+  it.each([
+    ['listDocuments', 'DocumentPage'],
+    ['listVersions', 'VersionPage'],
+    ['listWorkspaceActivity', 'ActivityPage'],
+    ['listDocumentActivity', 'ActivityPage'],
+  ])('answers %s with its page, %s', (id, page) => {
+    const success = operations.find((operation) => operation.id === id)?.responses['200']
+    const body = success === undefined || '$ref' in success ? undefined : success.content?.['application/json']?.schema
+
+    expect(document.referencedName(body)).toBe(page)
+  })
+
   it('returns nextCursor on every page, null on the last one', () => {
     const pages = Object.entries(schemas).filter(([name]) => name.endsWith('Page'))
 
@@ -121,6 +156,10 @@ describe('pagination', () => {
 })
 
 describe('optimistic concurrency', () => {
+  it.each(['Document', 'Folder'])('shows the revision in every %s', (name) => {
+    expect(schemaNamed(name).required).toContain('revision')
+  })
+
   it.each(['UpdateDocumentRequest', 'UpdateFolderRequest'])('requires the revision in %s', (name) => {
     expect(schemaNamed(name).required).toContain('revision')
   })
@@ -150,6 +189,10 @@ describe('optimistic concurrency', () => {
 })
 
 describe('error codes', () => {
+  it('are the only ones a problem can carry', () => {
+    expect(document.referencedName(schemaNamed('Problem').properties?.['code'])).toBe('ErrorCode')
+  })
+
   it('are the stable set of the plan plus the two server-side ones', () => {
     expect(schemaNamed('ErrorCode').enum).toEqual([
       'validation-failed',

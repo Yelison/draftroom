@@ -15,8 +15,11 @@ export type FieldErrorCode = Schema<'FieldErrorCode'>
 export type Problem = Schema<'Problem'>
 
 /**
- * The limits of plan §4.1 as values, for inputs that need a `maxLength` and for validators. The generated types cannot
- * carry them; a contract test pins every figure here to its schema in `openapi.yaml`.
+ * The limits of plan §4.1 as values, for inputs and validators. The generated types cannot carry them; a contract test
+ * pins every figure here to its schema in `openapi.yaml`.
+ *
+ * Lengths count Unicode code points, as JSON Schema does: count with `[...value].length`, not `value.length` and not the
+ * HTML `maxlength` attribute, which both count UTF-16 units and would cut an emoji-heavy title short.
  */
 export const contractLimits = {
   documentTitle: { min: 1, max: 200 },

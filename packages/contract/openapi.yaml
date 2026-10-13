@@ -6,7 +6,7 @@ info:
   description: |-
     Metadata, permissions, comments, versions and history. Document content is a Yjs document: it travels over the collaboration connection and never over REST.
 
-    Every request after sign-in carries the `dr_session` cookie; requests that change state also carry the `X-CSRF-Token` header. Every error is `application/problem+json` with a stable `code`.
+    Every request after sign-in carries the `dr_session` cookie; requests that change state also carry the `X-CSRF-Token` header. Every error is `application/problem+json` with a stable `code`. Text lengths count Unicode code points.
   license:
     name: MIT
     identifier: MIT
@@ -71,7 +71,7 @@ paths:
         - Session
       summary: Create an account and sign in
       description: |-
-        Starts a session: the response sets the `dr_session` cookie and the `dr_csrf` cookie. A workspace member added by this email while it had no account becomes active.
+        Starts a session: the response sets the `dr_session` cookie and the `dr_csrf` cookie. The account **claims** the pending membership row of this email, if there is one: it keeps the same `userId`, becomes an active member and inherits the document grants given to it. Only an email that already has a signed-up account is a `409 conflict`.
 
         No sign-in needed.
       requestBody:
@@ -193,7 +193,10 @@ paths:
       tags:
         - Workspaces
       summary: List the caller's workspaces
-      description: Any signed-in person.
+      description: |-
+        Ordered by `name`, then `id`, ascending.
+
+        Any signed-in person.
       responses:
         '200':
           description: The workspaces the caller belongs to.
@@ -238,8 +241,6 @@ paths:
                   $ref: '#/components/examples/Workspace'
         '401':
           $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
@@ -313,7 +314,7 @@ paths:
         - Members
       summary: List the members of a workspace
       description: |-
-        Includes pending members.
+        Includes pending members. Ordered by `createdAt`, then `userId`, ascending.
 
         Required workspace role. Read the workspace, its members, folders and lists: member, owner.
       parameters:
@@ -343,8 +344,6 @@ paths:
                         createdAt: 2026-10-13T15:30:00Z
         '401':
           $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
@@ -473,7 +472,7 @@ paths:
         - Members
       summary: Remove a member
       description: |-
-        The person loses access to every document of the workspace and their open collaboration connections close. Removing the last owner is a `409 last-owner`.
+        The person loses access to every document of the workspace and their open collaboration connections close. A document always keeps at least one explicit owner grant, so when the person holds the only one of some documents, those grants are transferred to the workspace owner who makes the request (when an owner removes themselves, to the longest-standing remaining owner) and one `access.granted` event is recorded per document; the removal is not blocked. Removing the last owner of the workspace is a `409 last-owner`.
 
         Required workspace role. Add, change role or remove members: owner.
       parameters:
@@ -507,12 +506,15 @@ paths:
       tags:
         - Folders
       summary: List the folders of a workspace
-      description: 'Required workspace role. Read the workspace, its members, folders and lists: member, owner.'
+      description: |-
+        Ordered by `name`, then `id`, ascending.
+
+        Required workspace role. Read the workspace, its members, folders and lists: member, owner.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       responses:
         '200':
-          description: The folders, by name.
+          description: The folders.
           content:
             application/json:
               schema:
@@ -529,8 +531,6 @@ paths:
                         updatedAt: 2026-10-13T15:30:00Z
         '401':
           $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
@@ -603,7 +603,7 @@ paths:
       description: |-
         A stale `revision` is a `409 revision-conflict` carrying the current folder.
 
-        Required workspace role. Rename and delete folders: member, owner.
+        Required workspace role. Rename folders: member, owner.
       parameters:
         - $ref: '#/components/parameters/FolderId'
       requestBody:
@@ -647,7 +647,7 @@ paths:
       x-draftroom-roles:
         scope: workspace
         rules:
-          - row: manage-folders
+          - row: rename-folder
             roles:
               - member
               - owner
@@ -657,9 +657,9 @@ paths:
         - Folders
       summary: Delete an empty folder
       description: |-
-        A folder that still holds documents, archived ones included, is a `409 conflict`.
+        Only workspace owners: they can read every document, so they can always empty a folder first. A folder that still holds documents, archived ones included, is a `409 conflict`.
 
-        Required workspace role. Rename and delete folders: member, owner.
+        Required workspace role. Delete folders: owner.
       parameters:
         - $ref: '#/components/parameters/FolderId'
       responses:
@@ -681,9 +681,8 @@ paths:
       x-draftroom-roles:
         scope: workspace
         rules:
-          - row: manage-folders
+          - row: delete-folder
             roles:
-              - member
               - owner
   /api/workspaces/{workspaceId}/documents:
     get:
@@ -711,7 +710,7 @@ paths:
         - name: folderId
           in: query
           required: false
-          description: Only the documents of this folder.
+          description: Only the documents of this folder. A folder that is unknown, or belongs to another workspace, is a `400 validation-failed` at `/query/folderId`.
           schema:
             $ref: '#/components/schemas/Id'
         - name: archived
@@ -752,8 +751,6 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
@@ -773,7 +770,7 @@ paths:
         - Documents
       summary: Create a document
       description: |-
-        The caller gets an explicit `owner` grant and `generalAccess` starts at `none`. With `templateId`, the document starts from that template in the language of the template list.
+        The caller gets an explicit `owner` grant and `generalAccess` starts at `none`. With `templateId`, the document starts with that template's content in `locale` (`en` when omitted); `locale` without `templateId` is a `400 validation-failed`. A `folderId` or a `templateId` that is unknown, or belongs to another workspace, is a `400 validation-failed` with `invalid-value` at its pointer, the same in both cases.
 
         Required workspace role. Create documents and folders: member, owner.
       parameters:
@@ -787,9 +784,10 @@ paths:
             examples:
               default:
                 value:
-                  title: Autumn launch plan
+                  title: Notas de la reunión de otoño
                   folderId: a3d5c7e9-1b2f-4a6c-8d0e-3f5a7c9e1b33
                   templateId: meeting-notes
+                  locale: es
       responses:
         '201':
           description: The new document.
@@ -846,8 +844,6 @@ paths:
                   $ref: '#/components/examples/Document'
         '401':
           $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
@@ -869,7 +865,7 @@ paths:
         - Documents
       summary: Rename or move a document
       description: |-
-        Send the `revision` you last read. A stale one is a `409 revision-conflict` carrying the current document. `folderId: null` moves the document out of its folder.
+        Send the `revision` you last read. A stale one is a `409 revision-conflict` carrying the current document. `folderId: null` moves the document out of its folder; a `folderId` that is unknown, or belongs to another workspace, is a `400 validation-failed` with `invalid-value` at `/folderId`.
 
         Required document role. Rename, move to folder: editor, owner.
       parameters:
@@ -1106,14 +1102,14 @@ paths:
         - Pins and shared
       summary: List the caller's pinned documents
       description: |-
-        Only documents the caller can still read.
+        Only documents the caller can still read. Ordered by `updatedAt` descending, then `id` descending.
 
         Required workspace role. Read the workspace, its members, folders and lists: member, owner.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       responses:
         '200':
-          description: The pinned documents, most recently updated first.
+          description: The pinned documents.
           content:
             application/json:
               schema:
@@ -1139,8 +1135,6 @@ paths:
                         archivedAt: null
         '401':
           $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
@@ -1161,7 +1155,7 @@ paths:
         - Pins and shared
       summary: List the documents shared with the caller
       description: |-
-        The documents the caller can read without owning them, by explicit grant or general access. `access` keeps only those where the caller's role is `editor` (`edit`), `commenter` (`comment`) or `viewer` (`view`).
+        The documents the caller can read without owning them, by explicit grant or general access. `access` keeps only those where the caller's role is `editor` (`edit`), `commenter` (`comment`) or `viewer` (`view`). Ordered by `updatedAt` descending, then `id` descending.
 
         Required workspace role. Read the workspace, its members, folders and lists: member, owner.
       parameters:
@@ -1178,7 +1172,7 @@ paths:
               - view
       responses:
         '200':
-          description: The shared documents, most recently updated first.
+          description: The shared documents.
           content:
             application/json:
               schema:
@@ -1194,7 +1188,7 @@ paths:
                         excerpt: The launch moves to the second week of November so the workshop can run first.
                         revision: 3
                         role: editor
-                        generalAccess: none
+                        generalAccess: null
                         pinned: false
                         createdBy:
                           id: 7c2e9d41-6a8b-4f03-b5d7-2e4a8c1f9b22
@@ -1206,8 +1200,6 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
@@ -1227,7 +1219,10 @@ paths:
       tags:
         - Access
       summary: List who can open a document
-      description: 'Required document role. Read and change access, general access: owner.'
+      description: |-
+        Ordered by `createdAt`, then `userId`, ascending.
+
+        Required document role. Read and change access, general access: owner.
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       responses:
@@ -1270,7 +1265,7 @@ paths:
         - Access
       summary: Grant or change a member's role on a document
       description: |-
-        The person must belong to the workspace, pending members included. Lowering the last explicit owner is a `409 last-owner`. A role change closes the person's open connection so they reconnect in the new mode.
+        The person must belong to the workspace, pending members included; anyone else is a `404 not-found`. A document always keeps at least one explicit owner grant: lowering the last one is a `409 last-owner`. A role change closes the person's open connection so they reconnect in the new mode.
 
         Required document role. Read and change access, general access: owner.
       parameters:
@@ -1323,7 +1318,7 @@ paths:
         - Access
       summary: Remove a member's explicit grant
       description: |-
-        The person keeps whatever the general access gives them. Their open connection closes. Removing the last explicit owner is a `409 last-owner`.
+        The person keeps whatever the general access gives them. Their open connection closes. Removing the last explicit owner grant is a `409 last-owner`.
 
         Required document role. Read and change access, general access: owner.
       parameters:
@@ -1409,7 +1404,10 @@ paths:
       tags:
         - Comments
       summary: List the comment threads of a document
-      description: 'Required document role. List and read comments: viewer, commenter, editor, owner.'
+      description: |-
+        Ordered by `createdAt`, then `id`, ascending; the comments of a thread in the same order.
+
+        Required document role. List and read comments: viewer, commenter, editor, owner.
       parameters:
         - $ref: '#/components/parameters/DocumentId'
         - name: status
@@ -1420,7 +1418,7 @@ paths:
             $ref: '#/components/schemas/ThreadStatus'
       responses:
         '200':
-          description: The threads with their comments, oldest first.
+          description: The threads with their comments.
           content:
             application/json:
               schema:
@@ -1455,8 +1453,6 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
@@ -1793,8 +1789,6 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
@@ -1885,8 +1879,6 @@ paths:
                 format: binary
         '401':
           $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
@@ -2016,8 +2008,6 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
@@ -2073,8 +2063,6 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
@@ -2097,7 +2085,7 @@ paths:
         - Templates
       summary: List the built-in templates
       description: |-
-        Names and descriptions come back in the requested language: templates are product content, not user content.
+        Names and descriptions come back in the requested language: templates are product content, not user content. Ordered by `id` ascending.
 
         Any signed-in person.
       parameters:
@@ -2323,7 +2311,7 @@ components:
       minLength: 1
       maxLength: 512
       pattern: ^[A-Za-z0-9_-]+$
-      description: Opaque. Clients pass back exactly what `nextCursor` returned.
+      description: 'Opaque. Clients pass back exactly what `nextCursor` returned. A cursor is bound to the filters of the request that produced it: using it with other filters is a `400 validation-failed` at `/query/cursor`.'
     NextCursor:
       type:
         - string
@@ -2561,11 +2549,9 @@ components:
         email:
           $ref: '#/components/schemas/Email'
         name:
-          type:
-            - string
-            - 'null'
-          minLength: 1
-          maxLength: 80
+          oneOf:
+            - $ref: '#/components/schemas/PersonName'
+            - type: 'null'
           description: '`null` while the member is pending.'
         role:
           $ref: '#/components/schemas/WorkspaceRole'
@@ -2635,7 +2621,13 @@ components:
           $ref: '#/components/schemas/DocumentRole'
           description: The caller's effective role on this document.
         generalAccess:
-          $ref: '#/components/schemas/GeneralAccess'
+          oneOf:
+            - $ref: '#/components/schemas/GeneralAccess'
+            - type: 'null'
+          description: How the document is shared with the workspace. Only the document's effective owners get it; for everyone else it is `null`, because the matrix keeps the sharing settings to owners.
+          x-draftroom-restricted:
+            visibleTo:
+              - owner
         pinned:
           type: boolean
           description: Whether the caller pinned it.
@@ -2692,11 +2684,9 @@ components:
         email:
           $ref: '#/components/schemas/Email'
         name:
-          type:
-            - string
-            - 'null'
-          minLength: 1
-          maxLength: 80
+          oneOf:
+            - $ref: '#/components/schemas/PersonName'
+            - type: 'null'
         role:
           $ref: '#/components/schemas/DocumentRole'
         createdAt:
@@ -2825,11 +2815,9 @@ components:
         kind:
           $ref: '#/components/schemas/VersionKind'
         label:
-          type:
-            - string
-            - 'null'
-          minLength: 1
-          maxLength: 100
+          oneOf:
+            - $ref: '#/components/schemas/VersionLabel'
+            - type: 'null'
         createdBy:
           oneOf:
             - $ref: '#/components/schemas/UserRef'
@@ -2867,6 +2855,15 @@ components:
             - $ref: '#/components/schemas/UserRef'
             - type: 'null'
           description: The person an access change is about.
+      description: Events that reveal how a document is shared (`access.granted`, `access.changed`, `access.revoked`, `general-access.changed`), with their `targetUser`, reach only the effective owners of that document.
+      x-draftroom-restricted:
+        types:
+          - access.granted
+          - access.changed
+          - access.revoked
+          - general-access.changed
+        visibleTo:
+          - owner
     LiveStatus:
       type: object
       additionalProperties: false
@@ -2983,6 +2980,15 @@ components:
         templateId:
           type: string
           pattern: ^[a-z0-9-]{1,64}$
+        locale:
+          type: string
+          enum:
+            - en
+            - es
+          description: The language of the template's content; `en` when omitted. Only valid together with `templateId`.
+      dependentRequired:
+        locale:
+          - templateId
     UpdateDocumentRequest:
       type: object
       additionalProperties: false

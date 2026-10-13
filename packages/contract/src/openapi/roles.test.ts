@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { loadOpenApi } from './document.ts'
+import { asSchema, loadOpenApi, restrictionOf } from './document.ts'
 
-const { operations } = loadOpenApi()
+const document = loadOpenApi()
+const { operations, schemas } = document
 
 const everyone = ['viewer', 'commenter', 'editor', 'owner']
 const commenters = ['commenter', 'editor', 'owner']
@@ -26,7 +27,8 @@ const matrix: Record<string, { scope: 'document' | 'workspace'; roles: string[] 
   pin: { scope: 'document', roles: everyone },
   'workspace-read': { scope: 'workspace', roles: members },
   'create-content': { scope: 'workspace', roles: members },
-  'manage-folders': { scope: 'workspace', roles: members },
+  'rename-folder': { scope: 'workspace', roles: members },
+  'delete-folder': { scope: 'workspace', roles: owners },
   'manage-members': { scope: 'workspace', roles: owners },
   'rename-workspace': { scope: 'workspace', roles: owners },
 }
@@ -49,8 +51,8 @@ const operationAccess: [string, string, string[]][] = [
   ['removeMember', 'workspace', ['manage-members']],
   ['listFolders', 'workspace', ['workspace-read']],
   ['createFolder', 'workspace', ['create-content']],
-  ['updateFolder', 'workspace', ['manage-folders']],
-  ['deleteFolder', 'workspace', ['manage-folders']],
+  ['updateFolder', 'workspace', ['rename-folder']],
+  ['deleteFolder', 'workspace', ['delete-folder']],
   ['listDocuments', 'workspace', ['workspace-read']],
   ['createDocument', 'workspace', ['create-content']],
   ['getDocument', 'document', ['read']],
@@ -155,6 +157,42 @@ describe('roles', () => {
 
     it('cover every operation of the contract', () => {
       expect(operationAccess.map(([id]) => id).sort()).toEqual(operations.map((operation) => operation.id).sort())
+    })
+  })
+
+  // The matrix gives the sharing settings to owners alone, and the data must not leave through other operations.
+  describe('sharing data', () => {
+    const accessOwners = matrix['manage-access']?.roles
+
+    it('keeps the general access of a document for its owners', () => {
+      const property = schemas['Document']?.properties?.['generalAccess']
+
+      expect([document.alternativesOf(property), restrictionOf(property)?.visibleTo]).toEqual([
+        ['GeneralAccess', 'null'],
+        accessOwners,
+      ])
+    })
+
+    it('keeps every event that reveals how a document is shared for its owners', () => {
+      const event = schemas['ActivityEvent']
+      const revealing = (asSchema(schemas['ActivityType']).enum ?? []).filter(
+        (type) => typeof type === 'string' && (type.startsWith('access.') || type.startsWith('general-access.')),
+      )
+
+      expect([restrictionOf(event)?.types, restrictionOf(event)?.visibleTo]).toEqual([revealing, accessOwners])
+    })
+  })
+
+  describe('last owner', () => {
+    const description = (id: string) => operations.find((operation) => operation.id === id)?.description ?? ''
+
+    it.each(['setAccess', 'removeAccess'])('is one explicit owner grant per document in %s', (id) => {
+      expect(description(id)).toContain('explicit owner grant')
+    })
+
+    it('hands the documents of a removed member to the workspace owner instead of blocking', () => {
+      expect(description('removeMember')).toContain('transferred to the workspace owner who makes the request')
+      expect(description('removeMember')).toContain('`access.granted` event is recorded per document')
     })
   })
 })

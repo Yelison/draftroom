@@ -30,6 +30,7 @@ const parameter = z.looseObject({
 
 const operation = z.looseObject({
   operationId: z.string().optional(),
+  description: z.string().optional(),
   security: z.array(securityRequirement).optional(),
   parameters: z.array(z.union([reference, parameter])).optional(),
   requestBody: z.looseObject({ content: content.optional() }).optional(),
@@ -73,6 +74,8 @@ export interface OpenApiDocument {
   readonly securitySchemes: Readonly<Record<string, Record<string, unknown>>>
   /** Follows a `$ref` into `components`; anything that is not a reference comes back unchanged. */
   resolveResponse(candidate: Reference | Response): Response
+  /** The `$ref`s or `type`s of the alternatives of a `oneOf`, in order; empty for a node without one. */
+  alternativesOf(node: unknown): unknown[]
   /** The name a `$ref` such as `#/components/schemas/Id` points at, or `undefined` for anything else. */
   referencedName(node: unknown): string | undefined
 }
@@ -83,6 +86,7 @@ export interface Operation {
   /** `GET /api/me`, the form the plan's table uses. */
   readonly key: string
   readonly id: string | undefined
+  readonly description: string | undefined
   readonly security: z.infer<typeof securityRequirement>[] | undefined
   readonly parameters: readonly (Reference | z.infer<typeof parameter>)[]
   readonly requestBody: { content?: z.infer<typeof content> | undefined } | undefined
@@ -94,6 +98,24 @@ const responsesPrefix = '#/components/responses/'
 
 function isReference(node: unknown): node is Reference {
   return reference.safeParse(node).success
+}
+
+const oneOf = z.looseObject({ oneOf: z.array(z.unknown()) })
+
+function nameOf(node: unknown): string | undefined {
+  const parsed = reference.safeParse(node)
+  return parsed.success ? parsed.data.$ref.slice(parsed.data.$ref.lastIndexOf('/') + 1) : undefined
+}
+
+const restricted = z.looseObject({
+  'x-draftroom-restricted': z
+    .object({ visibleTo: z.array(z.string()), types: z.array(z.string()).optional() })
+    .optional(),
+})
+
+/** What a schema or property marks, with `x-draftroom-restricted`, as visible only to some roles. */
+export function restrictionOf(node: unknown) {
+  return restricted.parse(node)['x-draftroom-restricted']
 }
 
 export function loadOpenApi(): OpenApiDocument {
@@ -111,6 +133,7 @@ export function loadOpenApi(): OpenApiDocument {
           path,
           key: `${method.toUpperCase()} ${path}`,
           id: parsed.operationId,
+          description: parsed.description,
           security: parsed.security,
           parameters: parsed.parameters ?? [],
           requestBody: parsed.requestBody,
@@ -135,10 +158,13 @@ export function loadOpenApi(): OpenApiDocument {
       if (resolved === undefined) throw new Error(`Unresolved response reference ${candidate.$ref}`)
       return resolved
     },
-    referencedName(node) {
-      const parsed = reference.safeParse(node)
-      return parsed.success ? parsed.data.$ref.slice(parsed.data.$ref.lastIndexOf('/') + 1) : undefined
+    alternativesOf(node) {
+      const parsed = oneOf.safeParse(node)
+      return parsed.success
+        ? parsed.data.oneOf.map((alternative) => nameOf(alternative) ?? asSchema(alternative).type)
+        : []
     },
+    referencedName: nameOf,
   }
 }
 
