@@ -13,7 +13,13 @@
     "skipLibCheck": true,
     "composite": true,
     "declaration": true,
+    // Packages only emit declarations: the build output stays out of the sources and Vitest never sees compiled tests.
+    // A package that must emit JavaScript (the server, T0.4) has to turn on `rewriteRelativeImportExtensions`
+    // (or use a bundler) because sources import with explicit `.ts` extensions.
     "emitDeclarationOnly": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    // Resolved against each package's own tsconfig.json, so every package builds into its own ignored `dist/`.
+    "outDir": "${configDir}/dist",
+    "tsBuildInfoFile": "${configDir}/dist/tsconfig.tsbuildinfo"
   }
 }

@@ -13,3 +13,4 @@ test-results/
 # Local, private agent instructions; they are not part of the public repository.
 /CLAUDE.md
 /CLAUDE.local.md
+*.tsbuildinfo
