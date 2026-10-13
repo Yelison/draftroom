@@ -6,6 +6,16 @@ import {
   CLOSE_CODES,
   LIBRARY_CLOSE_CODES,
   MAX_ANCHOR_POSITION_LENGTH,
+  MAX_AWARENESS_STATE_BYTES,
+  MAX_UNSENT_BYTES,
+  MESSAGE_RATE_LIMIT_BURST,
+  MESSAGE_RATE_LIMIT_PER_SECOND,
+  RECONNECT_INITIAL_DELAY_MS,
+  RECONNECT_MAX_DELAY_MS,
+  RECONNECT_STABLE_MS,
+  STORE_DEBOUNCE_MS,
+  authDeniedReasons,
+  authorizedScopes,
   MAX_DOCUMENT_STATE_BYTES,
   MAX_MESSAGE_BYTES,
   MAX_QUOTE_LENGTH,
@@ -171,16 +181,47 @@ describe('comment anchors', () => {
 })
 
 describe('limits and timings', () => {
-  it('fixes the sizes and the version rules the plan states', () => {
-    expect(MAX_QUOTE_LENGTH).toBe(500)
-    expect(MAX_MESSAGE_BYTES).toBe(2 * 1024 * 1024)
-    expect(MAX_DOCUMENT_STATE_BYTES).toBe(5 * 1024 * 1024)
-    expect(AUTO_VERSION_IDLE_MS).toBe(10 * 60 * 1000)
-    expect(AUTO_VERSION_MIN_INTERVAL_MS).toBe(30 * 60 * 1000)
+  // The values the protocol document tabulates; a change here is a change to the protocol.
+  const pinned = {
+    MAX_QUOTE_LENGTH: [MAX_QUOTE_LENGTH, 500],
+    MAX_MESSAGE_BYTES: [MAX_MESSAGE_BYTES, 2 * 1024 * 1024],
+    MAX_DOCUMENT_STATE_BYTES: [MAX_DOCUMENT_STATE_BYTES, 5 * 1024 * 1024],
+    MAX_AWARENESS_STATE_BYTES: [MAX_AWARENESS_STATE_BYTES, 1024],
+    MAX_UNSENT_BYTES: [MAX_UNSENT_BYTES, 1.5 * 1024 * 1024],
+    MESSAGE_RATE_LIMIT_PER_SECOND: [MESSAGE_RATE_LIMIT_PER_SECOND, 100],
+    MESSAGE_RATE_LIMIT_BURST: [MESSAGE_RATE_LIMIT_BURST, 200],
+    STORE_DEBOUNCE_MS: [STORE_DEBOUNCE_MS, 1_000],
+    STORE_MAX_DEBOUNCE_MS: [STORE_MAX_DEBOUNCE_MS, 5_000],
+    STORED_ACK_TIMEOUT_MS: [STORED_ACK_TIMEOUT_MS, 15_000],
+    AUTO_VERSION_IDLE_MS: [AUTO_VERSION_IDLE_MS, 10 * 60 * 1000],
+    AUTO_VERSION_MIN_INTERVAL_MS: [AUTO_VERSION_MIN_INTERVAL_MS, 30 * 60 * 1000],
+    RECONNECT_INITIAL_DELAY_MS: [RECONNECT_INITIAL_DELAY_MS, 1_000],
+    RECONNECT_MAX_DELAY_MS: [RECONNECT_MAX_DELAY_MS, 30_000],
+    RECONNECT_STABLE_MS: [RECONNECT_STABLE_MS, 60_000],
+  } as const
+
+  it.each(Object.entries(pinned))('fixes %s at the value the protocol states', (_name, [actual, expected]) => {
+    expect(actual).toBe(expected)
   })
 
-  it('waits for a stored event longer than the longest write delay', () => {
+  it('waits for a stored event longer than the longest write delay, and writes sooner than that delay allows', () => {
+    expect(STORE_DEBOUNCE_MS).toBeLessThan(STORE_MAX_DEBOUNCE_MS)
     expect(STORED_ACK_TIMEOUT_MS).toBeGreaterThan(STORE_MAX_DEBOUNCE_MS)
+  })
+
+  it('keeps the unsent budget below the message limit and below the document limit', () => {
+    expect(MAX_UNSENT_BYTES).toBeLessThan(MAX_MESSAGE_BYTES)
+    expect(MAX_MESSAGE_BYTES).toBeLessThan(MAX_DOCUMENT_STATE_BYTES)
+  })
+
+  it('backs off from a short first delay to a longer cap, and calls a connection stable after the cap', () => {
+    expect(RECONNECT_INITIAL_DELAY_MS).toBeLessThan(RECONNECT_MAX_DELAY_MS)
+    expect(RECONNECT_STABLE_MS).toBeGreaterThan(RECONNECT_MAX_DELAY_MS)
+  })
+
+  it('refuses an authentication with exactly the two reasons that cannot be used to probe ids', () => {
+    expect(authDeniedReasons).toEqual(['unauthenticated', 'not-found'])
+    expect(authorizedScopes).toEqual(['read-write', 'readonly'])
   })
 })
 
@@ -213,5 +254,30 @@ describe('docs/collab/protocol.md', () => {
 
   it.each(syncStates)('documents the sync state %s in the table of states', (state) => {
     expect(section('### 8.1')).toContain(`| \`${state}\``)
+  })
+
+  it.each([
+    'MAX_MESSAGE_BYTES',
+    'MAX_DOCUMENT_STATE_BYTES',
+    'MAX_AWARENESS_STATE_BYTES',
+    'MAX_UNSENT_BYTES',
+    'MESSAGE_RATE_LIMIT_PER_SECOND',
+    'MESSAGE_RATE_LIMIT_BURST',
+    'STORE_DEBOUNCE_MS',
+    'STORE_MAX_DEBOUNCE_MS',
+    'STORED_ACK_TIMEOUT_MS',
+    'AUTO_VERSION_IDLE_MS',
+    'AUTO_VERSION_MIN_INTERVAL_MS',
+    'RECONNECT_INITIAL_DELAY_MS',
+    'RECONNECT_MAX_DELAY_MS',
+    'RECONNECT_STABLE_MS',
+    'MAX_ANCHOR_POSITION_LENGTH',
+    'MAX_QUOTE_LENGTH',
+  ])('names the constant %s', (name) => {
+    expect(protocolText).toContain(`\`${name}\``)
+  })
+
+  it.each(authDeniedReasons)('documents the authentication refusal reason %s in §3.3', (reason) => {
+    expect(section('### 3.3')).toContain(`\`${reason}\``)
   })
 })
