@@ -1,0 +1,10 @@
+# Generated from packages/contract/openapi.yaml
+packages/contract/src/schema.ts
+
+dist/
+coverage/
+node_modules/
+package-lock.json
+
+# Markdown is written for reading, not for a formatter's line width.
+*.md
