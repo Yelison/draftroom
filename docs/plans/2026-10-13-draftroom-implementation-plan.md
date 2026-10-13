@@ -122,7 +122,7 @@ Product components and their variants: Button (from Forma UI); Presence (Online,
 
 ### 2.1 MVP
 
-Explorer with search and recent documents; create (blank or from template), rename, move to folder, archive and restore, permanently delete; editor with title, paragraphs, headings, bulleted and numbered lists, links, bold, italic and code; live presence and carets; anchored comments with replies, resolve and reopen; sharing with workspace members by explicit role; workspace history and document version history with preview and confirmed restore; home with pinned documents and recent activity; settings for profile, workspace, members and appearance (light, dark, system); English and Spanish; email-and-password accounts (pending Q1).
+Explorer with search and recent documents; create (blank or from template), rename, move to folder, archive and restore, permanently delete; editor with title, paragraphs, headings, bulleted and numbered lists, links, bold, italic and code; live presence and carets; anchored comments with replies, resolve and reopen; sharing with workspace members by explicit role; workspace history and document version history with preview and confirmed restore; home with pinned documents and recent activity; settings for profile, workspace, members and appearance (light, dark, system); English and Spanish; email-and-password accounts (Q1).
 
 ### 2.2 Deferred (needs an explicit decision to enter)
 
@@ -186,7 +186,7 @@ One Node process with two listeners:
 
 Database access through Kysely with `pg`; migrations with Kysely's `Migrator` (one tool, TypeScript migrations, forward-only, each tested on an empty and a populated database). Alternatives considered: Drizzle (1.0 still a release candidate), Prisma (heavy runtime, binary engine, weaker fit for `bytea` streaming), Hono (fine, but Fastify's `inject()` and schema hooks suit contract tests; Hono stays an option if Fastify blocks).
 
-### 3.4 Authentication [proposed, pending Q1]
+### 3.4 Authentication (Q1)
 
 Default: email and password accounts with Argon2id (`@node-rs/argon2`), server-side sessions in PostgreSQL, an `HttpOnly`, `SameSite=Lax`, `Secure` cookie rotated at sign-in, CSRF double-submit (`dr_csrf` cookie echoed in `X-CSRF-Token` on unsafe methods), login rate limiting. The WebSocket upgrade carries the same cookie; `onAuthenticate` resolves the session, never a token passed in the URL. Development and the mocked e2e use a development identity header (`X-Dev-User`) accepted only when `NODE_ENV=development` or `test` and compiled out of production builds (guard test in T7.2). Authentication sits behind an `AuthProvider` boundary so OIDC (as in Resolve) can be added without touching routes.
 
@@ -252,7 +252,7 @@ Rules:
 
 Workspace roles: `owner`, `member`. Document roles: `viewer`, `commenter`, `editor`, `owner`.
 
-**Precedence (effective document role):** a workspace owner is `owner` of every document in the workspace; otherwise the effective role is the highest of the person's explicit grant on the document and the document's `general_access` (which applies to every workspace member). A non-member has no role. The document creator gets an explicit `owner` grant. New documents start with `general_access = none` (pending Q4). Archived documents are readable only by their owners (to restore or delete); every other operation on them returns `404`.
+**Precedence (effective document role):** a workspace owner is `owner` of every document in the workspace; otherwise the effective role is the highest of the person's explicit grant on the document and the document's `general_access` (which applies to every workspace member). A non-member has no role. The document creator gets an explicit `owner` grant. New documents start with `general_access = none` (Q4). Archived documents are readable only by their owners (to restore or delete); every other operation on them returns `404`.
 
 | Operation | Viewer | Commenter | Editor | Owner |
 | --- | --- | --- | --- | --- |
@@ -538,7 +538,7 @@ Archived documents of the caller (owners), restore and permanent delete with con
 
 #### T7.1 · Sign-up, sign-in and sessions (L, high, lane A + B)
 
-§3.4 (pending Q1): migration for credentials, Argon2id, session rotation, CSRF, login rate limit, sign-out purges offline copies, sign-in and sign-up screens in both languages, pending member invitations accepted at sign-up. Depends on T4.1.
+§3.4 (Q1): migration for credentials, Argon2id, session rotation, CSRF, login rate limit, sign-out purges offline copies, sign-in and sign-up screens in both languages, pending member invitations accepted at sign-up. Depends on T4.1.
 **Files:** `apps/server/src/http/auth/{passwords.ts,sessions.ts,csrf.ts,rateLimit.ts}`, `apps/server/src/http/routes/auth.ts`, migration `credentials`, `apps/web/src/features/auth/`, `docs/decisions/0004-authentication.md`.
 **Dependencies added:** `@node-rs/argon2` 2.2.2, `@fastify/cookie`, `@fastify/rate-limit`.
 **Tests:** session fixation, CSRF missing or wrong, rate limit, WebSocket rejected after sign-out, cookie flags in production mode, timing-safe comparison, no account enumeration in sign-in errors.
@@ -673,9 +673,11 @@ The code is read as much as it is used. Each task is reviewed for: small single-
 
 ## 12. Questions, defaults and risks
 
-### 12.1 Questions for the owner (by priority)
+### 12.1 Owner decisions
 
-| # | Question | Default if unanswered | Blocks |
+The owner approved the plan on 2026-10-13 with the default of every question below; each default is now a decision, and changing one later goes through its own pull request.
+
+| # | Question | Decision (2026-10-13) | Affects |
 | --- | --- | --- | --- |
 | Q1 | Authentication: own email and password accounts, or OIDC with an identity provider (Keycloak, as in Resolve)? | Email and password with Argon2id (§3.4) | T7.1 (earlier tasks use the development identity) |
 | Q2 | States and screens without a visual reference yet (D1, D12): build them in code from the product components, or wait for a reference? | Build in code; screenshots in each delivery | Phase 1 onwards |
