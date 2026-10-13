@@ -172,6 +172,7 @@ describe('comment anchors', () => {
 
 describe('limits and timings', () => {
   it('fixes the sizes and the version rules the plan states', () => {
+    expect(MAX_QUOTE_LENGTH).toBe(500)
     expect(MAX_MESSAGE_BYTES).toBe(2 * 1024 * 1024)
     expect(MAX_DOCUMENT_STATE_BYTES).toBe(5 * 1024 * 1024)
     expect(AUTO_VERSION_IDLE_MS).toBe(10 * 60 * 1000)
@@ -184,25 +185,33 @@ describe('limits and timings', () => {
 })
 
 describe('docs/collab/protocol.md', () => {
+  // Each name has to be in the table of its own section, not merely somewhere in the document.
+  const section = (heading: string) => {
+    const start = protocolText.indexOf(`\n${heading}`)
+    const next = protocolText.indexOf('\n#', start + heading.length)
+    expect(start, `section "${heading}" exists`).toBeGreaterThan(-1)
+    return protocolText.slice(start, next)
+  }
+
   it.each(closeCodeNames.map((name) => [name, CLOSE_CODES[name]] as const))(
-    'documents the close code %s (%i)',
+    'documents the close code %s (%i) in the table of codes the server sends',
     (name, code) => {
-      expect(protocolText).toContain(`\`${code}\` | \`${name}\``)
+      expect(section('### 6.2')).toContain(`| \`${code}\` | \`${name}\``)
     },
   )
 
   it.each(libraryCloseCodeNames.map((name) => [name, LIBRARY_CLOSE_CODES[name]] as const))(
-    'documents the library close code %s (%i)',
+    'documents the library close code %s (%i) in the table of codes the transport emits',
     (name, code) => {
-      expect(protocolText).toContain(`\`${code}\` | \`${name}\``)
+      expect(section('### 6.4')).toContain(`| \`${code}\` | \`${name}\``)
     },
   )
 
-  it.each(statelessEventTypes)('documents the stateless event %s', (type) => {
-    expect(protocolText).toContain(`| \`${type}\``)
+  it.each(statelessEventTypes)('documents the stateless event %s in the table of events', (type) => {
+    expect(section('## 9.')).toContain(`| \`${type}\``)
   })
 
-  it.each(syncStates)('documents the sync state %s', (state) => {
-    expect(protocolText).toContain(`| \`${state}\``)
+  it.each(syncStates)('documents the sync state %s in the table of states', (state) => {
+    expect(section('### 8.1')).toContain(`| \`${state}\``)
   })
 })
