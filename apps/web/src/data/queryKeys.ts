@@ -3,29 +3,34 @@ import type { QueryKey } from '@tanstack/react-query'
 import type { OperationId, RequestOf } from './DataSource.ts'
 
 /**
- * Every TanStack Query key of the app, in one place. A key starts with what it belongs to (`workspaces/<id>/...`,
- * `documents/<id>/...`), so invalidating a prefix reaches every query under it; the table in `invalidations.ts` says
- * which mutation reaches which.
+ * Every TanStack Query key of the app, in one place.
+ *
+ * `invalidateQueries` matches by prefix, so no key may be the prefix of another unless that is meant: a detail key ends
+ * in `detail` and a list key in `list`, which leaves nothing under them. The two prefixes that are meant are
+ * `documentLists`, which reaches every document list of a workspace whatever its filters, and `shared`, which reaches
+ * the shared list with and without its `access` filter. The table below, and the test that runs it against a real
+ * `QueryClient`, say which mutation reaches which.
  */
 export const queryKeys = {
   me: () => ['me'] as const,
 
-  workspaces: () => ['workspaces'] as const,
-  workspace: (workspaceId: string) => ['workspaces', workspaceId] as const,
+  workspaces: () => ['workspaces', 'list'] as const,
+  workspace: (workspaceId: string) => ['workspaces', workspaceId, 'detail'] as const,
   members: (workspaceId: string) => ['workspaces', workspaceId, 'members'] as const,
   folders: (workspaceId: string) => ['workspaces', workspaceId, 'folders'] as const,
-  /** Every document list of a workspace, whatever its filters: the prefix to invalidate. */
+  /** Every document list of a workspace, whatever its filters: a prefix on purpose. */
   documentLists: (workspaceId: string) => ['workspaces', workspaceId, 'documents'] as const,
   documentList: (workspaceId: string, filters: ListFilters = {}) =>
     ['workspaces', workspaceId, 'documents', filters] as const,
   pinned: (workspaceId: string) => ['workspaces', workspaceId, 'pinned'] as const,
+  /** Without `access`, every shared list of the workspace: a prefix on purpose. */
   shared: (workspaceId: string, access?: SharedAccess) =>
     access === undefined
       ? (['workspaces', workspaceId, 'shared'] as const)
       : (['workspaces', workspaceId, 'shared', access] as const),
   workspaceActivity: (workspaceId: string) => ['workspaces', workspaceId, 'activity'] as const,
 
-  document: (documentId: string) => ['documents', documentId] as const,
+  document: (documentId: string) => ['documents', documentId, 'detail'] as const,
   access: (documentId: string) => ['documents', documentId, 'access'] as const,
   threads: (documentId: string) => ['documents', documentId, 'threads'] as const,
   versions: (documentId: string) => ['documents', documentId, 'versions'] as const,
@@ -46,8 +51,8 @@ export interface Scope {
   documentId?: string
 }
 
-// The queries a change makes stale, by name. What each name stands for: A name that needs a document fails loudly without one: asking for it is a mistake of the
-// caller, and silently skipping the key would leave a screen showing what is no longer true.
+// The queries a change makes stale, by name. A name that is about a document fails loudly without one: asking for it
+// is a mistake of the caller, and silently skipping the key would leave a screen showing what is no longer true.
 const keyOf = {
   everything: () => [],
   workspace: ({ workspaceId }) => queryKeys.workspace(workspaceId),
@@ -77,10 +82,9 @@ function documentOf({ documentId }: Scope): string {
  * invalidation"), as data. A test requires a row for every operation that changes state.
  */
 export const mutationInvalidations = {
-  // A person's session decides everything they can read, so none of what the last one read may be shown to the next:
-  // `everything` is the empty key, which matches every query. Marking those queries stale is not enough on a change of
-  // person (they would be shown until refetched), so whoever runs a sign-in, sign-up or sign-out clears the cache with
-  // it. The README table has no row for these three; this is the decision recorded here.
+  // A person's session decides everything they can read: `everything` is the empty key, which matches every query. The
+  // README table has no row for these three; this is the decision recorded here. See `sessionChanges` for why marking
+  // the queries stale is not all they need.
   signUp: ['everything'],
   signIn: ['everything'],
   signOut: ['everything'],
@@ -119,6 +123,14 @@ export const mutationInvalidations = {
 } as const satisfies Partial<Record<OperationId, readonly InvalidationName[]>>
 
 export type MutationId = keyof typeof mutationInvalidations
+
+/**
+ * The mutations after which the signed-in person is someone else, or nobody. Invalidating is not enough for them:
+ * stale queries keep showing the last person's data until they are refetched, so the cache has to be cleared
+ * (`queryClient.clear()`). Doing that belongs to the authentication task (T7.1), which must read this list rather than
+ * the names of the three operations.
+ */
+export const sessionChanges = ['signUp', 'signIn', 'signOut'] as const satisfies readonly MutationId[]
 
 /**
  * The events other people's changes arrive as, over the collaboration connection (protocol, section 5.3). `stored` is
