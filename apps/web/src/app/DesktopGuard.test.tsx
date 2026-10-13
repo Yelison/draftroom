@@ -60,7 +60,7 @@ describe('the desktop requirement', () => {
     expect(screen.getByText(new RegExp(text))).toBeInTheDocument()
   })
 
-  it('keeps the app and its state while the window is narrow, and gives the focus back to it', async () => {
+  it('keeps the app and its state while the window is narrow, and gives the focus back to where it was', async () => {
     const user = userEvent.setup()
     const viewport = simulateViewport(1440)
     renderGuarded()
@@ -72,8 +72,18 @@ describe('the desktop requirement', () => {
 
     act(() => viewport.resizeTo(1280))
     expect(screen.getByRole('textbox', { name: 'Draft' })).toHaveValue('Quarterly plan')
-    expect(screen.getByRole('heading', { name: 'Work area' })).toHaveFocus()
+    expect(screen.getByRole('textbox', { name: 'Draft' })).toHaveFocus()
     expect(screen.queryByRole('heading', { name: 'Draftroom needs a larger window' })).not.toBeInTheDocument()
+  })
+
+  it('gives the focus to the heading of the page when nothing had it before the notice', () => {
+    const viewport = simulateViewport(1440)
+    renderGuarded()
+
+    act(() => viewport.resizeTo(1000))
+    act(() => viewport.resizeTo(1280))
+
+    expect(screen.getByRole('heading', { name: 'Work area' })).toHaveFocus()
   })
 
   it('asks the browser to tell it about the crossing, not about every pixel', () => {

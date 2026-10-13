@@ -70,13 +70,14 @@ describe('the focus when the person navigates', () => {
 
   it('moves the skip link to the headline too, without changing the address', async () => {
     const user = userEvent.setup()
-    const { router } = renderApp('/documents')
+    renderApp('/documents')
 
     await user.tab()
     await user.keyboard('{Enter}')
 
     expect(screen.getByRole('heading', { level: 1, name: 'Documents' })).toHaveFocus()
-    expect(router.state.location.hash).toBe('')
+    // The browser's address, not the router's: a followed fragment would show here even if the router ignored it.
+    expect(window.location.hash).toBe('')
   })
 })
 

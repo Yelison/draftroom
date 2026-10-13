@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import styles from './DesktopGuard.module.css'
 import { focusMainContent } from './mainContent.ts'
@@ -39,13 +39,26 @@ function DesktopNotice() {
   const intl = useIntl()
   const heading = useRef<HTMLHeadingElement>(null)
 
-  // The notice takes the focus when it appears, because the app it hides held it. When it goes away the focus returns
-  // to the app. In StrictMode the first cleanup runs while the app is still hidden and does nothing; the second effect
-  // takes the focus again and the real cleanup comes at the end.
-  useEffect(() => {
+  const previous = useRef<Element | null>(null)
+
+  // The notice takes the focus when it appears, because the app it hides held it, and gives it back to the element
+  // that had it when it goes away, so the place where the person was typing is not lost. The element is read in a
+  // layout effect: by the time a passive one runs, the browser has already dropped the focus of what was hidden. It is
+  // given back in the cleanup of a passive effect, which runs once the app is on screen again; a layout cleanup runs
+  // while it is still hidden. If the element is gone, the focus goes to the page's heading. StrictMode runs the layout
+  // effect twice, so the first element read is kept.
+  useLayoutEffect(() => {
+    previous.current ??= document.activeElement
     heading.current?.focus()
-    return focusMainContent
   }, [])
+  useEffect(
+    () => () => {
+      const element = previous.current
+      if (element instanceof HTMLElement && element !== document.body && element.isConnected) element.focus()
+      else focusMainContent()
+    },
+    [],
+  )
 
   return (
     <main className={styles.notice}>
