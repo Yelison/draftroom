@@ -261,8 +261,8 @@ describe('HttpDataSource answers', () => {
     expect(error).toMatchObject({ status: null, cause: expect.any(SyntaxError) })
   })
 
-  it('rejects an unreadable body in a call without content as a transport error too', async () => {
-    const { source } = connect(() => new Response('<html>', { status: 500, headers: { 'Content-Type': 'text/html' } }))
+  it('rejects an unreadable body in a call that expects none as a transport error too', async () => {
+    const { source } = connect(() => new Response('<html>', { headers: { 'Content-Type': 'text/html' } }))
 
     await expect(source.signOut()).rejects.toBeInstanceOf(TransportError)
   })

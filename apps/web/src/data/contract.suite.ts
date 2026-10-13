@@ -293,6 +293,8 @@ export function describeDataSourceContract(name: string, harness: Harness) {
           const page = await owner.listDocuments({
             params: { path: { workspaceId }, query: { limit: 100, ...(cursor === undefined ? {} : { cursor }) } },
           })
+          // A cursor is only issued when there is more to read: a page with nothing in it means it was issued too soon.
+          expect(page.items.length).toBeGreaterThan(0)
           ids.push(...page.items.map((row) => row.id))
           cursor = page.nextCursor ?? undefined
           pages += 1
