@@ -93,8 +93,9 @@ export const MESSAGE_RATE_LIMIT_BURST = 200
 /**
  * What the client may hold that the server has not stored: the size of the update a reconnection would send. Above
  * it the editor stops accepting edits until they are stored, so the SyncStep2 of the handshake never exceeds
- * `MAX_MESSAGE_BYTES` (which `ws` would answer with a 1009 close). Paste and drop handlers refuse content whose
- * text is larger than a third of it, which leaves room for the markup and the Yjs overhead.
+ * `MAX_MESSAGE_BYTES` (which `ws` would answer with a 1009 close). Paste and drop handlers measure content by the bytes
+ * of the Yjs update it would produce, not by its text, and refuse it when the unsent bytes plus those would exceed
+ * this budget.
  */
 export const MAX_UNSENT_BYTES = 1.5 * 1024 * 1024
 

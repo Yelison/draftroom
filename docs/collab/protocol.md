@@ -249,7 +249,7 @@ Both hooks run inside the document's store mutex, so the pair is atomic with res
 3. **A failed write sends nothing** (F4), and the server MUST NOT lose the change:
    - It retries without waiting for another change: `instance.storeDocumentHooks(document, payload, true)` after 1 s, 2 s, 4 s, up to 30 s, until it succeeds.
    - **The document stays loaded while a write is unconfirmed.** `beforeUnloadDocument` throws while the document is *dirty*: an update was applied after the last committed capture, or a failed write has not yet succeeded. Without it, the last client leaving would make Hocuspocus unload the document and drop the acknowledged edits (F18). After the retry succeeds, Hocuspocus unloads the document by itself.
-4. **Shutdown** stops accepting connections, runs `flushPendingStores()`, and then also waits for every document with a pending retry: it attempts them at once (skipping the back-off) and waits up to 30 s before `destroy()`. A document still unstored after that is logged; its clients keep their `pending` changes.
+4. **Shutdown** stops accepting connections, runs `flushPendingStores()`, and then also waits for every document with a pending retry: it attempts them at once (skipping the back-off) and waits up to 30 s. When the wait ends it sets a `shuttingDown` flag, with which `beforeUnloadDocument` stops throwing, and then calls `destroy()`; without the flag `Server.destroy()` would wait forever for an unload the guard keeps aborting. A document still unstored at that point is logged; its clients keep their `pending` changes.
 
 ### 7.3 Server: the snapshot a new connection gets
 
@@ -309,7 +309,7 @@ The machine is implemented by T2.2; its types are `SyncState`, `SyncEvent` and `
 | `revoked`       | Access was removed. Terminal for this editor session.                                                              | Access removed          | not editable                          |
 | `read-only`     | Authorised read-only, including archived documents. Never unsynced.                                                | Read-only               | not editable                          |
 
-The action offered in `error` is a retry (`open`; `pending` survives) for every cause except `document-too-large`: there the offer is "discard my local changes and reload", which purges the local copy and then sends `open`. A retry would send the same oversize message again (§5.1, §12.5). Whenever the editor is not editable, edits are not accepted at all rather than accepted and lost.
+The action offered in `error` is a retry (`open`; `pending` survives) for every cause except `document-too-large`: there the offer is "discard my local changes and reload", which purges the local copy and then sends `open`. A retry would send the same oversize message again (§5.1, §12.5). Whenever the editor is not editable, edits are not accepted at all rather than accepted and lost. A further condition applies to every editable state: the unsent changes are within `MAX_UNSENT_BYTES` (§12.5); above it the editor stops accepting edits until they are stored.
 
 ### 8.2 Transitions
 
@@ -318,7 +318,7 @@ The action offered in `error` is a retry (`open`; `pending` survives) for every 
 | Event                      | From                                                                       | Guard or detail                                    | To                                                         |
 | -------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------- |
 | `open`                     | initial                                                                    |                                                    | `connecting`                                               |
-| `open`                     | `error`                                                                    | retry, or after the discard of §8.1                | `connecting`                                               |
+| `open`                     | `error`                                                                    | retry, or after the discard of §8.1; the provider is reopened with `disconnect()` and then `connect()`, also when the socket is still open (`store-timeout`) | `connecting` |
 | `authenticated`            | `connecting`, `reconnecting`, `offline-local`                              | `scope = 'read-write'`                             | `synchronising`, then settle                               |
 | `authenticated`            | `connecting`, `reconnecting`, `offline-local`                              | `scope = 'readonly'`                               | `read-only` (§12.4 if changes were pending)                |
 | `authentication-denied`    | any state                                                                  | `reason = 'unauthenticated'`                       | `error` (cause `unauthenticated`)                          |
@@ -365,6 +365,7 @@ A `stored` that arrives in a state that does not settle (`connecting`, `reconnec
 | Reconnection authorised as `readonly` after offline edits                     | `read-only` and the discard of §12.4                                                                       |
 | Close `4403`, or `not-found` on re-authentication of a known document         | `revoked`; no upload                                                                                       |
 | Close `4413` or `1009`                                                        | `error` (`document-too-large`) offering only "discard my local changes and reload"                         |
+| Retry from `error` (`store-timeout`) while the socket is still open           | `connecting`, and the provider is reopened (`disconnect()`, then `connect()`), so authentication and the handshake run again instead of waiting for an event that never comes |
 | In-band close (`1000`) with the socket open                                   | `reconnecting`, and `disconnect()` then `connect()` (§6.5)                                                 |
 
 ### 8.4 Effects
@@ -550,7 +551,7 @@ The handshake after a reconnection sends everything the server lacks in one Sync
 
 - It measures the unsent part as `Y.encodeStateAsUpdate(doc, stateVectorOf(lastStoredSnapshot)).byteLength`, where `lastStoredSnapshot` is the last `stored` snapshot it received (its state vector is the server's, as of that store).
 - When it exceeds `MAX_UNSENT_BYTES` (1.5 MiB), the editor stops accepting edits (not editable, §8.1) until a covering `stored` brings it back under the budget.
-- Paste and drop handlers refuse content whose text is larger than a third of the budget, which leaves room for markup and Yjs overhead.
+- Paste and drop handlers measure the content by the **bytes of the Yjs update it would produce**, not by its characters: they insert it into a throwaway `Y.Doc` built with the editor schema and encode that (`Y.encodeStateAsUpdate`). They refuse it when the unsent bytes plus the new ones would exceed `MAX_UNSENT_BYTES`. Text length is a poor measure because every node costs structs of its own: a list of 35 000 short items is small as text and large as an update.
 - If a 1009 or `4413` happens anyway, the way out is "discard my local changes and reload" (§8.1), never a retry.
 
 ## 13. Undo
@@ -594,7 +595,7 @@ The handshake after a reconnection sends everything the server lacks in one Sync
 7. **A read-write editor with no changes, a commenter and a viewer open a document above `MAX_DOCUMENT_STATE_BYTES` and read it;** a deletion-only update is applied; an update that adds content is refused with `document-too-large` and `4413`.
 8. A write fails: no `stored` is sent, the retry succeeds without a new edit, and a client that connects meanwhile receives the previous snapshot, not the unwritten one.
 9. **A write fails and the last client leaves: the document stays loaded and ends up stored.**
-10. Shutdown waits for a pending retry and stores it.
+10. Shutdown waits for a pending retry and stores it; with a write that never succeeds, shutdown still finishes within the 30 s wait and logs the document.
 11. Revocation: `readOnly` is set before the close, an update sent in between is not applied, and the code is `4403` or `4409` as §6.3 says.
 12. The rate limit closes with `4429`; the pre-load buffer limit closes with `4205`.
 13. A hook that throws produces an in-band close with the socket still open (the behaviour the client rule of §6.5 answers).
@@ -607,8 +608,16 @@ The handshake after a reconnection sends everything the server lacks in one Sync
 3. 2 000 offline edits and then a reconnection against a slow `onLoadDocument` complete (§12.3).
 4. The `stored` rule: a deletion-only change is not covered by a snapshot taken before it.
 5. An in-band close makes the client call `disconnect()` and then `connect()`.
+   Retrying from `error` (`store-timeout`) with the socket still open does the same, and reaches `synced` after a covering `stored`.
 6. `1009` and `4413` offer "discard my local changes and reload", never a retry.
 7. Above `MAX_UNSENT_BYTES` the editor stops accepting edits.
+8. A paste of a list of 35 000 short items is refused, because of the bytes of the update it would produce, even though its text is small.
+
+**T2.3 (offline cache)**
+
+1. The `unsynced` marker of a copy is set when `pending` becomes non-empty and cleared when a covering `stored` empties it.
+2. Sign-out and account switch wait (bounded) for copies with a marker to store while online, count the documents whose changes were never stored, and ask for confirmation before purging; without a marker, or after confirmation, they purge.
+3. Entering `revoked` purges that document's copy without asking, and nothing is uploaded afterwards.
 
 **T3.2 (anchors)**
 
