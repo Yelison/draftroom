@@ -20,5 +20,7 @@
     "src/theme.ts",
     "src/data/mock/fixtures",
     "src/data/mock/ids.ts"
-  ]
+  ],
+  // The fixtures import types from the contract, so a change of `schema.ts` has to rebuild this project too.
+  "references": [{ "path": "../../packages/contract" }]
 }

@@ -11,5 +11,7 @@
     "outDir": null,
     "tsBuildInfoFile": "${configDir}/node_modules/.tmp/tsconfig.app.tsbuildinfo"
   },
-  "include": ["src"]
+  "include": ["src"],
+  // The contract's types are an input of this project: when `schema.ts` changes, `tsc -b` must rebuild it.
+  "references": [{ "path": "../../packages/contract" }]
 }
