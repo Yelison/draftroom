@@ -23,3 +23,4 @@ CI runs the same commands in the required `Static checks` job.
 - Every new test must fail without its change: describe the mutation in the pull request.
 - Do not weaken CI or skip tests to get a green build.
 - Keep design files, exports and secrets out of the repository.
+- `apps/web/src/styles/draftroom-tokens.css` is generated: never edit it by hand (see ADR 0008).
