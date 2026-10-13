@@ -24,7 +24,11 @@ function firstPaint(html: string, { stored, languages }: { stored: Record<string
 }
 
 describe('the first-paint scripts', () => {
-  const html = insertFirstPaintScripts(template, headScripts)
+  // The built page has its stylesheet in <head>, after the app module: the template gets one so the order is checked.
+  const html = insertFirstPaintScripts(
+    template.replace('</head>', '<link rel="stylesheet" href="/app.css" /></head>'),
+    headScripts,
+  )
 
   it.each([
     {
@@ -67,7 +71,11 @@ describe('the first-paint scripts', () => {
     for (const script of inline) {
       expect(script.compareDocumentPosition(appModule as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     }
-    expect(document.querySelector('link[rel="stylesheet"]')).toBeNull()
+    const stylesheet = document.querySelector('link[rel="stylesheet"]')
+    expect(stylesheet).not.toBeNull()
+    for (const script of inline) {
+      expect(script.compareDocumentPosition(stylesheet as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
     expect(html.indexOf('<script>')).toBeLessThan(html.indexOf('<title>'))
   })
 

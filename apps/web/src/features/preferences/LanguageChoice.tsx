@@ -16,7 +16,7 @@ export function LanguageChoice({ onChange }: LanguageChoiceProps) {
 
   return (
     <fieldset className={styles.group}>
-      <legend>{intl.formatMessage({ id: 'preferences.language.legend' })}</legend>
+      <legend className={styles.legend}>{intl.formatMessage({ id: 'preferences.language.legend' })}</legend>
       {locales.map((option) => (
         <Radio
           key={option}

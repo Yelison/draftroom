@@ -6,7 +6,7 @@
   border: 0;
 }
 
-.group legend {
+.legend {
   padding: 0;
   margin-bottom: var(--space-4);
   color: var(--color-muted);

@@ -17,7 +17,7 @@ export function ThemeChoice({ onChange }: ThemeChoiceProps) {
 
   return (
     <fieldset className={styles.group}>
-      <legend>{intl.formatMessage({ id: 'preferences.theme.legend' })}</legend>
+      <legend className={styles.legend}>{intl.formatMessage({ id: 'preferences.theme.legend' })}</legend>
       {themeOptions.map((option) => (
         <Radio
           key={option}

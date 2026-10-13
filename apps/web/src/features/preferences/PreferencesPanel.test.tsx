@@ -21,6 +21,7 @@ describe('the language choice', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: 'Español' }))
 
+    expect(screen.getByRole('radio', { name: 'Español' })).toHaveFocus()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Escribe en equipo')
     expect(screen.getByRole('group', { name: 'Idioma' })).toBeInTheDocument()
     expect(document.documentElement.lang).toBe('es')
@@ -43,6 +44,7 @@ describe('the language choice', () => {
     await userEvent.keyboard('{ArrowDown}')
 
     expect(screen.getByRole('radio', { name: 'Español' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Español' })).toHaveFocus()
   })
 })
 
