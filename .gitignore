@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.tgz
+.env
+.env.*
+!.env.example
+.DS_Store
+.claude/settings.local.json
+.vitest/
+# Local, private agent instructions; they are not part of the public repository.
+/CLAUDE.md
+/CLAUDE.local.md
