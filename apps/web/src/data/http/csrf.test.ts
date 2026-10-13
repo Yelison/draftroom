@@ -12,7 +12,7 @@ describe('cookieValue', () => {
     expect(cookieValue(cookies, 'dr_csrf')).toBe(expected)
   })
 
-  it.each([[''], ['theme=dark'], ['dr_csrf_other=1'], ['dr_csrf']])('finds nothing in %j', (cookies) => {
+  it.each([[''], ['theme=dark'], ['dr_csrf_other=1'], ['dr_csrf'], ['dr_csrfx']])('finds nothing in %j', (cookies) => {
     expect(cookieValue(cookies, 'dr_csrf')).toBeUndefined()
   })
 })
