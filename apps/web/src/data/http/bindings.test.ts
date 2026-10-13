@@ -7,14 +7,16 @@ const contract = loadContract()
 const origin = 'http://app.test'
 
 /** A data source whose transport records what it was asked for and answers the way the contract says a success looks. */
-function recordingSource(status: number) {
+function recordingSource(status: number, mediaType = 'application/json') {
   const requests: Request[] = []
   const source = createHttpDataSource({
     baseUrl: origin,
     csrfToken: () => 'token',
     fetch: async (request) => {
       requests.push(request)
-      return status === 204 ? new Response(null, { status }) : Response.json({}, { status })
+      return status === 204
+        ? new Response(null, { status })
+        : new Response('{}', { status, headers: { 'Content-Type': mediaType } })
     },
   })
   return { source, requests }
@@ -38,7 +40,7 @@ describe('the HTTP bindings', () => {
   })
 
   it('downloads a version as bytes from its content path', async () => {
-    const { source, requests } = recordingSource(200)
+    const { source, requests } = recordingSource(200, 'application/octet-stream')
 
     await source.getVersionContent({ params: { path: { versionId: 'v-1' } } })
 

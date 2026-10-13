@@ -246,25 +246,54 @@ describe('HttpDataSource answers', () => {
     expect(error).not.toHaveProperty('code')
   })
 
-  it.each([
-    [
-      'a gateway page served with 200',
-      () => new Response('<html>App</html>', { headers: { 'Content-Type': 'text/html' } }),
-    ],
-    ['a truncated JSON body', () => new Response('{"id":', { headers: { 'Content-Type': 'application/json' } })],
-  ])('rejects %s with a transport error, not a SyntaxError', async (_name, answer) => {
-    const { source } = connect(answer)
+  it('rejects a 200 that is not JSON with a transport error that keeps its status', async () => {
+    const { source } = connect(() => new Response('<html>App</html>', { headers: { 'Content-Type': 'text/html' } }))
 
     const error = await source.getMe().catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(TransportError)
+    expect(error).toMatchObject({ status: 200 })
+  })
+
+  it('rejects a 200 with no content type, which is not what the operation answers with', async () => {
+    const { source } = connect(() => new Response('{}', { headers: { 'Content-Type': '' } }))
+
+    await expect(source.getMe()).rejects.toMatchObject({ status: 200 })
+  })
+
+  it('takes a JSON type with parameters, such as a charset', async () => {
+    const { source } = connect(() => json({ id: 'x', email: 'a@b.example', name: 'A' }))
+
+    await expect(source.getMe()).resolves.toMatchObject({ id: 'x' })
+  })
+
+  it.each([
+    ['a call that returns JSON', (source: ReturnType<typeof connect>['source']) => source.getMe()],
+    ['a call that expects no content', (source: ReturnType<typeof connect>['source']) => source.signOut()],
+  ])('rejects a JSON body that is cut short, in %s, with a transport error and its cause', async (_name, call) => {
+    const { source } = connect(() => new Response('{"id":', { headers: { 'Content-Type': 'application/json' } }))
+
+    const error = await call(source).catch((caught: unknown) => caught)
 
     expect(error).toBeInstanceOf(TransportError)
     expect(error).toMatchObject({ status: null, cause: expect.any(SyntaxError) })
   })
 
-  it('rejects an unreadable body in a call that expects none as a transport error too', async () => {
+  it('rejects a 200 HTML page in a call that expects no content', async () => {
     const { source } = connect(() => new Response('<html>', { headers: { 'Content-Type': 'text/html' } }))
 
-    await expect(source.signOut()).rejects.toBeInstanceOf(TransportError)
+    await expect(source.signOut()).rejects.toMatchObject({ status: 200 })
+  })
+
+  it('does not take for the bytes of a version a 200 that is not an octet stream', async () => {
+    const { source } = connect(() => new Response('<html>App</html>', { headers: { 'Content-Type': 'text/html' } }))
+
+    const error = await source
+      .getVersionContent({ params: { path: { versionId: documentId } } })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(TransportError)
+    expect(error).toMatchObject({ status: 200 })
   })
 
   it('rejects a failed connection with a transport error that keeps its cause', async () => {

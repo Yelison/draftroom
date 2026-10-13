@@ -48,8 +48,9 @@ export class ApiError extends Error {
 }
 
 /**
- * The request did not end in an answer of the contract: the network failed (`status` is `null`) or something between
- * the client and the API replied with a body that is not a problem, such as a gateway's error page. It has no `code`
+ * The request did not end in an answer of the contract. When the network failed, or a response could not be read at all
+ * (a body cut short), `status` is `null`; when something between the client and the API answered with what is not the
+ * contract's (a gateway's error page, a 200 with HTML where JSON was due), `status` is that answer's. It has no `code`
  * because the server never said one: it is never mistaken for an `ApiError`.
  */
 export class TransportError extends Error {

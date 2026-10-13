@@ -20,10 +20,13 @@ interface Answer<Data> {
   response: Response
 }
 
+/** The one operation whose success is not JSON: the download of a version is a Yjs update. */
+const download: keyof paths = '/api/versions/{versionId}/content'
+
 /**
  * What `openapi-fetch` answers, with whatever it throws made a `TransportError`. It only routes a failed `fetch` through
- * the middleware: a success whose body is not JSON (a gateway's page, an SPA fallback answering 200 to a wrong
- * `VITE_API_URL`) escapes as a `SyntaxError`, which is not an answer of the contract either.
+ * the middleware, so a body that claims to be JSON and is not (a response cut short) escapes as a `SyntaxError`, which
+ * is not an answer of the contract either. There is no response to take a status from, so that one has none.
  */
 async function answered<Data>(call: Promise<Answer<Data>>): Promise<Answer<Data>> {
   try {
@@ -69,6 +72,16 @@ export function createHttpDataSource({
     onRequest({ request }) {
       const token = csrfToken()
       if (changesState(request.method) && token !== undefined) request.headers.set(csrfHeaderName, token)
+    },
+    // A success must be what its operation answers with. A gateway's page, or the `index.html` a static host serves with
+    // 200 to a wrong `VITE_API_URL`, is an answer that arrived and is not the contract's: it keeps its status, which is
+    // what tells it from a lost connection. Without a body (`204`, empty) there is no type to check.
+    onResponse({ response, schemaPath }) {
+      const hasBody = response.status !== 204 && response.headers.get('Content-Length') !== '0'
+      const expected = schemaPath === download ? 'application/octet-stream' : 'application/json'
+      if (response.ok && hasBody && response.headers.get('Content-Type')?.includes(expected) !== true) {
+        throw new TransportError(response.status)
+      }
     },
     // A failed `fetch` has no contract code to carry: it is its own error, so no screen mistakes it for a refusal.
     onError({ error }) {
