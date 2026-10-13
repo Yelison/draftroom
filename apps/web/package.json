@@ -10,6 +10,7 @@
     "sync:forma-tokens": "node scripts/sync-forma-tokens.mjs"
   },
   "dependencies": {
+    "@draftroom/contract": "*",
     "@tanstack/react-query": "5.104.2",
     "@yelison/forma-ui": "0.3.0",
     "openapi-fetch": "0.17.0",
