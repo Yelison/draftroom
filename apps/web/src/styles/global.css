@@ -1,0 +1,16 @@
+/* The document's own rules, drawn from the tokens of Forma UI. It declares no token: a token of the package is never
+ * redefined here, and the product's own tokens have a file of their own. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font: var(--font-body);
+  font-family: var(--font-family);
+}
