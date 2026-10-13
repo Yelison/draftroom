@@ -52,13 +52,36 @@ The creator of a document receives an explicit `owner` grant. New documents star
 | Archive, restore from archive, delete permanently | | | | ✓ |
 | Pin (personal) | ✓ | ✓ | ✓ | ✓ |
 
-Workspace operations: any member lists members and creates documents and folders; owners add, change or remove members and rename the workspace. A workspace and a document always keep at least one owner (`409 last-owner`).
+Workspace operations: any member lists members and creates documents and folders; owners add, change or remove members and rename the workspace. A workspace always keeps at least one owner, and a document always keeps at least one explicit owner grant (`409 last-owner`; see below).
+
+### Decisions made when the REST contract was written
+
+The plan left these open. The contract owner decided them, and each is binding on the server and the mocks.
+
+**Pending members have a `userId` from the start.** Adding a member by email creates the identity at once: a user row without credentials, which already belongs to the workspace as a `pending` member and can already receive document grants. Signing up with that email **claims** the row: same `userId`, same grants, status `active`. It is not an "email already registered" conflict; only an email with a signed-up account is. Reason: every member and access operation addresses a person by `{userId}`, and a pending member has to be addressable.
+Alternatives discarded: a separate invitation id (a second way to address a member in every path, and grants would need re-pointing at sign-up); keying pending members by email (emails change case and are personal data in URLs); refusing to share with someone until they sign up (breaks the "add by email" flow).
+
+**Folders.** Folders are flat. Any workspace member creates and renames a folder; only workspace owners delete one. Reason: owners read every document, so they can always empty a folder first; if any member could delete, a member would meet a `409 conflict` for documents they cannot read, which also reveals that those documents exist.
+Alternatives discarded: any member deletes (the leak above, and more permissive than the matrix, which is default deny); owners do everything (renaming a typo would need an owner); the creator or an owner (needs a `created_by` on folders for little gain).
+
+**Last owner.** A workspace keeps at least one owner. A document keeps at least one **explicit owner grant**. Workspace owners are implicit owners of every document but do not count towards it: the guarantee has to survive the workspace owners changing.
+Alternatives discarded: counting workspace owners (the rule could then never be broken, so `setAccess` and `removeAccess` could never answer `409`, and a document could end up with only implicit owners that nobody chose); no rule for documents (an ownerless document is left for workspace owners to rescue).
+
+**Removing a member transfers their sole ownerships.** When the person removed holds the only explicit owner grant of some documents, `removeMember` transfers those grants to the workspace owner who makes the request, records one `access.granted` activity event per document, and goes ahead. When an owner removes themselves, the grants go to the longest-standing remaining owner. `409 last-owner` stays for the last owner of the workspace only.
+Alternatives discarded: `409 last-owner` until the documents are handed over by hand (a person who has left cannot be asked to do it, and an owner would have to hunt each document down before removing anyone); deleting or archiving the documents (silently destroys other people's work).
+
+**Sharing data is owner-only wherever it appears.** The matrix gives "read and change access, general access" to owners. `Document.generalAccess` is therefore `null` for anyone who is not an effective owner, and the events that reveal how a document is shared (`access.*`, `general-access.changed`) are served only to its effective owners, in both activity lists. The caller's own role is shown to everyone.
+Alternatives discarded: a documented exception that lets every reader see the general access (simpler, and contradicts the matrix); removing the field and the events (the "Shared with me" table and the activity timeline would lose information that is not sensitive: who did what).
+
+### Left to the authentication task
+
+Decided with ADR 0004, not here: whether `409` on sign-up is acceptable given that it reveals which emails have an account; how passwords are normalised (NFKC, or not at all); email verification (without it, whoever signs up first with a pending email inherits the grants given to it); the CSRF exemption of sign-in (login CSRF).
 
 ### Rules that hold everywhere
 
 - **Default deny.** An operation the matrix does not grant is refused.
 - **Enforced on the server,** for REST and for WebSocket, and tested on both. The interface hides what a role cannot do as a courtesy.
-- **Not found, not forbidden, when the caller cannot read.** A resource the caller cannot read answers `404`, identical to a missing one, so ids cannot be probed across workspaces. `403` is only for a readable resource and a forbidden operation.
+- **Not found, not forbidden, when the caller cannot read.** A resource the caller cannot read answers `404`, identical to a missing one, so ids cannot be probed across workspaces. `403` is only for a readable resource and a forbidden operation. The checks run in a fixed order (session, CSRF, request shape, resource and read access, role, state), which is what keeps the rule; `docs/api/README.md` states it.
 - **Read-only means the connection is read-only.** Viewers and commenters open the document over WebSocket in read-only mode; a raw update from them is neither applied, stored nor broadcast. Commenters comment through REST, with anchors that live outside the Yjs document.
 - **Pure domain logic.** The permission resolver is a pure function of its inputs, with no database or network access, so it can be tested exhaustively as a table.
 
