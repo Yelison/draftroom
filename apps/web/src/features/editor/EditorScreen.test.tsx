@@ -2,7 +2,9 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError, TransportError } from '../../data/errors.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
-import { budget, launchPlan, people, renderEditor } from './testing/renderEditor.tsx'
+import type { Editor } from '@tiptap/core'
+import type * as Y from 'yjs'
+import { budget, launchPlan, openEditor, people, renderEditor } from './testing/renderEditor.tsx'
 
 const textArea = () => screen.findByRole('textbox', { name: /Document content|Contenido del documento/ })
 
@@ -219,6 +221,41 @@ describe('who may edit', () => {
 })
 
 describe('the Yjs document of an open document', () => {
+  /** The Yjs document the editor was given: the Collaboration extension keeps it in its options. */
+  const ydocOf = (editor: Editor) => {
+    const collaboration = editor.extensionManager.extensions.find((extension) => extension.name === 'collaboration')
+    return collaboration?.options.document as Y.Doc
+  }
+
+  it.each([
+    ['an editor', people.daniel, launchPlan.id],
+    ['a viewer', people.daniel, budget.id],
+  ])(
+    'is not written to by opening it as %s, so a reader never makes an update',
+    async (_role, signedInAs, documentId) => {
+      const { editor } = await openEditor({ signedInAs, documentId })
+      const ydoc = ydocOf(editor)
+      const updates = vi.fn()
+      ydoc.on('update', updates)
+
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      expect(updates).not.toHaveBeenCalled()
+      expect(ydoc.getXmlFragment('default').length).toBe(0)
+    },
+  )
+
+  it('holds the text in the fragment called default and in no other', async () => {
+    const { editor } = await openEditor()
+
+    editor.commands.setContent('<p>Hello</p>')
+
+    // `@tiptap/y-tiptap` also keeps a map of its own beside the content, named with a `__tiptap` prefix, empty here.
+    const roots = [...ydocOf(editor).share.keys()].filter((name) => !name.startsWith('__tiptap'))
+    expect(roots).toEqual(['default'])
+    expect(ydocOf(editor).getXmlFragment('default').length).toBe(1)
+  })
+
   it('is destroyed when the document is left', async () => {
     const destroyed = vi.fn()
     const { Doc } = await import('yjs')
