@@ -1,0 +1,15 @@
+{
+  "forma.buttonLoading": "Cargando…",
+  "forma.dialogClose": "Cerrar",
+  "home.documentTitle": "Inicio · Draftroom",
+  "home.title": "Escribe en equipo, sin perder una palabra",
+  "home.description": "Un lugar compartido para redactar, comentar y revisar con tu equipo.",
+  "home.newDocument": "Nuevo documento",
+  "preferences.language.legend": "Idioma",
+  "preferences.language.announcement": "Idioma cambiado a {language}",
+  "preferences.theme.legend": "Tema",
+  "preferences.theme.light": "Claro",
+  "preferences.theme.dark": "Oscuro",
+  "preferences.theme.system": "Sistema",
+  "preferences.theme.announcement": "{theme, select, light {Tema claro activado} dark {Tema oscuro activado} other {El tema sigue al sistema}}"
+}
