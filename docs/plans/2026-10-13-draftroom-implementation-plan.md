@@ -168,6 +168,8 @@ apps/server/         Node server
   src/db/            Kysely instance, generated table types, migrations/, demo-seed/
   test/              integration tests (Testcontainers), contract and access-matrix harnesses
 packages/contract/   openapi.yaml, generated TypeScript types, collaboration message schemas (Zod), shared constants
+packages/editor-schema/  the Tiptap extension list shared by client and server, and the ProseMirror JSON <-> Yjs conversion
+                     helpers (`@tiptap/y-tiptap`) the server needs to write content (templates, restore)
 docs/                api/README.md, collab/protocol.md, decisions/ (ADRs), development/, deploy/, plans/
 ```
 
@@ -278,7 +280,7 @@ Workspace operations: members list (any member); add, change role or remove memb
 - `onAuthenticate`: reads the session cookie from `requestHeaders`, resolves the user, loads the effective role, rejects (throws) when there is none, sets `connectionConfig.readOnly = true` for viewers and commenters, and returns `{ userId, workspaceId, role }` as the connection context.
 - `onLoadDocument` loads the stored state only after authentication succeeded (Hocuspocus queues unauthenticated messages; `maxUnauthenticatedQueueSize` stays bounded).
 - Limits: `websocketOptions.maxPayload` 2 MiB; documents above 5 MiB of state refuse further writes with a stateless `{ type: "document-too-large" }`; per-connection message rate limit.
-- Awareness: `onAwarenessUpdate` drops states whose `user.id` differs from the connection's `userId`, so presence cannot be spoofed.
+- Awareness: a state whose `user.id` differs from the connection's `userId` is dropped and never relayed, so presence cannot be spoofed. The Hocuspocus hook that can filter an awareness message before it is applied (an informational hook is not enough) is verified and pinned by a test in T2.1.
 - Close codes: `4401 unauthenticated`, `4403 access-revoked`, `4409 role-changed` (reconnect to get the new mode), `4413 document-too-large`, `4429 rate-limited`.
 
 ### 5.2 Durability acknowledgement
@@ -324,7 +326,7 @@ Authorisation is enforced on the server from T1.1 using the development identity
 
 ## 7. Tasks
 
-Sizes: S (≤ 1 day), M (1–2 days), L (2–4 days). Effort: the reasoning level of the implementer session; reviewers run at high for high tasks and medium otherwise. Lanes: **A** server, **B** client, **C** docs and infrastructure.
+Every task is expanded into a self-contained brief (files, interfaces, tests, acceptance, effort and escalation conditions) before it is launched; later phases are written shorter here because their details depend on the contracts of Phase 0. Sizes: S (≤ 1 day), M (1–2 days), L (2–4 days). Effort: the reasoning level of the implementer session; reviewers run at high for high tasks and medium otherwise. Lanes: **A** server, **B** client, **C** docs and infrastructure.
 
 ### Phase 0 · Foundations
 
@@ -403,10 +405,10 @@ Sizes: S (≤ 1 day), M (1–2 days), L (2–4 days). Effort: the reasoning leve
 
 #### T1.2 · Editor with a local document (L, high, lane B)
 
-**Objective:** the editor screen with Tiptap 3.31.4 on a local `Y.Doc` (no provider yet): title field (metadata), headings, paragraphs, lists, links, bold, italic, code; toolbar inside the work area; paste sanitisation; keyboard shortcuts.
-**Dependencies:** T0.6, T0.7. **Files:** `src/features/editor/{EditorScreen,Toolbar,TitleField,extensions.ts,sanitizePaste.ts}`.
+**Objective:** the editor screen with Tiptap 3.31.4 on a local `Y.Doc` (no provider yet): title field (metadata), headings, paragraphs, lists, links, bold, italic, code; toolbar inside the work area; paste sanitisation; keyboard shortcuts. Creates `packages/editor-schema` with the extension list both client and server import.
+**Dependencies:** T0.6, T0.7. **Files:** `packages/editor-schema/src/{extensions.ts,convert.ts,index.ts}` (`editorExtensions(options)`, `jsonToYUpdate(json): Uint8Array`, `yUpdateToJson(update): JSONContent`), `apps/web/src/features/editor/{EditorScreen,Toolbar,TitleField,sanitizePaste.ts}`.
 **Dependencies added:** `@tiptap/core`, `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-link`, `@tiptap/extension-collaboration`, `@tiptap/y-tiptap`, yjs 13.6.33 (all exact).
-**Tests:** pasting HTML with scripts, event handlers, `javascript:` links and styles keeps only allowed nodes; links get `rel="noopener noreferrer"`; toolbar buttons have accessible names and pressed state; title edit calls `PATCH` with `revision` and handles `409`.
+**Tests:** `jsonToYUpdate` then `yUpdateToJson` round-trips every node and mark in Node (no DOM); pasting HTML with scripts, event handlers, `javascript:` links and styles keeps only allowed nodes; links get `rel="noopener noreferrer"`; toolbar buttons have accessible names and pressed state; title edit calls `PATCH` with `revision` and handles `409`.
 **Acceptance:** the sheet keeps 708 px at 1440 and adapts at 1280; StarterKit's `undoRedo` disabled.
 
 #### T1.3 · Explorer, Documents and folder screens (M, medium, lane B)
@@ -480,7 +482,7 @@ Sizes: S (≤ 1 day), M (1–2 days), L (2–4 days). Effort: the reasoning leve
 #### T5.1 · Versions and restore on the server (L, high, lane A)
 
 **Objective:** §5.5: automatic and manual versions, list, content download, restore with pre-restore version, activity events, `versions-changed` broadcast.
-**Dependencies:** T2.1, T4.1. **Files:** migration `0004_versions.ts`, `src/domain/versions.ts`, `src/collab/restore.ts`, `src/http/routes/versions.ts`, `test/versions.test.ts`.
+**Dependencies:** T2.1, T4.1, `packages/editor-schema` (T1.2). **Files:** migration `0004_versions.ts`, `src/domain/versions.ts`, `src/collab/restore.ts` (reads the version through `yUpdateToJson` and writes it into the live fragment with the conversion helpers; Yjs types cannot be moved between documents), `src/http/routes/versions.ts`, `test/versions.test.ts`. The exact `@tiptap/y-tiptap` exports used are verified against the installed version before writing the restore.
 **Tests:** restore while two connected editors keep typing (Review Focus 5): final state equals the restored content plus edits after the restore, the pre-restore version equals the state before it, no exception; restore by a non-owner is 403 over REST; automatic versions respect the idle and minimum-interval rules (fake timers).
 
 #### T5.2 · Version history screen (M, medium, lane B)
@@ -499,47 +501,69 @@ Sizes: S (≤ 1 day), M (1–2 days), L (2–4 days). Effort: the reasoning leve
 
 #### T6.1 · Home (S, medium, lane B)
 
-Pinned documents with excerpts (first paragraph text stored in `documents.excerpt`, updated on store), recent activity, empty states. Depends on T1.1, T5.3. Tests: excerpt never includes content of documents without access; pin toggling.
+Pinned documents with excerpts (first paragraph text stored in `documents.excerpt`, updated on store), recent activity, empty states. Depends on T1.1, T5.3.
+**Files:** `apps/web/src/features/home/`, `apps/server/src/collab/excerpt.ts` (computed in `onStoreDocument` through `yUpdateToJson`), migration for `documents.excerpt`.
+**Tests:** the excerpt never includes content of documents without access; pin toggling; empty and error states.
+**Risks:** computing the excerpt on every store adds latency: it runs after the store and never blocks the durable acknowledgement.
 
 #### T6.2 · Settings (M, medium, lane A + B)
 
-Profile (name, language preference stored on the account), Workspace (name), Members (invite by email, roles, removal), Appearance (light, dark, system; editor text size). Depends on T4.1. Tests: language preference applies on next load and overrides the browser; theme persists; last-owner protection in Members.
+Profile (name, language preference stored on the account), Workspace (name), Members (invite by email, roles, removal), Appearance (light, dark, system; editor text size). Depends on T4.1.
+**Files:** `apps/web/src/features/settings/{ProfileTab,WorkspaceTab,MembersTab,AppearanceTab}.tsx`, `apps/server/src/http/routes/profile.ts`, a migration for `users.locale` and `users.editor_text_size`; contract change for `PATCH /api/me` through the contract owner.
+**Tests:** language preference applies on next load and overrides the browser; theme persists; last-owner protection in Members; each tab's save success, validation and server error.
+**Risks:** a contract change mid-phase: requested before the task starts, not during it.
 
 #### T6.3 · Templates (S, medium, lane A + B)
 
-Built-in localised templates served by `GET /api/templates`, creating a document from a template copies its content into the new document's initial Yjs state on the server. Depends on T1.1. Tests: the created document's state is binary Yjs, not JSON at runtime; template language follows the request locale.
+Built-in localised templates served by `GET /api/templates`; creating a document from a template writes its content into the new document's initial Yjs state on the server with `jsonToYUpdate` from `packages/editor-schema`. Depends on T1.1, T1.2.
+**Files:** `apps/server/src/domain/templates/{en,es}/*.json` (ProseMirror JSON, validated against the schema at start-up), `apps/server/src/domain/templates.ts`, `apps/web/src/features/templates/`.
+**Tests:** the created document's stored state is a Yjs update that loads in a fresh `Y.Doc`; the template language follows the request locale; an invalid template fails start-up, not a request.
+**Risks:** templates drifting from the schema: start-up validation catches it.
 
 #### T6.4 · Trash (S, medium, lane B)
 
-Archived documents of the caller (owners), restore and permanent delete with confirmation. Depends on T1.1, T1.3. Tests: a permanently deleted document's state, versions, threads and access rows are gone; its id returns 404.
+Archived documents of the caller (owners), restore and permanent delete with confirmation. Depends on T1.1, T1.3.
+**Files:** `apps/web/src/features/trash/`, server tests in `apps/server/test/documents.api.test.ts`.
+**Tests:** a permanently deleted document's state, versions, threads and access rows are gone (foreign keys with `on delete cascade`); its id returns 404; live connections to it close.
+**Risks:** irreversible action: confirmation dialog names the document and focus starts on Cancel.
 
 #### T6.5 · Desktop adaptation and accessibility pass (M, medium, lane B)
 
-1280–1440 behaviour (G8), closable comments panel, zoom 200 %, axe on every route in both themes and languages, pseudo-locale overflow check, reduced motion. Depends on all screens. Tests: Playwright axe and overflow specs over a route list.
+1280–1440 behaviour (G8), closable comments panel, zoom 200 %, axe on every route in both themes and languages, pseudo-locale overflow check, reduced motion. Depends on all screens.
+**Files:** `apps/web/src/app/layouts/EditorLayout.tsx` (panel state), `apps/web/e2e/a11y.spec.ts`, `apps/web/e2e/overflow.spec.ts`, `apps/web/e2e/routes.ts` (one list of routes and states).
+**Tests:** axe and overflow over the route list in 2 themes × 2 languages × 1280/1440; panel toggle keeps focus and announces.
+**Risks:** run time: the matrix runs in CI only; locally one theme and language.
 
 ### Phase 7 · Authentication and hardening
 
 #### T7.1 · Sign-up, sign-in and sessions (L, high, lane A + B)
 
-§3.4 (pending Q1): migration for credentials, Argon2id, session rotation, CSRF, login rate limit, sign-out purges offline copies, sign-in and sign-up screens in both languages, pending member invitations accepted at sign-up. Depends on T4.1. Tests: session fixation, CSRF missing or wrong, rate limit, WebSocket rejected after sign-out, cookie flags in production mode.
+§3.4 (pending Q1): migration for credentials, Argon2id, session rotation, CSRF, login rate limit, sign-out purges offline copies, sign-in and sign-up screens in both languages, pending member invitations accepted at sign-up. Depends on T4.1.
+**Files:** `apps/server/src/http/auth/{passwords.ts,sessions.ts,csrf.ts,rateLimit.ts}`, `apps/server/src/http/routes/auth.ts`, migration `credentials`, `apps/web/src/features/auth/`, `docs/decisions/0004-authentication.md`.
+**Dependencies added:** `@node-rs/argon2` 2.2.2, `@fastify/cookie`, `@fastify/rate-limit`.
+**Tests:** session fixation, CSRF missing or wrong, rate limit, WebSocket rejected after sign-out, cookie flags in production mode, timing-safe comparison, no account enumeration in sign-in errors.
+**Risks:** security-critical: high-effort review that repeats the attacks against the running stack.
 
 #### T7.2 · Hardening (M, high, lane A)
 
 Security headers and CSP (hash of the single inline script), CORS by `ALLOWED_ORIGINS`, body and message limits, REST and WebSocket rate limits, production build guard against `X-Dev-User` and mock code, dependency audit in CI, threat checklist (§9.3) as tests. Depends on T7.1, T3.1.
+**Files:** `apps/server/src/http/security.ts`, `apps/server/test/security/*.test.ts`, `.github/workflows/ci.yml` (audit step).
+**Tests:** one per §9.3 row not already covered; the CSP hash matches the built `index.html`.
+**Risks:** a too-strict CSP breaking the theme and language head script: the hash is generated from the build, not hand-written.
 
 ### Phase 8 · Deployment readiness and demo
 
 #### T8.1 · Production packaging, backup and restore (L, high, lane C)
 
-Multi-stage `Dockerfile` (server serves the built web app or a proxy does), `deploy/docker-compose.prod.yml` (Caddy for HTTPS and WSS with upgrade headers, server, PostgreSQL with a volume), migrations at start-up with a lock, `GET /api/health/ready` as healthcheck, `deploy/env.example` (no secrets), `scripts/backup.sh` and `scripts/restore.sh` (`pg_dump` custom format), a CI job that restores a backup into a fresh database and opens a document, `docs/deploy/README.md` (any host with Node 24 and PostgreSQL 17; reverse proxy; scaling note: one collaboration instance per document), README "Run it yourself". Depends on T7.1.
+**Risks:** secrets in images or examples (checked by a test over `deploy/`), migrations racing on two starts (advisory lock), backups never restored (the CI drill restores one). Multi-stage `Dockerfile` (server serves the built web app or a proxy does), `deploy/docker-compose.prod.yml` (Caddy for HTTPS and WSS with upgrade headers, server, PostgreSQL with a volume), migrations at start-up with a lock, `GET /api/health/ready` as healthcheck, `deploy/env.example` (no secrets), `scripts/backup.sh` and `scripts/restore.sh` (`pg_dump` custom format), a CI job that restores a backup into a fresh database and opens a document, `docs/deploy/README.md` (any host with Node 24 and PostgreSQL 17; reverse proxy; scaling note: one collaboration instance per document), README "Run it yourself". Depends on T7.1.
 
 #### T8.2 · Static demo on GitHub Pages (M, medium, lane B + C)
 
-`build:demo` (`VITE_DATA_SOURCE=mock`, base path `/draftroom/`, `404.html` copy), demo content in both languages, scripted collaborator and cross-tab collaboration via `BroadcastChannel`, state reset on reload, `.github/workflows/pages.yml`, `e2e-demo/` asserting no request reaches the network. Depends on T0.7 and the screens. The README and the demo video say that the demo's collaboration is simulated in the browser; the app UI does not.
+**Risks:** mock code leaking into the production bundle (guard from T0.7); the demo implying real collaboration (stated in README and video, not in the UI). `build:demo` (`VITE_DATA_SOURCE=mock`, base path `/draftroom/`, `404.html` copy), demo content in both languages, scripted collaborator and cross-tab collaboration via `BroadcastChannel`, state reset on reload, `.github/workflows/pages.yml`, `e2e-demo/` asserting no request reaches the network. Depends on T0.7 and the screens. The README and the demo video say that the demo's collaboration is simulated in the browser; the app UI does not.
 
 #### T8.3 · README tour and architecture document (S, medium, lane C)
 
-Screenshots and a short video recorded against the real stack by a script; `docs/architecture.md` with a diagram of the two listeners, the data flow and the durability acknowledgement. Depends on T8.1, T8.2.
+**Files:** `scripts/readme-tour/`, `docs/assets/`, `docs/architecture.md`, `README.md`. **Risks:** stale screenshots: the script is rerun before each release. Screenshots and a short video recorded against the real stack by a script; `docs/architecture.md` with a diagram of the two listeners, the data flow and the durability acknowledgement. Depends on T8.1, T8.2.
 
 ## 8. Dependencies, parallel batches and ownership
 
@@ -570,7 +594,8 @@ Screenshots and a short video recorded against the real stack by a script; `docs
 | T5.3 | T4.1 | A + B |
 | T6.1 | T1.1, T5.3 | B |
 | T6.2 | T4.1 | A + B |
-| T6.3, T6.4 | T1.1 (T6.4 also T1.3) | A + B / B |
+| T6.3 | T1.1, T1.2 | A + B |
+| T6.4 | T1.1, T1.3 | B |
 | T6.5 | all screens | B |
 | T7.1 | T4.1 | A + B |
 | T7.2 | T7.1, T3.1 | A |
@@ -586,7 +611,8 @@ Screenshots and a short video recorded against the real stack by a script; `docs
 | --- | --- | --- |
 | `package-lock.json` and root configs | the task that adds dependencies (one at a time) | two tasks that add dependencies never run in parallel; the second rebases |
 | REST contract | T0.2, then a contract task per change | a task needing a contract change stops with a blocked report |
-| Collaboration protocol and Yjs document schema (`default` fragment, anchors, events) | T0.3 | same |
+| Collaboration protocol (anchors, events, close codes) | T0.3 | same |
+| Yjs document schema (`packages/editor-schema`: extensions, `default` fragment, conversion helpers) | T1.2, then one task per change | a node or mark added later must keep old documents and stored versions loadable |
 | Migrations | lane A, one task at a time | numbered sequentially; never edited after merge |
 | Authentication | T7.1 (and T1.1 for the development identity) | same |
 | `routes.tsx` | lane B, one task at a time | |
