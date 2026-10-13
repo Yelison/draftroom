@@ -58,7 +58,7 @@ export class TransportError extends Error {
   constructor(status: number | null, options?: ErrorOptions) {
     super(
       status === null
-        ? 'The server could not be reached'
+        ? 'The request did not end in an answer of the contract'
         : `The server answered ${status} with a body the contract does not define`,
       options,
     )

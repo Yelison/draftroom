@@ -8,6 +8,7 @@ describe('cookieValue', () => {
     ['dr_csrf=a%2Bb%3D', 'a+b='],
     ['  dr_csrf = padded ', 'padded'],
     ['xdr_csrf=wrong; dr_csrf=right', 'right'],
+    ['dr_csrf=%E0%A4%A', '%E0%A4%A'],
   ])('reads dr_csrf from %j', (cookies, expected) => {
     expect(cookieValue(cookies, 'dr_csrf')).toBe(expected)
   })

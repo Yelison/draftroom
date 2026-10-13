@@ -1,21 +1,22 @@
 import type { Schema } from '@draftroom/contract'
 import { ApiError, isErrorCode, TransportError, type ProblemBody } from '../errors.ts'
 
-const fieldErrorCodes: readonly string[] = [
+/** Every `code` of a field error. A test pins this list to the `FieldErrorCode` enum of `openapi.yaml`. */
+export const fieldErrorCodes = [
   'required',
   'too-short',
   'too-long',
   'invalid-format',
   'invalid-value',
   'unknown-field',
-]
+] as const satisfies readonly Schema<'FieldError'>['code'][]
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
 function isFieldError(value: unknown): value is Schema<'FieldError'> {
-  return isRecord(value) && typeof value.pointer === 'string' && fieldErrorCodes.includes(String(value.code))
+  return isRecord(value) && typeof value.pointer === 'string' && fieldErrorCodes.some((code) => code === value.code)
 }
 
 /**

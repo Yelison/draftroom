@@ -127,6 +127,22 @@ describe('HttpDataSource CSRF token from the cookie', () => {
     document.cookie = 'dr_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
   })
 
+  it('echoes a cookie value that is not well formed as it came, instead of failing the request', async () => {
+    document.cookie = 'dr_csrf=%E0%A4%A'
+    const requests: Request[] = []
+    const source = createHttpDataSource({
+      baseUrl: origin,
+      fetch: async (request) => {
+        requests.push(request)
+        return new Response(null, { status: 204 })
+      },
+    })
+
+    await source.signOut()
+
+    expect(requests[0]?.headers.get('X-CSRF-Token')).toBe('%E0%A4%A')
+  })
+
   it('echoes the dr_csrf cookie of the page, which is where the server sets it', async () => {
     document.cookie = 'dr_csrf=from-the-cookie'
     const requests: Request[] = []
@@ -228,6 +244,27 @@ describe('HttpDataSource answers', () => {
     expect(error).toBeInstanceOf(TransportError)
     expect(error).toMatchObject({ status: 502 })
     expect(error).not.toHaveProperty('code')
+  })
+
+  it.each([
+    [
+      'a gateway page served with 200',
+      () => new Response('<html>App</html>', { headers: { 'Content-Type': 'text/html' } }),
+    ],
+    ['a truncated JSON body', () => new Response('{"id":', { headers: { 'Content-Type': 'application/json' } })],
+  ])('rejects %s with a transport error, not a SyntaxError', async (_name, answer) => {
+    const { source } = connect(answer)
+
+    const error = await source.getMe().catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(TransportError)
+    expect(error).toMatchObject({ status: null, cause: expect.any(SyntaxError) })
+  })
+
+  it('rejects an unreadable body in a call without content as a transport error too', async () => {
+    const { source } = connect(() => new Response('<html>', { status: 500, headers: { 'Content-Type': 'text/html' } }))
+
+    await expect(source.signOut()).rejects.toBeInstanceOf(TransportError)
   })
 
   it('rejects a failed connection with a transport error that keeps its cause', async () => {

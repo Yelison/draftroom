@@ -8,12 +8,21 @@ export function changesState(method: string): boolean {
   return methodsThatChangeState.has(method.toUpperCase())
 }
 
+/** A cookie value is percent-encoded; one that is not well formed is used as it came rather than failing the request. */
+function decoded(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
 /** The value of one cookie in a `document.cookie` string, or `undefined` when it is not there. */
 export function cookieValue(cookies: string, name: string): string | undefined {
   for (const pair of cookies.split(';')) {
     const separator = pair.indexOf('=')
     if (separator !== -1 && pair.slice(0, separator).trim() === name) {
-      return decodeURIComponent(pair.slice(separator + 1).trim())
+      return decoded(pair.slice(separator + 1).trim())
     }
   }
   return undefined
