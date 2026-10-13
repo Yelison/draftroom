@@ -1,0 +1,15 @@
+{
+  "name": "@draftroom/contract",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@redocly/cli": "2.63.0",
+    "openapi-typescript": "7.13.0"
+  }
+}
