@@ -49,19 +49,37 @@ describe('length limits', () => {
     expect(document.referencedName(schemaNamed(request).properties?.[property])).toBe(limit)
   })
 
-  it('are answered with 413 by every operation whose body carries a limited text', () => {
-    const limitedNames = new Set<string>(limited.map(([name]) => name))
-    const carriers = operations.filter((operation) => {
-      const body = operation.requestBody?.content?.['application/json']?.schema
-      const request = schemas[document.referencedName(body) ?? '']
-      return Object.values(request?.properties ?? {}).some((property) =>
-        limitedNames.has(document.referencedName(property) ?? ''),
-      )
-    })
+  // The rule is by location: a text in the body over its maximum is 413, while query and path parameters are always 400.
+  it('are answered with 413 by every operation whose body bounds a text', () => {
+    const boundsText = (node: unknown): boolean => {
+      if (node === undefined) return false
+      const name = document.referencedName(node)
+      const schema = asSchema(name === undefined ? node : schemas[name])
+      return schema.maxLength !== undefined || Object.values(schema.properties ?? {}).some(boundsText)
+    }
+    const carriers = operations.filter((operation) =>
+      boundsText(operation.requestBody?.content?.['application/json']?.schema),
+    )
     const without = carriers.filter((operation) => operation.responses['413'] === undefined)
 
-    expect({ carriers: carriers.length, without: without.map((operation) => operation.key) }).toEqual({
-      carriers: 9,
+    expect({
+      carriers: carriers.map((operation) => operation.id).sort(),
+      without: without.map((operation) => operation.id),
+    }).toEqual({
+      carriers: [
+        'addMember',
+        'createDocument',
+        'createFolder',
+        'createThread',
+        'createVersion',
+        'replyToThread',
+        'signIn',
+        'signUp',
+        'updateComment',
+        'updateDocument',
+        'updateFolder',
+        'updateWorkspace',
+      ],
       without: [],
     })
   })

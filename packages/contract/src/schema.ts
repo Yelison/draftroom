@@ -1169,7 +1169,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["FolderRevisionConflict"];
             };
         };
-        /** @description A value is longer than its limit, or the body is bigger than the server accepts. A value below its minimum is a `400 validation-failed` instead. */
+        /** @description A text in the request body is longer than its limit, or the body is bigger than the server accepts. A value below its minimum, and any query or path parameter out of range, is a `400 validation-failed` instead. */
         TooLarge: {
             headers: {
                 [name: string]: unknown;
@@ -1275,6 +1275,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
             429: components["responses"]["RateLimited"];
             default: components["responses"]["Unexpected"];
         };
@@ -1305,6 +1306,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
+            413: components["responses"]["TooLarge"];
             429: components["responses"]["RateLimited"];
             default: components["responses"]["Unexpected"];
         };
@@ -1465,6 +1467,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
             default: components["responses"]["Unexpected"];
         };
     };

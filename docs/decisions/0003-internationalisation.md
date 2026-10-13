@@ -8,7 +8,7 @@ Draftroom's interface is available in English and Spanish, and neither is an aft
 
 ## Decision
 
-- **Library.** `react-intl` (FormaJS) with ICU messages. Catalogues are `apps/web/src/i18n/en.json` and `es.json`, precompiled at build time. Plurals are ICU plurals, dates and numbers use `Intl`, and a sentence is never built by concatenation.
+- **Library.** `react-intl` (FormatJS) with ICU messages. Catalogues are `apps/web/src/i18n/en.json` and `es.json`, precompiled at build time. Plurals are ICU plurals, dates and numbers use `Intl`, and a sentence is never built by concatenation.
 - **Resolution.** The language is the stored preference, then the browser's language, then English. It is applied before first paint by an inline script in the document head, which also sets `<html lang>`.
 - **URLs** and slugs are in English and identical in both languages.
 - **The server never returns translated text.** Errors carry a stable `code` and the client maps it to a message. The REST contract's `title` field is an English summary for logs, not for display.

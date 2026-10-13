@@ -105,6 +105,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
         '429':
           $ref: '#/components/responses/RateLimited'
         default:
@@ -152,6 +154,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthenticated'
+        '413':
+          $ref: '#/components/responses/TooLarge'
         '429':
           $ref: '#/components/responses/RateLimited'
         default:
@@ -396,6 +400,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
         default:
           $ref: '#/components/responses/Unexpected'
       security:
@@ -3272,7 +3278,7 @@ components:
                   createdAt: 2026-10-13T14:00:00Z
                   updatedAt: 2026-10-13T15:30:00Z
     TooLarge:
-      description: A value is longer than its limit, or the body is bigger than the server accepts. A value below its minimum is a `400 validation-failed` instead.
+      description: A text in the request body is longer than its limit, or the body is bigger than the server accepts. A value below its minimum, and any query or path parameter out of range, is a `400 validation-failed` instead.
       content:
         application/problem+json:
           schema:

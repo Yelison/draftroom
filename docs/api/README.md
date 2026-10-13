@@ -73,14 +73,14 @@ Every 4xx and 5xx is `application/problem+json` (RFC 9457) with `type`, `title`,
 | `revision-conflict` | 409 | A stale `revision`; the body carries `current`. |
 | `last-owner` | 409 | The change would leave a workspace or a document without an owner. |
 | `conflict` | 409 | The request conflicts with the current state: the email is already registered or already a member, deleting a document that is not archived, deleting a folder that still holds documents. |
-| `too-large` | 413 | A value is longer than its limit, or the body is bigger than the server accepts. |
+| `too-large` | 413 | A text in the request body is longer than its limit, or the body is bigger than the server accepts. |
 | `rate-limited` | 429 | Too many attempts; `Retry-After` says when to retry. |
 | `internal-error` | 500 | An unhandled failure. |
 | `unavailable` | 503 | `getReadiness` only: the database is unreachable or the migrations are not current. |
 
 Each entry of `errors[]` is `{ "pointer": "/title", "code": "required" }`: a JSON Pointer into the body (`/query/<name>` or `/path/<name>` for parameters) and one of `required`, `too-short`, `too-long`, `invalid-format`, `invalid-value`, `unknown-field`.
 
-Limits split the two statuses on purpose: going over a maximum is `413 too-large` (`too-long`), while an empty value or any other broken rule is `400 validation-failed`.
+The two statuses are split by what went wrong and where. A text **in the request body** that goes over its maximum is `413 too-large` with the pointer and `too-long`, and so is a body bigger than the server accepts. An empty value, any other broken rule, and every query or path parameter out of range (`limit`, `cursor`, `query`) is `400 validation-failed`.
 
 ## Pagination
 
@@ -109,9 +109,13 @@ Archive, restore, pin, resolve and reopen are idempotent and take no revision.
 | Folder name | 1–80 characters | `413 too-large` |
 | Workspace name | 1–80 characters | `413 too-large` |
 | Version label | 1–100 characters | `413 too-large` |
+| Person name | 1–80 characters | `413 too-large` |
+| Email | at most 254 characters | `413 too-large` |
+| Password | 12–128 characters | `413 too-large` over 128, `400 validation-failed` under 12 |
+| Search `query` | 1–200 characters | `400 validation-failed` |
 | Page size | default 25, at most 100 | `400 validation-failed` |
 
-The figures live in the schemas (`DocumentTitle`, `CommentBody`, `Quote`, `FolderName`, `WorkspaceName`, `VersionLabel`) and, for inputs that need them, in `contractLimits` exported by `@draftroom/contract`. A test keeps the two equal.
+The figures live in the schemas (`DocumentTitle`, `CommentBody`, `Quote`, `FolderName`, `WorkspaceName`, `VersionLabel`, `PersonName`, `Email`, `Password`). The ones a form needs, for the documents, comments, folders and versions, are also exported as `contractLimits` by `@draftroom/contract`, and a test keeps the two equal. A test also checks that every operation whose body bounds a text declares the `413`.
 
 ## Cache and invalidation (client)
 
