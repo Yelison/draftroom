@@ -770,7 +770,7 @@ paths:
         - Documents
       summary: Create a document
       description: |-
-        The caller gets an explicit `owner` grant and `generalAccess` starts at `none`. With `templateId`, the document starts with that template's content in `locale` (`en` when omitted); `locale` without `templateId` is a `400 validation-failed`. A `folderId` or a `templateId` that is unknown, or belongs to another workspace, is a `400 validation-failed` with `invalid-value` at its pointer, the same in both cases.
+        The caller gets an explicit `owner` grant and `generalAccess` starts at `none`. With `templateId`, the document starts with that template's content in `locale` (`en` when omitted); `locale` without `templateId` is a `400 validation-failed` with `{ pointer: /templateId, code: required }`, the entry a validator gives for a missing dependency. A `folderId` that is unknown, or belongs to another workspace, is a `400 validation-failed` with `invalid-value` at `/folderId`; a `templateId` that is unknown is the same `400` at `/templateId`. Templates are global, so only the folder can belong to another workspace.
 
         Required workspace role. Create documents and folders: member, owner.
       parameters:

@@ -81,7 +81,7 @@ Decided with ADR 0004, not here: whether `409` on sign-up is acceptable given th
 
 - **Default deny.** An operation the matrix does not grant is refused.
 - **Enforced on the server,** for REST and for WebSocket, and tested on both. The interface hides what a role cannot do as a courtesy.
-- **Not found, not forbidden, when the caller cannot read.** A resource the caller cannot read answers `404`, identical to a missing one, so ids cannot be probed across workspaces. `403` is only for a readable resource and a forbidden operation. The checks run in a fixed order (session, CSRF, request shape, resource and read access, role, state), which is what keeps the rule; `docs/api/README.md` states it.
+- **Not found, not forbidden, when the caller cannot read.** A resource the caller cannot read answers `404`, identical to a missing one, so ids cannot be probed across workspaces. `403` is only for a readable resource and a forbidden operation. The checks run in a fixed order (session, CSRF, request shape, resource and read access, role, references to other resources, state), which is what keeps the rule: the references (`folderId`, `templateId`, the `{userId}` of `setAccess`) come after the role, so only someone allowed to act can tell a foreign id from an unknown one. `docs/api/README.md` states it.
 - **Read-only means the connection is read-only.** Viewers and commenters open the document over WebSocket in read-only mode; a raw update from them is neither applied, stored nor broadcast. Commenters comment through REST, with anchors that live outside the Yjs document.
 - **Pure domain logic.** The permission resolver is a pure function of its inputs, with no database or network access, so it can be tested exhaustively as a table.
 
