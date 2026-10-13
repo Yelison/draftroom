@@ -1,4 +1,4 @@
-import { getSchema } from '@tiptap/core'
+import { flattenExtensions, getSchema } from '@tiptap/core'
 import { describe, expect, it } from 'vitest'
 import { editorExtensions, fragmentName, headingLevels } from './extensions.ts'
 
@@ -30,10 +30,18 @@ describe('the schema of a document', () => {
     expect(headingLevels).toEqual([2, 3])
   })
 
-  it('has no undo of its own: the Collaboration extension brings the one that only reverts local edits', () => {
-    const names = editorExtensions().flatMap((extension) => extension.name)
-    expect(names).not.toContain('undoRedo')
-    expect(names).not.toContain('trailingNode')
+  it('adds only the behaviour of the cursors and the list keys besides the schema: no undo and no trailing node', () => {
+    const behaviour = flattenExtensions(editorExtensions())
+      .filter((extension) => extension.type === 'extension')
+      .map((extension) => extension.name)
+
+    expect(behaviour.sort()).toEqual([
+      'dropCursor',
+      'gapCursor',
+      'listItemBranchingDeleteKeymap',
+      'listKeymap',
+      'starterKit',
+    ])
   })
 
   describe('the link mark', () => {
