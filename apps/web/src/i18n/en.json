@@ -1,0 +1,15 @@
+{
+  "forma.buttonLoading": "Loading…",
+  "forma.dialogClose": "Close",
+  "home.documentTitle": "Home · Draftroom",
+  "home.title": "Write together, without losing a word",
+  "home.description": "A shared place to draft, comment and review with your team.",
+  "home.newDocument": "New document",
+  "preferences.language.legend": "Language",
+  "preferences.language.announcement": "Language changed to {language}",
+  "preferences.theme.legend": "Theme",
+  "preferences.theme.light": "Light",
+  "preferences.theme.dark": "Dark",
+  "preferences.theme.system": "System",
+  "preferences.theme.announcement": "{theme, select, light {Light theme on} dark {Dark theme on} other {Theme follows the system}}"
+}
