@@ -13,7 +13,7 @@ export const textLimits = {
   workspaceName: contractLimits.workspaceName,
   versionLabel: contractLimits.versionLabel,
   personName: { min: 1, max: 80 },
-  email: { min: 3, max: 254 },
+  email: { min: 1, max: 254 },
   password: { min: 12, max: 128 },
   search: { min: 1, max: 200 },
 } as const satisfies Record<string, TextLimits>
