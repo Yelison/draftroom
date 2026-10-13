@@ -16,10 +16,13 @@ import { routes } from './app/router.tsx'
 const container = document.getElementById('root')
 if (container === null) throw new Error('index.html has no #root element')
 
+// The pseudo-locale build is served from a directory of its own, so the router starts at the base the app was built for.
+const router = createBrowserRouter(routes, { basename: import.meta.env.BASE_URL })
+
 createRoot(container).render(
   <StrictMode>
     <AppProviders>
-      <RouterProvider router={createBrowserRouter(routes)} />
+      <RouterProvider router={router} />
     </AppProviders>
   </StrictMode>,
 )
