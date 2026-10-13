@@ -1,0 +1,8 @@
+{
+  "name": "@draftroom/server",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
