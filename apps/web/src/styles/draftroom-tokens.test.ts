@@ -72,6 +72,25 @@ describe('draftroom-tokens.css', () => {
     expect(product.length).toBeGreaterThan(0)
     expect(new Set(product)).toEqual(new Set(colourContexts(rulesOf(packageTokens))))
   })
+
+  describe('the colours of the dark theme', () => {
+    const rules = rulesOf(productTokens)
+    const colours = (rule: Rule | undefined) =>
+      new Map([...(rule?.tokens ?? [])].filter(([name]) => name.startsWith('--color-')))
+    const light = colours(rules.find(({ media, selector }) => media === '' && selector === ':root'))
+    const darkBySystem = colours(rules.find(({ media }) => media === '(prefers-color-scheme: dark)'))
+    const darkByChoice = colours(rules.find(({ selector }) => selector === ":root[data-theme='dark']"))
+
+    it('are the same when the system asks for dark as when the person chooses it', () => {
+      // The AA checks below read the chosen theme; this is what makes them true for the system one too.
+      expect(darkByChoice.size).toBeGreaterThan(0)
+      expect(darkBySystem).toEqual(darkByChoice)
+    })
+
+    it('declare the colour tokens the light theme declares, and no others', () => {
+      expect(new Set(darkByChoice.keys())).toEqual(new Set(light.keys()))
+    })
+  })
 })
 
 describe('the text colours of the product, in both themes', () => {
