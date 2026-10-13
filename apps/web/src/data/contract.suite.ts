@@ -115,6 +115,29 @@ export function describeDataSourceContract(name: string, harness: Harness) {
         await expect(member.pinDocument(document(created.id))).resolves.toBeUndefined()
       })
 
+      it('refuses an editor what only an owner may do', async () => {
+        const { owner, member, memberId, workspaceId } = await harness.scenario()
+        const created = await owner.createDocument({
+          ...inWorkspace(workspaceId),
+          body: { title: 'Edited by a guest' },
+        })
+        await owner.setAccess({
+          params: { path: { documentId: created.id, userId: memberId } },
+          body: { role: 'editor' },
+        })
+
+        const version = await member.createVersion({ ...document(created.id), body: { label: 'By an editor' } })
+
+        await expectRefusal(member.archiveDocument(document(created.id)), 'forbidden')
+        await expectRefusal(member.deleteDocument(document(created.id)), 'forbidden')
+        await expectRefusal(member.listAccess(document(created.id)), 'forbidden')
+        await expectRefusal(
+          member.setGeneralAccess({ ...document(created.id), body: { generalAccess: 'editor' } }),
+          'forbidden',
+        )
+        await expectRefusal(member.restoreVersion({ params: { path: { versionId: version.id } } }), 'forbidden')
+      })
+
       it('judges the shape of a request before whether its resource exists', async () => {
         const { member } = await harness.scenario()
 
