@@ -32,7 +32,7 @@ export function parseDocumentName(name: string): string | null {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Close codes and authentication refusals (protocol.md §3.3, §3.4)
+// Close codes and authentication refusals (protocol.md §3.3 and §6)
 // ---------------------------------------------------------------------------------------------------------------------
 
 /** Codes the Draftroom server sends when it closes a WebSocket. The reason text of the close frame is the name. */
@@ -74,7 +74,7 @@ export const authorizedScopes = ['read-write', 'readonly'] as const
 export type AuthorizedScope = (typeof authorizedScopes)[number]
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Limits (protocol.md §3.5)
+// Limits (protocol.md §5.1)
 // ---------------------------------------------------------------------------------------------------------------------
 
 /** `websocketOptions.maxPayload`: the transport refuses a larger message and closes with 1009. */
@@ -90,8 +90,25 @@ export const MAX_AWARENESS_STATE_BYTES = 1024
 export const MESSAGE_RATE_LIMIT_PER_SECOND = 100
 export const MESSAGE_RATE_LIMIT_BURST = 200
 
+/**
+ * What the client may hold that the server has not stored: the size of the update a reconnection would send. Above
+ * it the editor stops accepting edits until they are stored, so the SyncStep2 of the handshake never exceeds
+ * `MAX_MESSAGE_BYTES` (which `ws` would answer with a 1009 close). Paste and drop handlers refuse content whose
+ * text is larger than a third of it, which leaves room for the markup and the Yjs overhead.
+ */
+export const MAX_UNSENT_BYTES = 1.5 * 1024 * 1024
+
+/**
+ * The client reconnects after a close by the server with its own back-off, because the provider's own retry only
+ * grows its delay for failed attempts: the delay doubles from the initial value to the maximum and starts again
+ * after a connection that stayed up for the stable period.
+ */
+export const RECONNECT_INITIAL_DELAY_MS = 1_000
+export const RECONNECT_MAX_DELAY_MS = 30_000
+export const RECONNECT_STABLE_MS = 60_000
+
 // ---------------------------------------------------------------------------------------------------------------------
-// Durability (protocol.md §4)
+// Durability (protocol.md §7)
 // ---------------------------------------------------------------------------------------------------------------------
 
 /** Hocuspocus `debounce` and `maxDebounce`: how long after a change the server writes the document. */
@@ -105,14 +122,14 @@ export const STORE_MAX_DEBOUNCE_MS = 5_000
 export const STORED_ACK_TIMEOUT_MS = 3 * STORE_MAX_DEBOUNCE_MS
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Automatic versions (protocol.md §8)
+// Automatic versions (protocol.md §11.2)
 // ---------------------------------------------------------------------------------------------------------------------
 
 export const AUTO_VERSION_IDLE_MS = 10 * 60 * 1000
 export const AUTO_VERSION_MIN_INTERVAL_MS = 30 * 60 * 1000
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Comment anchors (protocol.md §7)
+// Comment anchors (protocol.md §10)
 // ---------------------------------------------------------------------------------------------------------------------
 
 export const MAX_QUOTE_LENGTH = 500
@@ -146,7 +163,7 @@ export const quoteSchema = z
   .refine((quote) => codePointLength(quote) <= MAX_QUOTE_LENGTH, `at most ${MAX_QUOTE_LENGTH} characters`)
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Stateless events, server to client (protocol.md §5)
+// Stateless events, server to client (protocol.md §9)
 // ---------------------------------------------------------------------------------------------------------------------
 
 export const MAX_TITLE_LENGTH = 200
@@ -191,7 +208,7 @@ export function parseStatelessEvent(payload: string): StatelessEvent | null {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Client sync-state machine: types only; T2.2 implements it (protocol.md §6)
+// Client sync-state machine: types only; T2.2 implements it (protocol.md §8)
 // ---------------------------------------------------------------------------------------------------------------------
 
 export const syncStates = [
@@ -207,7 +224,11 @@ export const syncStates = [
 
 export type SyncState = (typeof syncStates)[number]
 
-/** Why the machine is in `error`; each cause has its own message and the retry is offered for every one. */
+/**
+ * Why the machine is in `error`; each cause has its own message. The retry is offered for every cause except
+ * `document-too-large`, which offers "discard my local changes and reload" instead (a retry would send the same
+ * oversize message again).
+ */
 export type SyncErrorCause = 'store-timeout' | 'document-too-large' | 'unauthenticated' | 'not-found'
 
 export type SyncEvent =
@@ -221,11 +242,14 @@ export type SyncEvent =
   | { type: 'local-change' }
   /** The provider's `unsyncedChanges` event, with its counter. */
   | { type: 'unsynced-changes-changed'; count: number }
-  /** A `stored` event arrived; `coversLocalChanges` is the result of the rule in protocol.md §4.3. */
+  /** A `stored` event arrived; `coversLocalChanges` is the result of the rule in protocol.md §7.4. */
   | { type: 'stored'; coversLocalChanges: boolean }
   | { type: 'stored-ack-timeout' }
   /** The `document-too-large` stateless event. */
   | { type: 'document-too-large' }
-  /** The WebSocket closed; `code` is the close frame's code, or `null` when the browser reports none. */
+  /**
+   * The WebSocket closed, or the server ended the document connection in band (`code` 1000 while the socket is still
+   * open); `code` is `null` when the browser reports none.
+   */
   | { type: 'connection-closed'; code: number | null; online: boolean }
   | { type: 'network-changed'; online: boolean }
