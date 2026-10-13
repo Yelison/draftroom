@@ -345,7 +345,7 @@ Sizes: S (≤ 1 day), M (1–2 days), L (2–4 days). Effort: the reasoning leve
 **Files:** `packages/contract/openapi.yaml`, `packages/contract/src/schema.ts` (generated, Prettier-ignored), `packages/contract/scripts/generate.mjs`, `docs/api/README.md`, `docs/decisions/0001-architecture-and-stack.md`, `0002-adopt-forma-ui.md`, `0003-internationalisation.md`, `0005-data-model-and-permissions.md`.
 **Dependencies added:** openapi-typescript 7.13.0, `@redocly/cli` (lint only).
 **Tests:** `api:lint` (Redocly); `api:types` + `git diff --exit-code` in **Static checks**; a test that every operation declares `operationId`, a `problem+json` default response and a security requirement (except health and sign-in/up).
-**Acceptance:** each row of §4.3 maps to operations; ADRs record decisions and alternatives; no Herdr, kit or Figma references.
+**Acceptance:** each row of §4.3 maps to operations; ADRs record decisions and alternatives; no references to private design material or internal tooling.
 
 #### T0.3 · Collaboration protocol contract (M, high, lane C)
 
