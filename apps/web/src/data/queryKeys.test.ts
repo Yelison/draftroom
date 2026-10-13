@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { eventInvalidations, keysAfterEvent, keysAfterMutation, mutationInvalidations } from './invalidations.ts'
-import { queryKeys } from './queryKeys.ts'
+import { eventInvalidations, keysAfterEvent, keysAfterMutation, mutationInvalidations, queryKeys } from './queryKeys.ts'
 import { loadContract } from './testing/contract.ts'
 
 const contract = loadContract()

@@ -58,10 +58,13 @@ const emoji = (length: number) => '😀'.repeat(length)
 
 type Document = Schema<'Document'>
 
-function isNewestFirst(rows: readonly { key: string; id: string }[]): boolean {
+/** Whether rows are in the order of a newest-first list: by instant, as time and not as text, then by id. */
+function isNewestFirst(rows: readonly { instant: string; id: string }[]): boolean {
   return rows.every((row, index) => {
     const previous = rows[index - 1]
-    return previous === undefined || previous.key > row.key || (previous.key === row.key && previous.id > row.id)
+    if (previous === undefined) return true
+    const difference = Date.parse(previous.instant) - Date.parse(row.instant)
+    return difference > 0 || (difference === 0 && previous.id > row.id)
   })
 }
 
@@ -163,9 +166,13 @@ export function describeDataSourceContract(name: string, harness: Harness) {
 
         await owner.removeMember({ params: { path: { workspaceId, userId: memberId } } })
 
-        const access = await owner.listAccess(document(theirs.id))
-        expect(access.items.map((entry) => [entry.userId, entry.role])).toEqual([[ownerId, 'owner']])
+        // The person is gone from the document; the owner still holds it, and the history says who it was handed to.
         await expectRefusal(member.getDocument(document(theirs.id)), 'not-found')
+        await expect(owner.getDocument(document(theirs.id))).resolves.toMatchObject({ role: 'owner' })
+        const access = await owner.listAccess(document(theirs.id))
+        expect(access.items.map((entry) => entry.userId)).not.toContain(memberId)
+        const { items } = await owner.listDocumentActivity(document(theirs.id))
+        expect(items.find((event) => event.type === 'access.granted')?.targetUser?.id).toBe(ownerId)
       })
 
       it('tells only the owners of a document how it is shared', async () => {
@@ -247,7 +254,7 @@ export function describeDataSourceContract(name: string, harness: Harness) {
         const ids = seen.map((row) => row.id)
         expect(new Set(ids).size).toBe(ids.length)
         expect(ids).toEqual(expect.arrayContaining(created.map((row) => row.id)))
-        expect(isNewestFirst(seen.map((row) => ({ key: row.updatedAt, id: row.id })))).toBe(true)
+        expect(isNewestFirst(seen.map((row) => ({ instant: row.updatedAt, id: row.id })))).toBe(true)
       })
 
       it('says there is no next page when everything fits in one', async () => {
@@ -307,16 +314,22 @@ export function describeDataSourceContract(name: string, harness: Harness) {
         expect([...first.items, ...second.items].map((row) => row.label)).toEqual(['Three', 'Two', 'One'])
       })
 
-      it('lists folders by name, then id', async () => {
+      it('lists folders by name, with the id as tie-breaker', async () => {
         const { owner, workspaceId } = await harness.scenario()
-        for (const name of ['Beta', 'Alpha', 'Beta']) {
-          await owner.createFolder({ ...inWorkspace(workspaceId), body: { name } })
-        }
+        const prefix = unique()
+        const created = await Promise.all(
+          [`${prefix} Beta`, `${prefix} Alpha`, `${prefix} Beta`].map((name) =>
+            owner.createFolder({ ...inWorkspace(workspaceId), body: { name } }),
+          ),
+        )
 
+        // Only the folders this test made: how the server collates the names of the others is its own business.
         const { items } = await owner.listFolders(inWorkspace(workspaceId))
 
-        const rows = items.map((row) => ({ key: row.name, id: row.id }))
-        expect(rows).toEqual([...rows].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : a.id < b.id ? -1 : 1)))
+        const mine = items.filter((folder) => created.some((row) => row.id === folder.id))
+        const [beta1, beta2] = created.filter((row) => row.name.endsWith('Beta')).sort((a, b) => (a.id < b.id ? -1 : 1))
+        expect(mine.map((folder) => folder.name.slice(prefix.length + 1))).toEqual(['Alpha', 'Beta', 'Beta'])
+        expect(mine.slice(1).map((folder) => folder.id)).toEqual([beta1?.id, beta2?.id])
       })
     })
 

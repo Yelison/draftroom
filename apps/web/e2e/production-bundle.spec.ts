@@ -35,6 +35,10 @@ const fixtureTexts = [...new Set(readableTexts(seed))]
 
 /** What only the mock or the test tooling has: the mock's own words and the messages of the validator and the parser. */
 const forbiddenMarkers = [
+  // The choice of data source is made when the app is built and leaves no value behind in a build for the real API.
+  'VITE_DATA_SOURCE',
+  '"mock"',
+  "'mock'",
   'UnhandledOperationError',
   'The mock does not implement',
   'createMockDataSource',

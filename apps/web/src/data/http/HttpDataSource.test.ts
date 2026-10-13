@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { ApiError, isApiError, TransportError } from '../errors.ts'
 import { createHttpDataSource } from './HttpDataSource.ts'
 
@@ -119,6 +119,28 @@ describe('HttpDataSource requests', () => {
     await source.getMe()
 
     expect(requests[0]?.url).toBe('https://api.example.test/api/me')
+  })
+})
+
+describe('HttpDataSource CSRF token from the cookie', () => {
+  afterEach(() => {
+    document.cookie = 'dr_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+  })
+
+  it('echoes the dr_csrf cookie of the page, which is where the server sets it', async () => {
+    document.cookie = 'dr_csrf=from-the-cookie'
+    const requests: Request[] = []
+    const source = createHttpDataSource({
+      baseUrl: origin,
+      fetch: async (request) => {
+        requests.push(request)
+        return new Response(null, { status: 204 })
+      },
+    })
+
+    await source.signOut()
+
+    expect(requests[0]?.headers.get('X-CSRF-Token')).toBe('from-the-cookie')
   })
 })
 

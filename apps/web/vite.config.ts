@@ -17,8 +17,12 @@ const pseudoDirectory = '__pseudo__'
 // The data source is chosen when the app is built: the real API in a production build, the in-memory mock in every other
 // mode (development, the mocked end-to-end suite, tests, the pseudo-locale build). `VITE_DATA_SOURCE` overrides it, so
 // `vite build --mode production` with `VITE_DATA_SOURCE=mock` makes a build for a static demo.
-const dataSourceFor = (mode: string, variables: Record<string, string>) =>
-  variables.VITE_DATA_SOURCE ?? (mode === 'production' ? 'http' : 'mock')
+const dataSourceFor = (mode: string, variables: Record<string, string>): 'http' | 'mock' => {
+  const chosen = variables.VITE_DATA_SOURCE ?? (mode === 'production' ? 'http' : 'mock')
+  if (chosen !== 'http' && chosen !== 'mock')
+    throw new Error(`VITE_DATA_SOURCE is "${chosen}": it must be http or mock`)
+  return chosen
+}
 
 export default defineConfig(({ command, mode }) => ({
   // The pseudo-locale build is served by the same preview as the real one, from a directory of its own inside dist/.

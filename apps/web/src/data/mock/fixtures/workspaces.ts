@@ -60,4 +60,7 @@ export const productFolder = folder(1, 'Product', '2026-08-04T09:00:00.000Z')
 export const researchFolder = folder(2, 'Research', '2026-08-12T11:20:00.000Z')
 export const operationsFolder = folder(3, 'Operaciones', '2026-09-02T08:40:00.000Z')
 
-export const folders: readonly FolderRecord[] = [productFolder, researchFolder, operationsFolder]
+/** The only folder with nothing in it: the one a test can delete. */
+export const ideasFolder = folder(4, 'Ideas', '2026-09-20T10:00:00.000Z')
+
+export const folders: readonly FolderRecord[] = [productFolder, researchFolder, operationsFolder, ideasFolder]

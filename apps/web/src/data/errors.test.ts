@@ -4,7 +4,10 @@ import { loadContract } from './testing/contract.ts'
 
 describe('errorCodes', () => {
   it('lists exactly the codes of the contract', () => {
-    expect([...errorCodes].sort()).toEqual([...(loadContract().schema('ErrorCode').enum as string[])].sort())
+    const declared = loadContract().schema('ErrorCode').enum
+
+    expect(Array.isArray(declared)).toBe(true)
+    expect([...errorCodes].sort()).toEqual([...(Array.isArray(declared) ? declared : [])].sort())
   })
 })
 
