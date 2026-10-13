@@ -6,14 +6,14 @@ import { expect, test as base } from '@playwright/test'
  * handled does not slip by behind assertions that happen to pass.
  */
 export const test = base.extend({
-  page: async ({ page }, use) => {
+  page: async ({ page }, run) => {
     const problems: string[] = []
     page.on('pageerror', (error) => problems.push(`uncaught: ${error.message}`))
     page.on('console', (message) => {
       if (message.type() === 'error') problems.push(`console.error: ${message.text()}`)
     })
 
-    await use(page)
+    await run(page)
 
     expect(problems, 'errors the browser reported while the test ran').toEqual([])
   },
