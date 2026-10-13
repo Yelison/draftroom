@@ -498,6 +498,44 @@ export function describeDataSourceContract(name: string, harness: Harness) {
         expect(archived.items.map((row) => row.id)).toContain(created.id)
       })
 
+      it('treats an archived document as missing for everything but reading, restoring and deleting it', async () => {
+        const { owner, workspaceId } = await harness.scenario()
+        const created = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Set aside' } })
+        const archived = await owner.archiveDocument(document(created.id))
+
+        await expectRefusal(
+          owner.updateDocument({ ...document(created.id), body: { title: 'Renamed', revision: archived.revision } }),
+          'not-found',
+        )
+        await expectRefusal(owner.pinDocument(document(created.id)), 'not-found')
+        await expect(owner.getDocument(document(created.id))).resolves.toMatchObject({ id: created.id })
+      })
+
+      it('lists as shared the documents the caller can read without owning, filtered by their role', async () => {
+        const { owner, member, memberId, workspaceId } = await harness.scenario()
+        const open = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Open to comment' } })
+        await owner.setGeneralAccess({ ...document(open.id), body: { generalAccess: 'commenter' } })
+        const granted = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Granted to edit' } })
+        await owner.setAccess({
+          params: { path: { documentId: granted.id, userId: memberId } },
+          body: { role: 'editor' },
+        })
+        const own = await member.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Their own' } })
+
+        const all = await member.listSharedDocuments(inWorkspace(workspaceId))
+        const commenting = await member.listSharedDocuments({
+          params: { path: { workspaceId }, query: { access: 'comment' } },
+        })
+        const ownersShared = await owner.listSharedDocuments(inWorkspace(workspaceId))
+
+        const ids = (page: { items: readonly Document[] }) => page.items.map((row) => row.id)
+        expect(ids(all)).toEqual(expect.arrayContaining([open.id, granted.id]))
+        expect(ids(all)).not.toContain(own.id)
+        expect(ids(commenting)).toContain(open.id)
+        expect(ids(commenting)).not.toContain(granted.id)
+        expect(ids(ownersShared)).not.toContain(open.id)
+      })
+
       it('deletes only what is archived', async () => {
         const { owner, workspaceId } = await harness.scenario()
         const created = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Deletable' } })

@@ -212,6 +212,12 @@ describe('HttpDataSource answers', () => {
     await expect(source.getMe()).rejects.toBeInstanceOf(TransportError)
   })
 
+  it('does not take for a problem a body that looks like one but is not served as application/problem+json', async () => {
+    const { source } = connect(() => json(notFound, 404))
+
+    await expect(source.getMe()).rejects.toBeInstanceOf(TransportError)
+  })
+
   it('rejects a gateway page with a transport error that has the status and no code', async () => {
     const { source } = connect(
       () => new Response('<html>Bad gateway</html>', { status: 502, headers: { 'Content-Type': 'text/html' } }),

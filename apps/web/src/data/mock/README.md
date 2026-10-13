@@ -37,10 +37,10 @@ authorization is the server's and is tested there (plan, section 9.2).
 
 ## Operations it leaves out
 
-| Operation | Why |
-| --- | --- |
-| `getLiveness`, `getReadiness` | Probes for the orchestrator; the data source does not carry them. |
-| `getVersionContent` | The bytes are a Yjs update, which needs Yjs and a document with content (T1.2, T2.2). It fails loudly. |
+| Operation                     | Why                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `getLiveness`, `getReadiness` | Probes for the orchestrator; the data source does not carry them.                                      |
+| `getVersionContent`           | The bytes are a Yjs update, which needs Yjs and a document with content (T1.2, T2.2). It fails loudly. |
 
 An operation without a handler never answers with a made-up value: it rejects with `UnhandledOperationError` and logs
 the reason on the console, which fails the end-to-end test that reached it.

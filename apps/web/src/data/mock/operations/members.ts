@@ -23,21 +23,18 @@ export function memberOperations(ctx: Context): MemberOperations {
     return membership
   }
 
+  /** Who inherits the documents of someone who leaves: the owner who removed them or, when an owner leaves, the owner who has been there longest. */
+  function successorOf(workspaceId: string, leaving: string, actorId: string): string | undefined {
+    if (leaving !== actorId) return actorId
+    const others = ownersOf(workspaceId).filter((row) => row.userId !== leaving)
+    return sortRows(others, { key: (row) => row.createdAt, id: (row) => row.userId, direction: 'asc' })[0]?.userId
+  }
+
   /**
    * A document always keeps an explicit owner. When the person leaving holds the only such grant of a document, it goes
-   * to the owner who removed them (or, when an owner leaves on their own, to the longest-standing owner left), and one
-   * `access.granted` event says so: the removal is not blocked.
+   * to their successor, and one `access.granted` event says so: the removal is not blocked.
    */
-  function handOverDocuments(workspaceId: string, leaving: string, actorId: string) {
-    const successor =
-      leaving === actorId
-        ? sortRows(
-            ownersOf(workspaceId).filter((row) => row.userId !== leaving),
-            { key: (row) => row.createdAt, id: (row) => row.userId, direction: 'asc' },
-          )[0]?.userId
-        : actorId
-    if (successor === undefined) throw lastOwner()
-
+  function handOverDocuments(workspaceId: string, leaving: string, successor: string, actorId: string) {
     for (const document of world.documents.filter((row) => row.workspaceId === workspaceId)) {
       const owners = world.grants.filter((row) => row.documentId === document.id && row.role === 'owner')
       if (owners.length !== 1 || owners[0]?.userId !== leaving) continue
@@ -102,9 +99,11 @@ export function memberOperations(ctx: Context): MemberOperations {
       const { workspace, role } = workspaceOf(ctx, path.workspaceId)
       requireWorkspaceOwner(role)
       const membership = membershipOf(workspace.id, path.userId)
-      if (membership.role === 'owner' && ownersOf(workspace.id).length === 1) throw lastOwner()
+      // Only an owner removing themselves can leave the workspace without one: anyone else is removed by an owner.
+      const successor = successorOf(workspace.id, membership.userId, user.id)
+      if (successor === undefined) throw lastOwner()
 
-      handOverDocuments(workspace.id, membership.userId, user.id)
+      handOverDocuments(workspace.id, membership.userId, successor, user.id)
       const documentIds = new Set(
         world.documents.filter((row) => row.workspaceId === workspace.id).map((row) => row.id),
       )
