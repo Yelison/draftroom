@@ -2,8 +2,13 @@
   "name": "@draftroom/server",
   "private": true,
   "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=../../.env src/main.ts",
+    "start": "node src/main.ts",
+    "migrate": "node --env-file-if-exists=../../.env src/db/run-migrations.ts",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "ajv": "8.20.0",

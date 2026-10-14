@@ -11,5 +11,8 @@ export default defineConfig({
     setupFiles: ['./test/support/coverage-setup.ts'],
     // Starting a container and pulling its image takes longer than a test.
     hookTimeout: 120_000,
+    // In CI a failed run leaves its report behind as an artifact, next to the database log (see the global setup).
+    reporters: process.env['CI'] === undefined ? ['default'] : ['default', 'junit'],
+    outputFile: { junit: 'test-results/integration.junit.xml' },
   },
 })

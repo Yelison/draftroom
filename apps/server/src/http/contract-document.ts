@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
 import { z } from 'zod'
 
@@ -41,7 +43,9 @@ export type Response = z.infer<typeof response>
 export type ContractDocument = z.infer<typeof documentShape>
 
 /** The contract file: the package does not export it, so it is found beside the package's entry point. */
-const contractFile = (): URL => new URL('../openapi.yaml', import.meta.resolve('@draftroom/contract'))
+const contractFile = (): URL =>
+  // `require.resolve` rather than `import.meta.resolve`: Vitest's module runner does not implement the latter.
+  new URL('../openapi.yaml', pathToFileURL(createRequire(import.meta.url).resolve('@draftroom/contract')))
 
 export function readContractDocument(): ContractDocument {
   return documentShape.parse(parse(readFileSync(contractFile(), 'utf8')))
