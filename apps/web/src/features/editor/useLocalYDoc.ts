@@ -1,32 +1,26 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 import * as Y from 'yjs'
 
 /**
- * A store with one Yjs document that exists while something is subscribed to it: made on subscribing, destroyed on
- * unsubscribing. Destroying a `Y.Doc` takes its listeners with it, so a document that React rendered twice and cleaned up
- * once (StrictMode runs every effect, cleanup and effect again) would reach the editor dead; here each subscription gets
- * a document of its own.
- */
-function createYDocStore() {
-  let current: Y.Doc | null = null
-  return {
-    subscribe() {
-      const created = new Y.Doc()
-      current = created
-      return () => {
-        created.destroy()
-        current = null
-      }
-    },
-    getSnapshot: () => current,
-  }
-}
-
-/**
  * The Yjs document of the document that is open: made when the screen is shown and destroyed when it is left, one per
- * opening. It is `null` for the first render, until the screen has subscribed.
+ * opening. It is `null` for the first render, until the screen has mounted.
+ *
+ * It is made in an effect, not while rendering. Destroying a `Y.Doc` takes its listeners with it, and StrictMode runs
+ * every effect, its cleanup and the effect again: a document made while rendering would be destroyed by that cleanup and
+ * handed on dead. Made in the effect, each run has a document of its own, and the render that follows (StrictMode's two
+ * runs are batched into one) sees the one that is alive.
  */
 export function useLocalYDoc(): Y.Doc | null {
-  const [store] = useState(createYDocStore)
-  return useSyncExternalStore(store.subscribe, store.getSnapshot)
+  const [ydoc, setYdoc] = useState<Y.Doc | null>(null)
+
+  useEffect(() => {
+    const created = new Y.Doc()
+    // The state is the way this effect hands an external resource to the render, which is the case a setState in an effect
+    // is for: the document cannot be made while rendering, for the reason above.
+    // oxlint-disable-next-line react/set-state-in-effect
+    setYdoc(created)
+    return () => created.destroy()
+  }, [])
+
+  return ydoc
 }

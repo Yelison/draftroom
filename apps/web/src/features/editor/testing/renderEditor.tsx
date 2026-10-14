@@ -2,7 +2,7 @@ import type { Editor } from '@tiptap/core'
 import type * as Y from 'yjs'
 import { configure, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { StrictMode } from 'react'
+import { StrictMode, type ReactNode } from 'react'
 import { createMemoryRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { AppProviders } from '../../../app/AppProviders.tsx'
@@ -38,6 +38,8 @@ export interface RenderEditorOptions {
   signedInAs?: string
   /** Replaces the data source, to make a call fail or to watch it. It starts from the mock the person would have had. */
   wrap?: (dataSource: DataSource) => DataSource
+  /** Rendered beside the router, inside the providers: a way for a test to reach the language or the theme. */
+  extra?: ReactNode
 }
 
 /**
@@ -49,6 +51,7 @@ export function renderEditor({
   documentId = launchPlan.id,
   signedInAs = people.marta,
   wrap,
+  extra,
 }: RenderEditorOptions = {}) {
   const server = createMockServer()
   const base = server.connect({ signedInAs })
@@ -59,6 +62,7 @@ export function renderEditor({
       <DataSourceContext value={dataSource}>
         <AppProviders>
           <RouterProvider router={router} />
+          {extra}
         </AppProviders>
       </DataSourceContext>
     </StrictMode>,

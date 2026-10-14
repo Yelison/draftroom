@@ -1,7 +1,9 @@
 import { editorExtensions, fragmentName } from '@draftroom/editor-schema'
 import { Collaboration } from '@tiptap/extension-collaboration'
 import { useEditor } from '@tiptap/react'
-import { useMemo } from 'react'
+import type { EditorProps, EditorView } from '@tiptap/pm/view'
+import { redo, undo } from '@tiptap/y-tiptap'
+import { useEffect, useMemo } from 'react'
 import type * as Y from 'yjs'
 import { LinkShortcut } from './LinkShortcut.ts'
 import { sanitizePastedHtml } from './sanitizePaste.ts'
@@ -30,23 +32,44 @@ export function useDocumentEditor({ ydoc, editable, contentLabel, onLinkRequest 
     [ydoc, onLinkRequest],
   )
 
-  // The editor is made again when one of these changes: `useEditor` reads its options when it creates the editor, and
-  // the content is in the Yjs document, so a new editor opens on the same text.
-  return useEditor(
-    {
-      extensions,
-      editable,
-      editorProps: {
-        attributes: {
-          class: styles.prose ?? '',
-          role: 'textbox',
-          'aria-label': contentLabel,
-          'aria-multiline': 'true',
-          'aria-readonly': String(!editable),
-        },
-        transformPastedHTML: sanitizePastedHtml,
+  // What the editor takes from the screen after it is made: who may type, and the name of the text area, which follows the
+  // language. They change the editor that is there (`editorProps` through `setOptions`, which `useEditor` does when the
+  // object changes, and `setEditable`), so a change of role or of language keeps the text, the selection and the undo
+  // history, and does not bind Collaboration again.
+  const editorProps = useMemo<EditorProps>(
+    () => ({
+      attributes: {
+        class: styles.prose ?? '',
+        role: 'textbox',
+        'aria-label': contentLabel,
+        'aria-multiline': 'true',
+        'aria-readonly': String(!editable),
       },
-    },
-    [extensions, editable, contentLabel],
+      transformPastedHTML: sanitizePastedHtml,
+      handleDOMEvents: { beforeinput: takeOverHistory },
+    }),
+    [contentLabel, editable],
   )
+
+  // No dependencies: one editor for as long as the screen lives, which is as long as its Yjs document.
+  const editor = useEditor({ extensions, editable, editorProps }, [])
+  useEffect(() => {
+    editor.setEditable(editable)
+  }, [editor, editable])
+  return editor
+}
+
+/**
+ * The browser keeps an undo history of its own, and on Chromium `Ctrl+Z` in a field with nothing to undo (the title)
+ * reaches the text area as `beforeinput` of type `historyUndo` and reverts the browser's last edit there, outside the
+ * undo of Collaboration, which only reverts the person's own changes. The editor refuses the native undo and redo and,
+ * when the person is in the text, does what its own keys do.
+ */
+function takeOverHistory(view: EditorView, event: Event): boolean {
+  if (!(event instanceof InputEvent) || (event.inputType !== 'historyUndo' && event.inputType !== 'historyRedo')) {
+    return false
+  }
+  event.preventDefault()
+  if (view.hasFocus()) (event.inputType === 'historyUndo' ? undo : redo)(view.state)
+  return true
 }
