@@ -33,19 +33,6 @@ export function problemBody(code: ErrorCode, errors?: readonly FieldError[]): Pr
   }
 }
 
-/** Thrown by a handler to answer with a problem: the error handler turns it into `application/problem+json`. */
-export class HttpProblem extends Error {
-  readonly code: ErrorCode
-  readonly errors: readonly FieldError[]
-
-  constructor(code: ErrorCode, errors: readonly FieldError[] = []) {
-    super(catalogue[code].title)
-    this.name = 'HttpProblem'
-    this.code = code
-    this.errors = errors
-  }
-}
-
 export function sendProblem(reply: FastifyReply, code: ErrorCode, errors?: readonly FieldError[]): FastifyReply {
   return reply.code(catalogue[code].status).type(problemMediaType).send(problemBody(code, errors))
 }
@@ -54,13 +41,7 @@ export function sendProblem(reply: FastifyReply, code: ErrorCode, errors?: reado
 const wholeBody: FieldError = { pointer: '/', code: 'invalid-format' }
 
 /** Maps anything the framework or a handler throws to a problem; only a `5xx` is logged, with its stack. */
-export function handleError(
-  error: FastifyError | HttpProblem,
-  request: FastifyRequest,
-  reply: FastifyReply,
-): FastifyReply {
-  if (error instanceof HttpProblem) return sendProblem(reply, error.code, error.errors)
-
+export function handleError(error: FastifyError, request: FastifyRequest, reply: FastifyReply): FastifyReply {
   const status = 'statusCode' in error && typeof error.statusCode === 'number' ? error.statusCode : 500
   if (status === 413) return sendProblem(reply, 'too-large')
   // Malformed JSON, an empty body where JSON was declared, a media type the API does not read: the contract has no
