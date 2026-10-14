@@ -7,7 +7,8 @@ describe('isAllowedLinkHref', () => {
     ['an http address', 'http://example.com'],
     ['a mail address', 'mailto:ana@example.com'],
     ['the scheme in capitals', 'HTTPS://EXAMPLE.COM'],
-    ['spaces around the address, which the URL parser drops', '  https://example.com  '],
+    ['spaces around the address, which a browser drops', '  https://example.com  '],
+    ['a tab inside the host, which a browser drops', 'https://exam\tple.com'],
   ] as const
 
   const refused = [
@@ -28,6 +29,9 @@ describe('isAllowedLinkHref', () => {
     ['an address with no scheme', '//evil.example/path'],
     ['a bare domain', 'example.com'],
     ['a fragment', '#section'],
+    ['http with no host', 'http:'],
+    ['https with only slashes', 'https:///'],
+    ['a mail link with no address', 'mailto:'],
     ['an empty string', ''],
     ['only spaces', '   '],
     ['null', null],
