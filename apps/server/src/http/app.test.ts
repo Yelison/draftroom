@@ -188,19 +188,47 @@ describe('a request that breaks the contract', () => {
 })
 
 describe('a handler that fails', () => {
-  it('answers the internal-error problem and keeps the cause to itself', async () => {
+  const failWith = (error: Error) => {
     const application = appWithoutDatabase()
     application.route(
       operationRoute(contract, 'getMe', () => {
-        throw new Error('the connection string is postgres://secret')
+        throw error
       }),
     )
+    return application.inject('/api/me')
+  }
 
-    const response = await application.inject('/api/me')
+  it('answers the internal-error problem and keeps the cause to itself', async () => {
+    const response = await failWith(new Error('the connection string is postgres://secret'))
 
     expect(response.statusCode).toBe(500)
     expect(response.body).not.toContain('secret')
     expect(response.json()).toMatchObject({ status: 500, code: 'internal-error' })
+  })
+
+  // A handler may throw an HTTP error for these four; each keeps the code the contract gives it, so the 404 that hides
+  // a resource from someone who cannot read it is never turned into a 400.
+  const httpErrors: readonly (readonly [number, string])[] = [
+    [401, 'unauthenticated'],
+    [403, 'forbidden'],
+    [404, 'not-found'],
+    [409, 'conflict'],
+  ]
+
+  it.each(httpErrors)('keeps a thrown %i as the %s of the contract', async (statusCode, code) => {
+    const response = await failWith(Object.assign(new Error('refused'), { statusCode }))
+
+    expect(response.statusCode).toBe(statusCode)
+    expect(response.json()).toMatchObject({ status: statusCode, code })
+  })
+
+  // The contract does not define these as answers of a handler, so they are bugs of the server: a 500, not a 400 that
+  // would blame the request.
+  it.each([400, 422, 429])('answers a thrown %i with the internal-error problem', async (statusCode) => {
+    const response = await failWith(Object.assign(new Error('refused'), { statusCode }))
+
+    expect(response.statusCode).toBe(500)
+    expect(response.json()).toMatchObject({ code: 'internal-error' })
   })
 })
 
@@ -220,6 +248,31 @@ describe('a response that breaks the contract', () => {
     expect(violations).toHaveLength(1)
     expect(violations[0]).toMatchObject({ operationId: 'getMe', status: 200 })
     expect(violations[0]?.reason).toContain('name')
+  })
+
+  it("does not carry the handler's headers, a session cookie included", async () => {
+    const application = appWithoutDatabase()
+    application.route(
+      operationRoute(contract, 'getMe', (_request, reply) =>
+        reply
+          .header('set-cookie', 'dr_session=abc; HttpOnly')
+          .header('etag', '"v1"')
+          .header('location', '/api/me')
+          .header('retry-after', '3')
+          .header('cache-control', 'max-age=60')
+          .send({ id: 'not-a-uuid' }),
+      ),
+    )
+
+    const response = await application.inject('/api/me')
+
+    expect(response.statusCode).toBe(500)
+    expect(response.headers).not.toHaveProperty('set-cookie')
+    expect(response.headers).not.toHaveProperty('etag')
+    expect(response.headers).not.toHaveProperty('location')
+    expect(response.headers).not.toHaveProperty('retry-after')
+    expect(response.headers).not.toHaveProperty('cache-control')
+    expect(response.headers['content-type']).toContain(problemType)
   })
 
   it('is let through when the contract accepts it', async () => {

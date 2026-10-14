@@ -75,6 +75,9 @@ export function buildApp({
     const violation = { operationId, status: reply.statusCode, reason: verdict.reason }
     request.log.error(violation, 'the response breaks the contract')
     onContractViolation?.(violation)
+    // What the handler put on the refused response (a session cookie, an ETag, a Location) must not outlive it.
+    // Fastify adds the content length itself once this hook returns.
+    for (const name of Object.keys(reply.getHeaders())) reply.removeHeader(name)
     reply.code(500).type(problemMediaType)
     return JSON.stringify(problemBody('internal-error'))
   })

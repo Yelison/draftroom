@@ -40,13 +40,27 @@ export function sendProblem(reply: FastifyReply, code: ErrorCode, errors?: reado
 /** The body is unreadable as a whole: its pointer is the document itself. */
 const wholeBody: FieldError = { pointer: '/', code: 'invalid-format' }
 
-/** Maps anything the framework or a handler throws to a problem; only a `5xx` is logged, with its stack. */
+// The statuses a handler may throw as plain HTTP errors, with the code the contract gives each. Anything else a handler
+// throws is a bug of the server, not an answer the contract defines.
+const codeByStatus: ReadonlyMap<number, ErrorCode> = new Map([
+  [401, 'unauthenticated'],
+  [403, 'forbidden'],
+  [404, 'not-found'],
+  [409, 'conflict'],
+])
+
+// Fastify's content-type parser: malformed JSON, an empty body where JSON was declared (400), a media type the API does
+// not read (415). The contract has no 415 and no 422, so they are all the same request that breaks its rules.
+const isParserError = (error: FastifyError, status: number): boolean =>
+  typeof error.code === 'string' && error.code.startsWith('FST_ERR_CTP_') && (status === 400 || status === 415)
+
+/** Maps what the framework or a handler throws to a problem; what the contract does not define is a 500, logged. */
 export function handleError(error: FastifyError, request: FastifyRequest, reply: FastifyReply): FastifyReply {
-  const status = 'statusCode' in error && typeof error.statusCode === 'number' ? error.statusCode : 500
-  if (status === 413) return sendProblem(reply, 'too-large')
-  // Malformed JSON, an empty body where JSON was declared, a media type the API does not read: the contract has no
-  // 415 and no 422, so they are all the same request that breaks its rules.
-  if (status >= 400 && status < 500) return sendProblem(reply, 'validation-failed', [wholeBody])
+  const status = error.statusCode ?? 500
+  if (error.code === 'FST_ERR_CTP_BODY_TOO_LARGE') return sendProblem(reply, 'too-large')
+  if (isParserError(error, status)) return sendProblem(reply, 'validation-failed', [wholeBody])
+  const code = codeByStatus.get(status)
+  if (code !== undefined) return sendProblem(reply, code)
 
   request.log.error({ err: error }, 'unhandled error')
   return sendProblem(reply, 'internal-error')
