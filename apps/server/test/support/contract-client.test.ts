@@ -6,6 +6,7 @@ import { operationRoute } from '../../src/http/operation-route.ts'
 import { createContractClient, findOperation, ContractError } from './contract-client.ts'
 import { ContractCoverage } from './contract-coverage.ts'
 import { createDatabase } from '../../src/db/database.ts'
+import { unreachableDatabaseUrl } from './unreachable-database.ts'
 
 let contract: Contract
 beforeAll(() => {
@@ -34,7 +35,7 @@ describe('findOperation', () => {
 })
 
 describe('the contract client', () => {
-  const unusedDatabase = () => createDatabase('postgres://unused@127.0.0.1:1/unused')
+  const unusedDatabase = () => createDatabase(unreachableDatabaseUrl)
 
   it('returns a response that follows the contract and records the operation as exercised', async () => {
     const coverage = new ContractCoverage()

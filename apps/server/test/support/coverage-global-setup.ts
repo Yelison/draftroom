@@ -5,6 +5,7 @@ import type { TestProject } from 'vitest/node'
 import { createDatabase } from '../../src/db/database.ts'
 import { buildApp } from '../../src/http/app.ts'
 import { ContractCoverage } from './contract-coverage.ts'
+import { unreachableDatabaseUrl } from './unreachable-database.ts'
 
 declare module 'vitest' {
   export interface ProvidedContext {
@@ -15,7 +16,7 @@ declare module 'vitest' {
 /** The operations the server has routes for, read from a real app: a list kept by hand would miss a new route. */
 async function implementedOperations(): Promise<ReadonlySet<string>> {
   // Nothing connects: the pool opens its first connection on the first query, and building the app runs none.
-  const database = createDatabase('postgres://unused@127.0.0.1:1/unused')
+  const database = createDatabase(unreachableDatabaseUrl)
   const app = buildApp({ database })
   try {
     await app.ready()

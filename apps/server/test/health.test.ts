@@ -1,7 +1,8 @@
 import { sql } from 'kysely'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createDatabase } from '../src/db/database.ts'
-import { provisionDatabase, unreachableDatabaseUrl, type TestDatabase } from './support/postgres.ts'
+import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
+import { unreachableDatabaseUrl } from './support/unreachable-database.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
 
 const notReady = {

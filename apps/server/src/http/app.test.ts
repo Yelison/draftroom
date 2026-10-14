@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import type { Kysely } from 'kysely'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { unreachableDatabaseUrl } from '../../test/support/postgres.ts'
+import { unreachableDatabaseUrl } from '../../test/support/unreachable-database.ts'
 import { createDatabase } from '../db/database.ts'
 import type { Database } from '../db/tables.ts'
 import { buildApp, type ContractViolation } from './app.ts'
