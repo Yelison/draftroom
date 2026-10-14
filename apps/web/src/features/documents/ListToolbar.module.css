@@ -8,7 +8,7 @@
 }
 
 .search {
-  flex: 1 1 var(--list-card-min-width);
+  flex: 1 1 var(--list-search-min-width);
   max-width: var(--list-search-width);
 }
 

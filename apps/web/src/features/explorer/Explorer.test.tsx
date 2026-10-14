@@ -266,11 +266,18 @@ describe('the states of the explorer', () => {
     })
 
     const explorer = await screen.findByRole('complementary', { name: 'Explorer' })
-    await waitFor(() => expect(within(explorer).getByRole('status')).toHaveTextContent('Loading documents'))
+    // The workspace is read first: only once the folders are asked for is there something to wait for.
+    await waitFor(() => expect(arrive).toBeDefined())
+    await waitFor(() =>
+      expect(
+        within(explorer)
+          .getAllByRole('status')
+          .map((region) => region.textContent),
+      ).toContain('Loading documents'),
+    )
+    expect(within(explorer).queryByText('No documents yet')).not.toBeInTheDocument()
     expect(within(explorer).queryByRole('tree')).not.toBeInTheDocument()
 
-    // The call may not have been made yet: the workspace is read first.
-    await waitFor(() => expect(arrive).toBeDefined())
     await act(async () => arrive?.())
     expect(await tree()).toBeInTheDocument()
   })

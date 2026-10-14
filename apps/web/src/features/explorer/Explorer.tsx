@@ -140,7 +140,7 @@ function Content({ workspaceId }: { workspaceId: string }) {
               description={intl.formatMessage({ id: 'documents.noResults.description' })}
             />
           ))}
-        {roots.length > 0 && (
+        {!loading && roots.length > 0 && (
           <ExplorerTree
             ref={tree}
             label={intl.formatMessage({ id: term === undefined ? 'explorer.tree' : 'explorer.results' })}

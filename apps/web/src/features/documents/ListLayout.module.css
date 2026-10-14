@@ -1,11 +1,13 @@
 /*
  * The measures of the list screens, in one place: the width of the page, the narrowest a card gets and the widest the
  * search is. They are literals until the product token layer has them; the next regeneration of the tokens takes them
- * over (`--layout-*` there), and this file is the only one to change.
+ * over (`--layout-*` there), and this file is the only one to change. The toolbar's search reads its two widths from
+ * here, so it must stay inside `.screen`.
  */
 .screen {
   --list-page-width: 1080px;
   --list-card-min-width: 280px;
+  --list-search-min-width: 280px;
   --list-search-width: 480px;
 
   max-width: var(--list-page-width);
