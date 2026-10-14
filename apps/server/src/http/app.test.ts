@@ -84,6 +84,16 @@ describe('the routes of the app', () => {
     expect(response.statusCode).toBe(404)
   })
 
+  it('refuse a query the operation does not declare with the validation-failed problem', async () => {
+    const response = await appWithoutDatabase().inject('/api/health/live?probe=1')
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toMatchObject({
+      code: 'validation-failed',
+      errors: [{ pointer: '/query/probe', code: 'unknown-field' }],
+    })
+  })
+
   it('answer a path that is not in the contract with the not-found problem', async () => {
     const response = await appWithoutDatabase().inject('/api/nothing-here')
 

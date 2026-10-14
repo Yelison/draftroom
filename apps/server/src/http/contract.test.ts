@@ -102,6 +102,26 @@ describe('checkRequest', () => {
       expect(query).toEqual({ limit: 10, archived: true })
     })
 
+    it('refuses a name the operation does not declare, as an unknown field of the query', () => {
+      expect(list({ folder: 'x', limit: '5' })).toEqual({
+        ok: false,
+        status: 400,
+        errors: [{ pointer: '/query/folder', code: 'unknown-field' }],
+      })
+    })
+
+    it('refuses any query on an operation that declares none', () => {
+      const verdict = contract
+        .operation('getLiveness')
+        .checkRequest({ params: {}, query: { probe: '1' }, body: undefined })
+
+      expect(verdict).toMatchObject({
+        ok: false,
+        status: 400,
+        errors: [{ pointer: '/query/probe', code: 'unknown-field' }],
+      })
+    })
+
     it('answers 400, never 413, for a query value out of range', () => {
       expect(list({ limit: '101' })).toMatchObject({ ok: false, status: 400, errors: [{ pointer: '/query/limit' }] })
       expect(list({ query: 'a'.repeat(201) })).toMatchObject({

@@ -127,17 +127,20 @@ export function loadContract(source: ContractDocument = readContractDocument()):
       const declared = operationShape.parse(declaration)
       const parameters = (declared.parameters ?? []).map((candidate) => resolve(candidate, components.parameters))
 
-      const validatorFor = (location: 'path' | 'query') => {
-        const named = parameters.filter((candidate) => candidate.in === location)
-        if (named.length === 0) return undefined
-        return compile(parameterAjv, {
+      const named = (location: 'path' | 'query') => parameters.filter((candidate) => candidate.in === location)
+      const objectOf = (declaredParameters: typeof parameters, extra: object) =>
+        compile(parameterAjv, {
           type: 'object',
-          properties: Object.fromEntries(named.map((candidate) => [candidate.name, candidate.schema])),
-          required: named.filter((candidate) => candidate.required === true).map((candidate) => candidate.name),
+          properties: Object.fromEntries(declaredParameters.map((candidate) => [candidate.name, candidate.schema])),
+          required: declaredParameters
+            .filter((candidate) => candidate.required === true)
+            .map((candidate) => candidate.name),
+          ...extra,
         })
-      }
-      const pathValidator = validatorFor('path')
-      const queryValidator = validatorFor('query')
+      // The router only hands over the path parameters the path has. A query is the caller's to write: a name the
+      // operation does not declare is refused, like an unknown field of a body, so a typo is never a silent no-op.
+      const pathValidator = named('path').length === 0 ? undefined : objectOf(named('path'), {})
+      const queryValidator = objectOf(named('query'), { additionalProperties: false })
 
       const body =
         declared.requestBody === undefined ? undefined : resolve(declared.requestBody, components.requestBodies)
