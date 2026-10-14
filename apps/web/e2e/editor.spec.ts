@@ -595,9 +595,11 @@ test.describe('the keyboard and the focus', () => {
   test('is reachable end to end with the keyboard, in reading order', async ({ page }) => {
     await page.goto(documentPath)
     await textArea(page).waitFor()
+    // The explorer's rows arrive with its data; the Tab key finds the tree where it will be.
+    await page.getByRole('tree').waitFor()
 
     const stops: (string | null)[] = []
-    for (let press = 0; press < 9; press++) {
+    for (let press = 0; press < 13; press++) {
       await page.keyboard.press('Tab')
       stops.push(
         await page.evaluate(() => {
@@ -620,6 +622,11 @@ test.describe('the keyboard and the focus', () => {
       'Shared',
       'History',
       'Settings',
+      // The explorer: its search, its two buttons and one stop for the whole tree, which is the open document.
+      'Search documents',
+      'New document',
+      'New folder',
+      'Autumn launch plan',
       'Bold',
       'Document title',
       'Document content',

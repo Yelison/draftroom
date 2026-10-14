@@ -1,0 +1,38 @@
+.explorer {
+  height: 100%;
+  min-width: 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-8);
+}
+
+.actions > :first-child {
+  flex: 1;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.problem {
+  margin: 0;
+  color: var(--color-red-ink);
+  font: var(--font-body);
+}

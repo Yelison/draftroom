@@ -1,5 +1,7 @@
 import { redirect, type RouteObject } from 'react-router'
 import { PageTitle } from '../components/PageTitle/PageTitle.tsx'
+import { DocumentsScreen } from '../features/documents/DocumentsScreen.tsx'
+import { FolderScreen } from '../features/documents/FolderScreen.tsx'
 import { EditorSkeleton } from '../features/editor/EditorSkeleton.tsx'
 import type { MessageId } from '../i18n/messages.ts'
 import { AppFrame } from './AppFrame.tsx'
@@ -25,8 +27,12 @@ export const routes: RouteObject[] = [
         Component: OverviewLayout,
         children: [
           { index: true, ...screen('nav.home', 'home') },
-          { path: 'documents', ...screen('nav.documents', 'documents') },
-          { path: 'folders/:folderId', ...screen('screen.folder', 'documents') },
+          { path: 'documents', Component: DocumentsScreen, handle: { section: 'documents' } satisfies RouteHandle },
+          {
+            path: 'folders/:folderId',
+            Component: FolderScreen,
+            handle: { section: 'documents' } satisfies RouteHandle,
+          },
           { path: 'templates/:templateId', ...screen('screen.template', 'documents') },
           { path: 'shared', ...screen('nav.shared', 'shared') },
           { path: 'history', ...screen('nav.history', 'history') },

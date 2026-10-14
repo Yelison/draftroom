@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router'
+import { Explorer } from '../../features/explorer/Explorer.tsx'
 import { NavRail } from '../../components/NavRail/NavRail.tsx'
 import { MainContent } from './MainContent.tsx'
 import styles from './EditorLayout.module.css'
@@ -8,7 +9,9 @@ export function EditorLayout() {
   return (
     <div className={styles.layout}>
       <NavRail variant="compact" />
-      <div className={styles.explorer} />
+      <div className={styles.explorer}>
+        <Explorer />
+      </div>
       <MainContent className={styles.main}>
         <Outlet />
       </MainContent>
