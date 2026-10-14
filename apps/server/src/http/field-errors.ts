@@ -12,11 +12,8 @@ const codeByKeyword: Readonly<Record<string, FieldErrorCode>> = {
   // `minProperties` is how the contract says "at least one of these fields".
   minProperties: 'required',
   minLength: 'too-short',
-  minItems: 'too-short',
   maxLength: 'too-long',
-  maxItems: 'too-long',
   additionalProperties: 'unknown-field',
-  unevaluatedProperties: 'unknown-field',
   format: 'invalid-format',
   pattern: 'invalid-format',
 }
