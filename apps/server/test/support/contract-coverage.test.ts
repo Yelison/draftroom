@@ -51,8 +51,8 @@ describe('ContractCoverage', () => {
       ])
     })
 
-    it('keeps one record per file when it saves twice', () => {
-      coverageOf('getLiveness').save(directory, '/tests/health.test.ts')
+    it('keeps one record per file: saving again replaces what the file saved before', () => {
+      coverageOf('getLiveness', 'getMe').save(directory, '/tests/health.test.ts')
       coverageOf('getLiveness', 'getReadiness').save(directory, '/tests/health.test.ts')
 
       expect(ContractCoverage.collect(directory).coverage.exercised).toEqual(['getLiveness', 'getReadiness'])
