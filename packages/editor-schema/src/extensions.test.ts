@@ -36,6 +36,7 @@ describe('the schema of a document', () => {
       .map((extension) => extension.name)
 
     expect(behaviour.sort()).toEqual([
+      'contentGuard',
       'dropCursor',
       'gapCursor',
       'listItemBranchingDeleteKeymap',

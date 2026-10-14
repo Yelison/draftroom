@@ -1,6 +1,8 @@
 import type { Extensions } from '@tiptap/core'
 import { Link } from '@tiptap/extension-link'
 import { StarterKit } from '@tiptap/starter-kit'
+import { ContentGuard } from './guard.ts'
+import { headingLevels } from './levels.ts'
 import { isAllowedLinkHref } from './links.ts'
 
 /**
@@ -10,11 +12,7 @@ import { isAllowedLinkHref } from './links.ts'
  */
 export const fragmentName = 'default'
 
-/**
- * The levels of heading a document has. The document's title is the page's level 1 and lives outside the Yjs document,
- * so the content starts at 2. Adding a level is a change to the schema: it goes through the owner of this package.
- */
-export const headingLevels = [2, 3] as const
+export { headingLevels }
 
 /**
  * The nodes and marks of a document, and nothing else. A document stored with a node this list does not know cannot be
@@ -28,7 +26,8 @@ export const headingLevels = [2, 3] as const
  * `trailingNode` (it writes an empty paragraph into every document it opens, even a read-only one, which would show up
  * as an update nobody typed) and `undoRedo` (undo is the one of the Collaboration extension, which only reverts the
  * person's own changes). What stays besides the schema is behaviour that adds no node or mark: the drop and gap
- * cursors and the list keymap.
+ * cursors, the list keymap and `contentGuard`, which puts right the attributes a change leaves outside what the schema
+ * allows.
  */
 export function editorExtensions(): Extensions {
   return [
@@ -45,6 +44,7 @@ export function editorExtensions(): Extensions {
       undoRedo: false,
     }),
     safeLink,
+    ContentGuard,
   ]
 }
 

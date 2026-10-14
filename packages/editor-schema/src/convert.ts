@@ -2,7 +2,8 @@ import { getSchema, type JSONContent } from '@tiptap/core'
 import type { Node } from '@tiptap/pm/model'
 import { prosemirrorToYDoc, yXmlFragmentToProseMirrorRootNode } from '@tiptap/y-tiptap'
 import * as Y from 'yjs'
-import { editorExtensions, fragmentName, headingLevels } from './extensions.ts'
+import { attributeProblem } from './attributes.ts'
+import { editorExtensions, fragmentName } from './extensions.ts'
 import { isAllowedLinkHref } from './links.ts'
 
 // Conversion between ProseMirror JSON and a Yjs update, for the server: it writes content it did not receive from an
@@ -54,17 +55,14 @@ function parse(json: JSONContent): Node {
 }
 
 /**
- * What the schema cannot say about a document that fits it. A heading made from JSON with no level has level 1, which
- * this schema has no heading for, and a link mark takes any text as its address: both are checked here, for the content
- * that is written and for the content that is read.
+ * What the schema cannot say about a document that fits it: attributes it gives a default and no limit (a heading made
+ * from JSON with no level has level 1, a list can start anywhere) and a link mark's address, which takes any text. Checked
+ * for the content that is written and for the content that is read.
  */
 function assertAllowed(root: Node) {
   root.descendants((node) => {
-    if (node.type.name === 'heading' && !headingLevels.some((level) => level === node.attrs.level)) {
-      throw new RangeError(
-        `A heading has level ${String(node.attrs.level)}, and only ${headingLevels.join(' and ')} are allowed`,
-      )
-    }
+    const problem = attributeProblem(node.type.name, node.attrs)
+    if (problem !== null) throw new RangeError(problem)
     for (const mark of node.marks) {
       if (mark.type.name === 'link' && !isAllowedLinkHref(mark.attrs.href)) {
         throw new RangeError(`A link points to an address that is not allowed: ${String(mark.attrs.href)}`)

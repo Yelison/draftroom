@@ -126,6 +126,18 @@ describe('what the conversion refuses', () => {
       doc({ type: 'heading', attrs: { level: 1 }, content: [text('H1')] }),
     ],
     ['a heading with no level, which would be level 1', doc({ type: 'heading', content: [text('H')] })],
+    [
+      'a numbered list that starts at -5',
+      doc({ type: 'orderedList', attrs: { start: -5, type: null }, content: [listItem(paragraph(text('x')))] }),
+    ],
+    [
+      'a numbered list that starts at 1e20',
+      doc({ type: 'orderedList', attrs: { start: 1e20, type: null }, content: [listItem(paragraph(text('x')))] }),
+    ],
+    [
+      'a numbered list with a style that does not exist',
+      doc({ type: 'orderedList', attrs: { start: 1, type: 'x' }, content: [listItem(paragraph(text('x')))] }),
+    ],
     ['a heading of level 4', doc({ type: 'heading', attrs: { level: 4 }, content: [text('H4')] })],
   ]
 
