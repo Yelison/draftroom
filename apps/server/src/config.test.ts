@@ -75,6 +75,11 @@ describe('loadConfig', () => {
       ],
       ['with a wildcard origin', { DATABASE_URL: database, ALLOWED_ORIGINS: '*' }, 'ALLOWED_ORIGINS'],
       [
+        'with the collaboration port on the default API port',
+        { DATABASE_URL: database, COLLAB_PORT: '8380' },
+        'API_PORT and COLLAB_PORT',
+      ],
+      [
         'with both servers on one port',
         { DATABASE_URL: database, API_PORT: '9000', COLLAB_PORT: '9000' },
         'API_PORT and COLLAB_PORT',

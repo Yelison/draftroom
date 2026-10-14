@@ -94,6 +94,20 @@ describe('the routes of the app', () => {
     })
   })
 
+  it('answer a URL that cannot be decoded with the validation-failed problem', async () => {
+    const response = await appWithoutDatabase().inject('/api/documents/%E0%A4%A')
+
+    expect(response.statusCode).toBe(400)
+    expect(response.headers['content-type']).toContain(problemType)
+    expect(response.json()).toEqual({
+      type: '/problems/validation-failed',
+      title: 'The request is not valid.',
+      status: 400,
+      code: 'validation-failed',
+      errors: [{ pointer: '/', code: 'invalid-format' }],
+    })
+  })
+
   it('answer a path that is not in the contract with the not-found problem', async () => {
     const response = await appWithoutDatabase().inject('/api/nothing-here')
 
@@ -232,9 +246,26 @@ describe('a handler that fails', () => {
     expect(response.json()).toMatchObject({ status: statusCode, code })
   })
 
+  it("does not carry the handler's headers into the 500, a session cookie included", async () => {
+    const application = appWithoutDatabase()
+    application.route(
+      operationRoute(contract, 'getMe', (_request, reply) => {
+        reply.header('set-cookie', 'dr_session=abc; HttpOnly').header('etag', '"v1"')
+        throw new Error('failed after the session was started')
+      }),
+    )
+
+    const response = await application.inject('/api/me')
+
+    expect(response.statusCode).toBe(500)
+    expect(response.headers).not.toHaveProperty('set-cookie')
+    expect(response.headers).not.toHaveProperty('etag')
+    expect(response.headers['content-type']).toContain(problemType)
+  })
+
   // The contract does not define these as answers of a handler, so they are bugs of the server: a 500, not a 400 that
   // would blame the request.
-  it.each([400, 422, 429])('answers a thrown %i with the internal-error problem', async (statusCode) => {
+  it.each([400, 413, 422, 429])('answers a thrown %i with the internal-error problem', async (statusCode) => {
     const response = await failWith(Object.assign(new Error('refused'), { statusCode }))
 
     expect(response.statusCode).toBe(500)

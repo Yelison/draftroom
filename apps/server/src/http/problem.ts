@@ -37,6 +37,14 @@ export function sendProblem(reply: FastifyReply, code: ErrorCode, errors?: reado
   return reply.code(catalogue[code].status).type(problemMediaType).send(problemBody(code, errors))
 }
 
+/**
+ * Strips what a handler put on a response the server is about to replace by a 500: a session cookie, an ETag, a
+ * Location must not outlive the answer that was refused. Fastify adds the content length itself afterwards.
+ */
+export function clearHeaders(reply: FastifyReply): void {
+  for (const name of Object.keys(reply.getHeaders())) reply.removeHeader(name)
+}
+
 /** The body is unreadable as a whole: its pointer is the document itself. */
 const wholeBody: FieldError = { pointer: '/', code: 'invalid-format' }
 
@@ -63,7 +71,21 @@ export function handleError(error: FastifyError, request: FastifyRequest, reply:
   if (code !== undefined) return sendProblem(reply, code)
 
   request.log.error({ err: error }, 'unhandled error')
+  clearHeaders(reply)
   return sendProblem(reply, 'internal-error')
+}
+
+/**
+ * Fastify's own errors, raised before a route is chosen (a URL that cannot be decoded, for one), which would otherwise
+ * leave as Fastify's default JSON and break the `Problem` of the contract.
+ */
+export function handleFrameworkError(error: FastifyError, request: FastifyRequest, reply: FastifyReply): void {
+  if (error.code === 'FST_ERR_BAD_URL') {
+    sendProblem(reply, 'validation-failed', [wholeBody])
+    return
+  }
+  request.log.error({ err: error }, 'framework error')
+  sendProblem(reply, 'internal-error')
 }
 
 export function handleNotFound(_request: FastifyRequest, reply: FastifyReply): FastifyReply {

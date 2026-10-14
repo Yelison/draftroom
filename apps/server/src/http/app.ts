@@ -2,7 +2,15 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 import type { Kysely } from 'kysely'
 import type { Database } from '../db/tables.ts'
 import { loadContract, type Contract } from './contract.ts'
-import { handleError, handleNotFound, problemBody, problemMediaType, sendProblem } from './problem.ts'
+import {
+  clearHeaders,
+  handleError,
+  handleFrameworkError,
+  handleNotFound,
+  problemBody,
+  problemMediaType,
+  sendProblem,
+} from './problem.ts'
 import { healthRoutes } from './routes/health.ts'
 
 declare module 'fastify' {
@@ -36,7 +44,7 @@ export function buildApp({
   onContractViolation,
 }: AppDependencies): FastifyInstance {
   // The contract has no HEAD operations, so none is exposed.
-  const app = Fastify({ logger, exposeHeadRoutes: false })
+  const app = Fastify({ logger, exposeHeadRoutes: false, frameworkErrors: handleFrameworkError })
   const implementedOperations = new Set<string>()
   app.decorate('implementedOperations', implementedOperations)
 
@@ -75,9 +83,7 @@ export function buildApp({
     const violation = { operationId, status: reply.statusCode, reason: verdict.reason }
     request.log.error(violation, 'the response breaks the contract')
     onContractViolation?.(violation)
-    // What the handler put on the refused response (a session cookie, an ETag, a Location) must not outlive it.
-    // Fastify adds the content length itself once this hook returns.
-    for (const name of Object.keys(reply.getHeaders())) reply.removeHeader(name)
+    clearHeaders(reply)
     reply.code(500).type(problemMediaType)
     return JSON.stringify(problemBody('internal-error'))
   })
