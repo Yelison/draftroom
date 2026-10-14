@@ -1,4 +1,4 @@
-/* Generated from `@yelison/forma-ui@0.4.0` (the version of the last sync): do not edit by hand.
+/* Generated from `@yelison/forma-ui@0.5.0` (the version of the last sync): do not edit by hand.
  * Run `npm run sync:forma-tokens -w @draftroom/web` to regenerate it. Below is the package's `tokens.css`,
  * unchanged. Draftroom's own tokens live in their own files, never here. `tokens.sync.test.ts` fails when the
  * content differs from the installed package. */
@@ -28,6 +28,8 @@
   --color-amber-ink: #94600d;
   --color-red-bg: #fdecec;
   --color-red-ink: #b63535;
+  --color-purple-bg: #efe7ff;
+  --color-purple-ink: #7751b8;
   --color-on-brand: #ffffff;
   --color-nav-ink: #ffffff;
   --color-focus: #3569f6;
@@ -69,6 +71,7 @@
   --control-height: 40px;
   --control-icon-size: 20px;
   --button-height: 42px;
+  --button-height-compact: 36px;
   --touch-target: 44px;
   --avatar-size-small: 28px;
   --avatar-size-medium: 36px;
@@ -101,6 +104,7 @@
   :root {
     --control-height: var(--touch-target);
     --button-height: var(--touch-target);
+    --button-height-compact: var(--touch-target);
   }
 }
 
@@ -127,6 +131,8 @@
     --color-amber-ink: #f2ce85;
     --color-red-bg: #3f242b;
     --color-red-ink: #ffacb3;
+    --color-purple-bg: #31244a;
+    --color-purple-ink: #cfb1ff;
     --color-on-brand: #ffffff;
     --color-nav-ink: #ffffff;
     --color-focus: #9bbcff;
@@ -159,6 +165,8 @@
   --color-amber-ink: #f2ce85;
   --color-red-bg: #3f242b;
   --color-red-ink: #ffacb3;
+  --color-purple-bg: #31244a;
+  --color-purple-ink: #cfb1ff;
   --color-on-brand: #ffffff;
   --color-nav-ink: #ffffff;
   --color-focus: #9bbcff;
