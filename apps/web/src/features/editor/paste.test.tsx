@@ -1,4 +1,4 @@
-import type { JSONContent } from '@tiptap/core'
+import type { Editor, JSONContent } from '@tiptap/core'
 import { describe, expect, it } from 'vitest'
 import { yUpdateToJson } from '@draftroom/editor-schema/convert'
 import * as Y from 'yjs'
@@ -288,4 +288,37 @@ describe('what the schema guards by itself, whatever the way in', () => {
 
     expect(editor.getJSON().content?.[0]).toMatchObject({ type: 'heading', attrs: { level: 2 } })
   })
+
+  const hostileLinks = [
+    [
+      'insertContent',
+      (editor: Editor) =>
+        editor.commands.insertContent({
+          type: 'text',
+          text: 'click',
+          marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }],
+        }),
+    ],
+    [
+      'setMark',
+      (editor: Editor) => {
+        editor.commands.setContent('<p>click</p>')
+        editor.commands.selectAll()
+        editor.commands.setMark('link', { href: 'javascript:alert(1)' })
+      },
+    ],
+  ] as const
+
+  it.each(hostileLinks)(
+    'takes a link to javascript: off the text a command puts it on (%s), and the server can read the state',
+    async (_name, put) => {
+      const { editor } = await openEditor()
+
+      put(editor)
+
+      expect(JSON.stringify(editor.getJSON())).not.toContain('javascript')
+      expect(editor.getText()).toBe('click')
+      expect(yUpdateToJson(Y.encodeStateAsUpdate(ydocOf(editor))).content).toEqual([paragraph(text('click'))])
+    },
+  )
 })

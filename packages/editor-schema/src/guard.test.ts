@@ -90,4 +90,97 @@ describe('the content guard', () => {
 
     expect(ruledNodes(next)).toEqual([['heading', { level: 1 }]])
   })
+
+  describe('what it looks at', () => {
+    const level = (state: EditorState, index: number) => state.doc.child(index).attrs.level
+
+    it('leaves a heading that is already there alone when the person types somewhere else', () => {
+      const bad = make('heading', { level: 1 }, word())
+      const state = start(bad, paragraph())
+      const at = state.doc.child(0).nodeSize + 1
+
+      const next = state.apply(state.tr.insertText('x', at))
+
+      expect(level(next, 0)).toBe(1)
+    })
+
+    it('leaves what another person wrote alone, then the person typing in another paragraph', () => {
+      const state = start(paragraph())
+      const remote = state.apply(
+        state.tr.insert(0, make('heading', { level: 1 }, word())).setMeta(ySyncPluginKey, { isChangeOrigin: true }),
+      )
+      const at = remote.doc.child(0).nodeSize + 1
+
+      const next = remote.apply(remote.tr.insertText('x', at))
+
+      expect(level(next, 0)).toBe(1)
+    })
+
+    it('still finds a bad heading when a later step of the same transaction moved it', () => {
+      const state = start(paragraph())
+
+      const change = state.tr
+        .insert(state.doc.content.size, make('heading', { level: 7 }, word()))
+        .insert(0, paragraph())
+        .insert(0, paragraph())
+      const next = state.apply(change)
+
+      expect(ruledNodes(next)).toEqual([['heading', { level: 3 }]])
+    })
+
+    it('puts right a level changed in place, which moves no position', () => {
+      const state = start(make('heading', { level: 2 }, word()))
+
+      const next = state.apply(state.tr.setNodeAttribute(0, 'level', 1))
+
+      expect(level(next, 0)).toBe(2)
+    })
+  })
+
+  describe('links', () => {
+    const marked = (href: string) => schema.text('click', [schema.marks.link!.create({ href })])
+    const marksOf = (state: EditorState) => {
+      const found: unknown[] = []
+      state.doc.descendants((node) => void node.marks.forEach((mark) => found.push([mark.type.name, mark.attrs.href])))
+      return found
+    }
+
+    it.each(['javascript:alert(1)', 'data:text/html,x', '/relative', ''])(
+      'removes a link to %j that is inserted',
+      (href) => {
+        const state = start()
+
+        const next = state.apply(state.tr.insert(1, marked(href)))
+
+        expect(marksOf(next)).toEqual([])
+        expect(next.doc.textContent).toBe('click')
+      },
+    )
+
+    it('removes a link that is put on text already there', () => {
+      const state = start(paragraph())
+
+      const next = state.apply(state.tr.addMark(1, 6, schema.marks.link!.create({ href: 'javascript:alert(1)' })))
+
+      expect(marksOf(next)).toEqual([])
+      expect(next.doc.textContent).toBe('Hello')
+    })
+
+    it('keeps a link to an address that is allowed', () => {
+      const state = start()
+
+      const next = state.apply(state.tr.insert(1, marked('https://example.com')))
+
+      expect(marksOf(next)).toEqual([['link', 'https://example.com']])
+    })
+
+    it('leaves a link that another person wrote alone', () => {
+      const state = start()
+      const change = state.tr.insert(1, marked('javascript:alert(1)')).setMeta(ySyncPluginKey, { isChangeOrigin: true })
+
+      const next = state.apply(change)
+
+      expect(marksOf(next)).toEqual([['link', 'javascript:alert(1)']])
+    })
+  })
 })

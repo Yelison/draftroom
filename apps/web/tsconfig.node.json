@@ -9,7 +9,12 @@
     "outDir": null,
     "tsBuildInfoFile": "${configDir}/node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
-  // The build tooling and its tests, the browser specs, plus the few modules of `src` that the Vite configuration reads the fixtures that the bundle guard searches for and the clipboard HTML the editor spec pastes.
+  // What this project covers, besides the build tooling and its tests (`vite.config.ts`, `scripts`) and the browser
+  // specs (`e2e`):
+  //  - the few modules of `src` that the Vite configuration reads (`i18n/locale.ts`, `i18n/localeScript.ts`, the
+  //    catalogues, `theme.ts`);
+  //  - the fixtures that the bundle guard searches the production build for (`data/mock/fixtures`, `data/mock/ids.ts`);
+  //  - the clipboard HTML that the editor spec pastes (`features/editor/testing/wordProcessorHtml.ts`).
   "include": [
     "vite.config.ts",
     "scripts",

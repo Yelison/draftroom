@@ -28,13 +28,14 @@ const documents: [string, (fragment: Y.XmlFragment) => void][] = [
   ['a document that ends in a heading', (fragment) => fragment.insert(0, [element('heading', new Y.XmlText('Title'))])],
 ]
 
-const people_ = [
+/** Who opens the document, and the document they open: one that they edit and one that they can only read. */
+const openers = [
   ['an editor', people.daniel, launchPlan.id],
   ['a viewer', people.daniel, budget.id],
 ] as const
 
 describe('opening a document', () => {
-  it.each(documents.flatMap(([name, fill]) => people_.map(([role, who, id]) => [name, role, fill, who, id] as const)))(
+  it.each(documents.flatMap(([name, fill]) => openers.map(([role, who, id]) => [name, role, fill, who, id] as const)))(
     'writes nothing to %s, as %s',
     async (_name, _role, fill, signedInAs, documentId) => {
       const ydoc = new Y.Doc()
