@@ -1,6 +1,6 @@
-import type { Kysely } from 'kysely'
+import { sql, type Kysely } from 'kysely'
 import { Migrator } from 'kysely/migration'
-import { migrationProvider } from './migrations/index.ts'
+import { migrationProvider, migrations } from './migrations/index.ts'
 
 const createMigrator = <DB>(db: Kysely<DB>): Migrator => new Migrator({ db, provider: migrationProvider })
 
@@ -15,13 +15,27 @@ export async function migrateToLatest<DB>(db: Kysely<DB>): Promise<readonly stri
 
 export type MigrationStatus = { readonly current: true } | { readonly current: false; readonly reason: string }
 
+/** The names of the migrations the database has run: Kysely's `getMigrations()` only reports the ones it knows. */
+async function executedMigrationNames<DB>(db: Kysely<DB>): Promise<string[]> {
+  const { rows: tables } = await sql<{
+    present: boolean
+  }>`select to_regclass('kysely_migration') is not null as present`.execute(db)
+  if (tables[0]?.present !== true) return []
+  const { rows } = await sql<{ name: string }>`select name from kysely_migration`.execute(db)
+  return rows.map((row) => row.name)
+}
+
 /**
  * Whether the database holds exactly the migrations this server knows. Anything else is not current: migrations still
  * to run, but also migrations the database has and this server lacks, which means a newer or a different server
- * migrated it, and Kysely refuses to continue past those.
+ * migrated it (and `migrateToLatest` would refuse to go on).
  */
 export async function migrationStatus<DB>(db: Kysely<DB>): Promise<MigrationStatus> {
   try {
+    const unknown = (await executedMigrationNames(db)).filter((name) => !(name in migrations))
+    if (unknown.length > 0) {
+      return { current: false, reason: `the database has migrations this server does not know: ${unknown.join(', ')}` }
+    }
     const pending = (await createMigrator(db).getMigrations()).filter((migration) => migration.executedAt === undefined)
     return pending.length === 0
       ? { current: true }
