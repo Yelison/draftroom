@@ -1,7 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "src"
+    // The server runs its sources directly with Node's type stripping (ADR 0009): tsc only checks, so the syntax
+    // must be erasable, and module resolution must be the one Node really applies.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "erasableSyntaxOnly": true,
+    "rootDir": ".",
+    // Without this tsc loads the DOM and React typings hoisted from the web app into a server with no DOM.
+    "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src", "test", "vitest.config.ts", "vitest.integration.config.ts"]
 }
