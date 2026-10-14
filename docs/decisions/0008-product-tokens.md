@@ -15,7 +15,7 @@ These values are maintained in a token source that is kept outside this reposito
 - **It never redefines a Forma UI token.** The generator refuses to emit a name Forma UI declares, and a test checks every stylesheet under `src/`, this one included, against the installed package. A product value that differs from a Forma UI token is resolved by adopting Forma UI's value, or by asking Forma UI for the change; it is not overridden here.
 - **Themes switch as Forma UI's do.** The colours of the product sit under the same selectors as Forma UI's (`:root`, the dark media query for a system preference that has not been overridden, and `[data-theme='dark']`). A test compares the two sets of selectors, so a theme switch cannot reach one file and miss the other.
 - **Readable pairs are tested.** The text and background pairs the file adds (the navigation ink on the selected item) must pass WCAG AA in both themes, using Forma UI's `contrastRatio`.
-- **The purple is not here.** Forma UI 0.5.0 publishes `--color-purple-bg` and `--color-purple-ink`, so the provisional pair this file carried was removed from the source and the file regenerated. The components read Forma UI's tokens, and the readable-pairs test still checks the purple pair, now from Forma UI, next to the navigation one.
+- **The purple is not here.** Forma UI 0.5.0 publishes `--color-purple-bg` and `--color-purple-ink`, so the provisional pair this file carried was removed from the source and the file regenerated. Components that need purple read Forma UI's tokens, and the readable-pairs test still checks the purple pair, now from Forma UI, next to the navigation one.
 
 ## Consequences
 
