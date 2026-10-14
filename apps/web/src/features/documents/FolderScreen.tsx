@@ -11,12 +11,14 @@ import { useCreateDocument } from './actions/useCreateDocument.ts'
 import { DocumentCollection } from './DocumentCollection.tsx'
 import { ListSkeleton } from './ListSkeleton.tsx'
 import { ListToolbar } from './ListToolbar.tsx'
+import { NoWorkspace } from './NoWorkspace.tsx'
 import { QueryFailure } from './QueryFailure.tsx'
 import { StateMessage } from './StateMessage.tsx'
 import { foldersQuery } from './queries.ts'
 import { problemMessageId } from './problemMessage.ts'
 import { searchTerm } from './searchTerm.ts'
 import { useWorkspaceId } from './useWorkspaceId.ts'
+import layout from './ListLayout.module.css'
 import styles from './DocumentsScreen.module.css'
 
 /**
@@ -39,7 +41,8 @@ export function FolderScreen() {
   })
   const folder = folders.data?.items.find((item) => item.id === folderId)
 
-  const failed = workspace.isError || folders.isError || (workspace.isSuccess && workspaceId === undefined)
+  const failed = workspace.isError || folders.isError
+  const noWorkspace = workspace.isSuccess && workspaceId === undefined
   const notFound = folders.isSuccess && folder === undefined
   const heading =
     folder?.name ?? intl.formatMessage({ id: notFound ? 'documents.folderNotFound.title' : 'screen.folder' })
@@ -52,6 +55,8 @@ export function FolderScreen() {
         onRetry={() => void (workspace.isError ? workspace.refetch() : folders.refetch())}
       />
     )
+  } else if (noWorkspace) {
+    body = <NoWorkspace />
   } else if (notFound) {
     body = (
       <StateMessage description={intl.formatMessage({ id: 'documents.folderNotFound.description' })}>
@@ -67,7 +72,7 @@ export function FolderScreen() {
   }
 
   return (
-    <div className={styles.screen}>
+    <div className={layout.screen}>
       <title>{intl.formatMessage({ id: 'app.documentTitle' }, { page: heading })}</title>
       <h1 tabIndex={-1} className={styles.heading}>
         {heading}

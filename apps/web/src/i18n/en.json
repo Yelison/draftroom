@@ -83,7 +83,7 @@
   "documents.folderName.tooLong": "A name can have up to {max, number} characters.",
   "documents.archive.action": "Archive",
   "documents.archive.title": "Archive “{title}”?",
-  "documents.archive.description": "It leaves your lists and the explorer, and goes to the trash, where an owner can restore it.",
+  "documents.archive.description": "It leaves your lists. An owner can restore it from the trash.",
   "documents.archive.announcement": "“{title}” was archived.",
   "documents.folder.createTitle": "New folder",
   "documents.folder.renameTitle": "Rename folder",
@@ -96,7 +96,7 @@
   "documents.loading": "Loading documents",
   "documents.search.label": "Search documents",
   "documents.folders": "Folders",
-  "documents.all": "Documents",
+  "documents.all": "All documents",
   "documents.empty.title": "No documents yet",
   "documents.empty.description": "Create your first document to get started.",
   "documents.noResults.title": "No results for “{query}”",
@@ -114,5 +114,7 @@
   "explorer.tree": "Documents and folders",
   "explorer.recent": "Recent",
   "explorer.results": "Results",
-  "documents.results.more": "{count, number} or more results"
+  "documents.results.more": "{count, number} or more results",
+  "documents.noWorkspace.title": "You're not in a workspace yet",
+  "documents.noWorkspace.description": "Ask the owner of a workspace to add you, and your documents will appear here."
 }

@@ -83,7 +83,7 @@
   "documents.folderName.tooLong": "Un nombre puede tener hasta {max, number} caracteres.",
   "documents.archive.action": "Archivar",
   "documents.archive.title": "¿Archivar «{title}»?",
-  "documents.archive.description": "Sale de tus listas y del explorador, y pasa a la papelera, donde un propietario puede restaurarlo.",
+  "documents.archive.description": "Sale de tus listas. Un propietario puede restaurarlo desde la papelera.",
   "documents.archive.announcement": "«{title}» se ha archivado.",
   "documents.folder.createTitle": "Nueva carpeta",
   "documents.folder.renameTitle": "Cambiar nombre de la carpeta",
@@ -96,7 +96,7 @@
   "documents.loading": "Cargando documentos",
   "documents.search.label": "Buscar documentos",
   "documents.folders": "Carpetas",
-  "documents.all": "Documentos",
+  "documents.all": "Todos los documentos",
   "documents.empty.title": "Aún no hay documentos",
   "documents.empty.description": "Crea tu primer documento para empezar.",
   "documents.noResults.title": "Sin resultados para «{query}»",
@@ -114,5 +114,7 @@
   "explorer.tree": "Documentos y carpetas",
   "explorer.recent": "Recientes",
   "explorer.results": "Resultados",
-  "documents.results.more": "{count, number} resultados o más"
+  "documents.results.more": "{count, number} resultados o más",
+  "documents.noWorkspace.title": "Aún no estás en ningún espacio de trabajo",
+  "documents.noWorkspace.description": "Pide al propietario de un espacio que te añada y tus documentos aparecerán aquí."
 }

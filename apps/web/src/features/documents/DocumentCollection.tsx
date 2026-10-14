@@ -9,7 +9,7 @@ import { ListSkeleton } from './ListSkeleton.tsx'
 import { QueryFailure } from './QueryFailure.tsx'
 import { StateMessage } from './StateMessage.tsx'
 import { documentListQuery } from './queries.ts'
-import styles from './DocumentCollection.module.css'
+import layout from './ListLayout.module.css'
 
 export interface DocumentCollectionProps {
   workspaceId: string
@@ -64,7 +64,7 @@ export function DocumentCollection({ workspaceId, folderId, term, empty, onActio
 
   return (
     <>
-      <ul ref={list} className={styles.grid}>
+      <ul ref={list} className={layout.grid}>
         {documents.map((document) => (
           <li key={document.id}>
             <DocumentCard document={document} onActions={onActions} />

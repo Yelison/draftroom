@@ -1,0 +1,21 @@
+/*
+ * The measures of the list screens, in one place: the width of the page, the narrowest a card gets and the widest the
+ * search is. They are literals until the product token layer has them; the next regeneration of the tokens takes them
+ * over (`--layout-*` there), and this file is the only one to change.
+ */
+.screen {
+  --list-page-width: 1080px;
+  --list-card-min-width: 280px;
+  --list-search-width: 480px;
+
+  max-width: var(--list-page-width);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--list-card-min-width), 1fr));
+  gap: var(--space-12);
+  margin: 0 0 var(--space-16);
+  padding: 0;
+  list-style: none;
+}

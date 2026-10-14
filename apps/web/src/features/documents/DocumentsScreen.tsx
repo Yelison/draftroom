@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@yelison/forma-ui'
-import { useDeferredValue, useState } from 'react'
+import { useDeferredValue, useEffect, useState } from 'react'
 import { useIntl } from 'react-intl'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { PageTitle } from '../../components/PageTitle/PageTitle.tsx'
 import { focusMainContent } from '../../app/mainContent.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
@@ -20,6 +20,7 @@ import { StateMessage } from './StateMessage.tsx'
 import { WorkspaceGate } from './WorkspaceGate.tsx'
 import { foldersQuery } from './queries.ts'
 import { searchTerm } from './searchTerm.ts'
+import layout from './ListLayout.module.css'
 import styles from './DocumentsScreen.module.css'
 
 /**
@@ -28,7 +29,7 @@ import styles from './DocumentsScreen.module.css'
  */
 export function DocumentsScreen() {
   return (
-    <div className={styles.screen}>
+    <div className={layout.screen}>
       <PageTitle titleId="nav.documents" />
       <WorkspaceGate loading={<ListSkeleton />}>
         {(workspaceId) => <Documents workspaceId={workspaceId} />}
@@ -46,11 +47,17 @@ function Documents({ workspaceId }: { workspaceId: string }) {
   const folders = useQuery(foldersQuery(dataSource, workspaceId))
   const create = useCreateDocument(workspaceId)
   const actions = useActionDialogs(focusMainContent)
-  const archivedTitle = archivedTitleFrom(useLocation().state)
+  // The notice of a document archived while open comes with the navigation. It is read once and taken out of the history
+  // entry, so reloading the page or coming back to it does not announce it again.
+  const location = useLocation()
+  const [archivedTitle] = useState(() => archivedTitleFrom(location.state))
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (archivedTitle !== null) void navigate(location.pathname, { replace: true, state: null })
+  }, [archivedTitle, location.pathname, navigate])
   const [archivedHere, setArchivedHere] = useState<string | null>(null)
-  // The notice of a document archived while open arrives with the navigation, and the one of a document archived from this
-  // page by the dialog. A live region says what is put into it after it is in the page, so the text is first rendered
-  // empty: the deferred value starts as '' and takes the message in the render that follows.
+  // A live region says what is put into it after it is in the page, so the text is first rendered empty: the deferred
+  // value starts as '' and takes the message in the render that follows.
   const announcedTitle = archivedHere ?? archivedTitle
   const announcement = useDeferredValue(
     announcedTitle === null
@@ -87,7 +94,7 @@ function Documents({ workspaceId }: { workspaceId: string }) {
           </h2>
           {folders.isError && <QueryFailure onRetry={() => void folders.refetch()} retrying={folders.isFetching} />}
           {folders.isSuccess && folders.data.items.length > 0 && (
-            <ul className={styles.folders}>
+            <ul className={layout.grid}>
               {folders.data.items.map((folder) => (
                 <li key={folder.id}>
                   <FolderCard

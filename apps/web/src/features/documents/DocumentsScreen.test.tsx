@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../data/errors.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { archivedNotice } from './archivedNotice.ts'
-import { fixtures, renderScreen } from './testing/renderScreen.tsx'
+import { fixtures, renderScreen, workspaceFixtures } from './testing/renderScreen.tsx'
 
 const heading = () => screen.findByRole('heading', { level: 1, name: 'Documents' })
 const main = () => screen.getByRole('main')
@@ -23,7 +23,7 @@ describe('the Documents screen', () => {
     const folders = await screen.findByRole('region', { name: 'Folders' })
     const links = await within(folders).findAllByRole('link')
     expect(links.map((link) => link.textContent)).toEqual(['Ideas', 'Operaciones', 'Product', 'Research'])
-    const documents = screen.getByRole('region', { name: 'Documents' })
+    const documents = screen.getByRole('region', { name: 'All documents' })
     expect(await within(documents).findByRole('link', { name: 'Autumn launch plan' })).toHaveAttribute(
       'href',
       `/documents/${fixtures.launchPlan.id}`,
@@ -56,6 +56,26 @@ describe('the Documents screen', () => {
     await waitFor(() => expect(arrive).toBeDefined())
     await act(async () => arrive?.())
     expect(await within(main()).findByRole('link', { name: 'Autumn launch plan' })).toBeInTheDocument()
+  })
+
+  it('shows the loading state, and not "No documents yet", while the folders are still on their way', async () => {
+    let called = false
+    renderScreen('/documents', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listFolders: () => {
+          called = true
+          return new Promise(() => {})
+        },
+      }),
+    })
+    await heading()
+
+    // The workspace is read first: only once the folders are asked for is there something to wait for.
+    await waitFor(() => expect(called).toBe(true))
+    await waitFor(() => expect(spoken()).toContain('Loading documents'))
+    expect(screen.queryByText('No documents yet')).not.toBeInTheDocument()
+    expect(within(main()).queryByRole('region')).not.toBeInTheDocument()
   })
 
   it('keeps the headline, and the focus on it, from the loading state to the list', async () => {
@@ -127,6 +147,28 @@ describe('the Documents screen', () => {
   })
 })
 
+describe('a person who belongs to no workspace', () => {
+  it.each([
+    { screen: 'Documents', path: '/documents' },
+    { screen: 'a folder', path: `/folders/${workspaceFixtures.productFolder.id}` },
+  ])('is told so on $screen, and is not shown a failure to retry', async ({ path }) => {
+    renderScreen(path, { wrap: (dataSource) => ({ ...dataSource, listWorkspaces: async () => ({ items: [] }) }) })
+
+    expect(await screen.findByText("You're not in a workspace yet")).toBeInTheDocument()
+    expect(within(main()).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(main()).queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+  })
+
+  it('is told so in Spanish too', async () => {
+    localStorage.setItem(localeStorageKey, 'es')
+    renderScreen('/documents', {
+      wrap: (dataSource) => ({ ...dataSource, listWorkspaces: async () => ({ items: [] }) }),
+    })
+
+    expect(await screen.findByText('Aún no estás en ningún espacio de trabajo')).toBeInTheDocument()
+  })
+})
+
 describe('searching the Documents screen', () => {
   it('lists only the documents that match, without the folders, and says how many', async () => {
     const { user } = renderScreen('/documents')
@@ -137,7 +179,7 @@ describe('searching the Documents screen', () => {
 
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Folders' })).not.toBeInTheDocument())
     expect(
-      within(screen.getByRole('region', { name: 'Documents' }))
+      within(screen.getByRole('region', { name: 'All documents' }))
         .getAllByRole('link')
         .map((link) => link.textContent),
     ).toEqual(['Weekly update — October 6'])
@@ -195,7 +237,7 @@ describe('the pages of the Documents screen', () => {
   it('loads the next page when asked, and moves the focus to the first document that arrived', async () => {
     const { user } = renderScreen('/documents', { wrap: smallPages })
     await heading()
-    const documents = await screen.findByRole('region', { name: 'Documents' })
+    const documents = await screen.findByRole('region', { name: 'All documents' })
     expect(await within(documents).findAllByRole('link')).toHaveLength(4)
 
     await user.click(within(documents).getByRole('button', { name: 'Load more' }))
@@ -207,7 +249,7 @@ describe('the pages of the Documents screen', () => {
   it('stops offering more once the last page is in', async () => {
     const { user } = renderScreen('/documents', { wrap: smallPages })
     await heading()
-    const documents = await screen.findByRole('region', { name: 'Documents' })
+    const documents = await screen.findByRole('region', { name: 'All documents' })
 
     // Ten documents in pages of four: two clicks reach the end.
     await user.click(await within(documents).findByRole('button', { name: 'Load more' }))
@@ -230,6 +272,31 @@ describe('what the Documents screen says when a document was archived', () => {
     await waitFor(() =>
       expect(within(main()).getByRole('status')).toHaveTextContent('“Autumn launch plan” was archived.'),
     )
+  })
+
+  it('takes the notice out of the history, so reloading the page does not announce it again', async () => {
+    const { router } = renderScreen('/shared')
+    await screen.findByRole('heading', { level: 1, name: 'Shared' })
+
+    await act(() => router.navigate('/documents', { state: archivedNotice('Autumn launch plan') }))
+
+    await waitFor(() => expect(router.state.location.state).toBeNull())
+    expect(router.state.location.pathname).toBe('/documents')
+    await waitFor(() => expect(spoken()).toContain('“Autumn launch plan” was archived.'))
+  })
+
+  it('does not announce it again when the person comes back to the screen', async () => {
+    const { router } = renderScreen('/shared')
+    await screen.findByRole('heading', { level: 1, name: 'Shared' })
+    await act(() => router.navigate('/documents', { state: archivedNotice('Autumn launch plan') }))
+    await waitFor(() => expect(router.state.location.state).toBeNull())
+
+    await act(() => router.navigate('/history'))
+    await screen.findByRole('heading', { level: 1, name: 'History' })
+    await act(() => router.navigate(-1))
+
+    await screen.findByRole('link', { name: 'Autumn launch plan' })
+    expect(within(main()).getByRole('status')).toBeEmptyDOMElement()
   })
 
   it('says nothing when the person simply comes to the screen', async () => {

@@ -1,4 +1,5 @@
 import { useIntl } from 'react-intl'
+import layout from './ListLayout.module.css'
 import styles from './ListSkeleton.module.css'
 
 const cards = 6
@@ -9,7 +10,7 @@ export function ListSkeleton() {
 
   return (
     <div aria-busy="true">
-      <ul className={styles.grid}>
+      <ul className={layout.grid}>
         {Array.from({ length: cards }, (_, index) => (
           <li key={index} className={styles.card} />
         ))}

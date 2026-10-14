@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { NoWorkspace } from './NoWorkspace.tsx'
 import { QueryFailure } from './QueryFailure.tsx'
 import { useWorkspaceId } from './useWorkspaceId.ts'
 
@@ -13,8 +14,8 @@ export function WorkspaceGate({ loading, children }: WorkspaceGateProps) {
   const workspace = useWorkspaceId()
 
   if (workspace.isPending) return loading
-  if (workspace.isError || workspace.data === undefined) {
+  if (workspace.isError)
     return <QueryFailure onRetry={() => void workspace.refetch()} retrying={workspace.isFetching} />
-  }
+  if (workspace.data === undefined) return <NoWorkspace />
   return children(workspace.data)
 }
