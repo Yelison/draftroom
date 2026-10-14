@@ -90,7 +90,7 @@ test('creates, renames and archives a document from the explorer', async ({ page
   await expect(page.getByRole('main').getByRole('link', { name: 'Roadmap' })).toHaveCount(0)
 })
 
-test('lists, searches and pages the Documents screen', async ({ page }) => {
+test('lists and searches the Documents screen', async ({ page }) => {
   await page.goto('/documents')
   const main = page.getByRole('main')
 
