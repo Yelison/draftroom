@@ -6,8 +6,9 @@ import { describe, expect, it } from 'vitest'
 
 /* `draftroom-tokens.css` is generated outside this repository and committed as it comes. These tests do not judge its
  * values; they check the promises the rest of the app relies on: it says it is generated, it leaves Forma UI's tokens
- * alone, it switches themes the way Forma UI does, and the text colours it adds are readable. (That it declares no
- * Forma UI token is checked, for every stylesheet at once, in `tokens.sync.test.ts`.) */
+ * alone, it switches themes the way Forma UI does, and the text colours it adds are readable (the purple pair, now
+ * Forma UI's, is checked with them). (That it declares no Forma UI token is checked, for every stylesheet at once, in
+ * `tokens.sync.test.ts`.) */
 
 const stylesDirectory = import.meta.dirname
 const require = createRequire(import.meta.url)
@@ -93,8 +94,9 @@ describe('draftroom-tokens.css', () => {
   })
 })
 
-describe('the text colours of the product, in both themes', () => {
-  // AA for text of any size.
+describe('the text colours the product relies on, in both themes', () => {
+  // The purple pair comes from Forma UI since 0.5.0 and the navigation pair from the product file: `resolvedTheme`
+  // reads both, which is how the components see them. AA for text of any size.
   const MINIMUM = 4.5
   const pairs = [
     { text: '--color-purple-ink', background: '--color-purple-bg' },
