@@ -132,13 +132,32 @@ describe('a document that could not be opened', () => {
   })
 
   it('stays on its message, with the button busy, while the retry runs, and goes back to it when the retry fails too', async () => {
-    renderEditor({ wrap: failing(2) })
+    let answerRetry: (() => void) | undefined
+    let calls = 0
+    renderEditor({
+      wrap: (dataSource) => ({
+        ...dataSource,
+        getDocument: async () => {
+          calls += 1
+          if (calls > 1) await new Promise<void>((resolve) => (answerRetry = resolve))
+          throw new ApiError({ type: 'about:blank', title: 'Unavailable', status: 503, code: 'unavailable' })
+        },
+      }),
+    })
     await screen.findByRole('heading', { level: 1, name: "We couldn't open this document" })
+    const retry = screen.getByRole('button', { name: 'Try again' })
 
-    await act(async () => screen.getByRole('button', { name: 'Try again' }).click())
+    await act(async () => retry.click())
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Try again' })).not.toHaveAttribute('aria-busy'))
+    // While the retry is on its way the same button is there, busy, and the skeleton has not taken its place.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Loading|Try again/ })).toHaveAttribute('aria-busy', 'true'),
+    )
     expect(screen.getByRole('heading', { level: 1, name: "We couldn't open this document" })).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+
+    await act(async () => answerRetry?.())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Try again' })).not.toHaveAttribute('aria-busy'))
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 

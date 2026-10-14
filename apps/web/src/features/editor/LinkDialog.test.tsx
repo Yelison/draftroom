@@ -42,6 +42,8 @@ describe('adding a link', () => {
       'Enter a web address that starts with http:// or https://, or an email address.',
     )
     expect(form.getByLabelText('Link address')).toBeInvalid()
+    // The button was pressed, so the focus goes back to the field the message is about.
+    expect(form.getByLabelText('Link address')).toHaveFocus()
     expect(screen.getByRole('dialog', { name: 'Add a link' })).toBeInTheDocument()
     expect(JSON.stringify(editor.getJSON())).not.toContain('javascript')
   })

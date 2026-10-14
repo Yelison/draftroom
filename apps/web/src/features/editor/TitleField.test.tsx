@@ -170,6 +170,8 @@ describe('a title that is not a title', () => {
     await user.keyboard('{Enter}')
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
+    // Moving into the text is done on the next animation frame, so it is given one before it is looked for.
+    await new Promise((resolve) => setTimeout(resolve, 100))
     expect(title()).toHaveFocus()
     expect(text).not.toHaveFocus()
   })
