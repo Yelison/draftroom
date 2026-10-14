@@ -1,4 +1,5 @@
 import type { Editor } from '@tiptap/core'
+import type * as Y from 'yjs'
 import { configure, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
@@ -76,4 +77,10 @@ export async function openEditor(options?: RenderEditorOptions) {
   const text = await screen.findByRole('textbox', { name: /Document content|Contenido del documento/ })
   const { editor } = text as HTMLElement & { editor: Editor }
   return { ...view, user, text, editor }
+}
+
+/** The Yjs document an editor was given: the Collaboration extension keeps it in its options. */
+export function ydocOf(editor: Editor): Y.Doc {
+  const collaboration = editor.extensionManager.extensions.find((extension) => extension.name === 'collaboration')
+  return collaboration?.options.document as Y.Doc
 }
