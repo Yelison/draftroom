@@ -85,6 +85,8 @@ Every 4xx and 5xx is `application/problem+json` (RFC 9457) with `type`, `title`,
 
 Each entry of `errors[]` is `{ "pointer": "/title", "code": "required" }`: a JSON Pointer into the body (`/query/<name>` or `/path/<name>` for parameters) and one of `required`, `too-short`, `too-long`, `invalid-format`, `invalid-value`, `unknown-field`.
 
+**Unknown parameters.** A query parameter that the operation does not declare is refused like an unknown body field: `400 validation-failed` with `{ "pointer": "/query/<name>", "code": "unknown-field" }`. A typo in a filter (`?folder=` for `?folderId=`) therefore fails loudly instead of returning the unfiltered list.
+
 The two statuses are split by what went wrong and where. A text **in the request body** that goes over its maximum is `413 too-large` with the pointer and `too-long`, and so is a body bigger than the server accepts. An empty value, any other broken rule, and every query or path parameter out of range (`limit`, `cursor`, `query`) is `400 validation-failed`.
 
 ## Pagination
