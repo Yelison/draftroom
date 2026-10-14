@@ -1,13 +1,44 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import type { DataSource } from '../../data/DataSource.ts'
 import { ApiError } from '../../data/errors.ts'
+import { daniel } from '../../data/mock/fixtures/index.ts'
 import { fixtures, renderScreen } from '../documents/testing/renderScreen.tsx'
 
 const openPath = `/documents/${fixtures.launchPlan.id}/share`
 const tree = () => screen.findByRole('tree', { name: 'Documents and folders' })
 const row = (name: string, index = 0) => screen.getAllByRole('treeitem', { name })[index] as HTMLElement
 
+const selectedRows = () =>
+  screen.getAllByRole('treeitem').filter((item) => item.getAttribute('aria-selected') === 'true')
+
 describe('the explorer beside a document', () => {
+  it('selects the open document once: the row under Recent is drawn as open and is not a second selection', async () => {
+    renderScreen(openPath)
+    await tree()
+
+    const [underRecent, underFolder] = screen.getAllByRole('treeitem', { name: 'Autumn launch plan' })
+    expect(underRecent).toHaveAttribute('data-variant', 'selected')
+    expect(underRecent).toHaveAttribute('aria-selected', 'false')
+    expect(underFolder).toHaveAttribute('aria-selected', 'true')
+    expect(selectedRows()).toHaveLength(1)
+  })
+
+  // What a row answers to besides the keys of the tree, by what the person may do with it.
+  it.each([
+    { name: 'a document the person owns', row: 'Autumn launch plan', shortcuts: 'F2 Delete', as: undefined },
+    { name: 'a folder', row: 'Operaciones', shortcuts: 'F2', as: undefined },
+    { name: 'a document the person can edit', row: 'Autumn launch plan', shortcuts: 'F2', as: daniel.email },
+    { name: 'a document the person can only read', row: 'Presupuesto 2027', shortcuts: null, as: daniel.email },
+  ])('announces the shortcuts of $name', async ({ row: name, shortcuts, as }) => {
+    renderScreen(openPath, as === undefined ? {} : { signedInAs: as })
+    await tree()
+
+    const item = row(name)
+    if (shortcuts === null) expect(item).not.toHaveAttribute('aria-keyshortcuts')
+    else expect(item).toHaveAttribute('aria-keyshortcuts', shortcuts)
+  })
+
   it('lists Recent, the folders with their documents and the documents that are in no folder', async () => {
     renderScreen(openPath)
 
@@ -33,10 +64,7 @@ describe('the explorer beside a document', () => {
     await tree()
 
     expect(row('Product')).toHaveAttribute('aria-expanded', 'true')
-    const selected = screen
-      .getAllByRole('treeitem', { name: 'Autumn launch plan' })
-      .filter((item) => item.getAttribute('aria-selected') === 'true')
-    expect(selected.length).toBeGreaterThan(0)
+    expect(selectedRows().map((item) => item.textContent)).toEqual(['Autumn launch plan'])
     expect(screen.getAllByRole('treeitem', { name: 'Notas de la revisión de diseño' })[0]).toHaveAttribute(
       'aria-selected',
       'false',
@@ -50,7 +78,7 @@ describe('the explorer beside a document', () => {
     await act(() => router.navigate(`/documents/${fixtures.weeklyEnglish.id}/share`))
 
     await waitFor(() =>
-      expect(screen.getAllByRole('treeitem', { name: 'Weekly update — October 6' })[0]).toHaveAttribute(
+      expect(screen.getAllByRole('treeitem', { name: 'Weekly update — October 6' }).at(-1)).toHaveAttribute(
         'aria-selected',
         'true',
       ),
@@ -68,14 +96,12 @@ describe('the explorer beside a document', () => {
     const stopRow = document.activeElement as HTMLElement
     expect(stopRow).toHaveAttribute('role', 'treeitem')
 
-    await user.keyboard('{ArrowDown}{ArrowDown}')
+    await user.keyboard('{ArrowDown}')
 
     const focused = document.activeElement as HTMLElement
     expect(focused).not.toBe(stopRow)
     expect(focused).toHaveAttribute('aria-selected', 'false')
-    expect(
-      screen.getAllByRole('treeitem').filter((item) => item.getAttribute('aria-selected') === 'true').length,
-    ).toBeGreaterThan(0)
+    expect(selectedRows()).toHaveLength(1)
   })
 
   it('is one stop of the Tab key, and it is the open document', async () => {
@@ -199,6 +225,33 @@ describe('the search of the explorer', () => {
     await user.clear(screen.getByRole('searchbox', { name: 'Search documents' }))
     expect(await screen.findByRole('tree', { name: 'Documents and folders' })).toBeInTheDocument()
     expect(queries).not.toContain('')
+  })
+})
+
+describe('the pages of the explorer', () => {
+  const smallPages = (dataSource: DataSource): DataSource => ({
+    ...dataSource,
+    listDocuments: (request) =>
+      dataSource.listDocuments({
+        ...request,
+        params: { path: request.params.path, query: { ...request.params.query, limit: 3 } },
+      }),
+  })
+
+  it('keeps the focus in the tree once "Load more" is gone', async () => {
+    const { user } = renderScreen(openPath, { wrap: smallPages })
+    await tree()
+
+    // Ten documents in pages of three: the button is pressed until it goes.
+    for (let pages = 0; pages < 3; pages++) {
+      const more = screen.getByRole('button', { name: 'Load more' })
+      more.focus()
+      await user.click(more)
+      await waitFor(() => expect(screen.getAllByRole('treeitem').length).toBeGreaterThan(pages + 8))
+    }
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getAllByRole('treeitem')).toContain(document.activeElement))
   })
 })
 

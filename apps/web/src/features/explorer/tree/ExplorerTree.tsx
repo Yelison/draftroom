@@ -28,6 +28,15 @@ export interface ExplorerTreeHandle {
 /** How long a pause ends a word being typed to find an item. */
 const typeaheadPause = 700
 
+/** The keys beyond the tree's own that a row answers to, by what the person may do with it (see `onKeyDown`). */
+function shortcutsOf(item: TreeItem): string | undefined {
+  if (item.kind === 'recent') return undefined
+  if (item.kind === 'folder') return 'F2'
+  const { role } = item.document
+  if (role === 'owner') return 'F2 Delete'
+  return role === 'editor' ? 'F2' : undefined
+}
+
 const idOf = (treeId: string, key: string) => `${treeId}-${key}`
 
 /**
@@ -62,7 +71,10 @@ export function ExplorerTree({
   const isExpanded = (key: string) => choices.get(key) ?? defaultOpen.has(key)
 
   const items = visibleItems(roots, isExpanded)
-  const isSelected = (item: TreeItem) => item.kind === 'document' && item.document.id === openDocumentId
+  const isOpen = (item: TreeItem) => item.kind === 'document' && item.document.id === openDocumentId
+  // A document that is under Recent and under its folder is one selection, not two: Recent's row is drawn as open and
+  // the row of its folder (or of the loose documents) is the one that carries `aria-selected`.
+  const isSelected = (item: TreeItem) => isOpen(item) && item.parentKey !== recentKey
   // The one tab stop: where the focus was last, and while it has not been in the tree, the open document, or the first row.
   const tabStopKey = items.find((item) => item.key === focusedKey)?.key ?? items.find(isSelected)?.key ?? items[0]?.key
 
@@ -137,7 +149,8 @@ export function ExplorerTree({
             // The name of a row is its own text: the rows it owns are not part of it, as they would be in a name from content.
             aria-label={isBranch(item) ? item.label : undefined}
             aria-selected={item.kind === 'document' ? isSelected(item) : undefined}
-            variant={item.kind === 'document' ? (isSelected(item) ? 'selected' : 'default') : 'folder'}
+            aria-keyshortcuts={shortcutsOf(item)}
+            variant={item.kind === 'document' ? (isOpen(item) ? 'selected' : 'default') : 'folder'}
             {...(item.kind === 'recent' ? { icon: 'clock' as const } : {})}
             expanded={expanded}
             title={item.label}

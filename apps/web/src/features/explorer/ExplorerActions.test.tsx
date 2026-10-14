@@ -175,8 +175,7 @@ describe('creating from the explorer', () => {
     await waitFor(() => expect(router.state.location.pathname).not.toBe(pathOf(launchPlan.id)))
     await waitFor(() => {
       const selected = screen.getAllByRole('treeitem').filter((item) => item.getAttribute('aria-selected') === 'true')
-      // Under Recent and in the list of documents that are in no folder: both rows are the open document.
-      expect(selected.map((item) => item.textContent)).toEqual(['Untitled document', 'Untitled document'])
+      expect(selected.map((item) => item.textContent)).toEqual(['Untitled document'])
     })
     // The new document opens in the editor, whose chunk (Tiptap, ProseMirror, Yjs) is slow to load in a test.
   }, 20_000)

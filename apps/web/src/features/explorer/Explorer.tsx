@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { Button, IconButton, SearchField, Tooltip } from '@yelison/forma-ui'
-import { useDeferredValue, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useIntl } from 'react-intl'
 import { useNavigate, useParams } from 'react-router'
 import { useDataSource } from '../../data/useDataSource.ts'
@@ -78,6 +78,14 @@ function Content({ workspaceId }: { workspaceId: string }) {
     if (item.kind === 'document') actions.open({ kind: 'archive', document: item.document })
   }
 
+  // "Load more" is gone once the last page is in, and with it the focus: it goes to the tree's tab stop.
+  const loadingMore = useRef(false)
+  useEffect(() => {
+    if (!loadingMore.current || documents.hasNextPage) return
+    loadingMore.current = false
+    if (document.activeElement === null || document.activeElement === document.body) tree.current?.focusTabStop()
+  }, [documents.hasNextPage, documentItems.length])
+
   const retry = () => void Promise.all([folders.refetch(), documents.refetch()])
   const failed = folders.isError || documents.isError
   const loading = folders.isPending || documents.isPending
@@ -144,7 +152,14 @@ function Content({ workspaceId }: { workspaceId: string }) {
           />
         )}
         {documents.hasNextPage && (
-          <Button variant="ghost" loading={documents.isFetchingNextPage} onClick={() => void documents.fetchNextPage()}>
+          <Button
+            variant="ghost"
+            loading={documents.isFetchingNextPage}
+            onClick={() => {
+              loadingMore.current = true
+              void documents.fetchNextPage()
+            }}
+          >
             {intl.formatMessage({ id: 'documents.loadMore' })}
           </Button>
         )}
