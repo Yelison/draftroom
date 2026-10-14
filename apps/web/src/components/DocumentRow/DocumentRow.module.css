@@ -1,0 +1,103 @@
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--button-height);
+  padding: var(--space-6) var(--space-8);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  font: var(--font-body);
+}
+
+.row:hover {
+  background: var(--color-surface-hover);
+}
+
+/* The open document. The keyboard focus is a ring and the selection a fill, so a row can show both. */
+.selected {
+  background: var(--color-blue-bg);
+  color: var(--color-blue-ink);
+  font: var(--font-strong);
+}
+
+.selected:hover {
+  background: var(--color-blue-bg);
+}
+
+.archived {
+  color: var(--color-muted);
+}
+
+.folder {
+  font: var(--font-label);
+}
+
+/* Inside the row so that the explorer's own scrolling never clips the ring. */
+.row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.icon,
+.chevron {
+  flex: none;
+}
+
+.chevron {
+  transition: transform var(--duration-fast);
+}
+
+/* A closed folder's chevron points to the side the text reads towards. */
+.collapsed {
+  transform: rotate(-90deg);
+}
+
+:dir(rtl) .collapsed {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  overflow: hidden;
+  color: var(--color-muted);
+  font: var(--font-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card {
+  /* The height the loading cards of the list screens have: a card with an actions button, the tallest it gets. */
+  min-height: calc(var(--button-height) + var(--space-24) + var(--space-2));
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+.card.selected {
+  border-color: var(--color-blue-ink);
+}
+
+/* Above the stretched link of the title, so the row's own button is what a click on it reaches. */
+.trailing {
+  position: relative;
+  flex: none;
+}
