@@ -14,12 +14,12 @@ export class ContractError extends Error {
 const patternOf = (operation: ContractOperation): RegExp =>
   new RegExp(`^${operation.routePath.replaceAll(/:[^/]+/g, '[^/]+')}$`)
 
-/** The operation a request is for: the one with the same method whose path matches, literal paths before parameters. */
+/** The operation a request is for: the one with the same method whose path template matches. */
 export function findOperation(contract: Contract, method: string, url: string): ContractOperation | undefined {
   const pathname = url.split('?')[0] ?? url
-  return [...contract.operations.values()]
-    .filter((operation) => operation.method === method.toUpperCase() && patternOf(operation).test(pathname))
-    .sort((a, b) => a.routePath.split(':').length - b.routePath.split(':').length)[0]
+  return [...contract.operations.values()].find(
+    (operation) => operation.method === method.toUpperCase() && patternOf(operation).test(pathname),
+  )
 }
 
 export interface ContractResponse {

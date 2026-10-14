@@ -23,7 +23,7 @@ describe('findOperation', () => {
     ['the method of the request', 'POST', '/api/auth/sign-in', 'signIn'],
     ['a path with a parameter', 'GET', '/api/documents/c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44', 'getDocument'],
     ['a query string, which it ignores', 'GET', '/api/workspaces/abc/documents?limit=5', 'listDocuments'],
-    ['a literal segment before a parameter', 'GET', '/api/workspaces/abc/pinned', 'listPinnedDocuments'],
+    ['a literal segment after a parameter', 'GET', '/api/workspaces/abc/pinned', 'listPinnedDocuments'],
     ['a method the path does not have', 'DELETE', '/api/health/live', undefined],
     ['a path that is not in the contract', 'GET', '/api/nothing', undefined],
   ]
