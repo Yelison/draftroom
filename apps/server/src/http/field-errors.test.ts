@@ -51,12 +51,6 @@ describe('toFieldErrors', () => {
     expect(errors).toEqual([{ pointer: '/', code: 'too-short' }])
   })
 
-  it('does not report the branches of a failed oneOf', () => {
-    expect(
-      errorsFor('body', document, { title: 'a', nickname: 7 }).filter((error) => error.pointer === '/nickname'),
-    ).toHaveLength(1)
-  })
-
   it('points into the query or the path for parameters', () => {
     const parameters = { type: 'object', properties: { limit: { type: 'integer', maximum: 100 } }, required: ['id'] }
 

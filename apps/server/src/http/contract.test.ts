@@ -61,6 +61,18 @@ describe('checkRequest', () => {
     expect(verdict).toHaveProperty('errors', expect.arrayContaining([error]))
   })
 
+  it('reports every invalid field at once, so a form can show them together', () => {
+    const verdict = createDocument().checkRequest(request({ title: '', folderId: 'x' }))
+
+    expect(verdict).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        { pointer: '/title', code: 'too-short' },
+        { pointer: '/folderId', code: 'invalid-format' },
+      ]),
+    })
+  })
+
   it('counts a title in Unicode code points, so 200 emoji fit', () => {
     expect(createDocument().checkRequest(request({ title: '😀'.repeat(200) }))).toEqual({ ok: true })
     expect(createDocument().checkRequest(request({ title: '😀'.repeat(201) }))).toMatchObject({ status: 413 })

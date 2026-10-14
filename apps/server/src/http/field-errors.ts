@@ -30,9 +30,6 @@ function propertyOf(error: ErrorObject): string | undefined {
   return typeof name === 'string' ? name : undefined
 }
 
-// Ajv also reports every branch of a failed `oneOf` or `anyOf`; the branch errors say nothing the combined one does not.
-const isBranchError = (error: ErrorObject): boolean => /\/(oneOf|anyOf)\/\d+\//.test(error.schemaPath)
-
 /**
  * Turns Ajv errors into the contract's `errors[]`: a JSON Pointer and a stable code, never a message. Each field is
  * reported once, with the first reason found.
@@ -42,7 +39,7 @@ export function toFieldErrors(part: RequestPart, errors: readonly ErrorObject[])
   const seen = new Set<string>()
   const fieldErrors: FieldError[] = []
 
-  for (const error of errors.filter((candidate) => !isBranchError(candidate))) {
+  for (const error of errors) {
     const property = propertyOf(error)
     const pointer = `${prefix}${error.instancePath}${property === undefined ? '' : `/${escapePointerSegment(property)}`}`
     const code = codeByKeyword[error.keyword] ?? 'invalid-value'
