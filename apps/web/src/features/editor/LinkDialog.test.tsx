@@ -5,7 +5,11 @@ import { openEditor } from './testing/renderEditor.tsx'
 
 const linkButton = () => screen.getByRole('button', { name: /^(Link|Enlace)$/ })
 const dialog = (name: string) => screen.findByRole('dialog', { name })
-const announcement = () => screen.getAllByRole('status').find((region) => region.textContent !== 'Loading document')
+// The explorer beside the editor has its own live regions: the editor's are the ones in the work area.
+const announcement = () =>
+  within(screen.getByRole('main'))
+    .getAllByRole('status')
+    .find((region) => region.textContent !== 'Loading document')
 
 describe('adding a link', () => {
   it('opens a dialog from the toolbar, asks for an address and links the selected text', async () => {

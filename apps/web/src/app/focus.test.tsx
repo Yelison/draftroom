@@ -4,6 +4,9 @@ import { StrictMode } from 'react'
 import { createMemoryRouter, type RouteObject } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { describe, expect, it } from 'vitest'
+import { DataSourceContext } from '../data/DataSourceContext.ts'
+import { createMockServer } from '../data/mock/createMockDataSource.ts'
+import { marta } from '../data/mock/fixtures/index.ts'
 import { renderApp } from '../test/renderApp.tsx'
 import { AppFrame } from './AppFrame.tsx'
 import { EditorLayout } from './layouts/EditorLayout.tsx'
@@ -112,14 +115,27 @@ describe('a page whose headline cannot take the focus', () => {
 
 describe('the order of the Tab key', () => {
   // The pages hold no control yet, so a probe in the work area shows where the content falls in the order.
+  const rail = ['Skip to content', 'Home', 'Documents', 'Shared', 'History', 'Settings']
   const layouts = [
-    { layout: 'overview', Component: OverviewLayout },
-    { layout: 'editor', Component: EditorLayout },
+    { layout: 'overview', Component: OverviewLayout, explorer: [] },
+    // The explorer is one stop for its search, one for each of its two buttons and one for the tree, however long it is.
+    {
+      layout: 'editor',
+      Component: EditorLayout,
+      explorer: ['Search documents', 'New document', 'New folder', 'Recent'],
+    },
   ]
 
+  /** What a stop is called: its text, or its label when it has none (an icon button, a field). */
+  const nameOf = (element: Element | null) =>
+    element?.textContent ||
+    element?.getAttribute('aria-label') ||
+    (element instanceof HTMLInputElement ? element.labels?.[0]?.textContent : null) ||
+    ''
+
   it.each(layouts)(
-    'goes from the skip link through the rail to the page in the $layout layout',
-    async ({ Component }) => {
+    'goes from the skip link through the rail and the explorer to the page in the $layout layout',
+    async ({ Component, explorer }) => {
       const user = userEvent.setup()
       const routes: RouteObject[] = [
         {
@@ -129,19 +145,23 @@ describe('the order of the Tab key', () => {
       ]
       render(
         <StrictMode>
-          <AppProviders>
-            <RouterProvider router={createMemoryRouter(routes)} />
-          </AppProviders>
+          <DataSourceContext value={createMockServer().connect({ signedInAs: marta.email })}>
+            <AppProviders>
+              <RouterProvider router={createMemoryRouter(routes)} />
+            </AppProviders>
+          </DataSourceContext>
         </StrictMode>,
       )
+      if (explorer.length > 0) await screen.findByRole('tree')
 
+      const expected = [...rail, ...explorer, 'Probe']
       const visited: string[] = []
-      for (let stop = 0; stop < 7; stop++) {
+      for (let stop = 0; stop < expected.length; stop++) {
         await user.tab()
-        visited.push(document.activeElement?.textContent ?? '')
+        visited.push(nameOf(document.activeElement))
       }
 
-      expect(visited).toEqual(['Skip to content', 'Home', 'Documents', 'Shared', 'History', 'Settings', 'Probe'])
+      expect(visited).toEqual(expected)
     },
   )
 })

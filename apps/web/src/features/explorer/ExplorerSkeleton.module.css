@@ -1,0 +1,12 @@
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* The height of a row of the tree. */
+.row {
+  height: var(--choice-min-height);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-hover);
+}

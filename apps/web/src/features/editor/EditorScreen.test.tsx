@@ -38,7 +38,7 @@ describe('the document screen', () => {
 
     // The headline comes with the screen; the skeleton before it is the router's, while the screen's chunk is on its way.
     expect(await screen.findByRole('heading', { level: 1, name: 'Document' })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Loading document')
+    expect(within(screen.getByRole('main')).getByRole('status')).toHaveTextContent('Loading document')
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
 
     await act(async () => arrive?.())
@@ -173,7 +173,7 @@ describe('a document that could not be opened', () => {
       expect(screen.getByRole('button', { name: /Loading|Try again/ })).toHaveAttribute('aria-busy', 'true'),
     )
     expect(screen.getByRole('heading', { level: 1, name: "We couldn't open this document" })).toBeInTheDocument()
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('main')).queryByRole('status')).not.toBeInTheDocument()
 
     await act(async () => answerRetry?.())
     await waitFor(() => expect(screen.getByRole('button', { name: 'Try again' })).not.toHaveAttribute('aria-busy'))
