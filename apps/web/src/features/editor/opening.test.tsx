@@ -34,9 +34,9 @@ const people_ = [
 ] as const
 
 describe('opening a document', () => {
-  it.each(documents.flatMap(([name, fill]) => people_.map(([role, who, id]) => [name, fill, role, who, id] as const)))(
+  it.each(documents.flatMap(([name, fill]) => people_.map(([role, who, id]) => [name, role, fill, who, id] as const)))(
     'writes nothing to %s, as %s',
-    async (_name, fill, _role, signedInAs, documentId) => {
+    async (_name, _role, fill, signedInAs, documentId) => {
       const ydoc = new Y.Doc()
       fill(ydoc.getXmlFragment('default'))
       given.ydoc = ydoc
