@@ -12,6 +12,9 @@ const looksLikeEmail = /^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/
 export function linkAddressFrom(typed: string): string | null {
   const text = typed.trim()
   if (text === '') return null
+  // An address with no scheme is a domain or an email, and neither has a space or a tab in it: text that does is not
+  // completed into one. (A scheme broken by a tab would otherwise become the host of an `https` address.)
+  if (!startsWithScheme.test(text) && /\s/.test(text)) return null
   const address = startsWithScheme.test(text) ? text : looksLikeEmail.test(text) ? `mailto:${text}` : `https://${text}`
   return isAllowedLinkHref(address) ? address : null
 }

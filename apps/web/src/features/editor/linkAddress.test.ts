@@ -21,6 +21,7 @@ describe('linkAddressFrom', () => {
     ['javascript: in mixed case', 'JaVaScRiPt:alert(1)'],
     ['javascript: after spaces', '   javascript:alert(1)'],
     ['javascript: split by a tab', 'java\tscript:alert(1)'],
+    ['two words, which are no address', 'read this'],
     ['data:', 'data:text/html,<script>alert(1)</script>'],
     ['vbscript:', 'vbscript:msgbox(1)'],
     ['file:', 'file:///etc/passwd'],
