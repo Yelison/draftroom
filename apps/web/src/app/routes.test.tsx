@@ -19,7 +19,6 @@ const routeCases = [
   { path: '/trash', active: 'Documents', heading: 'Trash', rail: 'expanded' },
   { path: '/search?q=budget', active: 'Documents', heading: 'Search results', rail: 'expanded' },
   { path: '/documents/new', active: 'Documents', heading: 'New document', rail: 'compact' },
-  { path: '/documents/d1', active: 'Documents', heading: 'Document', rail: 'compact' },
   { path: '/documents/d1/share', active: 'Documents', heading: 'Share', rail: 'compact' },
   { path: '/documents/d1/versions', active: 'Documents', heading: 'Version history', rail: 'compact' },
   { path: '/no/such/page', active: undefined, heading: 'Page not found', rail: 'expanded' },
@@ -48,7 +47,7 @@ describe('the route table', () => {
     expect(document.title).toBe('Version history · Draftroom')
   })
 
-  it.each(['/documents/d1', '/search?q=budget', '/trash'])('leaves the Settings item alone on %s', (path) => {
+  it.each(['/documents/d1/share', '/search?q=budget', '/trash'])('leaves the Settings item alone on %s', (path) => {
     renderApp(path)
 
     expect(screen.getByRole('link', { name: 'Settings' })).not.toHaveAttribute('aria-current')

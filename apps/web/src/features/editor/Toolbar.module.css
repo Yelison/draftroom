@@ -1,0 +1,54 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: 100%;
+  padding-inline: var(--space-8);
+}
+
+/* One look for the icon buttons of Forma UI and the buttons of text next to them. */
+.button {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-muted);
+  font: var(--font-strong);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+.button:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+.button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--space-2);
+}
+
+.button[aria-pressed='true'] {
+  background: var(--color-blue-bg);
+  color: var(--color-blue-ink);
+}
+
+.bold {
+  font-weight: 700;
+}
+
+.italic {
+  font-style: italic;
+}
+
+.code {
+  font-family: monospace;
+}

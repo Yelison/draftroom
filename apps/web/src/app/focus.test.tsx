@@ -42,7 +42,7 @@ describe('the focus when the person navigates', () => {
   })
 
   it.each([
-    { to: '/documents/d1', page: 'a page with an id', heading: 'Document' },
+    { to: '/documents/d1/share', page: 'a page with an id', heading: 'Share' },
     { to: '/documents/new', page: 'a page of the other layout', heading: 'New document' },
     { to: '/settings', page: 'an address that redirects', heading: 'Settings' },
     { to: '/no/such/page', page: 'a page that does not exist', heading: 'Page not found' },

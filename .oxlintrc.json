@@ -8,5 +8,24 @@
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error"
   },
-  "ignorePatterns": ["dist/", "coverage/", "packages/contract/src/schema.ts"]
+  "ignorePatterns": ["dist/", "coverage/", "packages/contract/src/schema.ts"],
+  "overrides": [
+    {
+      "files": ["apps/web/src/**"],
+      "excludeFiles": ["apps/web/src/**/*.test.ts", "apps/web/src/**/*.test.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@draftroom/editor-schema/convert",
+                "message": "The conversion between JSON and a Yjs update is for the server. A client opens the stored Yjs state as it is and never rebuilds a document from JSON (plan, Global Constraints)."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

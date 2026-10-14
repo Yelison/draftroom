@@ -1,4 +1,9 @@
 {
   "files": [],
-  "references": [{ "path": "apps/web" }, { "path": "apps/server" }, { "path": "packages/contract" }]
+  "references": [
+    { "path": "apps/web" },
+    { "path": "apps/server" },
+    { "path": "packages/contract" },
+    { "path": "packages/editor-schema" }
+  ]
 }

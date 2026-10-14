@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No DOM lib and no Node types on purpose: the server imports this package, so a reference to `document` or to
+    // anything of the platform must not compile.
+    "rootDir": "src"
+  },
+  "include": ["src"]
+}
