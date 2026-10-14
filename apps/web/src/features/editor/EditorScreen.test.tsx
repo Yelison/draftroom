@@ -47,6 +47,27 @@ describe('the document screen', () => {
     expect(await textArea()).toBeInTheDocument()
   })
 
+  it('draws the skeleton with the same band and sheet as the document, so nothing moves when it arrives', async () => {
+    let arrive: (() => void) | undefined
+    const { container } = renderEditor({
+      wrap: (dataSource) => ({
+        ...dataSource,
+        getDocument: (request) => new Promise((resolve) => (arrive = () => resolve(dataSource.getDocument(request)))),
+      }),
+    })
+    await screen.findByRole('heading', { level: 1, name: 'Document' })
+    // The classes of the column's first two children, which carry its measures (the CSS is not loaded in these tests).
+    const layoutOf = () =>
+      [...(container.querySelector('.column')?.children ?? [])].slice(0, 2).map((child) => child.className)
+
+    const whileLoading = layoutOf()
+    await act(async () => arrive?.())
+    await textArea()
+
+    expect(whileLoading).toEqual(['toolbarBand', 'sheet'])
+    expect(layoutOf()).toEqual(whileLoading)
+  })
+
   it('keeps the same headline element when the document arrives, so the focus that was put on it stays', async () => {
     let arrive: (() => void) | undefined
     renderEditor({

@@ -423,6 +423,8 @@ test.describe('a document that is not there', () => {
     await page.goto(missingPath)
 
     await expect(page.getByRole('heading', { level: 1, name: "This document isn't available" })).toBeVisible()
+    // Visible for real, not the one-pixel clip of a heading that is only there for a screen reader.
+    expect((await page.getByRole('heading', { level: 1 }).boundingBox())?.width).toBeGreaterThan(200)
     await expect(page.getByText('It may have been deleted, or you may not have access to it.')).toBeVisible()
     await expect(page.getByRole('textbox')).toHaveCount(0)
     await expect(page).toHaveTitle("This document isn't available · Draftroom")
