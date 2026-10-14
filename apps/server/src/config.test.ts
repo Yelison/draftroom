@@ -95,8 +95,17 @@ describe('loadConfig', () => {
       expect(problemsOf(environment).join('\n')).toContain(expected)
     })
 
-    it('names every problem at once', () => {
-      expect(problemsOf({ API_PORT: '0', SESSION_SECRET: 'short' })).toHaveLength(3)
+    it('names every problem at once, the rules of one variable and the rules that tie several together', () => {
+      expect(problemsOf({ NODE_ENV: 'production', DATABASE_URL: 'mysql://localhost/db', API_PORT: 'abc' })).toEqual([
+        'API_PORT: Invalid input: expected number, received NaN',
+        'DATABASE_URL: must be a postgres:// connection string',
+        'SESSION_SECRET: is required when NODE_ENV is production',
+        'ALLOWED_ORIGINS: is required when NODE_ENV is production',
+      ])
+    })
+
+    it('says a variable that is missing is required, instead of describing the type it lacks', () => {
+      expect(problemsOf({})).toEqual(['DATABASE_URL: is required'])
     })
   })
 
