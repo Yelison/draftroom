@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { sql, type Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
@@ -160,6 +161,18 @@ describe('removing rows that others hang from', () => {
     expect([states, grants]).toEqual([[], []])
   })
 
+  it('removes the sessions of a person who is deleted', async () => {
+    const person = await createUser(db)
+    await db
+      .insertInto('sessions')
+      .values({ user_id: person, token_hash: randomBytes(32), expires_at: new Date(Date.now() + 60_000) })
+      .execute()
+
+    await db.deleteFrom('users').where('id', '=', person).execute()
+
+    expect(await db.selectFrom('sessions').select('id').where('user_id', '=', person).execute()).toEqual([])
+  })
+
   it('refuses to delete a folder that still holds a document', async () => {
     const workspace = await createPopulatedWorkspace(db)
 
@@ -193,6 +206,8 @@ describe('the rules of a row', () => {
       refusedBy(checkViolation, 'documents_title_length'),
     )
   })
+
+  const tokenInUse = randomBytes(32)
 
   // Raw SQL for the values the table types forbid: the database has to refuse them even when the application does not.
   const refusedRows: readonly (readonly [string, () => Promise<unknown>, unknown])[] = [
@@ -248,6 +263,91 @@ describe('the rules of a row', () => {
           db,
         ),
       expect.objectContaining({ code: notNullViolation, column: 'state' }),
+    ],
+    [
+      'an empty folder name',
+      () => db.insertInto('folders').values({ workspace_id: workspace.id, name: '' }).execute(),
+      refusedBy(checkViolation, 'folders_name_length'),
+    ],
+    [
+      'a folder name over 80 characters',
+      () =>
+        db
+          .insertInto('folders')
+          .values({ workspace_id: workspace.id, name: 'a'.repeat(81) })
+          .execute(),
+      refusedBy(checkViolation, 'folders_name_length'),
+    ],
+    [
+      'an email under 3 characters',
+      () => sql`insert into users (email) values ('a@')`.execute(db),
+      refusedBy(checkViolation, 'users_email_length'),
+    ],
+    [
+      'an email over 254 characters',
+      () => sql`insert into users (email) values (${`${'a'.repeat(250)}@harborpine.example`})`.execute(db),
+      refusedBy(checkViolation, 'users_email_length'),
+    ],
+    [
+      'an empty person name',
+      () => sql`insert into users (email, name, signed_up_at) values ('a@harborpine.example', '', now())`.execute(db),
+      refusedBy(checkViolation, 'users_name_length'),
+    ],
+    [
+      'a person name over 80 characters',
+      () =>
+        sql`insert into users (email, name, signed_up_at) values ('b@harborpine.example', ${'a'.repeat(81)}, now())`.execute(
+          db,
+        ),
+      refusedBy(checkViolation, 'users_name_length'),
+    ],
+    [
+      'a password for a person who never signed up',
+      () => sql`insert into users (email, password_hash) values ('c@harborpine.example', 'hash')`.execute(db),
+      refusedBy(checkViolation, 'users_password_needs_sign_up'),
+    ],
+    [
+      'a session that expires before it is created',
+      async () =>
+        db
+          .insertInto('sessions')
+          .values({
+            user_id: await createUser(db),
+            token_hash: randomBytes(32),
+            expires_at: new Date(Date.now() - 60_000),
+          })
+          .execute(),
+      refusedBy(checkViolation, 'sessions_expire_after_creation'),
+    ],
+    [
+      'a session token that is already in use',
+      async () => {
+        const insertSession = async () =>
+          db
+            .insertInto('sessions')
+            .values({
+              user_id: await createUser(db),
+              token_hash: tokenInUse,
+              expires_at: new Date(Date.now() + 60_000),
+            })
+            .execute()
+        await insertSession()
+        return insertSession()
+      },
+      refusedBy(uniqueViolation, 'sessions_token_hash_key'),
+    ],
+    [
+      'the same document pinned twice by one person',
+      async () => {
+        const pin = () =>
+          db
+            .insertInto('pins')
+            .values({ workspace_id: workspace.id, document_id: workspace.documentId, user_id: workspace.userId })
+            .execute()
+        await pin()
+        return pin()
+      },
+      refusedBy(uniqueViolation, 'pins_pkey'),
     ],
   ]
 
