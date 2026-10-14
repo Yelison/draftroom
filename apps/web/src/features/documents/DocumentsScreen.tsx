@@ -78,12 +78,13 @@ function Documents({ workspaceId }: { workspaceId: string }) {
           {intl.formatMessage({ id: problemMessageId(create.error) })}
         </p>
       )}
-      {showFolders && (
+      {/* Folders first, then documents: the page is not shown until the folders are in, or the documents would move down when they arrive. */}
+      {folders.isPending && <ListSkeleton />}
+      {showFolders && !folders.isPending && (
         <section aria-labelledby="documents-folders">
           <h2 id="documents-folders" className={styles.group}>
             {intl.formatMessage({ id: 'documents.folders' })}
           </h2>
-          {folders.isPending && <ListSkeleton count={3} announce={false} />}
           {folders.isError && <QueryFailure onRetry={() => void folders.refetch()} retrying={folders.isFetching} />}
           {folders.isSuccess && folders.data.items.length > 0 && (
             <ul className={styles.folders}>
@@ -99,26 +100,28 @@ function Documents({ workspaceId }: { workspaceId: string }) {
           )}
         </section>
       )}
-      <section aria-labelledby="documents-all">
-        <h2 id="documents-all" className={styles.group}>
-          {intl.formatMessage({ id: 'documents.all' })}
-        </h2>
-        <DocumentCollection
-          workspaceId={workspaceId}
-          term={term}
-          onActions={(document) => actions.open({ kind: 'details', document })}
-          empty={
-            <StateMessage
-              title={intl.formatMessage({ id: 'documents.empty.title' })}
-              description={intl.formatMessage({ id: 'documents.empty.description' })}
-            >
-              <Button loading={create.isPending} onClick={createDocument}>
-                {intl.formatMessage({ id: 'documents.new' })}
-              </Button>
-            </StateMessage>
-          }
-        />
-      </section>
+      {!folders.isPending && (
+        <section aria-labelledby="documents-all">
+          <h2 id="documents-all" className={styles.group}>
+            {intl.formatMessage({ id: 'documents.all' })}
+          </h2>
+          <DocumentCollection
+            workspaceId={workspaceId}
+            term={term}
+            onActions={(document) => actions.open({ kind: 'details', document })}
+            empty={
+              <StateMessage
+                title={intl.formatMessage({ id: 'documents.empty.title' })}
+                description={intl.formatMessage({ id: 'documents.empty.description' })}
+              >
+                <Button loading={create.isPending} onClick={createDocument}>
+                  {intl.formatMessage({ id: 'documents.new' })}
+                </Button>
+              </StateMessage>
+            }
+          />
+        </section>
+      )}
       <DocumentActionDialogs actions={actions} onArchived={(document) => setArchivedHere(document.title)} />
       <p role="status" className="forma-visually-hidden">
         {announcement}

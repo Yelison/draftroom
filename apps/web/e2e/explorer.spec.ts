@@ -121,3 +121,28 @@ test('has no horizontal scroll at 1280 and 1440 px', async ({ page }) => {
     }
   }
 })
+
+/** The sum of the layout shifts the page has had since it loaded, which the browser measures. */
+const shifts = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        let total = 0
+        const observer = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            const shift = entry as PerformanceEntry & { value: number; hadRecentInput: boolean }
+            if (!shift.hadRecentInput) total += shift.value
+          }
+        })
+        observer.observe({ type: 'layout-shift', buffered: true })
+        setTimeout(() => resolve(total), 500)
+      }),
+  )
+
+test('does not shift while the lists arrive', async ({ page }) => {
+  for (const path of ['/documents', `/documents/${weeklyEnglish.id}/share`]) {
+    await page.goto(path)
+    await expect(page.getByRole('main').getByRole('link', { name: 'Autumn launch plan' }).or(tree(page))).toBeVisible()
+    expect(await shifts(page), path).toBeLessThan(0.01)
+  }
+})
