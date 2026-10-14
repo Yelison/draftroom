@@ -9,7 +9,7 @@
     "outDir": null,
     "tsBuildInfoFile": "${configDir}/node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
-  // The build tooling and its tests, the browser specs, plus the few modules of `src` that the Vite configuration reads and the fixtures that the bundle guard searches for.
+  // The build tooling and its tests, the browser specs, plus the few modules of `src` that the Vite configuration reads the fixtures that the bundle guard searches for and the clipboard HTML the editor spec pastes.
   "include": [
     "vite.config.ts",
     "scripts",
@@ -19,7 +19,8 @@
     "src/i18n/*.json",
     "src/theme.ts",
     "src/data/mock/fixtures",
-    "src/data/mock/ids.ts"
+    "src/data/mock/ids.ts",
+    "src/features/editor/testing/wordProcessorHtml.ts"
   ],
   // The fixtures import types from the contract, so a change of `schema.ts` has to rebuild this project too.
   "references": [{ "path": "../../packages/contract" }]

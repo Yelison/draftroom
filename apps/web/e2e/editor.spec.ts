@@ -1,6 +1,7 @@
 /* The editor in the production build, with a real browser: typing, the keyboard, the clipboard, the focus and the layout. */
 import type { Locator, Page } from '@playwright/test'
 import { launchPlan } from '../src/data/mock/fixtures/documents.ts'
+import { googleDocs, word } from '../src/features/editor/testing/wordProcessorHtml.ts'
 import { expect, test } from './fixtures.ts'
 
 test.use({ locale: 'en-US', colorScheme: 'light' })
@@ -131,6 +132,39 @@ test.describe('undo', () => {
     await expect(text.locator('strong')).toHaveCount(0)
     await expect(text.locator('p')).toHaveText('Some words')
   })
+
+  // Chromium sends the text area the browser's own undo when Ctrl+Z is pressed in a field that has nothing to undo.
+  test('does not change the text from the title: Ctrl+Z there leaves the body and the focus alone', async ({
+    page,
+  }) => {
+    const text = await open(page)
+    await page.keyboard.type('Body words')
+    await page.waitForTimeout(700)
+    const title = page.getByRole('textbox', { name: 'Document title' })
+    await title.click()
+
+    await page.keyboard.press('ControlOrMeta+Z')
+
+    await expect(text.locator('p')).toHaveText('Body words')
+    await expect(title).toBeFocused()
+  })
+
+  test('undoes what was typed in the title, and only that', async ({ page }) => {
+    const text = await open(page)
+    await page.keyboard.type('Body words')
+    await page.waitForTimeout(700)
+    const title = page.getByRole('textbox', { name: 'Document title' })
+    await title.click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' extra')
+    await expect(title).toHaveValue('Autumn launch plan extra')
+
+    await page.keyboard.press('ControlOrMeta+Z')
+
+    await expect(title).toHaveValue('Autumn launch plan')
+    await expect(text.locator('p')).toHaveText('Body words')
+    await expect(title).toBeFocused()
+  })
 })
 
 /** Pastes through a real paste event, as the browser makes one from the clipboard. */
@@ -210,6 +244,52 @@ test.describe('pasting', () => {
     await expect(anchor).toHaveAttribute('rel', 'noopener noreferrer')
     await expect(anchor).toHaveAttribute('target', '_blank')
     await expect(anchor).not.toHaveAttribute('class', 'x')
+  })
+
+  for (const { name, context } of [
+    { name: 'a heading of level 1', context: ['heading', { level: 1 }] },
+    { name: 'a heading of level 7', context: ['heading', { level: 7 }] },
+    { name: 'a heading whose level is text', context: ['heading', { level: 'x onclick=1' }] },
+  ]) {
+    test(`leaves of a clipboard slice that names ${name} plain text, not a heading`, async ({ page }) => {
+      const text = await open(page)
+      const slice = JSON.stringify(context).replaceAll('"', '&quot;')
+
+      await paste(text, `<span data-pm-slice="0 0 ${slice}">Hello</span>`)
+
+      await expect(text.locator('p')).toHaveText('Hello')
+      await expect(text.locator('h1, h2, h3, h4, h5, h6')).toHaveCount(0)
+    })
+  }
+
+  test('keeps a clipboard slice that names a heading the schema has', async ({ page }) => {
+    const text = await open(page)
+
+    await paste(text, '<span data-pm-slice="0 0 [&quot;heading&quot;,{&quot;level&quot;:3}]">Hello</span>')
+
+    await expect(text.locator('h3')).toHaveText('Hello')
+  })
+
+  test('takes a paste from Google Docs for what it is: only the bold text is bold, lists and all', async ({ page }) => {
+    const text = await open(page)
+
+    await paste(text, googleDocs)
+
+    await expect(text.locator('h2')).toHaveText('Heading')
+    await expect(text.locator('p').first()).toHaveText('Plain Bold Italic')
+    await expect(text.locator('strong')).toHaveText('Bold')
+    await expect(text.locator('em')).toHaveText('Italic')
+    await expect(text.locator('ul > li')).toHaveCount(2)
+  })
+
+  test('reads the bold and the italic of Word', async ({ page }) => {
+    const text = await open(page)
+
+    await paste(text, word)
+
+    await expect(text.locator('strong')).toHaveText(['Bold words', 'a b tag'])
+    await expect(text.locator('em')).toHaveText('italic words')
+    await expect(text.locator('p')).toHaveText('Bold words and italic words and a b tag and plain')
   })
 
   test('keeps headings, formats and lists from another page, and turns what the schema lacks into text', async ({
