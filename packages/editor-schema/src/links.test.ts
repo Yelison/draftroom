@@ -8,7 +8,8 @@ describe('isAllowedLinkHref', () => {
     ['a mail address', 'mailto:ana@example.com'],
     ['the scheme in capitals', 'HTTPS://EXAMPLE.COM'],
     ['spaces around the address, which a browser drops', '  https://example.com  '],
-    ['a tab inside the host, which a browser drops', 'https://exam\tple.com'],
+    ['a tab inside the scheme, which a browser drops', 'ht\ttps://example.com'],
+    ['a newline inside the host, which a browser drops', 'https://exam\nple.com'],
   ] as const
 
   const refused = [
