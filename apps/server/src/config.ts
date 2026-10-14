@@ -11,11 +11,13 @@ const origin = z.string().refine((value) => URL.canParse(value) && new URL(value
   message: 'must be an origin such as https://app.example, without a path or a trailing slash',
 })
 
+const databaseUrl = z.string().regex(/^postgres(ql)?:\/\//, 'must be a postgres:// connection string')
+
 const environmentSchema = z.object({
   NODE_ENV: z.enum(nodeEnvironments).default('development'),
   API_PORT: port.default(8380),
   COLLAB_PORT: port.default(8480),
-  DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\//, 'must be a postgres:// connection string'),
+  DATABASE_URL: databaseUrl,
   SESSION_SECRET: z.string().min(32, 'must have at least 32 characters').optional(),
   ALLOWED_ORIGINS: z
     .string()
@@ -28,8 +30,6 @@ const environmentSchema = z.object({
     )
     .pipe(z.array(origin)),
 })
-
-const environmentKeys = Object.keys(environmentSchema.shape)
 
 export interface Config {
   readonly nodeEnv: NodeEnvironment
@@ -52,23 +52,30 @@ export class ConfigError extends Error {
   }
 }
 
+/** Only the keys the schema names are read, and an empty value counts as absent: it is a variable set to nothing. */
+function parse<Shape extends z.ZodRawShape>(
+  schema: z.ZodObject<Shape>,
+  environment: NodeJS.ProcessEnv,
+): z.output<z.ZodObject<Shape>> {
+  const picked = Object.fromEntries(
+    Object.keys(schema.shape).flatMap((key) => {
+      const value = environment[key]
+      return value === undefined || value === '' ? [] : [[key, value]]
+    }),
+  )
+  const parsed = schema.safeParse(picked)
+  if (!parsed.success) {
+    throw new ConfigError(parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`))
+  }
+  return parsed.data
+}
+
 /**
  * Reads the configuration from the environment and refuses to start on anything missing or wrong, naming every problem
  * at once. Only the variables below are read: the rest of the environment is not ours to judge.
  */
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config {
-  const picked = Object.fromEntries(
-    environmentKeys.flatMap((key) => {
-      const value = environment[key]
-      // An empty value is a variable set to nothing in a compose or .env file: treat it as absent.
-      return value === undefined || value === '' ? [] : [[key, value]]
-    }),
-  )
-  const parsed = environmentSchema.safeParse(picked)
-  if (!parsed.success) {
-    throw new ConfigError(parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`))
-  }
-  const env = parsed.data
+  const env = parse(environmentSchema, environment)
 
   const inconsistencies = [
     ...(env.API_PORT === env.COLLAB_PORT ? ['API_PORT and COLLAB_PORT must be different ports'] : []),
@@ -93,4 +100,9 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config
     sessionSecret: env.SESSION_SECRET ?? randomBytes(32).toString('hex'),
     allowedOrigins: env.ALLOWED_ORIGINS,
   }
+}
+
+/** What the migration command needs: a deployment step that migrates has no use for a session secret. */
+export function loadDatabaseUrl(environment: NodeJS.ProcessEnv = process.env): string {
+  return parse(z.object({ DATABASE_URL: databaseUrl }), environment).DATABASE_URL
 }

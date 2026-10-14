@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ConfigError, loadConfig } from './config.ts'
+import { ConfigError, loadConfig, loadDatabaseUrl } from './config.ts'
 
 const database = 'postgres://draftroom:draftroom@127.0.0.1:5460/draftroom'
 const secret = 'a-secret-of-at-least-thirty-two-characters'
@@ -106,5 +106,15 @@ describe('loadConfig', () => {
 
   it('ignores the rest of the environment', () => {
     expect(problemsOf({ DATABASE_URL: database, PATH: '/usr/bin', HOME: '/root' })).toEqual([])
+  })
+})
+
+describe('loadDatabaseUrl', () => {
+  it('needs only the database, not the session secret a production server needs', () => {
+    expect(loadDatabaseUrl({ DATABASE_URL: database, NODE_ENV: 'production' })).toBe(database)
+  })
+
+  it('refuses to run without a database', () => {
+    expect(() => loadDatabaseUrl({})).toThrow(ConfigError)
   })
 })
