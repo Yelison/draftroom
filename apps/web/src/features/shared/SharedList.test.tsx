@@ -130,3 +130,46 @@ describe('the pages of the shared table', () => {
     expect(within(main()).queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
   })
 })
+
+describe('the count of the shared table', () => {
+  it('is announced again when another filter gives the same number', async () => {
+    const { user } = await openShared('/shared', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listSharedDocuments: async (request) => {
+          const list = await dataSource.listSharedDocuments(request)
+          return { items: list.items.slice(0, 2) }
+        },
+      }),
+    })
+    const count = () => within(main()).getByText('2 documents')
+
+    await user.click(within(filters()).getByRole('button', { name: 'Can edit' }))
+    await waitFor(() => expect(count()).toBeInTheDocument())
+    const first = count()
+    await user.click(within(filters()).getByRole('button', { name: 'Can view' }))
+    await waitFor(() => expect(count()).not.toBe(first))
+
+    // Two filters, two answers: the screen reader says the number after each press, though the number did not change.
+    expect(count()).toBeInTheDocument()
+  })
+})
+
+describe('a selected document beyond the first page', () => {
+  it('opens its preview and shows the rows up to it, instead of ignoring the address', async () => {
+    const last = `${(29).toString().padStart(8, '0')}-0000-4000-8000-000000000000`
+    await openShared(`/shared?selected=${last}`, { wrap: thirty })
+
+    expect(preview()).toHaveAccessibleName('Preview of “Shared document 30”')
+    expect(titles()).toHaveLength(30)
+    expect(within(main()).queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the page of 25 when the selected document is on it', async () => {
+    const early = `${(2).toString().padStart(8, '0')}-0000-4000-8000-000000000000`
+    await openShared(`/shared?selected=${early}`, { wrap: thirty })
+
+    expect(preview()).toHaveAccessibleName('Preview of “Shared document 3”')
+    expect(titles()).toHaveLength(25)
+  })
+})

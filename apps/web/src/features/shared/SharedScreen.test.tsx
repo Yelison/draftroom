@@ -19,7 +19,7 @@ describe('the Shared screen', () => {
   it('says how many documents the list has, in a region that was in the page before the list', async () => {
     await openShared()
 
-    expect(within(main()).getByText('6 documents')).toHaveAttribute('role', 'status')
+    expect(within(main()).getByText('6 documents').closest('[role="status"]')).not.toBeNull()
   })
 
   it('writes the words and the dates in Spanish when the app is in Spanish', async () => {

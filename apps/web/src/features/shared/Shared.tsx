@@ -74,7 +74,8 @@ export function Shared({ workspaceId }: { workspaceId: string }) {
         <SharedResults key={access ?? 'all'} documents={query.data.items} selectedId={selectedId} onSelect={select} />
       )}
       <p role="status" className="forma-visually-hidden">
-        {announcement}
+        {/* A new element for each filter: two filters with the same count are still two answers to the same press. */}
+        {announcement !== '' && <span key={access ?? 'all'}>{announcement}</span>}
       </p>
     </>
   )
@@ -93,8 +94,11 @@ function SharedResults({ documents, selectedId, onSelect }: SharedResultsProps) 
   // The document whose button takes the focus when it arrives: the first of the page "Load more" brought.
   const focusOnArrival = useRef<string | undefined>(undefined)
 
-  const shown = documents.slice(0, visible)
-  const selected = shown.find((document) => document.id === selectedId)
+  // A selected document is shown whatever page it is on: an address that names the 30th document opens its preview, with
+  // the rows up to it, instead of ignoring it.
+  const selectedIndex = documents.findIndex((document) => document.id === selectedId)
+  const shown = documents.slice(0, Math.max(visible, selectedIndex + 1))
+  const selected = documents[selectedIndex]
 
   const previewButton = (documentId: string) => (button: HTMLButtonElement | null) => {
     if (button === null) {
@@ -128,13 +132,13 @@ function SharedResults({ documents, selectedId, onSelect }: SharedResultsProps) 
           />
         )}
       </div>
-      {documents.length > visible && (
+      {documents.length > shown.length && (
         <Button
           className={styles.more}
           variant="secondary"
           onClick={() => {
-            focusOnArrival.current = documents[visible]?.id
-            setVisible(visible + pageSize)
+            focusOnArrival.current = documents[shown.length]?.id
+            setVisible(shown.length + pageSize)
           }}
         >
           {intl.formatMessage({ id: 'documents.loadMore' })}
