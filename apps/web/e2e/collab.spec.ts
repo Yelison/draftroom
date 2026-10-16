@@ -49,16 +49,20 @@ test.describe('in English', () => {
       })
     })
 
-    await page.keyboard.type('The first line of the plan, typed key by key')
+    const typed = 'The first line of the plan, typed key by key'
+    await page.keyboard.type(typed)
 
     await expect(syncRegion(page)).toHaveText('Sync status: Synchronising')
     await expect(visibleLabel(page, 'Synchronising')).toBeVisible()
     await expect(syncRegion(page)).toHaveText('Sync status: Synced')
     await expect(visibleLabel(page, 'Synced')).toBeVisible()
-    expect(await page.evaluate(() => Reflect.get(window, 'heard'))).toEqual([
-      'Sync status: Synchronising',
-      'Sync status: Synced',
-    ])
+    const heard = await page.evaluate((): string[] => Reflect.get(window, 'heard'))
+    // Each time it speaks, the state really changed: a slow machine can store the first keys before the last are typed, and
+    // then it says synchronising and synced again, but never once for each key.
+    expect(heard[0]).toBe('Sync status: Synchronising')
+    expect(heard.at(-1)).toBe('Sync status: Synced')
+    expect(heard.filter((said, index) => said === heard[index - 1])).toEqual([])
+    expect(heard.length).toBeLessThan(typed.length / 4)
   })
 
   test('says that the changes are on this device while offline, and stores them once the connection is back', async ({
@@ -86,7 +90,8 @@ test.describe('in English', () => {
   test('keeps the pill at one width whatever it says, so nothing beside it moves', async ({ page }) => {
     await open(page)
     await expect(syncRegion(page)).toHaveText('Sync status: Synced')
-    const pill = visibleLabel(page, 'Synced').locator('xpath=ancestor::*[contains(@class, "status")][1]')
+    // The pill is the parent of the live region it speaks in.
+    const pill = syncRegion(page).locator('xpath=..')
     const synced = await widthOf(pill)
 
     await page.keyboard.type('Changing the state')
