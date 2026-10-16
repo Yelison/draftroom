@@ -56,3 +56,16 @@ export function documentWith(...paragraphs: string[]): Y.Doc {
 export async function storeState(db: Kysely<Database>, documentId: string, state: Uint8Array): Promise<void> {
   await db.updateTable('document_states').set({ state }).where('document_id', '=', documentId).execute()
 }
+
+/** A document whose Yjs state is at least this many bytes, in paragraphs of about a kilobyte: a document over a limit. */
+export function documentOfAtLeast(bytes: number): Y.Doc {
+  const doc = new Y.Doc()
+  const line = 'The harbour lights came on one by one, and the quay filled with people on their way home. '.repeat(11)
+  while (Y.encodeStateAsUpdate(doc).byteLength < bytes) {
+    // Many paragraphs per check: the size is measured once per batch, not once per paragraph.
+    doc.transact(() => {
+      for (let paragraph = 0; paragraph < 500; paragraph += 1) appendParagraph(doc, line)
+    })
+  }
+  return doc
+}

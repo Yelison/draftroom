@@ -95,6 +95,18 @@ export class RawClient {
     )
   }
 
+  /** Resolves when this many frames of a kind have arrived since the mark. */
+  waitForFrames(kind: Incoming['kind'], count: number, from = 0): Promise<void> {
+    return this.waiter
+      .until(() => (this.framesOf(kind, from) >= count ? true : undefined), `${count} ${kind} frames`)
+      .then(() => undefined)
+  }
+
+  /** How many frames of a kind have arrived since the mark. */
+  framesOf(kind: Incoming['kind'], from = 0): number {
+    return this.received.slice(from).filter((frame) => frame.kind === kind).length
+  }
+
   /** The close of the socket, or a failure if it does not close. */
   async waitForClose(): Promise<Closed> {
     let timer: NodeJS.Timeout | undefined
