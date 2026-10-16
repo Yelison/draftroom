@@ -8,7 +8,8 @@
     "migrate": "node --env-file-if-exists=../../.env src/db/run-migrations.ts",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "seed:demo": "node --env-file-if-exists=../../.env src/db/demo-seed/run.ts"
   },
   "dependencies": {
     "@draftroom/contract": "*",
