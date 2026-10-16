@@ -132,7 +132,7 @@ class ProviderSession implements CollabSession {
 
   constructor(private readonly options: CollabSessionOptions) {
     this.network = options.network ?? browserNetwork
-    // Until the copy has been read, nothing is known of whether there is one: this is made again with that, at the first opening.
+    // Whether there is a copy is not known until it has been read: the model is made again then, at the first opening.
     this.model = createSyncModel({ online: this.network.online(), hasLocalCopy: false })
     this.backoff = createReconnectBackoff({ now: options.now ?? Date.now, random: options.random ?? Math.random })
     this.start()
@@ -297,11 +297,12 @@ class ProviderSession implements CollabSession {
   }
 
   /**
-   * Opens the copy of this device, which is what the document starts from, and then connects. Not before: what the copy
-   * holds decides what the machine knows about the document (it was authorised before, and there is something to show
-   * without a connection), and the copy's changes are not the person's. And not at once even where there is no copy: React
-   * runs an effect, its cleanup and the effect again in development, and a socket that is closed while it is still
-   * connecting is an error in the console. A session that was ended meanwhile never connects.
+   * Opens the copy of this device, which is what the document starts from, and then connects. The copy comes first because
+   * what it holds decides what the machine knows (the document was authorised before, and there is something to show with
+   * no connection), and because what it loads is not a change of the person's: the listener for those is attached after it.
+   * A session that was ended meanwhile closes the copy and never connects. The turn is yielded even where there is no copy:
+   * React runs an effect, its cleanup and the effect again in development, and a socket that is closed while it is still
+   * connecting is an error in the console.
    */
   private async attach(link: Link): Promise<void> {
     const copy = await this.openCopy(link.ydoc)
@@ -315,8 +316,8 @@ class ProviderSession implements CollabSession {
       this.model = createSyncModel({ online: this.network.online(), hasLocalCopy: copy?.hadContent ?? false })
       this.dispatch({ type: 'open' })
     }
-    // A copy that has changes the server was not shown to store is all pending until a `stored` snapshot contains it (section 7.4).
-    // One that has none is what the server holds, and what a reader opens again must not turn into changes it never made.
+    // A copy with changes the server was not shown to store is all pending until a `stored` snapshot contains it (section
+    // 7.4). One without is only what the server holds: what a reader opens again must not become changes they never made.
     if (copy?.hadUnstoredChanges) {
       this.pending.add(Y.encodeStateAsUpdate(link.ydoc))
       this.dispatch({ type: 'local-change' })

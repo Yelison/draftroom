@@ -78,12 +78,30 @@ describe('opening a copy', () => {
     expect(textOf(other.doc)).toBe('')
   })
 
-  it('is not opened at all in a browser that keeps nothing for the page', async () => {
-    vi.stubGlobal('indexedDB', undefined)
+  it.each([
+    { case: 'there is none', arrange: () => vi.stubGlobal('indexedDB', undefined) },
+    {
+      case: 'reading it is refused, as a browser that blocks the site data does',
+      arrange: () =>
+        Object.defineProperty(globalThis, 'indexedDB', {
+          configurable: true,
+          get: () => {
+            throw new DOMException('The operation is insecure.', 'SecurityError')
+          },
+        }),
+    },
+  ])('is not opened, and not waited for, where $case', async ({ arrange }) => {
+    // The clock does not move: an answer that waited for the storage would never come.
+    vi.useFakeTimers()
+    const storage = globalThis.indexedDB
+    arrange()
 
-    await expect(openLocalCopy(launchPlan, new Y.Doc())).resolves.toBeNull()
-
-    vi.unstubAllGlobals()
+    try {
+      await expect(openLocalCopy(launchPlan, new Y.Doc())).resolves.toBeNull()
+    } finally {
+      Object.defineProperty(globalThis, 'indexedDB', { configurable: true, writable: true, value: storage })
+      vi.unstubAllGlobals()
+    }
   })
 
   it('gives up on storage that never answers, so the document still opens from the server', async () => {

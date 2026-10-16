@@ -99,7 +99,7 @@ class PersistedCopy implements LocalCopy {
  * keeps nothing for the page (no IndexedDB, or one that does not answer): the document is then opened from the server alone.
  */
 export async function openLocalCopy(key: CopyKey, ydoc: Y.Doc): Promise<LocalCopy | null> {
-  if (typeof indexedDB === 'undefined') return null
+  if (!keepsStorage()) return null
   const name = copyName(key)
   // A copy that is being deleted is not opened again before it is gone: it would be loaded back, and with it what was
   // purged.
@@ -118,6 +118,15 @@ export async function openLocalCopy(key: CopyKey, ydoc: Y.Doc): Promise<LocalCop
   const copy = new PersistedCopy(persistence, name, Y.encodeStateVector(ydoc).byteLength > 1, hadUnstoredChanges)
   openCopies.add(copy)
   return copy
+}
+
+/** Some browsers throw on reading `indexedDB` when the site's data is blocked, which is as good as having none. */
+function keepsStorage(): boolean {
+  try {
+    return typeof indexedDB !== 'undefined'
+  } catch {
+    return false
+  }
 }
 
 function loadsWithin(persistence: IndexeddbPersistence, milliseconds: number): Promise<boolean> {
