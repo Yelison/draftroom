@@ -1,0 +1,15 @@
+/*
+ * Laid over the padding at the top of the sheet, which is the room the title leaves above itself: the notice takes none of
+ * the sheet's height, so the title and the text stay where they are whether it is there or not.
+ */
+.notice {
+  position: absolute;
+  inset-block-start: var(--space-8);
+  inset-inline: var(--space-12);
+  margin: 0;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-small);
+  background: var(--color-amber-bg);
+  color: var(--color-amber-ink);
+  font: var(--font-caption);
+}

@@ -5,9 +5,9 @@ import { AppProviders } from '../../app/AppProviders.tsx'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { SyncStatus } from './SyncStatus.tsx'
 
-const inApp = (state: SyncState) => (
+const inApp = (state: SyncState, keepsCopy = true) => (
   <AppProviders>
-    <SyncStatus state={state} />
+    <SyncStatus state={state} keepsCopy={keepsCopy} />
   </AppProviders>
 )
 
@@ -49,6 +49,29 @@ describe('the sync status', () => {
     expect(screen.getByRole('status')).toHaveTextContent(`Estado de la sincronización: ${labels.es[state]}`)
   })
 
+  // Without a copy what is written offline is only in the tab, and the notice over the sheet says so: the pill and its live
+  // region must not say the opposite, least of all to someone who hears them and does not see the notice.
+  it.each([
+    { language: 'English', locale: 'en', region: 'Sync status: Offline, no local copy' },
+    { language: 'Spanish', locale: 'es', region: 'Estado de la sincronización: Sin conexión, sin copia local' },
+  ])('says in $language that nothing is kept on the device when offline without a copy', ({ locale, region }) => {
+    localStorage.setItem(localeStorageKey, locale)
+
+    render(inApp('offline-local', false))
+
+    expect(screen.getByRole('status')).toHaveTextContent(region)
+    expect(screen.getByRole('status')).not.toHaveTextContent(/with local copy|con copia local|saved|guardad/i)
+  })
+
+  it.each(syncStates.filter((state) => state !== 'offline-local'))(
+    'says %s the same with or without a copy: only offline depends on it',
+    (state) => {
+      render(inApp(state, false))
+
+      expect(screen.getByRole('status')).toHaveTextContent(`Sync status: ${labels.en[state]}`)
+    },
+  )
+
   it('never calls a local copy synced or saved', () => {
     render(inApp('offline-local'))
 
@@ -85,7 +108,9 @@ describe('the sync status', () => {
     const { container } = render(inApp('reconnecting'))
 
     const drawn = [...container.querySelectorAll('[aria-hidden="true"] > span')]
-    expect(drawn.map((label) => label.textContent).sort()).toEqual(Object.values(labels.en).sort())
+    expect(drawn.map((label) => label.textContent).sort()).toEqual(
+      [...Object.values(labels.en), 'Offline, no local copy'].sort(),
+    )
     expect(drawn.filter((label) => label.className.includes('current')).map((label) => label.textContent)).toEqual([
       'Reconnecting',
     ])

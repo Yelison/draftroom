@@ -14,6 +14,7 @@ import type { CollaboratingPerson } from './CollaborationExtensions.ts'
 import { EditorSkeleton } from './EditorSkeleton.tsx'
 import { EditorStatePanel } from './EditorStatePanel.tsx'
 import { LinkDialog, type LinkRequest } from './LinkDialog.tsx'
+import { OfflineNotice } from './OfflineNotice.tsx'
 import { SyncAlerts } from './SyncAlerts.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { TitleField } from './TitleField.tsx'
@@ -39,8 +40,9 @@ export function DocumentEditor({
   focusHeadline: () => void
 }) {
   const dataSource = useDataSource()
-  const session = useCollabSession(document)
   const me = useQuery(meQuery(dataSource))
+  // The id, not the answer: a new answer for the same person must not end the connection and make it again.
+  const session = useCollabSession(document, me.data?.id)
   const person = useMemo<CollaboratingPerson | null>(
     () =>
       me.data === undefined ? null : { id: me.data.id, name: me.data.name, color: presenceLookOf(me.data.id).color },
@@ -276,11 +278,12 @@ function EditorWorkspace({
         {editable && <Toolbar editor={editor} onLinkRequest={requestLink} />}
         <div className={styles.status}>
           <Presence people={people} />
-          <SyncStatus state={snapshot.state} />
+          <SyncStatus state={snapshot.state} keepsCopy={snapshot.keepsCopy} />
         </div>
       </div>
       <SyncAlerts snapshot={snapshot} onRetry={retry} onDiscard={discard} onDismissNotice={dismissNotice} />
       <div className={styles.sheet}>
+        <OfflineNotice snapshot={snapshot} />
         <TitleField document={document} editable={mayEdit} onEnter={() => editor.commands.focus('start')} />
         <EditorContent editor={editor} />
       </div>

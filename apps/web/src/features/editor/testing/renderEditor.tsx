@@ -8,6 +8,7 @@ import { RouterProvider } from 'react-router/dom'
 import { AppProviders } from '../../../app/AppProviders.tsx'
 import { routes } from '../../../app/routes.tsx'
 import type { DataSource } from '../../../data/DataSource.ts'
+import { withFreshIndexedDb } from '../../../collab/testing/fakeIndexedDb.ts'
 import { DataSourceContext } from '../../../data/DataSourceContext.ts'
 import { createMockServer, type MockServer } from '../../../data/mock/createMockDataSource.ts'
 import { documentName } from '@draftroom/contract/collab'
@@ -21,6 +22,8 @@ import './jsdomShims.ts'
 // the five seconds a wait has by default ran out (5.16 s in CI, in the test of the skeleton) though nothing was wrong, so
 // every wait of these tests has half of the twenty seconds a test has: one that never arrives still fails.
 configure({ asyncUtilTimeout: 10_000 })
+// The browser keeps a copy of every document that is opened: each test starts on one that has kept nothing.
+withFreshIndexedDb()
 // A test that waits for the lazy screen and then for the editor can take longer than Vitest's default five seconds on a
 // machine that is busy with something else.
 vi.setConfig({ testTimeout: 20_000 })

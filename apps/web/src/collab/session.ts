@@ -15,6 +15,7 @@ import * as Y from 'yjs'
 import { peersOf, type Peer } from './awareness.ts'
 import { fromBase64 } from './base64.ts'
 import { browserNetwork, type Network } from './network.ts'
+import { openLocalCopy, type LocalCopy } from './offlineCache.ts'
 import { PendingChanges } from './PendingChanges.ts'
 import { createReconnectBackoff, reconnectsOnItsOwn, type ReconnectBackoff } from './reconnection.ts'
 import { createSyncModel, errorAction, isEditable, transition, type SyncEffect, type SyncModel } from './syncState.ts'
@@ -33,6 +34,8 @@ export interface CollabSnapshot {
   readonly editable: boolean
   /** True once the document has been opened in this session, so a retry does not take the editor away. */
   readonly loaded: boolean
+  /** Whether this device keeps a copy of the document: what is written offline is on the device, and not only in the tab. */
+  readonly keepsCopy: boolean
   readonly peers: readonly Peer[]
   readonly notice: SessionNotice | null
   /** Changes when the document and the provider are made again, which is when an editor bound to them must be too. */
@@ -64,6 +67,11 @@ export interface CollabSessionOptions {
   url: string
   /** Replaces the browser's WebSocket; the simulated server hands one out. */
   webSocket?: new (url: string) => unknown
+  /**
+   * Whose copy of the document this device keeps (protocol section 12.1). Without it nothing is kept on the device: the
+   * document is opened from the server alone, as it is where the browser stores nothing.
+   */
+  localCopy?: { userId: string; workspaceId: string }
   network?: Network
   now?: () => number
   random?: () => number
@@ -76,6 +84,8 @@ interface Link {
   readonly socket: HocuspocusProviderWebsocket
   /** Whether the provider sees the document's updates: closed while there is no handshake (section 12.3). */
   gateOpen: boolean
+  /** The copy of this device, once it is open; `null` before that, and where the browser keeps none. */
+  copy: LocalCopy | null
 }
 
 const scopeOf = (scope: string): AuthorizedScope => (scope === 'read-write' ? 'read-write' : 'readonly')
@@ -90,6 +100,7 @@ const sameSnapshot = (a: CollabSnapshot, b: CollabSnapshot): boolean =>
   a.action === b.action &&
   a.editable === b.editable &&
   a.loaded === b.loaded &&
+  a.keepsCopy === b.keepsCopy &&
   a.notice === b.notice &&
   a.generation === b.generation &&
   a.peers.length === b.peers.length &&
@@ -124,11 +135,11 @@ class ProviderSession implements CollabSession {
 
   constructor(private readonly options: CollabSessionOptions) {
     this.network = options.network ?? browserNetwork
+    // Whether there is a copy is not known until it has been read: the model is made again then, at the first opening.
     this.model = createSyncModel({ online: this.network.online(), hasLocalCopy: false })
     this.backoff = createReconnectBackoff({ now: options.now ?? Date.now, random: options.random ?? Math.random })
     this.start()
     this.current = this.build()
-    this.dispatch({ type: 'open' })
     this.stopListeningToNetwork = this.network.subscribe((online) => this.dispatch({ type: 'network-changed', online }))
   }
 
@@ -219,8 +230,9 @@ class ProviderSession implements CollabSession {
         this.reconnectAfter(null)
         break
       case 'purge-local-copy':
-        // There is no copy outside this page yet: what is pending leaves with the session. Nothing is uploaded after it.
+        // Nothing is uploaded after access was removed, and nothing of it stays on the device.
         this.pending.clear()
+        this.purgeCopy()
         break
       case 'discard-offline-changes':
         this.discardLocalState()
@@ -274,17 +286,48 @@ class ProviderSession implements CollabSession {
       websocketProvider: socket,
     })
     provider.attach()
-    const link: Link = { ydoc, provider, socket, gateOpen: true }
+    const link: Link = { ydoc, provider, socket, gateOpen: true, copy: null }
     this.link = link
     this.generation += 1
     this.closeGate()
-    ydoc.on('update', this.onDocumentUpdate)
     this.listenTo(link)
-    // Not at once: React runs an effect, its cleanup and the effect again in development, and a socket that is closed while
-    // it is still connecting is an error in the console. A session that was ended in the same turn never connects.
-    queueMicrotask(() => {
-      if (this.link === link) void socket.connect()
-    })
+    void this.attach(link)
+  }
+
+  private async openCopy(ydoc: Y.Doc): Promise<LocalCopy | null> {
+    const { localCopy, documentId } = this.options
+    return localCopy === undefined ? null : openLocalCopy({ ...localCopy, documentId }, ydoc)
+  }
+
+  /**
+   * Opens the copy of this device, which is what the document starts from, and then connects. The copy comes first because
+   * what it holds decides what the machine knows (the document was authorised before, and there is something to show with
+   * no connection), and because what it loads is not a change of the person's: the listener for those is attached after it.
+   * A session that was ended meanwhile closes the copy and never connects. The turn is yielded even where there is no copy:
+   * React runs an effect, its cleanup and the effect again in development, and a socket that is closed while it is still
+   * connecting is an error in the console.
+   */
+  private async attach(link: Link): Promise<void> {
+    const copy = await this.openCopy(link.ydoc)
+    if (this.link !== link) {
+      copy?.close()
+      return
+    }
+    link.copy = copy
+    link.ydoc.on('update', this.onDocumentUpdate)
+    if (this.model.state === 'initial') {
+      this.model = createSyncModel({ online: this.network.online(), hasLocalCopy: copy?.hadContent ?? false })
+      this.dispatch({ type: 'open' })
+    }
+    // A copy with changes the server was not shown to store is all pending until a `stored` snapshot contains it (section
+    // 7.4). One without is only what the server holds: what a reader opens again must not become changes they never made.
+    if (copy?.hadUnstoredChanges) {
+      this.pending.add(Y.encodeStateAsUpdate(link.ydoc))
+      this.dispatch({ type: 'local-change' })
+    }
+    // A browser that is offline cannot connect, and a copy is what there is to show: that is `offline-local`, not a wait.
+    if (!this.network.online() && this.model.hasLocalCopy) this.dispatch({ type: 'network-changed', online: false })
+    if (this.link === link && this.model.state !== 'offline-local') void link.socket.connect()
   }
 
   private listenTo({ provider, socket }: Link): void {
@@ -361,6 +404,12 @@ class ProviderSession implements CollabSession {
     link.gateOpen = true
   }
 
+  /** The copy of this device is deleted, and the document stops being kept in it from now on. */
+  private purgeCopy(): void {
+    // A copy that cannot be deleted now is deleted by the next purge of the account's copies (sign-out, account switch).
+    this.link?.copy?.purge().catch(() => undefined)
+  }
+
   private teardown(): void {
     this.stopReconnecting()
     this.stopAckTimer()
@@ -368,6 +417,7 @@ class ProviderSession implements CollabSession {
     if (link === null) return
     this.link = null
     link.ydoc.off('update', this.onDocumentUpdate)
+    link.copy?.close()
     link.provider.destroy()
     link.socket.destroy()
     link.ydoc.destroy()
@@ -378,6 +428,7 @@ class ProviderSession implements CollabSession {
    * connection again (`start`), which loads the server's state; a socket is never closed while it is still connecting.
    */
   private discardLocalState(): void {
+    this.purgeCopy()
     this.teardown()
     this.pending.clear()
     this.lastStored = null
@@ -420,6 +471,8 @@ class ProviderSession implements CollabSession {
     this.lastStored = snapshot
     const coversLocalChanges = this.pending.isContainedIn(snapshot)
     if (coversLocalChanges) this.pending.clear()
+    // Whether the copy holds more than this tab has pending is the copy's to know: another tab may have written to it.
+    void this.link?.copy?.settle(snapshot)
     this.dispatch({ type: 'stored', coversLocalChanges })
     this.measureUnsent()
   }
@@ -462,6 +515,7 @@ class ProviderSession implements CollabSession {
       action: cause === null ? null : errorAction(cause),
       editable: isEditable(this.model) && !this.overBudget,
       loaded: this.loaded,
+      keepsCopy: link.copy !== null,
       peers: this.peers,
       notice: this.notice,
       generation: this.generation,
