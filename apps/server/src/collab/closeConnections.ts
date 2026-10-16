@@ -1,7 +1,7 @@
 import {
   CLOSE_CODES,
   serializeStatelessEvent,
-  documentName,
+  documentName as documentNameOf,
   type CloseCodeName,
   type StatelessEvent,
 } from '@draftroom/contract/collab'
@@ -42,9 +42,19 @@ export interface ConnectionSelector {
 const hasCondition = ({ documentId, userId, sessionId, where }: ConnectionSelector): boolean =>
   documentId !== undefined || userId !== undefined || sessionId !== undefined || where !== undefined
 
+/** Whether a connection to this document, of the person this context describes, is one the selector names. */
+export function selects(selector: ConnectionSelector, documentName: string, context: ConnectionContext): boolean {
+  if (selector.documentId !== undefined && documentName !== documentNameOf(selector.documentId)) return false
+  if (selector.userId !== undefined && context.userId !== selector.userId) return false
+  // A connection without a session never matches one: two absences are not the same session.
+  if (selector.sessionId !== undefined && context.sessionId !== selector.sessionId) return false
+  return selector.where === undefined || selector.where(context)
+}
+
 /**
  * Ends every live connection the selector matches, and says how many it ended. It is the function T4.1 (revocation) and
- * T7.1 (the end of a session) call; it decides nothing about who should be closed.
+ * T7.1 (the end of a session) call; it decides nothing about who should be closed. Connections that are still being
+ * established are not live yet: `RevocationMarks` reaches those.
  */
 export function endConnections(
   instance: Hocuspocus<ConnectionContext>,
@@ -52,16 +62,10 @@ export function endConnections(
   plan: ClosePlan,
 ): number {
   if (!hasCondition(selector)) throw new RangeError('Closing connections needs at least one condition')
-  const only = selector.documentId === undefined ? undefined : documentName(selector.documentId)
   let ended = 0
   for (const document of instance.documents.values()) {
-    if (only !== undefined && document.name !== only) continue
     for (const connection of document.getConnections() as Connection<ConnectionContext>[]) {
-      const { context } = connection
-      if (selector.userId !== undefined && context.userId !== selector.userId) continue
-      // A connection without a session never matches one: two absences are not the same session.
-      if (selector.sessionId !== undefined && context.sessionId !== selector.sessionId) continue
-      if (selector.where !== undefined && !selector.where(context)) continue
+      if (!selects(selector, document.name, connection.context)) continue
       endConnection(connection, plan)
       ended += 1
     }

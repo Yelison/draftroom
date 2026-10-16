@@ -8,6 +8,7 @@ import { authenticateExtension } from './authenticate.ts'
 import { awarenessGuardExtension } from './awarenessGuard.ts'
 import { endConnections, type ClosePlan, type ConnectionSelector } from './closeConnections.ts'
 import type { ConnectionContext } from './context.ts'
+import { inFlightExtension, RevocationMarks } from './inFlight.ts'
 import { DurabilityRegistry } from './durability.ts'
 import { durableAckExtension } from './durableAck.ts'
 import { limitsExtension } from './limits.ts'
@@ -70,6 +71,7 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
   const durability = new DurabilityRegistry()
   const retry = new StoreRetry(timing.retryDelaysMs, log)
   const sockets = new OpenSockets()
+  const marks = new RevocationMarks(connectionTimeoutMs, now)
 
   const server = new Server<ConnectionContext>({
     port: config.collabPort,
@@ -89,9 +91,10 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
     yDocOptions: { gc: true, gcFilter: () => true },
     extensions: [
       upgradeGuardExtension({ allowedOrigins: config.allowedOrigins, development: config.devIdentity }, sockets),
-      authenticateExtension({ database, authProvider, sessionSecret: config.sessionSecret, log }),
+      authenticateExtension({ database, authProvider, sessionSecret: config.sessionSecret, log, marks }),
       persistenceExtension({ store, durability, retry, log }),
       durableAckExtension({ durability, log }),
+      inFlightExtension(marks),
       limitsExtension({ durability, now }),
       awarenessGuardExtension(),
     ],
@@ -108,7 +111,10 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
     endConnections({ sessionId, ...target }, plan) {
       const selector: ConnectionSelector =
         sessionId === undefined ? target : { ...target, sessionId: sessionKey(config.sessionSecret, sessionId) }
-      return endConnections(server.hocuspocus, selector, plan)
+      const ended = endConnections(server.hocuspocus, selector, plan)
+      // For the connections that are being established and so not live yet; the selector was valid, or this was not reached.
+      marks.leave(selector, plan)
+      return ended
     },
 
     shutDown: () => shutDownCollaboration({ server, durability, retry, sockets, timing, log }),

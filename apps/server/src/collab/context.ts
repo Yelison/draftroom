@@ -13,4 +13,9 @@ export interface ConnectionContext {
   readonly displayName: string
   /** A keyed hash of the session id, or `null` when the identity has no session. It is how a session that ends finds its connections. */
   readonly sessionId: string | null
+  /**
+   * The ticket this connection took before it read the person's role. A revocation that comes later reaches it even if it
+   * was still being established when the revocation looked for connections (see `RevocationMarks`).
+   */
+  readonly sequence: number
 }

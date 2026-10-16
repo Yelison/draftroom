@@ -23,8 +23,37 @@ export class ObservedStore implements StateStore {
     this.inner = inner
   }
 
-  load(documentId: string): Promise<Uint8Array | undefined> {
+  /** Loads wait for `releaseLoads()` while this is set: a document that is slow to load, as a busy database makes it. */
+  holdingLoads = false
+  private loadsHeld = 0
+  private releaseHeld: (() => void) | undefined
+  private held: Promise<void> = Promise.resolve()
+
+  async load(documentId: string): Promise<Uint8Array | undefined> {
+    if (this.holdingLoads) {
+      this.loadsHeld += 1
+      this.waiter.changed()
+      await this.held
+    }
     return this.inner.load(documentId)
+  }
+
+  holdLoads(): void {
+    this.holdingLoads = true
+    this.held = new Promise((resolve) => {
+      this.releaseHeld = resolve
+    })
+  }
+
+  releaseLoads(): void {
+    this.holdingLoads = false
+    this.releaseHeld?.()
+  }
+
+  waitForHeldLoad(): Promise<void> {
+    return this.waiter
+      .until(() => (this.loadsHeld >= 1 ? true : undefined), 'a load that is held')
+      .then(() => undefined)
   }
 
   async save(documentId: string, state: Uint8Array): Promise<void> {

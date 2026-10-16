@@ -6,6 +6,7 @@ import type { Database } from '../db/tables.ts'
 import type { AuthProvider } from '../http/auth/auth-provider.ts'
 import { connectionModeFor } from './connectionMode.ts'
 import type { ConnectionContext } from './context.ts'
+import type { RevocationMarks } from './inFlight.ts'
 import type { CollabLog } from './log.ts'
 import { connectionSessionId } from './sessionKey.ts'
 
@@ -15,6 +16,7 @@ export interface AuthenticateOptions {
   /** Keys the hash that stands for a session id in the connection context. */
   readonly sessionSecret: string
   readonly log: CollabLog
+  readonly marks: RevocationMarks
 }
 
 /** What the checks decided: the context of the connection, or the reason it is refused. */
@@ -31,6 +33,7 @@ async function decide(
   { database, authProvider, sessionSecret }: AuthenticateOptions,
   documentName: string,
   headers: Headers,
+  sequence: number,
 ): Promise<Decision> {
   const documentId = parseDocumentName(documentName)
   if (documentId === null) return deny('not-found')
@@ -59,6 +62,7 @@ async function decide(
       // A person who signed up has a name; the empty one is for the type, which allows it for someone who has not.
       displayName: access.personName ?? '',
       sessionId: connectionSessionId(sessionSecret, sessionId),
+      sequence,
     },
   }
 }
@@ -74,9 +78,12 @@ export function authenticateExtension(options: AuthenticateOptions): Extension<C
     // A refusal is a plain object with a `reason`: it has no `message`, so Hocuspocus does not log it, and it answers the
     // client with `PermissionDenied(reason)`. The socket stays open (F5): the hook cannot reach it, and the client closes it.
     async onAuthenticate({ documentName, requestHeaders, connectionConfig }) {
+      // Taken before anything is read: a revocation that is left after this ticket reaches this connection even if it is not
+      // registered when the revocation looks for it.
+      const sequence = options.marks.ticket()
       let decision: Decision
       try {
-        decision = await decide(options, documentName, requestHeaders)
+        decision = await decide(options, documentName, requestHeaders, sequence)
       } catch (error) {
         // Not `not-found`: a client that had access would take that for the removal of it and purge its local copy.
         options.log.error({ documentName, error }, 'authenticating a connection failed')

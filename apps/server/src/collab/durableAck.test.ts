@@ -17,6 +17,7 @@ const context: ConnectionContext = {
   role: 'editor',
   displayName: 'Eli',
   sessionId: null,
+  sequence: 1,
 }
 
 /** A connection with nowhere to send: it records what it was sent. */
