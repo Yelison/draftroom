@@ -139,6 +139,17 @@ describe('adding someone in the share dialog', () => {
     expect(picker).toHaveDisplayValue('Daniel Okafor')
   })
 
+  it('does not choose the person again when they are removed after being added', async () => {
+    const { user, share } = await openShare({ documentId: interviews.id })
+    await user.selectOptions(within(share).getByRole('combobox', { name: 'Person' }), 'Daniel Okafor')
+    await user.click(within(share).getByRole('button', { name: 'Add' }))
+    await user.click(await within(share).findByRole('button', { name: 'Remove Daniel Okafor' }))
+
+    const picker = await within(share).findByRole('combobox', { name: 'Person' })
+
+    expect(picker).toHaveDisplayValue('Choose someone from the workspace')
+  })
+
   it('takes the person out of the choices once they are in, and puts the focus back on the picker or the list', async () => {
     const { user, share } = await openShare({ documentId: interviews.id })
 
