@@ -53,11 +53,11 @@
   text-decoration: underline;
 }
 
-/* Forma UI has no monospace family token yet: the generic family keeps the code apart from the text around it. */
+/* Relative, so the code follows the size of the text around it, a title or a list item as much as a paragraph. */
 .prose code {
   padding-inline: var(--space-4);
   border-radius: var(--radius-small);
   background: var(--color-surface-hover);
-  font-family: monospace;
-  font-size: inherit;
+  font-family: var(--font-family-mono);
+  font-size: 0.875em;
 }
