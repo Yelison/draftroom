@@ -13,3 +13,8 @@
   color: var(--color-muted);
   font: var(--font-body);
 }
+
+.title {
+  margin: 0;
+  font: var(--font-section);
+}

@@ -11,6 +11,8 @@
 }
 
 .toolbarBand {
+  display: flex;
+  align-items: center;
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
@@ -27,4 +29,14 @@
   border-block-start: 0;
   border-radius: 0 0 var(--radius-panel) var(--radius-panel);
   background: var(--color-surface);
+}
+
+/* Who is in the document and where what was written is, at the end of the band; the toolbar takes the rest. */
+.status {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-12);
+  margin-inline-start: auto;
+  padding-inline: var(--space-12);
 }

@@ -150,24 +150,24 @@ class ProviderSession implements CollabSession {
     return () => this.eventListeners.delete(listener)
   }
 
-  retry(): void {
+  // These are handed to screens as callbacks, so they keep their `this`.
+
+  retry = (): void => {
     this.dispatch({ type: 'open' })
   }
 
-  discardAndReload(): void {
+  discardAndReload = (): void => {
     if (this.model.state !== 'error' || this.model.cause !== 'document-too-large') return
     this.discardLocalState()
     this.dispatch({ type: 'open' })
   }
 
-  dismissNotice(): void {
+  dismissNotice = (): void => {
     this.notice = null
     this.publish()
   }
 
-  hasRoomFor(bytes: number): boolean {
-    return this.unsentBytes() + bytes <= MAX_UNSENT_BYTES
-  }
+  hasRoomFor = (bytes: number): boolean => this.unsentBytes() + bytes <= MAX_UNSENT_BYTES
 
   destroy(): void {
     this.stopListeningToNetwork()

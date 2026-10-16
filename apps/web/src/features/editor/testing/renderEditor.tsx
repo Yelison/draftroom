@@ -10,6 +10,7 @@ import { routes } from '../../../app/routes.tsx'
 import type { DataSource } from '../../../data/DataSource.ts'
 import { DataSourceContext } from '../../../data/DataSourceContext.ts'
 import { createMockServer } from '../../../data/mock/createMockDataSource.ts'
+import { documentName } from '@draftroom/contract/collab'
 import { budget, launchPlan } from '../../../data/mock/fixtures/documents.ts'
 import { daniel, marta, sofia } from '../../../data/mock/fixtures/index.ts'
 import { vi } from 'vitest'
@@ -42,6 +43,8 @@ export interface RenderEditorOptions {
   wrap?: (dataSource: DataSource) => DataSource
   /** Rendered beside the router, inside the providers: a way for a test to reach the language or the theme. */
   extra?: ReactNode
+  /** Puts content in the document on the collaboration server before it is opened, as if someone had written it. */
+  content?: (shared: Y.Doc) => void
 }
 
 /**
@@ -54,8 +57,10 @@ export function renderEditor({
   signedInAs = people.marta,
   wrap,
   extra,
+  content,
 }: RenderEditorOptions = {}) {
   const server = createMockServer()
+  content?.(server.collaboration.document(documentName(documentId)))
   const base = server.connect({ signedInAs })
   const dataSource = wrap?.(base) ?? base
   const router = createMemoryRouter(routes, { initialEntries: [`/documents/${documentId}`] })

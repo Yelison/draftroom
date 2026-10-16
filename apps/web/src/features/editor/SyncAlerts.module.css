@@ -1,0 +1,10 @@
+.alerts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin-block-end: var(--space-12);
+}
+
+.description {
+  margin: 0 0 var(--space-8);
+}
