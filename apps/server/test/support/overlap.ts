@@ -6,7 +6,7 @@ import type { Database } from '../../src/db/tables.ts'
  * read what they read and queue behind it: the only way to make requests overlap on purpose. What they do next is
  * decided by the statement that writes, not by the check each of them made before.
  */
-async function whileHeld<T>(
+export async function whileHeld<T>(
   db: Kysely<Database>,
   hold: (trx: Transaction<Database>) => Promise<unknown>,
   send: () => Promise<T>[],
