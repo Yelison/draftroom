@@ -16,6 +16,7 @@ function client() {
     doc,
     pending,
     text: doc.getText('t'),
+    updates,
     /** What the server would have stored once it has applied the first `count` updates. */
     snapshotAfter(count: number) {
       const stored = new Y.Doc()
@@ -59,6 +60,18 @@ describe('what is pending', () => {
 
     expect(pending.isContainedIn(snapshotAfter(999))).toBe(false)
     expect(pending.isContainedIn(snapshotAfter(1000))).toBe(true)
+  })
+
+  it('is not contained in a snapshot that lacks a deletion made long before its last change', () => {
+    const { pending, text, updates } = client()
+    text.insert(0, 'hello world')
+    text.delete(0, 6)
+    for (let key = 0; key < 300; key += 1) text.insert(0, 'x')
+    // What a server holds that never received the deletion (it adds no struct, so nothing after it depends on it).
+    const stored = new Y.Doc()
+    for (const [index, update] of updates.entries()) if (index !== 1) Y.applyUpdate(stored, update)
+
+    expect(pending.isContainedIn(Y.snapshot(stored))).toBe(false)
   })
 
   it('is nothing again once it is cleared', () => {

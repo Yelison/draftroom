@@ -88,6 +88,18 @@ describe('what is said to be stored', () => {
     expect(state(opening)).toBe('synced')
   })
 
+  it('is synced at once for a document that holds what others wrote and the server has not stored yet', async () => {
+    world = createWorld()
+    world.server.holdStores()
+    typeInto(world.server.document(wireName), 'written by someone else')
+
+    const opening = await opened()
+
+    // Nothing of its own is waiting to be stored, so the person is not told it is synchronising.
+    expect(textOf(opening.doc)).toBe('written by someone else')
+    expect(opening.session.getSnapshot().state).toBe('synced')
+  })
+
   it('waits for the provider as well as for the server: a covering stored before the acknowledgement is remembered', async () => {
     world = createWorld()
     const opening = await opened()
@@ -260,6 +272,24 @@ describe('when the server ends the connection', () => {
     expect(reopened.state).toBe('synced')
     // One new connection, not one that is closed while it is still opening.
     expect(world.server.abortedConnections).toBe(0)
+  })
+
+  it('stores what the person writes after discarding, and nothing of what was discarded stands in the way', async () => {
+    world = createWorld()
+    const opening = await opened()
+    world.server.holdStores()
+    typeInto(opening.doc, 'acknowledged, never stored')
+    await advance(100)
+    world.server.closeConnections(4413, 'document-too-large')
+    await advance(50)
+    world.server.releaseStores()
+
+    opening.session.discardAndReload()
+    await advance(50)
+    typeInto(opening.session.getSnapshot().ydoc, ' and then more')
+    await advance(1100)
+
+    expect(opening.session.getSnapshot().state).toBe('synced')
   })
 
   it('does nothing when asked to discard and reload from an error that is not about size', async () => {

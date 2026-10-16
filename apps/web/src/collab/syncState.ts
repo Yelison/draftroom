@@ -209,12 +209,18 @@ function apply(model: SyncModel, event: SyncInput): SyncStep {
   switch (event.type) {
     case 'open':
       if (model.state === 'initial') return unchanged({ ...model, state: 'connecting' })
-      return model.state === 'error'
-        ? {
-            model: { ...withoutConnection(model), state: 'connecting', cause: null },
-            effects: [{ type: 'reopen' }],
-          }
-        : unchanged(model)
+      if (model.state !== 'error') return unchanged(model)
+      return {
+        // A document that is too large is opened again only after the person discarded their local changes (a retry would
+        // send the same message again), so what was pending went with them.
+        model: {
+          ...withoutConnection(model),
+          state: 'connecting',
+          cause: null,
+          hasPending: model.cause === 'document-too-large' ? false : model.hasPending,
+        },
+        effects: [{ type: 'reopen' }],
+      }
 
     case 'authenticated':
       return authenticate(model, event.scope)

@@ -204,6 +204,7 @@ describe('the transitions of section 8.2', () => {
     event: SyncEvent
     to: string
     effects?: SyncEffect[]
+    pending?: boolean
   }[] = [
     { row: 'open from initial', from: {}, event: open, to: 'connecting' },
     {
@@ -219,6 +220,22 @@ describe('the transitions of section 8.2', () => {
       event: open,
       to: 'connecting',
       effects: [reopen],
+    },
+    {
+      row: 'open after discarding the changes of a document that is too large drops what was pending',
+      from: { state: 'error', cause: 'document-too-large', hasPending: true },
+      event: open,
+      to: 'connecting',
+      effects: [reopen],
+      pending: false,
+    },
+    {
+      row: 'open from a transient error keeps what was pending',
+      from: { state: 'error', cause: 'store-timeout', hasPending: true },
+      event: open,
+      to: 'connecting',
+      effects: [reopen],
+      pending: true,
     },
     {
       row: 'open in a live state is ignored',
@@ -492,10 +509,11 @@ describe('the transitions of section 8.2', () => {
     },
   ]
 
-  it.each(rows)('$row', ({ from, event, to, effects }) => {
+  it.each(rows)('$row', ({ from, event, to, effects, pending }) => {
     const step = transition({ ...createSyncModel({ online: true, hasLocalCopy: false }), ...from }, event)
 
     expect(step.model.state).toBe(to)
+    if (pending !== undefined) expect(step.model.hasPending).toBe(pending)
     // The timer is the subject of its own tests below; here only what the row itself asks the caller to do.
     if (effects !== undefined)
       expect(step.effects.filter((effect) => !effect.type.endsWith('ack-timer'))).toEqual(effects)

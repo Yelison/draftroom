@@ -238,11 +238,10 @@ class ProviderSession implements CollabSession {
     }
     this.stopReconnecting()
     this.closeGate()
-    const { socket, provider } = this.link
+    const { socket } = this.link
     socket.disconnect()
-    // The provider is told the connection is over now, not when the socket reports its close: without it its `synced`
-    // stays true and the handshake of the new connection would never announce itself.
-    provider.onClose()
+    // The close the socket reports is what tells the provider the connection is over, so its `synced` starts again from
+    // false and the handshake of the new connection announces itself.
     this.connectWhenClosed()
   }
 
@@ -316,8 +315,6 @@ class ProviderSession implements CollabSession {
       this.connectOnClose = false
       void this.link?.socket.connect()
     }
-    // The echo of a socket this session closed itself, while it waits to connect again, says nothing new.
-    if (this.reconnectTimer !== null) return
     this.dispatch({ type: 'connection-closed', code, online: this.network.online() })
     const waiting = this.model.state === 'reconnecting' || this.model.state === 'connecting'
     if (waiting && reconnectsOnItsOwn({ code, inBand })) this.reconnectAfter(code)
