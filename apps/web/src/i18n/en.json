@@ -116,5 +116,20 @@
   "explorer.results": "Results",
   "documents.results.more": "{count, number} or more results",
   "documents.noWorkspace.title": "You're not in a workspace yet",
-  "documents.noWorkspace.description": "Ask the owner of a workspace to add you, and your documents will appear here."
+  "documents.noWorkspace.description": "Ask the owner of a workspace to add you, and your documents will appear here.",
+  "trash.description": "Archived documents wait here until an owner restores them or deletes them for good.",
+  "trash.loading": "Loading the trash",
+  "trash.empty.title": "The trash is empty",
+  "trash.empty.description": "Documents you archive will appear here.",
+  "trash.row.archived": "Archived {date}",
+  "trash.row.restore": "Restore",
+  "trash.row.restoreLabel": "Restore “{title}”",
+  "trash.row.delete": "Delete",
+  "trash.row.deleteLabel": "Delete “{title}” permanently",
+  "trash.restore.announcement": "“{title}” was restored.",
+  "trash.delete.title": "Delete “{title}” permanently?",
+  "trash.delete.description": "This can't be undone. The document, its version history and its comments will be gone for everyone.",
+  "trash.delete.action": "Delete permanently",
+  "trash.delete.announcement": "“{title}” was deleted permanently.",
+  "trash.gone": "“{title}” isn't in the trash any more: someone else restored or deleted it."
 }
