@@ -83,6 +83,18 @@ export class RawClient {
     this.send(outgoing.authenticate(documentName(documentId)))
   }
 
+  /**
+   * Authenticates and completes a handshake step, so that the server has the connection registered: the authenticated
+   * answer is sent before the document is loaded, and a connection that is not registered yet cannot be ended or seen.
+   */
+  async join(documentId: string): Promise<void> {
+    this.authenticate(documentId)
+    await this.waitFor('authenticated')
+    const mark = this.mark
+    this.send(outgoing.syncStep1(documentName(documentId), new Uint8Array([0])))
+    await this.waitFor('sync', () => true, mark)
+  }
+
   /** Resolves with the first frame, already received or still to come, that the predicate selects. */
   waitFor<Kind extends Incoming['kind']>(
     kind: Kind,
