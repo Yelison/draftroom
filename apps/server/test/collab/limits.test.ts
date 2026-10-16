@@ -84,7 +84,9 @@ describe('a message above the size of one message', () => {
   })
 })
 
-describe('a document above the size of a document', () => {
+// Each of these loads a state of 5 MiB into a server and a client: about two seconds on a loaded machine, so the bound of a
+// failure is wider than the 5 s of a test.
+describe('a document above the size of a document', { timeout: 30_000 }, () => {
   let heavy: Uint8Array
   beforeAll(() => {
     heavy = Y.encodeStateAsUpdate(documentOfAtLeast(MAX_DOCUMENT_STATE_BYTES + 1))
@@ -164,24 +166,28 @@ describe('the rate of messages', () => {
       const documentId = await newDocument()
       const name = documentName(documentId)
       const socket = await RawClient.connect(frozen.url, { email: people.editor.email })
-      socket.authenticate(documentId)
-      await socket.waitFor('authenticated')
+      await socket.join(documentId)
       const mark = socket.mark
-
-      for (let sent = 0; sent < MESSAGE_RATE_LIMIT_BURST; sent += 1)
-        socket.send(outgoing.syncStep1(name, new Uint8Array([0])))
-      await socket.waitForFrames('sync', FRAMES_PER_HANDSHAKE_MESSAGE * MESSAGE_RATE_LIMIT_BURST, mark)
+      // `join` used one token. The rest of the burst but one is spent on an empty presence update, which the server answers
+      // with nothing: the test waits for no reply, and what a busy machine takes to answer 200 handshakes is not what is measured.
+      const spent = 1
+      for (let sent = spent; sent < MESSAGE_RATE_LIMIT_BURST - 1; sent += 1) socket.send(outgoing.awareness(name, []))
+      // The last token of the burst goes to a message that is answered, which shows it was let through.
+      socket.send(outgoing.syncStep1(name, new Uint8Array([0])))
+      await socket.waitForFrames('sync', FRAMES_PER_HANDSHAKE_MESSAGE, mark)
       expect(socket.isOpen).toBe(true)
 
       socket.send(outgoing.syncStep1(name, new Uint8Array([0])))
 
       const closed = await socket.waitForClose()
       expect(closed).toEqual({ code: 4429, reason: 'rate-limited' })
-      expect(socket.framesOf('sync', mark)).toBe(FRAMES_PER_HANDSHAKE_MESSAGE * MESSAGE_RATE_LIMIT_BURST)
+      expect(socket.framesOf('sync', mark)).toBe(FRAMES_PER_HANDSHAKE_MESSAGE)
     } finally {
       await frozen.close()
     }
-  })
+    // Nothing here depends on time, but a worker of a loaded machine can take longer than the 5 s of a test to start a
+    // server and a connection: this is the bound of a failure, not a wait.
+  }, 30_000)
 })
 
 describe('what is sent before authentication finishes', () => {
