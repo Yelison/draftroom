@@ -6,8 +6,10 @@
     "dev": "vite",
     "build": "vite build",
     "build:pseudo": "vite build --mode pseudo",
+    "build:demo": "VITE_DATA_SOURCE=mock vite build --mode production --base /draftroom/ --outDir dist-demo --emptyOutDir && cp dist-demo/index.html dist-demo/404.html",
     "preview": "vite preview",
     "test:e2e": "playwright test",
+    "test:e2e-demo": "playwright test -c e2e-demo/playwright.config.ts",
     "sync:forma-tokens": "node scripts/sync-forma-tokens.mjs"
   },
   "dependencies": {
