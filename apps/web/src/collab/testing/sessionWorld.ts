@@ -12,6 +12,7 @@ import type { Network } from '../network.ts'
 
 export const documentId = '3f6b1c2a-0000-4000-8000-000000000001'
 export const wireName = documentName(documentId)
+export const workspaceId = 'workspace-1'
 
 export const editor: Identity = { userId: 'user-editor', displayName: 'Elena Editor' }
 export const reader: Identity = { userId: 'user-reader', displayName: 'Rafael Reader' }
@@ -50,8 +51,11 @@ export interface World {
   setAccess(identity: Identity, access: Access): void
   /** Ends every session that was opened. */
   dispose(): void
-  /** Opens the document as `who`, with the back-off drawn at its ceiling so a delay is exact. */
-  open(who?: Identity | null): Opened
+  /**
+   * Opens the document as `who`, with the back-off drawn at its ceiling so a delay is exact. With `keepCopy` the device
+   * keeps the document, as the app does for a person who is signed in: it needs `withFreshIndexedDb`.
+   */
+  open(who?: Identity | null, options?: { keepCopy?: boolean }): Opened
 }
 
 export interface Opened {
@@ -81,11 +85,12 @@ export function createWorld(options: Partial<SimulatedServerOptions> = {}): Worl
     dispose() {
       for (const session of sessions.splice(0)) session.destroy()
     },
-    open(who = editor) {
+    open(who = editor, { keepCopy = false } = {}) {
       const session = createCollabSession({
         documentId,
         url: 'ws://simulated.test',
         webSocket: server.socketFor(who),
+        ...(keepCopy && who !== null ? { localCopy: { userId: who.userId, workspaceId } } : {}),
         network,
         random: () => 1,
       })
