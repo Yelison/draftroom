@@ -10,5 +10,5 @@
     // Without this tsc loads the DOM and React typings hoisted from the web app into a server with no DOM.
     "types": ["node"]
   },
-  "include": ["src", "test", "vitest.config.ts", "vitest.integration.config.ts"]
+  "include": ["src", "test", "scripts", "vitest.config.ts", "vitest.integration.config.ts"]
 }
