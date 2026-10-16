@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useIntl } from 'react-intl'
 import { useMatch, useNavigate } from 'react-router'
 import { focusMainContent } from '../../app/mainContent.ts'
+import { openShareDialog } from './dialogHistory.ts'
 
 /**
  * The «Share» button of the editor, for the people who can change who has access, and the keeper of the focus around the
@@ -29,7 +30,7 @@ export function ShareControl({ document }: { document: Pick<Schema<'Document'>, 
 
   if (document.role !== 'owner') return null
   return (
-    <Button ref={button} variant="secondary" onClick={() => void navigate(`/documents/${document.id}/share`)}>
+    <Button ref={button} variant="secondary" onClick={() => openShareDialog(navigate, document.id)}>
       {intl.formatMessage({ id: 'sharing.button' })}
     </Button>
   )

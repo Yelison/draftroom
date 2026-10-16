@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { Button, Dialog } from '@yelison/forma-ui'
 import { useIntl } from 'react-intl'
-import { useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { documentQuery } from '../editor/documentQuery.ts'
+import { closeShareDialog } from './dialogHistory.ts'
 import { ShareBody } from './ShareBody.tsx'
 import { ShareSkeleton } from './ShareSkeleton.tsx'
 
@@ -15,11 +16,12 @@ import { ShareSkeleton } from './ShareSkeleton.tsx'
 export function ShareDialog() {
   const intl = useIntl()
   const navigate = useNavigate()
+  const location = useLocation()
   const { documentId } = useParams()
   if (documentId === undefined) throw new Error('The route of the share dialog has no :documentId')
   const dataSource = useDataSource()
   const document = useQuery(documentQuery(dataSource, documentId))
-  const close = () => void navigate(`/documents/${documentId}`)
+  const close = () => closeShareDialog(navigate, location, documentId)
 
   return (
     <Dialog

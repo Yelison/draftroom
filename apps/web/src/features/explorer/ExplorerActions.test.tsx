@@ -5,7 +5,7 @@ import { localeStorageKey } from '../../i18n/locale.ts'
 import { fixtures, renderScreen } from '../documents/testing/renderScreen.tsx'
 
 const { launchPlan, weeklyEnglish, budget } = fixtures
-const pathOf = (id: string) => `/documents/${id}/share`
+const pathOf = (id: string) => `/documents/${id}`
 const explorer = () => screen.findByRole('complementary', { name: 'Explorer' })
 const row = (name: string, index = 0) => screen.getAllByRole('treeitem', { name })[index] as HTMLElement
 
@@ -94,8 +94,7 @@ describe('archiving from the explorer', () => {
 
     await user.keyboard('{Delete}')
 
-    // The page of the test is the share route, whose dialog tells Daniel that only owners can share: that is not the one asked for.
-    expect(screen.queryByRole('dialog', { name: /^Archive/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
 
@@ -139,7 +138,7 @@ describe('renaming and moving from the explorer', () => {
 
     await user.keyboard('{F2}')
 
-    expect(screen.queryByRole('dialog', { name: 'Rename or move' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('shows the new title in the tree after it is saved', async () => {

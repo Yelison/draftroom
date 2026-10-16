@@ -103,6 +103,29 @@ describe('the focus around the share dialog', () => {
   })
 })
 
+describe('the history around the share dialog', () => {
+  it('does not open the dialog again when the person goes Back after closing it', async () => {
+    const { share, user, router } = await openFromButton()
+    await user.click(within(share).getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    await act(() => router.navigate(-1))
+
+    expect(router.state.location.pathname).toBe(editorPath)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('puts the editor in the place of a dialog that was opened from its address, so Back leaves it behind', async () => {
+    const { user, router } = renderScreen(`${editorPath}/share`)
+    const share = await dialog()
+
+    await user.click(within(share).getByRole('button', { name: 'Done' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(editorPath))
+    expect(router.state.historyAction).toBe('REPLACE')
+  })
+})
+
 describe('the editor behind the share dialog', () => {
   it('is the same one after the dialog opens and closes: its text and connection are not made again', async () => {
     const { user, share } = await openFromButton()
