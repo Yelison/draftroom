@@ -66,6 +66,17 @@ export function describeSessionContract(name: string, createWorld: () => Session
       expect(textOf(world.server.document(world.wireName))).toBe('')
     })
 
+    it('sends nothing of what a reader changes: the server is not even asked, only the connection says it is read-only', async () => {
+      const { session } = await opened('reader')
+
+      typeInto(doc(session), 'a change the editor should not have accepted')
+      typeInto(doc(session), ' and another', 0)
+      await advance(3000)
+
+      expect(world.server.updatesFromReaders).toBe(0)
+      expect(session.getSnapshot().state).toBe('read-only')
+    })
+
     it('stops with an error that can be tried again, and stops connecting, for a person who cannot open the document', async () => {
       const { session } = await opened('stranger')
 

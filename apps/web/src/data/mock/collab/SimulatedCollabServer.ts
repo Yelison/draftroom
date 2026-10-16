@@ -296,6 +296,8 @@ export class Connection {
     }
     const update = reader.bytes()
     if (!this.isWritable) {
+      // The handshake of a reader sends a SyncStep2 that adds nothing; a document update is a change it should not make.
+      if (syncType === SyncType.Update) this.server.updatesFromReaders += 1
       this.status(room, false)
       return
     }
@@ -450,6 +452,8 @@ export class SimulatedCollabServer {
   private readonly open = new Set<Connection>()
   /** How many sockets a client closed before they opened: what a browser logs as an error and `ws` raises. */
   abortedConnections = 0
+  /** How many document updates connections that may only read sent: a client that behaves sends none. */
+  updatesFromReaders = 0
   /** Every close the server made, in order: what a test reads to know that the server ended a connection and why. */
   readonly closes: { code: number; reason: string }[] = []
   private heldAuthentications: (() => void)[] | null = null
