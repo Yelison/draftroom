@@ -41,4 +41,4 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 }
 
 await app.listen({ port: config.apiPort, host: config.apiHost })
-await collaboration.listen()
+app.log.info({ port: await collaboration.listen() }, 'collaboration server listening')

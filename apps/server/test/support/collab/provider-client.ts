@@ -28,6 +28,8 @@ export class DocumentClient {
   scope: AuthorizedScope | undefined
   denied: string | undefined
   synced = false
+  /** How many of its changes the server has not acknowledged in memory: the provider's counter, which is not storage. */
+  unacknowledged = 0
   private readonly waiter = new Waiter()
   private readonly socket: HocuspocusProviderWebsocket
 
@@ -51,6 +53,10 @@ export class DocumentClient {
       },
       onAuthenticationFailed: ({ reason }) => {
         this.denied = reason
+        this.waiter.changed()
+      },
+      onUnsyncedChanges: ({ number }) => {
+        this.unacknowledged = number
         this.waiter.changed()
       },
       onSynced: ({ state }) => {
@@ -111,6 +117,13 @@ export class DocumentClient {
   /** The handshake is done: the server's state is in `doc`. */
   waitForSynced(): Promise<void> {
     return this.waiter.until(() => (this.synced ? true : undefined), 'the document to sync').then(() => undefined)
+  }
+
+  /** The server answered every change this client sent, which says it applied them in memory and not that it stored them. */
+  waitForAcknowledged(): Promise<void> {
+    return this.waiter
+      .until(() => (this.unacknowledged === 0 ? true : undefined), 'the changes to be acknowledged')
+      .then(() => undefined)
   }
 
   /** A `stored` event that the predicate accepts, from the ones already received or the next. */
