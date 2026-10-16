@@ -8,6 +8,7 @@ export type WorkspaceRole = 'owner' | 'member'
 export type DocumentRole = 'viewer' | 'commenter' | 'editor' | 'owner'
 export type GeneralAccess = 'none' | 'viewer' | 'commenter' | 'editor'
 export type ActivityType = Schema<'ActivityType'>
+export type VersionKind = Schema<'VersionKind'>
 
 export interface UsersTable {
   id: Generated<string>
@@ -80,6 +81,8 @@ export interface DocumentStatesTable {
   state: Uint8Array
   created_at: Generated<Date>
   updated_at: Generated<Date>
+  /** The `updated_at` the automatic versions last looked at, or `null` when they never did (protocol §11.2). */
+  versions_checked_at: Date | null
 }
 
 export interface PinsTable {
@@ -127,6 +130,21 @@ export interface CommentsTable {
   updated_at: Generated<Date>
 }
 
+export interface DocumentVersionsTable {
+  id: Generated<string>
+  workspace_id: string
+  document_id: string
+  /** A full Yjs update of the document at the moment of the version. */
+  state: Uint8Array
+  kind: VersionKind
+  label: string | null
+  /** `null` exactly when the server made the version on its own: an automatic one. */
+  created_by: string | null
+  /** The request of the restore a `pre-restore` or `restore` version belongs to, and null for any other. */
+  restore_id: string | null
+  created_at: Generated<Date>
+}
+
 export interface Database {
   users: UsersTable
   sessions: SessionsTable
@@ -140,4 +158,5 @@ export interface Database {
   activity_events: ActivityEventsTable
   threads: ThreadsTable
   comments: CommentsTable
+  document_versions: DocumentVersionsTable
 }
