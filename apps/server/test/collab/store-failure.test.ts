@@ -5,7 +5,7 @@ import * as Y from 'yjs'
 import { createPostgresStateStore } from '../../src/collab/stateStore.ts'
 import type { Database } from '../../src/db/tables.ts'
 import { appendParagraph, storedParagraphs } from '../support/collab/content.ts'
-import { FlakyStore } from '../support/collab/flaky-store.ts'
+import { ObservedStore } from '../support/collab/observed-store.ts'
 import { fastTiming, startCollab, type CollabHarness } from '../support/collab/harness.ts'
 import { ClientSet } from '../support/collab/provider-client.ts'
 import { settled } from '../support/collab/waiter.ts'
@@ -36,14 +36,14 @@ afterEach(async () => {
 })
 
 interface Run {
-  readonly store: FlakyStore
+  readonly store: ObservedStore
   readonly harness: CollabHarness
   readonly clients: ClientSet
   readonly documentId: string
 }
 
 async function start(timing = fastTiming): Promise<Run> {
-  const store = new FlakyStore(createPostgresStateStore(db))
+  const store = new ObservedStore(createPostgresStateStore(db))
   const harness = await startCollab(db, { store, timing })
   const set = new ClientSet(harness.url)
   collab = harness
