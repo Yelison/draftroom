@@ -30,7 +30,7 @@ export const factsFromDatabase = (database: Kysely<Database>): AccessFactsSource
 
 export interface RevocationOptions {
   readonly facts: AccessFactsSource
-  readonly collaboration: Pick<CollabServer, 'endConnections'>
+  readonly collaboration: Pick<CollabServer, 'endConnections' | 'tell'>
   /** Tells the connections of a document that its access changed. */
   readonly broadcaster: DocumentBroadcaster
   readonly log: CollabLog
@@ -62,7 +62,11 @@ const closures: readonly Closure[] = ['access-revoked', 'role-changed']
 type Decide = ReturnType<typeof closureOf>
 
 export function createLiveAccess({ facts, collaboration, broadcaster, log }: RevocationOptions): LiveAccess {
-  /** Ends the connections of the target that `decide` says end with each code, or all of them with `role-changed` when it cannot say. */
+  /**
+   * Ends the connections of the target that `decide` says end with each code, or all of them with `role-changed` when it
+   * cannot say. The ones that stay are told the event, if there is one: their role may have changed with the mode kept,
+   * and what they show (the controls of an owner) is made of the role (protocol §6.3).
+   */
   function hold(target: ConnectionTarget, decide: Decide | undefined, event?: StatelessEvent): void {
     const explained = event === undefined ? {} : { event }
     if (decide === undefined) {
@@ -75,6 +79,13 @@ export function createLiveAccess({ facts, collaboration, broadcaster, log }: Rev
       collaboration.endConnections(
         { ...target, where: (context, id) => within(context, id) && decide(context, id) === code },
         { code, ...explained },
+      )
+    }
+    if (event !== undefined) {
+      const within = target.where ?? (() => true)
+      collaboration.tell(
+        { ...target, where: (context, id) => within(context, id) && decide(context, id) === null },
+        event,
       )
     }
   }

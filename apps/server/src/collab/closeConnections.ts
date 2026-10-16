@@ -58,6 +58,28 @@ export function selects(selector: ConnectionSelector, documentName: string, cont
 }
 
 /**
+ * Sends a stateless event to every live connection the selector matches, and says how many it reached. It is for the
+ * connections that a change touches without ending them, such as a role that changes with the mode kept (protocol §6.3).
+ */
+export function tellConnections(
+  instance: Hocuspocus<ConnectionContext>,
+  selector: ConnectionSelector,
+  event: StatelessEvent,
+): number {
+  if (!hasCondition(selector)) throw new RangeError('Telling connections needs at least one condition')
+  const payload = serializeStatelessEvent(event)
+  let told = 0
+  for (const document of instance.documents.values()) {
+    for (const connection of document.getConnections() as Connection<ConnectionContext>[]) {
+      if (!selects(selector, document.name, connection.context)) continue
+      connection.sendStateless(payload)
+      told += 1
+    }
+  }
+  return told
+}
+
+/**
  * Ends every live connection the selector matches, and says how many it ended. It is the function T4.1 (revocation) and
  * T7.1 (the end of a session) call; it decides nothing about who should be closed. Connections that are still being
  * established are not live yet: `RevocationMarks` reaches those.

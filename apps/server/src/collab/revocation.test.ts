@@ -56,6 +56,8 @@ interface Call {
 function setUp(source: Partial<AccessFactsSource>, open: readonly ConnectionContext[]) {
   const calls: Call[] = []
   const told: string[] = []
+  /** The people whose connection the call would tell, without ending it. */
+  const noticed: string[] = []
   const log = new RecordingLog()
   const live = createLiveAccess({
     facts: {
@@ -69,11 +71,16 @@ function setUp(source: Partial<AccessFactsSource>, open: readonly ConnectionCont
         calls.push({ code: plan.code, event: plan.event, ended: ended.map(({ userId }) => userId) })
         return ended.length
       },
+      tell(target: ConnectionTarget) {
+        const reached = open.filter((context) => selects(target, documentName(documentId), context))
+        noticed.push(...reached.map(({ userId }) => userId))
+        return reached.length
+      },
     },
     broadcaster: { broadcast: (id, event) => told.push(`${id} ${event.type}`) },
     log,
   })
-  return { live, calls, told, log }
+  return { live, calls, told, noticed, log }
 }
 
 const endedWith = (calls: readonly Call[], code: Call['code']): readonly string[] =>
@@ -149,7 +156,7 @@ describe('a change to who can open a document', () => {
     const order: string[] = []
     const live = createLiveAccess({
       facts: { ofDocument: async () => [], ofMember: async () => [] },
-      collaboration: { endConnections: () => order.push('closed') },
+      collaboration: { endConnections: () => order.push('closed'), tell: () => 0 },
       broadcaster: { broadcast: () => order.push('told') },
       log: new RecordingLog(),
     })
@@ -191,6 +198,27 @@ describe('a change to a member of a workspace', () => {
     ])
   })
 
+  it('tells the connections that stay, whose role may have changed with the mode kept, and none of the ones it closes', async () => {
+    const { live, calls, noticed } = setUp({ ofMember: async () => [facts('ana', { grant: 'editor' })] }, [
+      connection('ana', 'owner'),
+      connection('ben', 'editor'),
+    ])
+
+    await live.memberChanged(workspaceId, 'ana')
+
+    // An owner of the workspace made a member, who keeps an editor grant: the mode is the same, so nothing is closed.
+    expect(endedWith(calls, 'access-revoked').concat(endedWith(calls, 'role-changed'))).toEqual([])
+    expect(noticed).toEqual(['ana'])
+  })
+
+  it('tells nobody a connection it closes: the notice goes in its close', async () => {
+    const { live, noticed } = setUp({ ofMember: async () => [] }, [connection('ana', 'editor')])
+
+    await live.memberChanged(workspaceId, 'ana')
+
+    expect(noticed).toEqual([])
+  })
+
   it('holds each document to what the person holds on it: one is revoked and another is only lowered', async () => {
     const calls: [string, string][] = []
     const live = createLiveAccess({
@@ -208,6 +236,7 @@ describe('a change to a member of a workspace', () => {
           }
           return 0
         },
+        tell: () => 0,
       },
       broadcaster: { broadcast: () => undefined },
       log: new RecordingLog(),

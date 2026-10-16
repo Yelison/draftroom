@@ -279,6 +279,29 @@ describe('changing a role while the person has the document open', () => {
     expect(await lowered.waitForClose()).toEqual({ code: 4409, reason: 'role-changed' })
   })
 
+  it.each([
+    ['a demoted workspace owner with an editor grant', 'owner', 'member'],
+    ['a member with an editor grant made an owner of the workspace', 'member', 'owner'],
+  ] as const)('%s stays connected and is told', async (_who, from, to) => {
+    const world = await newWorld()
+    const person = await createPerson(db, 'Ana Ortiz')
+    await join(db, world.workspaceId, person, from)
+    const documentId = await newDocument(world, [[person, 'editor']])
+    const socket = await open(documentId, person)
+
+    const response = await api({
+      as: world.owner,
+      method: 'PATCH',
+      url: `/api/workspaces/${world.workspaceId}/members/${person.id}`,
+      body: { role: to },
+    })
+
+    // Their role is not the one the connection was made with, and the mode is: the connection stays and learns it.
+    expect(response.statusCode).toBe(200)
+    await vi.waitFor(() => expect(told(socket)).toEqual([{ type: 'access-changed' }]))
+    expect(socket.isOpen).toBe(true)
+  })
+
   it('demotes an owner of the workspace on every document: no role left is 4403, a lower one is 4409', async () => {
     const world = await newWorld()
     const promoted = await createPerson(db, 'Ana Ortiz')
