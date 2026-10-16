@@ -153,6 +153,19 @@ describe('the simulated collaboration server, read by the real provider', () => 
     expect(seen.filter(([clientId]) => clientId === first.document.clientID)).toEqual([])
   })
 
+  it('drops the awareness of a client whose colour could not be put safely in a style', async () => {
+    const server = serverWith()
+    const first = join(server, ana)
+    const second = join(server, ben)
+    await vi.waitFor(() => expect([first.provider.synced, second.provider.synced]).toEqual([true, true]))
+
+    first.provider.setAwarenessField('user', { id: ana.userId, name: 'Ana', color: 'red; background: url(x)' })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    const seen = [...(second.provider.awareness?.getStates().keys() ?? [])]
+    expect(seen).not.toContain(first.document.clientID)
+  })
+
   it('closes a connection that sends more than 64 messages before it is authenticated, with 4205', async () => {
     const server = serverWith({ scope: 'read-write' }, { loadDelayMs: 100 })
     const { provider, document } = join(server, ana)
