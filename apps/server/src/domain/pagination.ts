@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
+import { isStorableInstant } from './activity.ts'
 
 // The cursor of a list ordered by a timestamp and then by id: a position in that order, bound to the request that
 // produced it. It is opaque to clients and carries nothing but a place in a list, so it needs no signature: a made-up
@@ -30,10 +31,18 @@ export function encodeCursor({ timestamp, id }: CursorPosition, filters: CursorF
   return Buffer.from(JSON.stringify({ t: timestamp, i: id, f: fingerprint(filters) })).toString('base64url')
 }
 
-/** A real instant: `Date` rolls an impossible day (the 30th of February) over to the next month, which gives it away. */
+/**
+ * A real instant that the database can hold: `Date` rolls an impossible day (the 30th of February) over to the next
+ * month, which gives it away, and accepts a year 0000 that does not exist and that PostgreSQL refuses, so a made-up
+ * cursor with it would be a 500 and not a 400.
+ */
 const isInstant = (timestamp: string): boolean => {
   const date = new Date(timestamp.slice(0, 23) + 'Z')
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 19) === timestamp.slice(0, 19)
+  return (
+    !Number.isNaN(date.getTime()) &&
+    date.toISOString().slice(0, 19) === timestamp.slice(0, 19) &&
+    isStorableInstant(timestamp)
+  )
 }
 
 const cursorShape = z.object({

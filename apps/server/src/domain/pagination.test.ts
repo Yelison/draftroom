@@ -45,6 +45,7 @@ describe('a cursor', () => {
       encode({ t: '2026-10-13T15:30:00.123Z', i: position.id, f: fingerprinted.f }),
     ],
     ['a day that does not exist', encode({ t: '2026-02-30T15:30:00.000123Z', i: position.id, f: fingerprinted.f })],
+    ['a year that does not exist', encode({ t: '0000-06-01T15:30:00.000123Z', i: position.id, f: fingerprinted.f })],
     ['an id that is not a UUID', encode({ t: position.timestamp, i: 'c4e6a8b0', f: fingerprinted.f })],
   ])('is refused when it holds %s', (_name, token) => {
     expect(decodeCursor(token, filters)).toBeNull()

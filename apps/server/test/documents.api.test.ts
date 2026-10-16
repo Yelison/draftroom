@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import type { Schema } from '@draftroom/contract'
 import { yUpdateToJson } from '@draftroom/editor-schema/convert'
 import { sql, type Kysely } from 'kysely'
 import * as Y from 'yjs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { encodeCursor } from '../src/domain/pagination.ts'
 import { builtInTemplates } from '../src/domain/templates/built-in.ts'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, bodyAs, type Api } from './support/api.ts'
@@ -624,6 +626,18 @@ describe('pages of documents', () => {
     ])('is refused with %s: it belongs to the list it came from', async (_name, filters) => {
       const joiner = filters === '' ? '?' : '&'
       const response = await list(first.owner, first.workspaceId, `${filters}${joiner}cursor=${first.cursor}`)
+
+      expect(response).toMatchObject({
+        statusCode: 400,
+        body: { code: 'validation-failed', errors: [{ pointer: '/query/cursor', code: 'invalid-value' }] },
+      })
+    })
+
+    it('is refused when it names a year that does not exist, as invalid and not as a failure of the server', async () => {
+      const filters = { workspaceId: first.workspaceId, query: null, folderId: null, archived: false }
+      const cursor = encodeCursor({ timestamp: '0000-06-01T00:00:00.000000Z', id: randomUUID() }, filters)
+
+      const response = await list(first.owner, first.workspaceId, `?cursor=${cursor}`)
 
       expect(response).toMatchObject({
         statusCode: 400,

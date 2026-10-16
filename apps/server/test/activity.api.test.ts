@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Schema } from '@draftroom/contract'
 import type { Kysely } from 'kysely'
+import { encodeCursor } from '../src/domain/pagination.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { ActivityType, Database } from '../src/db/tables.ts'
 import { apiOf, bodyAs, type Api } from './support/api.ts'
@@ -495,6 +496,20 @@ describe('paging through the history', () => {
         as: owner,
         method: 'GET',
         url: `/api/workspaces/${workspaceId}/activity?cursor=not-a-cursor`,
+      })
+
+      expect(response).toMatchObject(refusedAtTheCursor)
+    })
+
+    it('refuses a made-up cursor with a year that does not exist, as invalid and not as a failure of the server', async () => {
+      const { workspaceId, owner } = await newWorkspace()
+      const filters = { workspaceId, documentId: null, actorId: null, from: null, to: null }
+      const cursor = encodeCursor({ timestamp: '0000-06-01T00:00:00.000000Z', id: randomUUID() }, filters)
+
+      const response = await api({
+        as: owner,
+        method: 'GET',
+        url: `/api/workspaces/${workspaceId}/activity?cursor=${cursor}`,
       })
 
       expect(response).toMatchObject(refusedAtTheCursor)
