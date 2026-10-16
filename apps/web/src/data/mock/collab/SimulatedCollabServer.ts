@@ -214,7 +214,10 @@ export class Connection {
     }
     if (type === MessageType.Auth && !this.authenticationStarted) {
       this.authenticationStarted = true
-      setTimeout(() => this.authenticate(documentName), this.server.settings.loadDelayMs)
+      setTimeout(
+        () => this.server.whenAuthenticationMayRun(() => this.authenticate(documentName)),
+        this.server.settings.loadDelayMs,
+      )
     }
   }
 
@@ -449,6 +452,7 @@ export class SimulatedCollabServer {
   abortedConnections = 0
   /** Every close the server made, in order: what a test reads to know that the server ended a connection and why. */
   readonly closes: { code: number; reason: string }[] = []
+  private heldAuthentications: (() => void)[] | null = null
   private storesFail = false
   private storesHeld = false
 
@@ -493,6 +497,23 @@ export class SimulatedCollabServer {
     })
     this.rooms.set(documentName, room)
     return room
+  }
+
+  /** Makes every connection wait to be authenticated, as a server that cannot be reached for a moment does, until `release`. */
+  holdAuthentication(): void {
+    this.heldAuthentications ??= []
+  }
+
+  releaseAuthentication(): void {
+    const waiting = this.heldAuthentications ?? []
+    this.heldAuthentications = null
+    for (const authenticate of waiting) authenticate()
+  }
+
+  /** @internal */
+  whenAuthenticationMayRun(authenticate: () => void): void {
+    if (this.heldAuthentications === null) authenticate()
+    else this.heldAuthentications.push(authenticate)
   }
 
   /** @internal */

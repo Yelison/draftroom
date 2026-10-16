@@ -13,7 +13,8 @@ export interface SyncAlertsProps {
 /**
  * What the person needs to know and may do about their changes: why the connection stopped or could not confirm them, and
  * the one thing they can do (try again, or discard what was not stored and reload), and the notice that what they wrote
- * offline was not kept. They are above the text, where they are seen, and they are announced when they appear.
+ * offline was not kept. They are above the text, where they are seen. They are not live regions of their own: a region
+ * that arrives with its text may go unheard, so the editor says the same in one that was already in the page.
  */
 export function SyncAlerts({ snapshot, onRetry, onDiscard, onDismissNotice }: SyncAlertsProps) {
   const intl = useIntl()
@@ -25,7 +26,6 @@ export function SyncAlerts({ snapshot, onRetry, onDiscard, onDismissNotice }: Sy
       {cause !== null && (
         <Alert
           tone={cause === 'store-timeout' ? 'amber' : 'red'}
-          live
           title={intl.formatMessage({ id: `sync.problem.${cause}.title` })}
         >
           <p className={styles.description}>{intl.formatMessage({ id: `sync.problem.${cause}.description` })}</p>
@@ -37,7 +37,7 @@ export function SyncAlerts({ snapshot, onRetry, onDiscard, onDismissNotice }: Sy
         </Alert>
       )}
       {notice !== null && (
-        <Alert tone="blue" live title={intl.formatMessage({ id: 'sync.notice.offlineChangesDiscarded.title' })}>
+        <Alert tone="blue" title={intl.formatMessage({ id: 'sync.notice.offlineChangesDiscarded.title' })}>
           <p className={styles.description}>
             {intl.formatMessage({ id: 'sync.notice.offlineChangesDiscarded.description' })}
           </p>

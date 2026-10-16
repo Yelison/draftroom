@@ -283,7 +283,11 @@ class ProviderSession implements CollabSession {
     this.closeGate()
     ydoc.on('update', this.onDocumentUpdate)
     this.listenTo(link)
-    void socket.connect()
+    // Not at once: React runs an effect, its cleanup and the effect again in development, and a socket that is closed while
+    // it is still connecting is an error in the console. A session that was ended in the same turn never connects.
+    queueMicrotask(() => {
+      if (this.link === link) void socket.connect()
+    })
   }
 
   private listenTo({ provider, socket }: Link): void {

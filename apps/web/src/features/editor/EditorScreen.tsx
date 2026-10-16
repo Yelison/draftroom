@@ -68,7 +68,9 @@ export function EditorScreen() {
         </EditorStatePanel>
       )}
       {query.isPending && !retrying && <EditorSkeleton />}
-      {query.isSuccess && <DocumentEditor key={query.data.id} document={query.data} />}
+      {query.isSuccess && (
+        <DocumentEditor key={query.data.id} document={query.data} focusHeadline={() => headline.current?.focus()} />
+      )}
     </>
   )
 }

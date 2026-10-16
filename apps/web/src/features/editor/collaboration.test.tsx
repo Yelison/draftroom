@@ -1,10 +1,11 @@
 import { QueryClient } from '@tanstack/react-query'
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { documentName, type StatelessEvent } from '@draftroom/contract/collab'
 import { keysAfterEvent } from '../../data/queryKeys.ts'
 import { daniel } from '../../data/mock/fixtures/index.ts'
-import { budget, launchPlan, openEditor, people } from './testing/renderEditor.tsx'
+import { budget, launchPlan, openEditor, people, renderEditor } from './testing/renderEditor.tsx'
 import { joinAsPeer } from './testing/peer.ts'
 
 afterEach(() => vi.restoreAllMocks())
@@ -164,7 +165,7 @@ describe('when the connection stops', () => {
     act(() => server.collaboration.closeConnections(4401, 'unauthenticated'))
 
     const retry = await screen.findByRole('button', { name: 'Try again' })
-    expect(screen.getByText('Your session ended')).toBeInTheDocument()
+    expect(screen.getAllByText('Your session ended')).toHaveLength(2)
     expect(editor.getText()).toBe('Written before it ended')
     await user.click(retry)
 
@@ -180,13 +181,119 @@ describe('when the connection stops', () => {
 
     act(() => server.collaboration.closeConnections(4413, 'document-too-large'))
 
-    expect(await screen.findByText('This document is too large to keep editing')).toBeInTheDocument()
+    expect((await screen.findAllByText('This document is too large to keep editing')).length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Discard my local changes and reload' }))
 
     const reloaded = await screen.findByRole('textbox', { name: 'Document content' })
     await waitFor(() => expect(reloaded).toHaveFocus(), { timeout: 5000 })
     expect(reloaded).toHaveTextContent('Stored text')
-    expect(screen.queryByText('This document is too large to keep editing')).not.toBeInTheDocument()
+    expect(screen.queryAllByText('This document is too large to keep editing')).toHaveLength(0)
   })
+})
+
+describe('focus and announcements around a connection that stops', () => {
+  it('says what went wrong in a region that was already in the page, and the alert beside it is not a region too', async () => {
+    const { server } = await openEditor()
+    await screen.findByText('Sync status: Synced')
+    const regions = within(screen.getByRole('main')).getAllByRole('status')
+
+    act(() => server.collaboration.closeConnections(4401, 'unauthenticated'))
+
+    await screen.findByRole('button', { name: 'Try again' })
+    // The same element that was there before, now with the text: a region that arrives with its text may go unheard.
+    expect(regions.filter((region) => region.isConnected && region.textContent === 'Your session ended')).toHaveLength(
+      1,
+    )
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('keeps the focus off the page when the person tries again from an error that stops the editing', async () => {
+    const { server, text, user } = await openEditor()
+    await screen.findByText('Sync status: Synced')
+    act(() => server.collaboration.closeConnections(4401, 'unauthenticated'))
+    const retry = await screen.findByRole('button', { name: 'Try again' })
+    // The server does not answer at once: the text takes no focus until the connection is back.
+    server.collaboration.holdAuthentication()
+
+    await user.click(retry)
+
+    expect(document.body).not.toHaveFocus()
+    expect(screen.getByRole('heading', { level: 1, name: 'Autumn launch plan' })).toHaveFocus()
+    act(() => server.collaboration.releaseAuthentication())
+    await waitFor(() => expect(text).toHaveFocus(), { timeout: 5000 })
+  })
+})
+
+describe('a document that could not be opened at all', () => {
+  it('shows what happened, and keeps the focus off the page when the person tries again', async () => {
+    const { server } = renderEditor({ before: (mock) => mock.collaboration.holdAuthentication() })
+    const user = userEvent.setup()
+    await screen.findByRole('heading', { level: 1, name: 'Autumn launch plan' })
+    // The connection is open and the server has not answered when the session ends.
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    act(() => server.collaboration.closeConnections(4401, 'unauthenticated'))
+    server.collaboration.releaseAuthentication()
+
+    const retry = await screen.findByRole('button', { name: 'Try again' })
+    expect(screen.getByRole('heading', { level: 2, name: 'Your session ended' })).toBeInTheDocument()
+    await user.click(retry)
+
+    expect(document.body).not.toHaveFocus()
+    expect(screen.getByRole('heading', { level: 1, name: 'Autumn launch plan' })).toHaveFocus()
+    expect(await screen.findByRole('textbox', { name: 'Document content' })).toBeInTheDocument()
+  })
+})
+
+describe('what was written offline by someone who can only read now', () => {
+  it('tells them in a region that was already in the page, and gives the focus to the headline when the notice is dismissed', async () => {
+    const { server, editor, user } = await openEditor({ signedInAs: people.daniel })
+    await screen.findByText('Sync status: Synced')
+    const regions = within(screen.getByRole('main')).getAllByRole('status')
+    const marta = server.connect({ signedInAs: people.marta })
+
+    // A browser that goes offline says so in both places: the flag and the event.
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    act(() => window.dispatchEvent(new Event('offline')))
+    await screen.findByText('Sync status: Offline with local copy')
+    act(() => editor.commands.insertContent('Written offline'))
+    await marta.setAccess({
+      params: { path: { documentId: launchPlan.id, userId: daniel.id } },
+      body: { role: 'viewer' },
+    })
+    onLine.mockReturnValue(true)
+    act(() => window.dispatchEvent(new Event('online')))
+
+    const dismiss = await screen.findByRole('button', { name: 'Dismiss' })
+    expect(screen.getByText('Sync status: Read-only')).toBeInTheDocument()
+    expect(
+      regions.filter((region) => region.isConnected && region.textContent === "Your offline changes weren't kept"),
+    ).toHaveLength(1)
+    await user.click(dismiss)
+
+    expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument()
+    expect(document.body).not.toHaveFocus()
+    expect(screen.getByRole('heading', { level: 1, name: 'Autumn launch plan' })).toHaveFocus()
+  })
+})
+
+describe('opening the editor', () => {
+  it('connects once and never closes a connection that is still opening, though React makes the screen twice', async () => {
+    const { server } = await openEditor()
+    await waitFor(() => expect(server.collaboration.connectionsTo(wireName)).toBe(1))
+
+    expect(server.collaboration.abortedConnections).toBe(0)
+  })
+
+  it('stops accepting text above what may be unsent, and accepts it again once it was stored', async () => {
+    const { server, editor, text } = await openEditor()
+    await screen.findByText('Sync status: Synced')
+    server.collaboration.holdStores()
+
+    act(() => editor.commands.insertContent('z'.repeat(1.6 * 1024 * 1024)))
+
+    await waitFor(() => expect(text).toHaveAttribute('contenteditable', 'false'), { timeout: 10_000 })
+    server.collaboration.releaseStores()
+    await waitFor(() => expect(text).toHaveAttribute('contenteditable', 'true'), { timeout: 10_000 })
+  }, 40_000)
 })

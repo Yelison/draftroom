@@ -9,7 +9,7 @@ import { AppProviders } from '../../../app/AppProviders.tsx'
 import { routes } from '../../../app/routes.tsx'
 import type { DataSource } from '../../../data/DataSource.ts'
 import { DataSourceContext } from '../../../data/DataSourceContext.ts'
-import { createMockServer } from '../../../data/mock/createMockDataSource.ts'
+import { createMockServer, type MockServer } from '../../../data/mock/createMockDataSource.ts'
 import { documentName } from '@draftroom/contract/collab'
 import { budget, launchPlan } from '../../../data/mock/fixtures/documents.ts'
 import { daniel, marta, sofia } from '../../../data/mock/fixtures/index.ts'
@@ -45,6 +45,8 @@ export interface RenderEditorOptions {
   extra?: ReactNode
   /** Puts content in the document on the collaboration server before it is opened, as if someone had written it. */
   content?: (shared: Y.Doc) => void
+  /** Called with the mock server before anything is opened, to make it hold or refuse what a test needs it to. */
+  before?: (server: MockServer) => void
 }
 
 /**
@@ -58,8 +60,10 @@ export function renderEditor({
   wrap,
   extra,
   content,
+  before,
 }: RenderEditorOptions = {}) {
   const server = createMockServer()
+  before?.(server)
   content?.(server.collaboration.document(documentName(documentId)))
   const base = server.connect({ signedInAs })
   const dataSource = wrap?.(base) ?? base

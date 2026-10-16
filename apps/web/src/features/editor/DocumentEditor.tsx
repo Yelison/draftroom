@@ -2,7 +2,7 @@ import type { Schema } from '@draftroom/contract'
 import { useQuery } from '@tanstack/react-query'
 import { EditorContent } from '@tiptap/react'
 import { Button, buttonClassName } from '@yelison/forma-ui'
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useIntl } from 'react-intl'
 import { Link } from 'react-router'
 import { presenceLookOf } from '../../collab/presenceColor.ts'
@@ -30,7 +30,14 @@ type LinkChange = 'added' | 'updated' | 'removed'
  * in step with the server. What is shown while it opens, and when the connection stops, is the session's: the editor is
  * only there while there is something to show in it.
  */
-export function DocumentEditor({ document }: { document: Schema<'Document'> }) {
+export function DocumentEditor({
+  document,
+  focusHeadline,
+}: {
+  document: Schema<'Document'>
+  /** Where the focus goes when what had it is gone and the text cannot take it: the headline of the screen. */
+  focusHeadline: () => void
+}) {
   const dataSource = useDataSource()
   const session = useCollabSession(document)
   const me = useQuery(meQuery(dataSource))
@@ -45,7 +52,7 @@ export function DocumentEditor({ document }: { document: Schema<'Document'> }) {
   return session === null || person === null ? (
     <EditorSkeleton />
   ) : (
-    <OpenDocument document={document} session={session} person={person} />
+    <OpenDocument document={document} session={session} person={person} focusHeadline={focusHeadline} />
   )
 }
 
@@ -54,15 +61,52 @@ function OpenDocument({
   document,
   session,
   person,
+  focusHeadline,
 }: {
   document: Schema<'Document'>
   session: CollabSession
   person: CollaboratingPerson
+  focusHeadline: () => void
 }) {
   const intl = useIntl()
   const snapshot = useSyncExternalStore(session.subscribe, session.getSnapshot)
-  const stopped = snapshot.state === 'revoked' || (!snapshot.loaded && snapshot.state === 'error')
 
+  // Said here, above the editor that is made again when changes are discarded, and in a region that was in the page before
+  // there was anything to say: an alert that arrives with its text may go unheard, and the notice of discarded changes
+  // arrives together with the new editor.
+  const problem =
+    snapshot.cause !== null
+      ? intl.formatMessage({ id: `sync.problem.${snapshot.cause}.title` })
+      : snapshot.notice !== null
+        ? intl.formatMessage({ id: 'sync.notice.offlineChangesDiscarded.title' })
+        : ''
+
+  return (
+    <>
+      <Shown document={document} session={session} snapshot={snapshot} person={person} focusHeadline={focusHeadline} />
+      <p role="status" className="forma-visually-hidden">
+        {problem}
+      </p>
+    </>
+  )
+}
+
+/** The document, or the reason there is none: loading, access removed, or a connection that could not be opened. */
+function Shown({
+  document,
+  session,
+  snapshot,
+  person,
+  focusHeadline,
+}: {
+  document: Schema<'Document'>
+  session: CollabSession
+  snapshot: CollabSnapshot
+  person: CollaboratingPerson
+  focusHeadline: () => void
+}) {
+  const intl = useIntl()
+  const stopped = snapshot.state === 'revoked' || (!snapshot.loaded && snapshot.state === 'error')
   if (snapshot.state === 'revoked') {
     return (
       <EditorStatePanel
@@ -81,7 +125,15 @@ function OpenDocument({
         title={intl.formatMessage({ id: `sync.problem.${snapshot.cause}.title` })}
         description={intl.formatMessage({ id: `sync.problem.${snapshot.cause}.description` })}
       >
-        <Button onClick={session.retry}>{intl.formatMessage({ id: 'sync.problem.retry' })}</Button>
+        <Button
+          onClick={() => {
+            // The panel becomes the skeleton, and the button goes with it: the focus goes to the headline of the screen.
+            focusHeadline()
+            session.retry()
+          }}
+        >
+          {intl.formatMessage({ id: 'sync.problem.retry' })}
+        </Button>
       </EditorStatePanel>
     )
   }
@@ -95,6 +147,7 @@ function OpenDocument({
       session={session}
       snapshot={snapshot}
       person={person}
+      focusHeadline={focusHeadline}
     />
   )
 }
@@ -104,11 +157,13 @@ function EditorWorkspace({
   session,
   snapshot,
   person,
+  focusHeadline,
 }: {
   document: Schema<'Document'>
   session: CollabSession
   snapshot: CollabSnapshot
   person: CollaboratingPerson
+  focusHeadline: () => void
 }) {
   const intl = useIntl()
   // The role says what the screen offers and the connection what the server allows: the text takes edits only when both do.
@@ -134,16 +189,39 @@ function EditorWorkspace({
     onLinkRequest: requestLink,
   })
 
-  // The button that was pressed to try again is gone when the problem is, and the focus goes to the text, not to the page.
-  const retry = () => {
-    editor.commands.focus()
-    session.retry()
+  // The button that was pressed is gone when what it answered is, and the focus must not fall to the page. It goes to the text
+  // when the text takes it, and to the headline of the screen until it does (a text that is not editable takes no focus, and
+  // after a stopped error it only is once the connection is back). A text that was made again after changes were discarded
+  // is one the person did not make, and they are put in it as soon as it accepts typing.
+  const textWantsFocus = useRef(snapshot.generation > 1)
+  useEffect(() => {
+    if (textWantsFocus.current && editable) {
+      textWantsFocus.current = false
+      editor.commands.focus()
+    }
+  })
+
+  function handBackFocus() {
+    if (editable) {
+      editor.commands.focus()
+      return
+    }
+    focusHeadline()
+    textWantsFocus.current = true
   }
 
-  // What was discarded and loaded again is a text the person did not make: they are put in it once it accepts typing.
-  useEffect(() => {
-    if (snapshot.generation > 1 && editable) editor.commands.focus('start')
-  }, [editor, snapshot.generation, editable])
+  const retry = () => {
+    handBackFocus()
+    session.retry()
+  }
+  const discard = () => {
+    focusHeadline()
+    session.discardAndReload()
+  }
+  const dismissNotice = () => {
+    focusHeadline()
+    session.dismissNotice()
+  }
 
   const people = useMemo<PresenceEntry[]>(
     () =>
@@ -184,12 +262,7 @@ function EditorWorkspace({
           <SyncStatus state={snapshot.state} />
         </div>
       </div>
-      <SyncAlerts
-        snapshot={snapshot}
-        onRetry={retry}
-        onDiscard={session.discardAndReload}
-        onDismissNotice={session.dismissNotice}
-      />
+      <SyncAlerts snapshot={snapshot} onRetry={retry} onDiscard={discard} onDismissNotice={dismissNotice} />
       <div className={styles.sheet}>
         <TitleField document={document} editable={mayEdit} onEnter={() => editor.commands.focus('start')} />
         <EditorContent editor={editor} />
