@@ -274,15 +274,17 @@ describe('when the server ends the connection', () => {
     expect(world.server.abortedConnections).toBe(0)
   })
 
-  it('stores what the person writes after discarding, and nothing of what was discarded stands in the way', async () => {
+  it('stores what the person writes after discarding, and what was discarded does not stand in the way', async () => {
     world = createWorld()
     const opening = await opened()
-    world.server.holdStores()
-    typeInto(opening.doc, 'acknowledged, never stored')
-    await advance(100)
-    world.server.closeConnections(4413, 'document-too-large')
+    await typeAndStore(opening, 'stored text')
+    // Written offline and too large to send: the server refuses the message and none of it ever reaches it.
+    world.network.set(false)
     await advance(50)
-    world.server.releaseStores()
+    typeInto(opening.doc, 'z'.repeat(MAX_MESSAGE_BYTES + 1000), 0)
+    world.network.set(true)
+    await advance(100)
+    expect(opening.session.getSnapshot()).toMatchObject({ state: 'error', cause: 'document-too-large' })
 
     opening.session.discardAndReload()
     await advance(50)
@@ -290,6 +292,7 @@ describe('when the server ends the connection', () => {
     await advance(1100)
 
     expect(opening.session.getSnapshot().state).toBe('synced')
+    expect(textOf(world.server.document(wireName))).toBe(' and then morestored text')
   })
 
   it('does nothing when asked to discard and reload from an error that is not about size', async () => {
