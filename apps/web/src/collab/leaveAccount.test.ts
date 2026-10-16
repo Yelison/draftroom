@@ -141,6 +141,45 @@ describe('leaving an account with copies that hold changes that were never store
   })
 })
 
+describe('leaving an account in a browser that cannot say what it keeps', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it.each([
+    { case: 'there is no storage', arrange: () => vi.stubGlobal('indexedDB', undefined) },
+    {
+      case: 'reading the storage is refused',
+      arrange: () =>
+        Object.defineProperty(globalThis, 'indexedDB', {
+          configurable: true,
+          get: () => {
+            throw new DOMException('The operation is insecure.', 'SecurityError')
+          },
+        }),
+    },
+  ])('has nothing to remove and does not ask when $case', async ({ arrange }) => {
+    arrange()
+    const confirm = answering(true)
+
+    const outcome = await leaving({ userId: 'u1', network: fakeNetwork(), confirm })
+
+    expect(outcome).toEqual({ purged: true })
+    expect(confirm).not.toHaveBeenCalled()
+  })
+
+  it('fails when the storage cannot list its copies, instead of leaving as if there were none', async () => {
+    vi.stubGlobal('indexedDB', { open: () => ({}) })
+    const confirm = answering(true)
+
+    const failure = expect(leaveAccount({ userId: 'u1', network: fakeNetwork(), confirm })).rejects.toThrow(
+      'This browser cannot list the copies it keeps',
+    )
+    await advance(100)
+
+    await failure
+    expect(confirm).not.toHaveBeenCalled()
+  })
+})
+
 describe('leaving an account while a document is open and storing what the person wrote', () => {
   it('waits for the server to store it, and then leaves without asking', async () => {
     world = createWorld()

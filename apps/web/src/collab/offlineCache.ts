@@ -204,8 +204,14 @@ function deleteCopy(name: string, closing: Promise<void>): Promise<void> {
 
 // --- Every copy of an account (sign-out and account switch, protocol section 12.2) ---------------------------------
 
-/** The names of the copies of an account on this device, open or not. */
+/**
+ * The names of the copies of an account on this device, open or not. A browser that keeps nothing has none. One that keeps
+ * copies and cannot list them is an error and not an empty answer: leaving an account must not go on as if there was
+ * nothing to remove.
+ */
 export async function copiesOf(userId: string): Promise<string[]> {
+  if (!keepsStorage()) return []
+  if (typeof indexedDB.databases !== 'function') throw new Error('This browser cannot list the copies it keeps')
   const prefix = accountPrefix(userId)
   const databases = await indexedDB.databases()
   return databases.flatMap(({ name }) => (name?.startsWith(prefix) ? [name] : []))
