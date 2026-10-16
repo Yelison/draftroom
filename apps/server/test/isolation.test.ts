@@ -3,6 +3,7 @@ import type { Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, notFound, type Api, type Call } from './support/api.ts'
+import { anchor, createThread, quote } from './support/comments.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
 import { createDocument, createFolder, createPerson, createWorkspace, join, type Person } from './support/world.ts'
@@ -31,9 +32,9 @@ interface Setting {
   readonly zoe: Person
   readonly workspaceId: string
   /** What belongs to the other workspace, where Alice is nobody. */
-  readonly foreign: { workspaceId: string; documentId: string; folderId: string }
-  /** Documents of Alice's own workspace that she cannot read: private to Bruno. */
-  readonly hiddenDocumentId: string
+  readonly foreign: Ids
+  /** A document of Alice's own workspace that she cannot read: private to Bruno, with a thread of his in it. */
+  readonly hidden: { documentId: string; threadId: string; commentId: string }
 }
 
 let setting: Setting
@@ -47,18 +48,24 @@ beforeAll(async () => {
   await join(db, workspaceId, bruno)
   const otherId = await createWorkspace(db, 'Almazara')
   await join(db, otherId, bruno, 'owner')
+  // Open to everyone in its workspace: if the boundary between workspaces is lost, a person who belongs to another one
+  // would read and edit it, where a private document would still look not-found.
+  const foreignDocumentId = await createDocument(db, { workspaceId: otherId, creator: bruno, generalAccess: 'editor' })
+  const hiddenDocumentId = await createDocument(db, { workspaceId, creator: bruno })
   setting = {
     alice,
     zoe,
     workspaceId,
     foreign: {
       workspaceId: otherId,
-      // Open to everyone in its workspace: if the boundary between workspaces is lost, a person who belongs to
-      // another one would read and edit it, where a private document would still look not-found.
-      documentId: await createDocument(db, { workspaceId: otherId, creator: bruno, generalAccess: 'editor' }),
+      documentId: foreignDocumentId,
       folderId: await createFolder(db, otherId),
+      ...(await createThread(db, { workspaceId: otherId, documentId: foreignDocumentId, author: bruno })),
     },
-    hiddenDocumentId: await createDocument(db, { workspaceId, creator: bruno }),
+    hidden: {
+      documentId: hiddenDocumentId,
+      ...(await createThread(db, { workspaceId, documentId: hiddenDocumentId, author: bruno })),
+    },
   }
 })
 
@@ -66,6 +73,8 @@ interface Ids {
   readonly workspaceId: string
   readonly documentId: string
   readonly folderId: string
+  readonly threadId: string
+  readonly commentId: string
 }
 
 const routes: readonly (readonly [string, (ids: Ids) => Omit<Call, 'as'>])[] = [
@@ -105,9 +114,35 @@ const routes: readonly (readonly [string, (ids: Ids) => Omit<Call, 'as'>])[] = [
   ['deleteDocument', ({ documentId }) => ({ method: 'DELETE', url: `/api/documents/${documentId}` })],
   ['pinDocument', ({ documentId }) => ({ method: 'PUT', url: `/api/documents/${documentId}/pin` })],
   ['unpinDocument', ({ documentId }) => ({ method: 'DELETE', url: `/api/documents/${documentId}/pin` })],
+  ['listThreads', ({ documentId }) => ({ method: 'GET', url: `/api/documents/${documentId}/threads` })],
+  [
+    'createThread',
+    ({ documentId }) => ({
+      method: 'POST',
+      url: `/api/documents/${documentId}/threads`,
+      body: { anchor, quote, body: 'A comment' },
+    }),
+  ],
+  [
+    'replyToThread',
+    ({ threadId }) => ({ method: 'POST', url: `/api/threads/${threadId}/replies`, body: { body: 'A comment' } }),
+  ],
+  ['resolveThread', ({ threadId }) => ({ method: 'POST', url: `/api/threads/${threadId}/resolve` })],
+  ['reopenThread', ({ threadId }) => ({ method: 'POST', url: `/api/threads/${threadId}/reopen` })],
+  [
+    'updateComment',
+    ({ commentId }) => ({ method: 'PATCH', url: `/api/comments/${commentId}`, body: { body: 'Edited' } }),
+  ],
+  ['deleteComment', ({ commentId }) => ({ method: 'DELETE', url: `/api/comments/${commentId}` })],
 ]
 
-const missing = (): Ids => ({ workspaceId: randomUUID(), documentId: randomUUID(), folderId: randomUUID() })
+const missing = (): Ids => ({
+  workspaceId: randomUUID(),
+  documentId: randomUUID(),
+  folderId: randomUUID(),
+  threadId: randomUUID(),
+  commentId: randomUUID(),
+})
 
 describe.each(routes)('%s', (_operationId, call) => {
   // Alice belongs to a workspace and Zoe owns one: the id of a third must not open for either.
@@ -134,10 +169,17 @@ describe('a document of her own workspace that Alice cannot read', () => {
   it.each(routes.filter(([operationId]) => /Document$/.test(operationId) && operationId !== 'createDocument'))(
     'answers %s as an id that does not exist',
     async (_operationId, call) => {
-      const asked = await api({
-        as: setting.alice,
-        ...call({ ...setting.foreign, documentId: setting.hiddenDocumentId }),
-      })
+      const asked = await api({ as: setting.alice, ...call({ ...setting.foreign, ...setting.hidden }) })
+
+      expect(asked).toMatchObject({ statusCode: 404, body: notFound })
+    },
+  )
+
+  // Its threads and comments are hers to know about exactly when the document is: asking by their own ids changes nothing.
+  it.each(routes.filter(([operationId]) => /Thread|Comment/.test(operationId)))(
+    'answers %s, for its threads and comments, as an id that does not exist',
+    async (_operationId, call) => {
+      const asked = await api({ as: setting.alice, ...call({ ...setting.foreign, ...setting.hidden }) })
 
       expect(asked).toMatchObject({ statusCode: 404, body: notFound })
     },

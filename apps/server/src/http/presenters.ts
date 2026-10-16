@@ -1,4 +1,5 @@
 import type { Schema } from '@draftroom/contract'
+import type { CommentRecord, PersonRef, ThreadRecord } from '../db/comments/queries.ts'
 import { roleOf, type DocumentRecord } from '../db/documents/caller-documents.ts'
 import type { FolderRow } from '../db/folders.ts'
 import type { WorkspaceOfMember } from '../db/workspaces.ts'
@@ -52,3 +53,31 @@ export function presentReadable(record: DocumentRecord): Schema<'Document'> {
   if (role === null) throw new Error(`The list holds document ${record.id}, which its reader has no role on`)
   return presentDocument(record, role)
 }
+
+/** Every person who comments has signed up, and a person who signed up has a name. */
+function presentPerson(person: PersonRef, part: string): Schema<'UserRef'> {
+  if (person.name === null) throw new Error(`The ${part} ${person.id} has no name`)
+  return { id: person.id, name: person.name }
+}
+
+export const presentComment = (comment: CommentRecord): Schema<'Comment'> => ({
+  id: comment.id,
+  threadId: comment.thread_id,
+  author: presentPerson(comment.author, `author of comment ${comment.id}`),
+  body: comment.body,
+  createdAt: comment.created_at.toISOString(),
+  updatedAt: comment.updated_at.toISOString(),
+})
+
+export const presentThread = (thread: ThreadRecord): Schema<'Thread'> => ({
+  id: thread.id,
+  documentId: thread.document_id,
+  status: thread.resolved_at === null ? 'open' : 'resolved',
+  anchor: { start: thread.anchor_start, end: thread.anchor_end },
+  quote: thread.quote,
+  createdBy: presentPerson(thread.creator, `creator of thread ${thread.id}`),
+  createdAt: thread.created_at.toISOString(),
+  resolvedAt: thread.resolved_at?.toISOString() ?? null,
+  resolvedBy: thread.resolver === null ? null : presentPerson(thread.resolver, `resolver of thread ${thread.id}`),
+  comments: thread.comments.map(presentComment),
+})

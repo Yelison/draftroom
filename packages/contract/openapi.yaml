@@ -2724,12 +2724,12 @@ components:
         start:
           type: string
           pattern: ^[A-Za-z0-9+/]+={0,2}$
-          maxLength: 256
+          maxLength: 128
           description: Base64 `Y.encodeRelativePosition` with `assoc = 0`.
         end:
           type: string
           pattern: ^[A-Za-z0-9+/]+={0,2}$
-          maxLength: 256
+          maxLength: 128
           description: Base64 `Y.encodeRelativePosition` with `assoc = -1`.
     Comment:
       type: object

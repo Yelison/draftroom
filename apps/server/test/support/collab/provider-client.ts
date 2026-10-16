@@ -106,6 +106,29 @@ export class DocumentClient {
     return this.stateless.filter((event) => event.type === 'stored')
   }
 
+  /** The `comments-changed` events received, in order. */
+  get commentEvents(): readonly Extract<StatelessEvent, { type: 'comments-changed' }>[] {
+    return this.stateless.filter((event) => event.type === 'comments-changed')
+  }
+
+  /** At least `count` `comments-changed` events have arrived. */
+  waitForCommentEvents(count: number): Promise<readonly Extract<StatelessEvent, { type: 'comments-changed' }>[]> {
+    return this.waiter.until(
+      () => (this.commentEvents.length >= count ? this.commentEvents : undefined),
+      `${count} comments-changed events`,
+    )
+  }
+
+  /** Every `comments-changed` event received, once one the predicate accepts has arrived. */
+  waitForCommentEventsUntil(
+    accepts: (event: Extract<StatelessEvent, { type: 'comments-changed' }>) => boolean,
+  ): Promise<readonly Extract<StatelessEvent, { type: 'comments-changed' }>[]> {
+    return this.waiter.until(
+      () => (this.commentEvents.some(accepts) ? this.commentEvents : undefined),
+      'a comments-changed event to arrive',
+    )
+  }
+
   waitForScope(): Promise<AuthorizedScope> {
     return this.waiter.until(() => this.scope, 'the connection to be authorised')
   }

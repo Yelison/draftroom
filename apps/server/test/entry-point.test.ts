@@ -3,6 +3,8 @@ import { once } from 'node:events'
 import { createServer } from 'node:net'
 import { createInterface } from 'node:readline'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { devUserHeader } from '../src/http/auth/devIdentity.ts'
+import { anchor, quote } from './support/comments.ts'
 import { appendParagraph, storedParagraphs } from './support/collab/content.ts'
 import { ClientSet } from './support/collab/provider-client.ts'
 import { RawClient } from './support/collab/raw-client.ts'
@@ -102,4 +104,29 @@ describe('the server process', () => {
     expect(performance.now() - stopped).toBeLessThan(8_000)
     idle.terminate()
   }, 20_000)
+
+  it('tells the people who have a document open when a comment is written, through the one process that serves both', async () => {
+    const workspaceId = await createWorkspace(database.db)
+    const owner = await createPerson(database.db, 'Marta Ruiz')
+    await join(database.db, workspaceId, owner, 'owner')
+    const documentId = await createDocument(database.db, { workspaceId, creator: owner })
+    const { apiPort, collabPort } = await start()
+    const clients = new ClientSet(`ws://127.0.0.1:${collabPort}`)
+    try {
+      const reader = clients.open(documentId, { email: owner.email })
+      await reader.waitForSynced()
+
+      const response = await fetch(`http://127.0.0.1:${apiPort}/api/documents/${documentId}/threads`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', [devUserHeader]: owner.email },
+        body: JSON.stringify({ anchor, quote, body: 'Does the workshop fit before then?' }),
+      })
+      const { id } = (await response.json()) as { id: string }
+
+      expect(response.status).toBe(201)
+      expect(await reader.waitForCommentEvents(1)).toEqual([{ type: 'comments-changed', threadId: id }])
+    } finally {
+      clients.destroyAll()
+    }
+  }, 15_000)
 })
