@@ -140,11 +140,13 @@ export const sessionChanges = ['signUp', 'signIn', 'signOut'] as const satisfies
 type ChangeEvent = Exclude<StatelessEvent['type'], 'stored' | 'document-too-large'>
 
 export const eventInvalidations = {
-  'metadata-changed': ['document', 'documentLists'],
-  'access-changed': ['access', 'document', 'shared'],
+  'metadata-changed': ['document'],
+  'access-changed': ['access', 'shared'],
+  // The protocol also says "and that thread", and there is no query of one thread: the list is what shows it.
   'comments-changed': ['threads'],
   'versions-changed': ['versions'],
-  'document-archived': ['document', 'documentLists'],
+  // The archived state the protocol says to show is read from the document.
+  'document-archived': ['document'],
 } as const satisfies Record<ChangeEvent, readonly InvalidationName[]>
 
 const resolve = (names: readonly InvalidationName[], scope: Scope): QueryKey[] =>
