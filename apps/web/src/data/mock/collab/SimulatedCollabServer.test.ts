@@ -165,4 +165,21 @@ describe('the simulated collaboration server, read by the real provider', () => 
 
     await vi.waitFor(() => expect(closed).toHaveBeenCalledWith({ event: expect.objectContaining({ code: 4205 }) }))
   })
+
+  it('delivers what was sent before a close ahead of the close, in order, as the real transport does', async () => {
+    const server = serverWith()
+    const { provider } = join(server, ana)
+    await vi.waitFor(() => expect(provider.synced).toBe(true))
+    const heard: string[] = []
+    provider.on('stateless', ({ payload }: { payload: string }) =>
+      heard.push(parseStatelessEvent(payload)?.type ?? '?'),
+    )
+    provider.on('close', () => heard.push('close'))
+
+    server.broadcast(name, { type: 'access-changed' })
+    server.closeConnections(4403, 'access-revoked')
+
+    await vi.waitFor(() => expect(heard).toContain('close'))
+    expect(heard).toEqual(['access-changed', 'close'])
+  })
 })

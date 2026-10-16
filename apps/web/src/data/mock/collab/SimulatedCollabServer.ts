@@ -61,6 +61,7 @@ type Listener = (event: Event) => void
 export class SimulatedSocket {
   binaryType = 'arraybuffer'
   readyState = 0
+  private closing = false
   private readonly listeners = new Map<string, Set<Listener>>()
 
   constructor(
@@ -79,7 +80,7 @@ export class SimulatedSocket {
   }
 
   send(data: Uint8Array): void {
-    if (this.readyState === OPEN) this.peer.receive(data)
+    if (this.readyState === OPEN && !this.closing) this.peer.receive(data)
   }
 
   /** The client ends the connection; like a browser's, the close is reported afterwards and without a code. */
@@ -94,12 +95,18 @@ export class SimulatedSocket {
     for (const listener of this.listeners.get(type) ?? []) listener(event)
   }
 
-  /** @internal Whichever side ends the connection, the client hears one close event and nothing after it. */
+  /**
+   * @internal Whichever side ends the connection, the client hears one close event and nothing after it. What was already on
+   * its way is heard first, in order, as `ws` does it (protocol section 6.3: the event that explains a close arrives before it).
+   */
   end(code: number, reason: string): void {
-    if (this.readyState === CLOSED) return
-    this.readyState = CLOSED
+    if (this.closing || this.readyState === CLOSED) return
+    this.closing = true
     this.peer.drop()
-    queueMicrotask(() => this.dispatch('close', Object.assign(new Event('close'), { code, reason, wasClean: true })))
+    queueMicrotask(() => {
+      this.readyState = CLOSED
+      this.dispatch('close', Object.assign(new Event('close'), { code, reason, wasClean: true }))
+    })
   }
 
   /** @internal */

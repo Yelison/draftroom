@@ -158,7 +158,7 @@ describe('what each row leaves stale in a real cache', () => {
 describe('what each event of the collaboration protocol refreshes (section 9)', () => {
   it.each([
     { event: 'metadata-changed', names: ['document'] },
-    { event: 'access-changed', names: ['access', 'shared'] },
+    { event: 'access-changed', names: ['access', 'document', 'shared'] },
     { event: 'comments-changed', names: ['threads'] },
     { event: 'versions-changed', names: ['versions'] },
     { event: 'document-archived', names: ['document'] },

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { documentName, type StatelessEvent } from '@draftroom/contract/collab'
 import { keysAfterEvent } from '../../data/queryKeys.ts'
-import { daniel } from '../../data/mock/fixtures/index.ts'
+import { daniel, sofia } from '../../data/mock/fixtures/index.ts'
 import { budget, launchPlan, openEditor, people, renderEditor } from './testing/renderEditor.tsx'
 import { joinAsPeer } from './testing/peer.ts'
 
@@ -275,6 +275,28 @@ describe('what was written offline by someone who can only read now', () => {
     expect(document.body).not.toHaveFocus()
     expect(screen.getByRole('heading', { level: 1, name: 'Autumn launch plan' })).toHaveFocus()
   })
+})
+
+describe('a role that changes while the document is open', () => {
+  it('makes the text editable for a reader who was promoted: the connection and the role both say so', async () => {
+    const { server, text } = await openEditor({ signedInAs: people.sofia })
+    await screen.findByText('Sync status: Read-only')
+    expect(text).toHaveAttribute('contenteditable', 'false')
+    const marta = server.connect({ signedInAs: people.marta })
+
+    // What the server does when a person is made an editor: say that access changed, then end the connection so it is
+    // opened again in the new mode (protocol section 6.3).
+    await marta.setAccess({
+      params: { path: { documentId: launchPlan.id, userId: sofia.id } },
+      body: { role: 'editor' },
+    })
+    act(() => server.collaboration.broadcast(wireName, { type: 'access-changed' }))
+    act(() => server.collaboration.closeConnections(4409, 'role-changed'))
+
+    await waitFor(() => expect(text).toHaveAttribute('contenteditable', 'true'), { timeout: 10_000 })
+    expect(await screen.findByRole('toolbar', { name: 'Formatting' })).toBeInTheDocument()
+    await screen.findByText('Sync status: Synced')
+  }, 30_000)
 })
 
 describe('a dialog that was open when the connection stopped', () => {

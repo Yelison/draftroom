@@ -141,7 +141,8 @@ type ChangeEvent = Exclude<StatelessEvent['type'], 'stored' | 'document-too-larg
 
 export const eventInvalidations = {
   'metadata-changed': ['document'],
-  'access-changed': ['access', 'shared'],
+  // The document too: it carries the caller's role, which is what decides what the editor offers once the mode flips.
+  'access-changed': ['access', 'document', 'shared'],
   // The protocol also says "and that thread", and there is no query of one thread: the list is what shows it.
   'comments-changed': ['threads'],
   'versions-changed': ['versions'],
