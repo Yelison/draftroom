@@ -3,6 +3,7 @@ import { Button, buttonClassName } from '@yelison/forma-ui'
 import { useDeferredValue, useState, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import { Link, useParams } from 'react-router'
+import { PageTitle } from '../../components/PageTitle/PageTitle.tsx'
 import { focusMainContent } from '../../app/mainContent.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { DocumentActionDialogs } from './actions/DocumentActionDialogs.tsx'
@@ -73,10 +74,7 @@ export function FolderScreen() {
 
   return (
     <div className={layout.screen}>
-      <title>{intl.formatMessage({ id: 'app.documentTitle' }, { page: heading })}</title>
-      <h1 tabIndex={-1} className={styles.heading}>
-        {heading}
-      </h1>
+      <PageTitle title={heading} />
       {body}
     </div>
   )

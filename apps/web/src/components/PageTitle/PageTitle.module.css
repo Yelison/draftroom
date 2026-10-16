@@ -1,4 +1,6 @@
 .title {
   margin: 0;
   font: var(--font-title);
+  /* A title can hold a long word of the person's own: it breaks instead of widening the page. */
+  overflow-wrap: anywhere;
 }

@@ -11,6 +11,7 @@
 .title {
   margin: 0;
   font: var(--font-section);
+  overflow-wrap: anywhere;
 }
 
 .description {

@@ -3,6 +3,7 @@ import { PageTitle } from '../components/PageTitle/PageTitle.tsx'
 import { DocumentsScreen } from '../features/documents/DocumentsScreen.tsx'
 import { FolderScreen } from '../features/documents/FolderScreen.tsx'
 import { EditorSkeleton } from '../features/editor/EditorSkeleton.tsx'
+import { SearchScreen } from '../features/search/SearchScreen.tsx'
 import { TrashScreen } from '../features/trash/TrashScreen.tsx'
 import type { MessageId } from '../i18n/messages.ts'
 import { AppFrame } from './AppFrame.tsx'
@@ -49,7 +50,7 @@ export const routes: RouteObject[] = [
             ],
           },
           { path: 'trash', Component: TrashScreen, handle: { section: 'documents' } satisfies RouteHandle },
-          { path: 'search', ...screen('screen.search', 'documents') },
+          { path: 'search', Component: SearchScreen, handle: { section: 'documents' } satisfies RouteHandle },
           { path: '*', ...screen('screen.notFound') },
         ],
       },
