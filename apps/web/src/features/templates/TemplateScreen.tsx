@@ -1,6 +1,7 @@
 import { Button, buttonClassName } from '@yelison/forma-ui'
 import { useIntl } from 'react-intl'
 import { Link, useParams } from 'react-router'
+import type { Locale } from '../../i18n/locale.ts'
 import { PageTitle } from '../../components/PageTitle/PageTitle.tsx'
 import { useCreateDocument } from '../documents/actions/useCreateDocument.ts'
 import { problemMessageId } from '../documents/problemMessage.ts'
@@ -20,6 +21,7 @@ export function TemplateScreen() {
   return (
     <div className={styles.screen}>
       {template === undefined ? <PageTitle titleId="screen.template" /> : <PageTitle title={template.name} />}
+      {query.isPending && <TemplateLoading />}
       {query.isError && <TemplatesFailure onRetry={() => void query.refetch()} retrying={query.isFetching} />}
       {query.isSuccess && template === undefined && (
         <StateMessage
@@ -32,13 +34,28 @@ export function TemplateScreen() {
       {template !== undefined && (
         <>
           <p className={styles.description}>{template.description}</p>
-          <WorkspaceGate loading={null}>
+          <WorkspaceGate loading={<div className={styles.actionsPlaceholder} />}>
             {(workspaceId) => (
               <UseTemplate workspaceId={workspaceId} template={{ id: template.id, name: template.name, locale }} />
             )}
           </WorkspaceGate>
         </>
       )}
+    </div>
+  )
+}
+
+/** The measures of what is on its way (the description and the buttons), so nothing moves when it arrives. */
+function TemplateLoading() {
+  const intl = useIntl()
+
+  return (
+    <div aria-busy="true">
+      <div className={styles.descriptionPlaceholder} />
+      <div className={styles.actionsPlaceholder} />
+      <p role="status" className="forma-visually-hidden">
+        {intl.formatMessage({ id: 'templates.loading' })}
+      </p>
     </div>
   )
 }
@@ -55,7 +72,7 @@ function BackToDocuments() {
 
 interface UseTemplateProps {
   workspaceId: string
-  template: { id: string; name: string; locale: 'en' | 'es' }
+  template: { id: string; name: string; locale: Locale }
 }
 
 /** Creates the document from the template and opens it; a refusal is said next to the button that caused it. */

@@ -1,4 +1,6 @@
-import { Dialog, useFormaStrings, Button } from '@yelison/forma-ui'
+import type { Schema } from '@draftroom/contract'
+import { Button, Dialog, useFormaStrings } from '@yelison/forma-ui'
+import { useEffect, useRef } from 'react'
 import { useIntl } from 'react-intl'
 import { Link } from 'react-router'
 import { TemplatesFailure } from './TemplatesFailure.tsx'
@@ -44,9 +46,24 @@ function TemplateChoices() {
       </p>
     )
   }
+  return <TemplateList templates={query.data.items} />
+}
+
+/**
+ * The dialog puts the focus on the first thing it can when it opens: while the templates are on their way that is the
+ * button that closes it. When they arrive the focus moves to the first one, so the keyboard starts where the choice is.
+ */
+function TemplateList({ templates }: { templates: readonly Schema<'Template'>[] }) {
+  const list = useRef<HTMLUListElement>(null)
+  useEffect(() => {
+    const dialog = list.current?.closest('dialog, [role="dialog"]')
+    const focused = document.activeElement
+    if (dialog?.contains(focused) && !list.current?.contains(focused)) list.current?.querySelector('a')?.focus()
+  }, [])
+
   return (
-    <ul className={styles.list}>
-      {query.data.items.map((template) => (
+    <ul ref={list} className={styles.list}>
+      {templates.map((template) => (
         <li key={template.id}>
           <Link to={`/templates/${template.id}`} className={styles.choice}>
             <span className={styles.name}>{template.name}</span>

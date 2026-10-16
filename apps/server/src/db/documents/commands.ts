@@ -16,8 +16,8 @@ export interface NewDocument {
 }
 
 /**
- * Creates a document: its row, its initial content (empty unless it comes from a template), its creator's `owner` grant and the event that says it was created,
- * all or nothing. Sharing starts closed (`general_access` is `none` by default), and the creator is the only owner.
+ * Creates a document: its row, its initial content (empty unless it comes from a template), its creator's `owner`
+ * grant and the event that says it was created, all or nothing. Sharing starts closed (`general_access` is `none` by default), and the creator is the only owner.
  */
 export async function createDocumentRows(trx: Transaction<Database>, document: NewDocument): Promise<string> {
   const { id } = await trx

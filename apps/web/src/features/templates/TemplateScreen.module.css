@@ -21,3 +21,14 @@
   color: var(--color-red-ink);
   font: var(--font-body);
 }
+
+/* The description is one line of body text and the actions are one button, until the real ones are there. */
+.descriptionPlaceholder {
+  height: 1lh;
+  margin: 0 0 var(--space-24);
+  font: var(--font-body);
+}
+
+.actionsPlaceholder {
+  height: var(--button-height);
+}

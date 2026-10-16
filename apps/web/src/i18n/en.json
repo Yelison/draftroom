@@ -171,5 +171,5 @@
   "templates.use": "Use this template",
   "templates.back": "Back to documents",
   "templates.notFound.title": "This template doesn't exist",
-  "templates.notFound.description": "Pick another one from the list."
+  "templates.notFound.description": "Go back to Documents and choose another one."
 }

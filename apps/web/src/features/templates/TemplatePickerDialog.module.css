@@ -18,8 +18,14 @@
   text-decoration: none;
 }
 
-.choice:hover {
+.choice:hover,
+.choice:focus-visible {
   background: var(--color-surface-hover);
+}
+
+.choice:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--space-2);
 }
 
 .name {

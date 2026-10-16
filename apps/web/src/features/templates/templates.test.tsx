@@ -1,5 +1,12 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
+import { AppProviders } from '../../app/AppProviders.tsx'
+import { DataSourceContext } from '../../data/DataSourceContext.ts'
+import { createMockDataSource } from '../../data/mock/createMockDataSource.ts'
+import { LanguageChoice } from '../preferences/LanguageChoice.tsx'
+import { TemplatePickerDialog } from './TemplatePickerDialog.tsx'
 import type { DataSource } from '../../data/DataSource.ts'
 import { ApiError } from '../../data/errors.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
@@ -85,6 +92,24 @@ describe('choosing a template', () => {
     expect(await within(dialog).findByRole('link', { name: /Meeting notes/ })).toBeInTheDocument()
   })
 
+  it('moves the focus from the button that closes it to the first template when they arrive', async () => {
+    let arrive: (() => void) | undefined
+    const { dialog } = await openPicker({
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listTemplates: (request) =>
+          new Promise((resolve) => (arrive = () => resolve(dataSource.listTemplates(request)))),
+      }),
+    })
+    await waitFor(() => expect(arrive).toBeDefined())
+    // A browser puts the focus here when the dialog opens with nothing else to focus; jsdom does not.
+    within(dialog).getByRole('button', { name: 'Close' }).focus()
+
+    await act(async () => arrive?.())
+
+    await waitFor(() => expect(within(dialog).getByRole('link', { name: /Meeting notes/ })).toHaveFocus())
+  })
+
   it('announces a failure and offers to try again', async () => {
     let failures = 1
     const { user, dialog } = await openPicker({
@@ -101,6 +126,32 @@ describe('choosing a template', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Try again' }))
 
     expect(await within(dialog).findByRole('link', { name: /Meeting notes/ })).toBeInTheDocument()
+  })
+})
+
+describe('changing the language while the templates are on screen', () => {
+  it('shows them in the new language, not the ones that were fetched for the old one', async () => {
+    localStorage.removeItem(localeStorageKey)
+    const user = userEvent.setup()
+    try {
+      render(
+        <DataSourceContext value={createMockDataSource()}>
+          <AppProviders>
+            <MemoryRouter>
+              <LanguageChoice onChange={() => undefined} />
+              <TemplatePickerDialog open onClose={() => undefined} />
+            </MemoryRouter>
+          </AppProviders>
+        </DataSourceContext>,
+      )
+      expect(await screen.findByRole('link', { name: /Meeting notes/ })).toBeInTheDocument()
+
+      await user.click(screen.getByRole('radio', { name: 'Español', hidden: true }))
+
+      expect(await screen.findByRole('link', { name: /Notas de reunión/ })).toBeInTheDocument()
+    } finally {
+      localStorage.removeItem(localeStorageKey)
+    }
   })
 })
 
@@ -140,6 +191,23 @@ describe('the page of a template', () => {
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/templates/meeting-notes')
+  })
+
+  it('says it is loading, with room for what comes, and then shows the template', async () => {
+    let arrive: (() => void) | undefined
+    renderScreen('/templates/meeting-notes', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listTemplates: (request) =>
+          new Promise((resolve) => (arrive = () => resolve(dataSource.listTemplates(request)))),
+      }),
+    })
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading templates')
+    expect(screen.queryByRole('button', { name: 'Use this template' })).not.toBeInTheDocument()
+    await waitFor(() => expect(arrive).toBeDefined())
+    await act(async () => arrive?.())
+    expect(await screen.findByRole('button', { name: 'Use this template' })).toBeInTheDocument()
   })
 
   it('says a template does not exist when it is not one of the built-in ones', async () => {
