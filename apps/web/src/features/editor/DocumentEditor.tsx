@@ -39,8 +39,9 @@ export function DocumentEditor({
   focusHeadline: () => void
 }) {
   const dataSource = useDataSource()
-  const session = useCollabSession(document)
   const me = useQuery(meQuery(dataSource))
+  // The id, not the answer: a new answer for the same person must not end the connection and make it again.
+  const session = useCollabSession(document, me.data?.id)
   const person = useMemo<CollaboratingPerson | null>(
     () =>
       me.data === undefined ? null : { id: me.data.id, name: me.data.name, color: presenceLookOf(me.data.id).color },

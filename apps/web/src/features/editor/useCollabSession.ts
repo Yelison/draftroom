@@ -7,21 +7,27 @@ import { useDataSource } from '../../data/useDataSource.ts'
 
 /**
  * The live connection to the document that is open: made when the screen is shown and ended when it is left, one for each
- * opening. It is `null` for the first render, until the screen has mounted.
+ * opening. It is `null` for the first render, until the screen has mounted, and until it is known who is signed in: the
+ * copy this device keeps of the document is that person's (protocol section 12.1), so it cannot be opened before.
  *
  * It is made in an effect, not while rendering. Ending a session closes its connection, and StrictMode runs every effect,
  * its cleanup and the effect again: a session made while rendering would be ended by that cleanup and handed on dead.
  * What other people change in the document (its title, who may open it, comments, versions) arrives as events of the
  * connection, and each makes stale exactly the queries the protocol says it does.
  */
-export function useCollabSession(document: Schema<'Document'>): CollabSession | null {
+export function useCollabSession(document: Schema<'Document'>, userId: string | undefined): CollabSession | null {
   const dataSource = useDataSource()
   const queryClient = useQueryClient()
   const [session, setSession] = useState<CollabSession | null>(null)
   const { id: documentId, workspaceId } = document
 
   useEffect(() => {
-    const opened = createCollabSession({ documentId, ...dataSource.collaboration })
+    if (userId === undefined) return
+    const opened = createCollabSession({
+      documentId,
+      localCopy: { userId, workspaceId },
+      ...dataSource.collaboration,
+    })
     const stopListening = opened.onServerEvent((event) => {
       if (event.type === 'stored' || event.type === 'document-too-large') return
       for (const queryKey of keysAfterEvent(event.type, { workspaceId, documentId })) {
@@ -36,7 +42,7 @@ export function useCollabSession(document: Schema<'Document'>): CollabSession | 
       stopListening()
       opened.destroy()
     }
-  }, [dataSource, documentId, workspaceId, queryClient])
+  }, [dataSource, documentId, workspaceId, userId, queryClient])
 
   return session
 }

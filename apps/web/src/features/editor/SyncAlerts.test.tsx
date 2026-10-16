@@ -6,19 +6,19 @@ import { localeStorageKey } from '../../i18n/locale.ts'
 import type { CollabSnapshot } from '../../collab/session.ts'
 import { SyncAlerts } from './SyncAlerts.tsx'
 
-type Shown = Pick<CollabSnapshot, 'cause' | 'action' | 'notice'>
+type Shown = Pick<CollabSnapshot, 'state' | 'editable' | 'cause' | 'action' | 'notice'>
 
-function show(snapshot: Shown) {
+const nothing: Shown = { state: 'synced', editable: true, cause: null, action: null, notice: null }
+
+function show(snapshot: Partial<Shown>) {
   const handlers = { onRetry: vi.fn(), onDiscard: vi.fn(), onDismissNotice: vi.fn() }
   render(
     <AppProviders>
-      <SyncAlerts snapshot={snapshot} {...handlers} />
+      <SyncAlerts snapshot={{ ...nothing, ...snapshot }} {...handlers} />
     </AppProviders>,
   )
   return { ...handlers, user: userEvent.setup() }
 }
-
-const nothing: Shown = { cause: null, action: null, notice: null }
 
 describe('what is said about the changes when the connection has a problem', () => {
   it('says nothing when there is none', () => {
@@ -69,12 +69,51 @@ describe('what is said about the changes when the connection has a problem', () 
     expect(onDismissNotice).toHaveBeenCalledTimes(1)
   })
 
+  it('tells the person that what they write while offline is on this device only', () => {
+    show({ state: 'offline-local' })
+
+    expect(screen.getByText("You're working offline")).toBeInTheDocument()
+    expect(screen.getByText(/stays on this device until you're back online/)).toBeInTheDocument()
+    // It is a notice, not a way to say it is saved, and there is nothing for the person to press.
+    expect(screen.queryByText(/saved|synced/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    {
+      case: 'a reader who is offline, who has nothing of their own on the device',
+      shown: { state: 'offline-local', editable: false },
+    },
+    { case: 'a connection that is up', shown: { state: 'synced' } },
+    { case: 'a reconnection', shown: { state: 'reconnecting' } },
+  ] as const)('does not say it for $case', ({ shown }) => {
+    const { container } = render(
+      <AppProviders>
+        <SyncAlerts
+          snapshot={{ ...nothing, ...shown }}
+          onRetry={vi.fn()}
+          onDiscard={vi.fn()}
+          onDismissNotice={vi.fn()}
+        />
+      </AppProviders>,
+    )
+
+    expect(container.querySelector('[role]')).toBeNull()
+    expect(screen.queryByText("You're working offline")).not.toBeInTheDocument()
+  })
+
   it('says it in Spanish', () => {
     localStorage.setItem(localeStorageKey, 'es')
-    show({ cause: 'document-too-large', action: 'discard-and-reload', notice: 'offline-changes-discarded' })
+    show({
+      state: 'offline-local',
+      cause: 'document-too-large',
+      action: 'discard-and-reload',
+      notice: 'offline-changes-discarded',
+    })
 
     expect(screen.getByText('Este documento es demasiado grande para seguir editándolo')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Descartar mis cambios locales y recargar' })).toBeInTheDocument()
     expect(screen.getByText('Tus cambios sin conexión no se conservaron')).toBeInTheDocument()
+    expect(screen.getByText('Estás trabajando sin conexión')).toBeInTheDocument()
   })
 })
