@@ -87,6 +87,18 @@ describe('the Trash screen', () => {
   })
 })
 
+describe('the way to the Trash', () => {
+  it('is a link in the toolbar of Documents, and Documents stays the current section there', async () => {
+    const { user, router } = renderScreen('/documents')
+
+    await user.click(await screen.findByRole('link', { name: 'Trash' }))
+
+    await heading()
+    expect(router.state.location.pathname).toBe('/trash')
+    expect(screen.getAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual(['Documents'])
+  })
+})
+
 describe('the pages of the Trash screen', () => {
   const onePerPage = (dataSource: DataSource): DataSource => ({
     ...dataSource,
