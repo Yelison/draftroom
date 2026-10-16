@@ -2,7 +2,7 @@ import { sql, type Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, type Api, type Call } from './support/api.ts'
-import { whileHeld } from './support/overlap.ts'
+import { observingLockWaits, whileHeld } from './support/overlap.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
 import { createDocument, createPerson, createWorkspace, grant, join, type Person } from './support/world.ts'
@@ -126,6 +126,7 @@ describe('a person whose authority is taken away at the moment they act', () => 
             .execute()
         },
         () => [api({ as: setting.actor, ...call(setting) })],
+        { waitUntilBlocked: true },
       )
 
       // No grant and nothing from the general access: the document does not exist for them any more.
@@ -154,6 +155,7 @@ describe('a person whose authority is taken away at the moment they act', () => 
             .execute()
         },
         () => [api({ as: setting.actor, ...call(setting) })],
+        { waitUntilBlocked: true },
       )
 
       expect(answer?.statusCode).toBe(404)
@@ -181,6 +183,7 @@ describe('a person whose authority is taken away at the moment they act', () => 
             .execute()
         },
         () => [api({ as: setting.actor, ...call(setting) })],
+        { waitUntilBlocked: true },
       )
 
       // Still a member of the workspace, so it exists for them, and what they may do in it is not this.
@@ -193,7 +196,10 @@ describe('a person whose authority is taken away at the moment they act', () => 
   )
 })
 
-/** Makes a commit to these tables take a while, so that a change that does not wait for the lock reads what is not there yet. */
+/**
+ * Makes a commit to these tables take a while, so that a change that does not wait for the lock reads what is not there
+ * yet, and checks that the changes did wait for each other.
+ */
 async function whileCommitsAreSlow<T>(tables: readonly string[], run: () => Promise<T>): Promise<T> {
   await sql`create or replace function slow_commit() returns trigger language plpgsql as $$
     begin perform pg_sleep(0.4); return null; end $$`.execute(db)
@@ -202,7 +208,11 @@ async function whileCommitsAreSlow<T>(tables: readonly string[], run: () => Prom
       deferrable initially deferred for each row execute function slow_commit()`.execute(db)
   }
   try {
-    return await run()
+    const { result, sawWaiting } = await observingLockWaits(db, run)
+    // The changes did queue behind each other. Without it they might not have overlapped at all, and a change that took
+    // no lock would pass for having been refused.
+    expect(sawWaiting).toBe(true)
+    return result
   } finally {
     for (const table of tables)
       await sql`drop trigger ${sql.id(`${table}_slow_commit`)} on ${sql.table(table)}`.execute(db)
