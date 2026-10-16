@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { peersOf } from './awareness.ts'
+import { isPresenceColor, peersOf } from './awareness.ts'
 
 const state = (id: string, name = `Name of ${id}`, color = '#336699') => ({ user: { id, name, color } })
 
@@ -37,5 +37,27 @@ describe('the people in the document', () => {
     { what: 'text', value: 'ana' },
   ])('shows nobody for $what', ({ value }) => {
     expect(peersOf(new Map<number, unknown>([[2, value]]), 1)).toEqual([])
+  })
+})
+
+describe('the colour of a person', () => {
+  it.each(['#336699', '#AABBCC', '#0a0B0c'])('accepts %s', (color) => {
+    expect(isPresenceColor(color)).toBe(true)
+  })
+
+  it.each([
+    '#369',
+    '#33669',
+    '#3366999',
+    '336699',
+    'red',
+    'red; background: url(x)',
+    '#33669g',
+    '',
+    12,
+    null,
+    undefined,
+  ])('refuses %s, which is not safe in a style', (color) => {
+    expect(isPresenceColor(color)).toBe(false)
   })
 })

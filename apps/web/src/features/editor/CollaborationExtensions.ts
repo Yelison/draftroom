@@ -3,6 +3,7 @@ import type { HocuspocusProvider } from '@hocuspocus/provider'
 import { Collaboration } from '@tiptap/extension-collaboration'
 import { CollaborationCaret } from '@tiptap/extension-collaboration-caret'
 import type * as Y from 'yjs'
+import { isPresenceColor } from '../../collab/awareness.ts'
 import styles from './Prose.module.css'
 
 /** Who this person is to the others: the id is what the server checks, and it replaces the name with its own. */
@@ -12,14 +13,11 @@ export interface CollaboratingPerson {
   color: string
 }
 
-const COLOR = /^#[0-9a-fA-F]{6}$/
-
 /** The caret of someone else: a bar in their colour with their name over it. The name is text, never markup. */
 function renderCaret(user: Record<string, unknown>): HTMLElement {
   const caret = document.createElement('span')
   caret.className = styles.caret ?? ''
-  if (typeof user['color'] === 'string' && COLOR.test(user['color']))
-    caret.style.setProperty('--caret-color', user['color'])
+  if (isPresenceColor(user['color'])) caret.style.setProperty('--caret-color', user['color'])
   const label = document.createElement('span')
   label.className = styles.caretLabel ?? ''
   label.textContent = typeof user['name'] === 'string' ? user['name'] : ''
@@ -49,7 +47,7 @@ export function collaborationExtensions({
       selectionRender: (user) => ({
         nodeName: 'span',
         class: styles.selection ?? '',
-        style: `--caret-color: ${COLOR.test(String(user['color'])) ? String(user['color']) : 'transparent'}`,
+        style: `--caret-color: ${isPresenceColor(user['color']) ? user['color'] : 'transparent'}`,
       }),
     }),
   ]

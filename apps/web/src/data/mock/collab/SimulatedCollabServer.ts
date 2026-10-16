@@ -7,6 +7,7 @@ import {
   type StatelessEvent,
 } from '@draftroom/contract/collab'
 import * as Y from 'yjs'
+import { isPresenceColor, isRecord } from '../../../collab/awareness.ts'
 import { toBase64 } from '../../../collab/base64.ts'
 import { AuthType, FrameReader, FrameWriter, MessageType, SyncType } from './wire.ts'
 
@@ -445,11 +446,10 @@ export class Connection {
 
 /** What the awareness guard (protocol section 5.3) lets through: the person, under the name the server knows, and the caret. */
 function guardedState(state: unknown, { userId, displayName }: Identity): Record<string, unknown> | null {
-  if (typeof state !== 'object' || state === null) return null
-  const { user, cursor } = state as { user?: unknown; cursor?: unknown }
-  if (typeof user !== 'object' || user === null) return null
-  const { id, color } = user as { id?: unknown; color?: unknown }
-  if (id !== userId || typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) return null
+  if (!isRecord(state) || !isRecord(state['user'])) return null
+  const { id, color } = state['user']
+  if (id !== userId || !isPresenceColor(color)) return null
+  const { cursor } = state
   return { user: { id: userId, name: displayName, color }, ...(cursor === undefined ? {} : { cursor }) }
 }
 
@@ -591,7 +591,7 @@ export class SimulatedCollabServer {
     for (const room of this.rooms.values()) for (const connection of [...room.connections]) connection.endInBand(reason)
   }
 
-  /** Sends a stateless event to every connection of the document, or to the writable ones for `stored`. */
+  /** Sends a stateless event to every connection of the document, readers included: the events a test makes it send are the ones every connection gets. */
   broadcast(documentName: string, event: StatelessEvent): void {
     const room = this.roomOf(documentName)
     for (const connection of room.connections) connection.deliver(connection.stateless(room, event))

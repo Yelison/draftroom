@@ -9,12 +9,16 @@ export interface Peer {
 // anything else is not shown.
 const COLOR = /^#[0-9a-fA-F]{6}$/
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+/** Whether a value is a colour a presence state may carry: the only form the server relays, and the one that is safe in a style. */
+export const isPresenceColor = (value: unknown): value is string => typeof value === 'string' && COLOR.test(value)
+
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
 
 function peerOf(state: unknown): Peer | null {
   if (!isRecord(state) || !isRecord(state['user'])) return null
   const { id, name, color } = state['user']
-  if (typeof id !== 'string' || typeof name !== 'string' || typeof color !== 'string' || !COLOR.test(color)) return null
+  if (typeof id !== 'string' || typeof name !== 'string' || !isPresenceColor(color)) return null
   return { userId: id, name, color }
 }
 
