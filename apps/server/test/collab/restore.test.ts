@@ -19,7 +19,7 @@ import {
   storeState,
 } from '../support/collab/content.ts'
 import { forbiddenContent } from '../support/collab/forbidden-content.ts'
-import { startCollab, type CollabHarness } from '../support/collab/harness.ts'
+import { fastTiming, startCollab, type CollabHarness } from '../support/collab/harness.ts'
 import { ClientSet, type DocumentClient } from '../support/collab/provider-client.ts'
 import { provisionDatabase, type TestDatabase } from '../support/postgres.ts'
 import { createTestApp, type TestApp } from '../support/test-app.ts'
@@ -79,6 +79,8 @@ interface WorldOptions {
   readonly versions?: (real: RestoreVersions) => RestoreVersions
   /** Wraps where the document state is stored, for a write that takes its time. */
   readonly store?: (real: StateStore) => StateStore
+  /** How long the server waits after a change to store the document; long, so that no store takes the mutex unannounced. */
+  readonly debounceMs?: number
 }
 
 interface World {
@@ -92,8 +94,11 @@ interface World {
 }
 
 /** The REST app wired to a collaboration server as the process wires them. */
-async function startWorld({ versions, store }: WorldOptions = {}): Promise<World> {
+async function startWorld({ versions, store, debounceMs }: WorldOptions = {}): Promise<World> {
   const collab = await startCollab(db, {
+    ...(debounceMs === undefined
+      ? {}
+      : { timing: { ...fastTiming, debounceMs, maxDebounceMs: Math.max(debounceMs, fastTiming.maxDebounceMs) } }),
     restoreVersions: (versions ?? ((real) => real))(postgresRestoreVersions(db)),
     store: (store ?? ((real) => real))(createPostgresStateStore(db)),
   })
@@ -443,7 +448,8 @@ describe('the sequence of a restore, when the document changes under it or the d
   })
 
   it("closes the direct connection only after it has released the document's mutex, so the two never wait for each other", async () => {
-    world = await startWorld()
+    // No store of its own is due while this runs, so a locked mutex at the moment of closing could only be the restore's.
+    world = await startWorld({ debounceMs: 60_000 })
     const hocuspocus = world.collab.server.hocuspocus
     const open = hocuspocus.openDirectConnection.bind(hocuspocus)
     const lockedWhenClosed: boolean[] = []
