@@ -265,7 +265,7 @@ A client that reopens a document with a local copy has nothing new to send; the 
 The client keeps one value, `pending`: a Yjs update, or nothing.
 
 - Every change made by this client is merged into `pending` with `Y.mergeUpdates` (a change is a document update whose origin is neither the provider nor the local cache).
-- On open, when a local copy exists, **all of its content** is `pending` until proven stored. (The client cannot tell which part of an offline copy the server already has.)
+- On open, when a local copy exists **and carries the `unsynced` marker (§12.2)**, all of its content is `pending` until proven stored. (The client cannot tell which part of a marked copy the server already has.) A copy without the marker holds only what the server stored, and `pending` starts as nothing: counting it as the person's changes would tell a reader, who never wrote anything, that their offline changes were discarded (§12.4).
 - On a `stored` event the client decodes `snapshot` (base64 to bytes, `Y.decodeSnapshot`). If `pending` is nothing, or `Y.snapshotContainsUpdate(snapshot, pending)` is true, `pending` becomes nothing and the event is delivered to the state machine as `{ type: 'stored', coversLocalChanges: true }`; otherwise `pending` is kept and `coversLocalChanges` is `false`. Containment checks every struct clock and every deleted range of `pending`.
 - `pending` survives reconnections. It is dropped only by the purge of §12.
 
@@ -534,7 +534,12 @@ sequenceDiagram
 | Sign-out                                       | every copy whose name starts with `draftroom:<userId>:`            |
 | Account switch                                 | every copy of the previous account                                 |
 
-A copy may hold changes the server never stored, and a purge would destroy them. Each copy therefore carries an `unsynced` marker: set when `pending` becomes non-empty, cleared when a covering `stored` empties it. **Sign-out and account switch** check the markers first: if any copy has one, the app waits (bounded, a few seconds) for the copies to store while online; if some remain, it names how many documents have changes that were never stored and asks for confirmation before purging. Without a marker, or after confirmation, it purges. A revocation purges without asking, because nothing may be uploaded after it.
+A copy may hold changes the server never stored, and a purge would destroy them. Each copy therefore carries an `unsynced` marker, kept in the copy itself so that deleting the copy deletes it. The copy is one database shared by every tab of the account, so **the copy, not the session, sets and clears it**:
+
+- **Set** on every change of the person (a local Yjs transaction that adds or deletes something), never on what the server or the cache itself applies. It is written in an IndexedDB transaction whose scope includes the updates store and that is created while the change is still being announced (Yjs emits `afterTransaction` before `update`, where `y-indexeddb` creates its own). IndexedDB runs transactions with overlapping scopes in the order they were created, so the marker is committed first: a tab that dies in between leaves a marker without its change, never a change without its marker. Nothing remembers that it was set, so a marker cleared by another tab is set again by the next change.
+- **Cleared** only when a `stored` snapshot contains **everything the copy holds**, not only this tab's `pending`: in one transaction over the updates and the marker it reads the updates, merges them (`Y.mergeUpdates`), checks `Y.snapshotContainsUpdate` and deletes the marker. A tab whose own changes were stored therefore never clears the marker over changes another tab wrote, and a change that arrives meanwhile is not missed.
+
+**Sign-out and account switch** check the markers first: if any copy has one, the app waits (bounded, a few seconds) for the copies to store while online; if some remain, it names how many documents have changes that were never stored and asks for confirmation before purging. Without a marker, or after confirmation, it purges. A revocation purges without asking, because nothing may be uploaded after it.
 
 ### 12.3 No pre-authentication backlog
 
@@ -588,6 +593,7 @@ The handshake after a reconnection sends everything the server lacks in one Sync
 | Pre-authentication backlog         | the client must not queue offline edits (§12.3)                                                                  | F9, F10                                                          |
 | Unsent changes                     | a budget of `MAX_UNSENT_BYTES`; the editor stops above it (§12.5)                                               | F7                                                               |
 | Sign-out with unstored changes     | markers on copies, wait, then confirm (§12.2)                                                                    | a purge would destroy changes the server never stored            |
+| Copy opened with and without marker | all of a marked copy is `pending`; an unmarked copy is not (§7.4); the copy sets and clears the marker for every tab (§12.2) | a reader's copy is not changes; tabs share one copy              |
 | Stateless compatibility            | an existing event never gains fields; a new type instead (§9)                                                    | strict parsing in older tabs                                     |
 
 ## 15. Tests this protocol requires
