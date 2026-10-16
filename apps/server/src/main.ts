@@ -1,3 +1,4 @@
+import { broadcastToDocument } from './collab/broadcastToDocument.ts'
 import { createCollabServer } from './collab/server.ts'
 import { ConfigError, loadConfig } from './config.ts'
 import { createDatabase } from './db/database.ts'
@@ -20,7 +21,17 @@ function readConfig() {
 const config = readConfig()
 const database = createDatabase(config.databaseUrl)
 const authProvider = authProviderFor(config, database)
-const app = buildApp({ database, authProvider, logger: { level: 'info' } })
+// The collaboration server logs through the app, and the app tells the connections of a document about a change through
+// the collaboration server. The app is built first and the broadcaster reaches the server when a request is served,
+// which is always after both exist.
+const app = buildApp({
+  database,
+  authProvider,
+  logger: { level: 'info' },
+  broadcaster: {
+    broadcast: (documentId, event) => broadcastToDocument(collaboration.hocuspocus, documentId, event),
+  },
+})
 const collaboration = createCollabServer({
   config: { ...config, host: config.apiHost },
   database,

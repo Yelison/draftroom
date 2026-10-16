@@ -5,6 +5,7 @@ import { buildApp, type ContractViolation } from '../../src/http/app.ts'
 import type { AuthProvider } from '../../src/http/auth/auth-provider.ts'
 import { createDevIdentity } from '../../src/http/auth/devIdentity.ts'
 import { loadContract } from '../../src/http/contract.ts'
+import { silentBroadcaster, type DocumentBroadcaster } from '../../src/http/document-broadcaster.ts'
 import { createContractClient } from './contract-client.ts'
 import { runCoverage } from './run-coverage.ts'
 
@@ -20,11 +21,13 @@ export interface TestApp {
 export function createTestApp(
   database: Kysely<Database>,
   authProvider: AuthProvider = createDevIdentity(database),
+  broadcaster: DocumentBroadcaster = silentBroadcaster,
 ): TestApp {
   const violations: ContractViolation[] = []
   const app = buildApp({
     database,
     authProvider,
+    broadcaster,
     contract,
     onContractViolation: (violation) => violations.push(violation),
   })

@@ -4,6 +4,7 @@ import type { Database } from '../db/tables.ts'
 import type { AuthProvider } from './auth/auth-provider.ts'
 import { requireAuthentication } from './auth/authenticate.ts'
 import { loadContract, type Contract } from './contract.ts'
+import type { DocumentBroadcaster } from './document-broadcaster.ts'
 import {
   clearHeaders,
   handleError,
@@ -13,6 +14,7 @@ import {
   problemMediaType,
   sendProblem,
 } from './problem.ts'
+import { commentRoutes } from './routes/comments.ts'
 import { documentRoutes } from './routes/documents.ts'
 import { folderRoutes } from './routes/folders.ts'
 import { healthRoutes } from './routes/health.ts'
@@ -37,6 +39,8 @@ export interface AppDependencies {
   readonly database: Kysely<Database>
   /** Who the callers are. Required: an app without one would have to choose between serving everyone and no one. */
   readonly authProvider: AuthProvider
+  /** Who hears about a change to a document that people have open. Required, so that an app cannot forget to tell them. */
+  readonly broadcaster: DocumentBroadcaster
   /** Compiled once; build it at start-up and share it (compiling takes a moment). */
   readonly contract?: Contract
   readonly logger?: FastifyServerOptions['logger']
@@ -48,6 +52,7 @@ export interface AppDependencies {
 export function buildApp({
   database,
   authProvider,
+  broadcaster,
   contract = loadContract(),
   logger = false,
   onContractViolation,
@@ -100,8 +105,8 @@ export function buildApp({
     return JSON.stringify(problemBody('internal-error'))
   })
 
-  const dependencies = { contract, database }
-  for (const routes of [healthRoutes, workspaceRoutes, folderRoutes, documentRoutes, pinRoutes]) {
+  const dependencies = { contract, database, broadcaster }
+  for (const routes of [healthRoutes, workspaceRoutes, folderRoutes, documentRoutes, pinRoutes, commentRoutes]) {
     void app.register(routes, dependencies)
   }
 

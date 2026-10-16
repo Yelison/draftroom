@@ -6,6 +6,7 @@ import { createDatabase } from '../db/database.ts'
 import type { Database } from '../db/tables.ts'
 import { buildApp, type ContractViolation } from './app.ts'
 import type { AuthProvider } from './auth/auth-provider.ts'
+import { silentBroadcaster } from './document-broadcaster.ts'
 import { loadContract, type Contract } from './contract.ts'
 import { operationRoute } from './operation-route.ts'
 
@@ -15,16 +16,17 @@ import { operationRoute } from './operation-route.ts'
 const workspaceId = '0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01'
 const problemType = 'application/problem+json'
 
-const threadId = 'c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44'
+const documentId = 'c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44'
 const marta = { id: '5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11', name: 'Marta Ruiz' }
 
-const comment = {
-  id: 'd5f7b9c1-3e4a-4c6b-8d0f-5b7d9f1c3e55',
-  threadId,
-  author: marta,
-  body: 'Yes, it runs on the 4th.',
+const version = {
+  id: '08c0e2f4-6b7d-4f9e-9abc-8e0a2c4f6b88',
+  documentId,
+  kind: 'manual',
+  label: 'Before the workshop edits',
+  createdBy: marta,
   createdAt: '2026-10-13T14:00:00Z',
-  updatedAt: '2026-10-13T14:00:00Z',
+  sizeBytes: 2048,
 }
 
 // The operations below are the ones nobody has a route for yet: the app is tested with the handlers of the test, not
@@ -56,6 +58,7 @@ function appWithoutDatabase(
   app = buildApp({
     database,
     authProvider,
+    broadcaster: silentBroadcaster,
     contract,
     onContractViolation: (violation) => violations.push(violation),
   })
@@ -106,6 +109,13 @@ const implementedOperations = [
   'unpinDocument',
   'listPinnedDocuments',
   'listSharedDocuments',
+  'listThreads',
+  'createThread',
+  'replyToThread',
+  'resolveThread',
+  'reopenThread',
+  'updateComment',
+  'deleteComment',
 ]
 
 describe('the routes of the app', () => {
@@ -156,21 +166,21 @@ describe('the routes of the app', () => {
 })
 
 describe('a request that breaks the contract', () => {
-  function withReply(): FastifyInstance {
+  function withVersionRoute(): FastifyInstance {
     const application = appWithoutDatabase()
-    application.route(operationRoute(contract, 'replyToThread', (_request, reply) => reply.code(201).send(comment)))
+    application.route(operationRoute(contract, 'createVersion', (_request, reply) => reply.code(201).send(version)))
     return application
   }
   const create = (application: FastifyInstance, payload: unknown) =>
     application.inject({
       method: 'POST',
-      url: `/api/threads/${threadId}/replies`,
+      url: `/api/documents/${documentId}/versions`,
       payload: JSON.stringify(payload),
       headers: { 'content-type': 'application/json' },
     })
 
   it('gets the validation-failed problem of the contract, with the field and its code', async () => {
-    const response = await create(withReply(), { body: '' })
+    const response = await create(withVersionRoute(), { label: '' })
 
     expect(response.statusCode).toBe(400)
     expect(response.headers['content-type']).toContain(problemType)
@@ -179,40 +189,40 @@ describe('a request that breaks the contract', () => {
       title: 'The request is not valid.',
       status: 400,
       code: 'validation-failed',
-      errors: [{ pointer: '/body', code: 'too-short' }],
+      errors: [{ pointer: '/label', code: 'too-short' }],
     })
   })
 
   it('gets too-large for a text over its limit', async () => {
-    const response = await create(withReply(), { body: 'a'.repeat(5001) })
+    const response = await create(withVersionRoute(), { label: 'a'.repeat(101) })
 
     expect(response.statusCode).toBe(413)
-    expect(response.json()).toMatchObject({ code: 'too-large', errors: [{ pointer: '/body', code: 'too-long' }] })
+    expect(response.json()).toMatchObject({ code: 'too-large', errors: [{ pointer: '/label', code: 'too-long' }] })
   })
 
   it('reaches the handler once it follows the contract', async () => {
-    const response = await create(withReply(), { body: 'Yes, it runs on the 4th.' })
+    const response = await create(withVersionRoute(), { label: 'Before the workshop edits' })
 
     expect(response.statusCode).toBe(201)
   })
 
   it('is refused for a path parameter that is not an id', async () => {
-    const response = await withReply().inject({
+    const response = await withVersionRoute().inject({
       method: 'POST',
-      url: '/api/threads/nope/replies',
-      payload: { body: 'a' },
+      url: '/api/documents/nope/versions',
+      payload: { label: 'a' },
     })
 
     expect(response.json()).toMatchObject({
       code: 'validation-failed',
-      errors: [{ pointer: '/path/threadId', code: 'invalid-format' }],
+      errors: [{ pointer: '/path/documentId', code: 'invalid-format' }],
     })
   })
 
   it('is refused when the JSON cannot be read', async () => {
-    const response = await withReply().inject({
+    const response = await withVersionRoute().inject({
       method: 'POST',
-      url: `/api/threads/${threadId}/replies`,
+      url: `/api/documents/${documentId}/versions`,
       payload: '{"body":',
       headers: { 'content-type': 'application/json' },
     })
@@ -225,9 +235,9 @@ describe('a request that breaks the contract', () => {
   })
 
   it('is refused when it is not JSON at all, because the contract has no 415', async () => {
-    const response = await withReply().inject({
+    const response = await withVersionRoute().inject({
       method: 'POST',
-      url: `/api/threads/${threadId}/replies`,
+      url: `/api/documents/${documentId}/versions`,
       payload: 'body=a',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
     })
@@ -237,7 +247,7 @@ describe('a request that breaks the contract', () => {
   })
 
   it('is refused with too-large, and no field, when the body is bigger than the server reads', async () => {
-    const response = await create(withReply(), { body: 'a', padding: 'x'.repeat(1_100_000) })
+    const response = await create(withVersionRoute(), { label: 'a', padding: 'x'.repeat(1_100_000) })
 
     expect(response.statusCode).toBe(413)
     expect(response.json()).toEqual({
@@ -392,44 +402,44 @@ describe('the session check', () => {
     requests.length = 0
   })
 
-  function withReply(provider: AuthProvider): FastifyInstance {
+  function withVersionRoute(provider: AuthProvider): FastifyInstance {
     const application = appWithoutDatabase([], provider)
-    application.route(operationRoute(contract, 'replyToThread', (_request, reply) => reply.code(201).send(comment)))
+    application.route(operationRoute(contract, 'createVersion', (_request, reply) => reply.code(201).send(version)))
     application.route(operationRoute(contract, 'listMembers', () => ({ items: [] })))
     return application
   }
-  const reply = (application: FastifyInstance, payload: string) =>
+  const post = (application: FastifyInstance, payload: string) =>
     application.inject({
       method: 'POST',
-      url: `/api/threads/${threadId}/replies`,
+      url: `/api/documents/${documentId}/versions`,
       payload,
       headers: { 'content-type': 'application/json' },
     })
 
   it('answers 401 to a request without a session before it reads the body, so a broken body tells nothing', async () => {
-    const response = await reply(withReply(nobody), '{"body":')
+    const response = await post(withVersionRoute(nobody), '{"body":')
 
     expect(response.statusCode).toBe(401)
     expect(response.json()).toMatchObject({ status: 401, code: 'unauthenticated' })
   })
 
   it('answers 401 before it checks the shape of the request', async () => {
-    const response = await reply(withReply(nobody), JSON.stringify({ body: '' }))
+    const response = await post(withVersionRoute(nobody), JSON.stringify({ label: '' }))
 
     expect(response.statusCode).toBe(401)
   })
 
   it('answers 403 csrf when the provider rejects the token, also before the body is read', async () => {
-    const response = await reply(withReply(recording({ status: 'csrf-rejected' })), '{"body":')
+    const response = await post(withVersionRoute(recording({ status: 'csrf-rejected' })), '{"body":')
 
     expect(response.statusCode).toBe(403)
     expect(response.json()).toMatchObject({ status: 403, code: 'csrf' })
   })
 
   it('asks for the CSRF token on a method that changes state, and only there', async () => {
-    const application = withReply(recording({ status: 'authenticated', principal: { userId: marta.id } }))
+    const application = withVersionRoute(recording({ status: 'authenticated', principal: { userId: marta.id } }))
 
-    await reply(application, JSON.stringify({ body: 'Yes' }))
+    await post(application, JSON.stringify({ body: 'Yes' }))
     await application.inject(membersUrl)
 
     expect(requests).toEqual(['with csrf', 'without csrf'])
