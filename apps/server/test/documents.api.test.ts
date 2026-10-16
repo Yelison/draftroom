@@ -314,6 +314,9 @@ describe('changing the title or the folder of a document', () => {
         .executeTakeFirstOrThrow()
       expect(stored.revision).toBe(2)
       expect(['First', 'Second']).toContain(stored.title)
+      // The one that lost is told what won, as the server holds it.
+      const lost = answers.find((answer) => answer.statusCode === 409)
+      expect(lost?.body).toMatchObject({ current: { id: documentId, title: stored.title, revision: stored.revision } })
     })
   })
 })

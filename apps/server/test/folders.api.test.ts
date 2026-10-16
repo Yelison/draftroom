@@ -118,6 +118,14 @@ describe('renaming a folder', () => {
     ])
 
     expect(answers.map((answer) => answer.statusCode).sort()).toEqual([200, 409])
+    // The one that lost is told what won, as the server holds it.
+    const stored = await db
+      .selectFrom('folders')
+      .select(['name', 'revision'])
+      .where('id', '=', folderId)
+      .executeTakeFirstOrThrow()
+    const lost = answers.find((answer) => answer.statusCode === 409)
+    expect(lost?.body).toMatchObject({ current: { id: folderId, name: stored.name, revision: stored.revision } })
   })
 })
 
