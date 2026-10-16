@@ -60,6 +60,13 @@ export class Participant {
     })
   }
 
+  /** The offline copies this browser keeps for the signed-in accounts, by database name (`draftroom:<user>:<workspace>:<document>`). */
+  async localCopies(): Promise<string[]> {
+    return this.page.evaluate(async () =>
+      (await indexedDB.databases()).flatMap(({ name }) => (name?.startsWith('draftroom:') ? [name] : [])),
+    )
+  }
+
   /** Records every state the sync status announces from now on, in order, for a test to look at afterwards. */
   async recordSyncStates(): Promise<void> {
     await this.syncStatus.evaluate((region) => {
