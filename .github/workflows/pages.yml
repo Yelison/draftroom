@@ -1,0 +1,57 @@
+name: Demo build
+
+# Builds the static demo for GitHub Pages and checks it, and nothing else: it does not publish it. The deployment
+# (a Pages environment, `pages: write` and `id-token: write`) will be added in another task, once the owner authorises
+# publishing. Until then this workflow has read access only and keeps `dist-demo/` as an ordinary artifact.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/pages.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  demo-build:
+    name: Demo build and check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PLAYWRIGHT_PORT: '4173'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # The specs of the demo are not part of the project that `npm run typecheck` builds.
+      - run: npx tsc -b apps/web/e2e-demo
+      - run: npx playwright install --with-deps chromium
+      # Builds the demo itself (`build:demo`) before it serves it, so what is checked is what is kept below.
+      - run: npm run test:e2e-demo -w @draftroom/web
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: demo
+          path: apps/web/dist-demo/
+          if-no-files-found: error
+          retention-days: 7
+      # Only a failure leaves something to read: the traces Playwright keeps for the tests that failed.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: demo-playwright-traces
+          path: |
+            apps/web/e2e-demo/test-results/
+            apps/web/e2e-demo/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
