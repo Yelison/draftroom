@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { Connection, Document, Hocuspocus, type Extension } from '@hocuspocus/server'
+import { describe, expect, it, vi } from 'vitest'
 import type { ClosePlan } from './closeConnections.ts'
 import type { ConnectionContext } from './context.ts'
-import { RevocationMarks } from './inFlight.ts'
+import { inFlightExtension, RevocationMarks } from './inFlight.ts'
 
 const documentName = 'doc:00000000-0000-4000-8000-000000000001'
 const otherDocumentName = 'doc:00000000-0000-4000-8000-000000000002'
@@ -83,4 +84,67 @@ describe('what a revocation leaves for the connections that are being establishe
 
     expect(marks.planFor(documentName, contextOf(ticket))).toEqual(revoked)
   })
+})
+
+describe('a connection that registers after a revocation', () => {
+  // The hooks Hocuspocus calls for a connection, with a connection that has nowhere to send: it records what was done to it.
+  function registered(sequence: number) {
+    const socket = { send: vi.fn(), close: vi.fn(), readyState: 1 }
+    const document = new Document(documentName)
+    const connection = new Connection(
+      socket,
+      new Request('http://localhost'),
+      document,
+      'socket',
+      contextOf(sequence),
+      false,
+    )
+    return { socket, connection }
+  }
+  const hook = <Payload>(run: ((payload: Payload) => Promise<unknown>) | undefined) => {
+    if (run === undefined) throw new Error('The extension does not have this hook')
+    return run
+  }
+  const messageAbout = (connection: Connection<ConnectionContext>) => ({
+    instance: new Hocuspocus(),
+    clientsCount: 1,
+    context: connection.context,
+    document: connection.document,
+    documentName,
+    requestHeaders: new Headers(),
+    requestParameters: new URLSearchParams(),
+    update: new Uint8Array(),
+    socketId: 'socket',
+    connection,
+  })
+  type Before = NonNullable<Extension<ConnectionContext>['beforeHandleMessage']>
+
+  it('has its first message refused, and is closed with the plan, before the message is applied', async () => {
+    const { marks, extension } = withExtension()
+    const { socket, connection } = registered(marks.ticket())
+    marks.leave({ userId: 'person-1' }, revoked)
+
+    await expect(hook<Parameters<Before>[0]>(extension.beforeHandleMessage)(messageAbout(connection))).rejects.toThrow()
+
+    expect(connection.readOnly).toBe(true)
+    expect(socket.close).toHaveBeenCalledWith(4403, 'access-revoked')
+  })
+
+  it('has its messages go through when no mark names it', async () => {
+    const { marks, extension } = withExtension()
+    const { socket, connection } = registered(marks.ticket())
+    marks.leave({ userId: 'person-2' }, revoked)
+
+    await expect(
+      hook<Parameters<Before>[0]>(extension.beforeHandleMessage)(messageAbout(connection)),
+    ).resolves.toBeUndefined()
+
+    expect(connection.readOnly).toBe(false)
+    expect(socket.close).not.toHaveBeenCalled()
+  })
+
+  function withExtension() {
+    const marks = new RevocationMarks(lifetimeMs, () => 0)
+    return { marks, extension: inFlightExtension(marks) }
+  }
 })
