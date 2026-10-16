@@ -9,7 +9,7 @@ interface Mark {
   /** The ids the list had when the page was asked for. */
   ids: ReadonlySet<string>
   /** What had the focus then: "Load more", which goes away with the last page. */
-  asked: Element | null
+  focused: Element | null
   /** The query the page was asked for. */
   query: string
 }
@@ -28,8 +28,8 @@ interface Mark {
  * Two rules keep it from taking the focus from the person:
  * - It follows the page asked for `query` (the workspace, the folder and the search, as one string), and gives up when
  *   `query` changes: the rows of another query are not that page.
- * - It moves the focus only if it is still where the page was asked for, or lost (on `body`, or on a node that is no
- *   longer in the document). Anywhere else the person went on, and the page arrives without taking the focus.
+ * - It moves the focus only if it is still where the page was asked for, or lost (on `body`). Anywhere else the person
+ *   went on, and the page arrives without taking the focus.
  *
  * `ids` must keep its identity until the list changes, or the effect would run on every render.
  */
@@ -42,29 +42,29 @@ export function useFocusFirstArrival(
   const mark = useRef<Mark | null>(null)
 
   useEffect(() => {
-    const asked = mark.current
-    if (asked === null) return
-    if (asked.query !== query) {
+    const pending = mark.current
+    if (pending === null) return
+    if (pending.query !== query) {
       mark.current = null
       return
     }
 
-    const firstArrival = ids.findIndex((id) => !asked.ids.has(id))
+    const firstArrival = ids.findIndex((id) => !pending.ids.has(id))
     if (firstArrival >= 0) {
-      if (isLostOrAt(asked.asked)) focusRow(list.current, firstArrival, selector)
+      if (isLostOrAt(pending.focused)) focusRow(list.current, firstArrival, selector)
       mark.current = null
-    } else if (ids.length < asked.ids.size) {
-      mark.current = { ...asked, ids: new Set(ids) }
+    } else if (ids.length < pending.ids.size) {
+      mark.current = { ...pending, ids: new Set(ids) }
     } else {
       mark.current = null
     }
   }, [ids, list, selector, query])
 
-  return () => void (mark.current = { ids: new Set(ids), asked: document.activeElement, query })
+  return () => void (mark.current = { ids: new Set(ids), focused: document.activeElement, query })
 }
 
-/** Whether the focus is on `element`, or nowhere: on `body`, or on a node that is gone. */
+/** Whether the focus is on `element`, or nowhere: a node that leaves the document hands it to `body`. */
 function isLostOrAt(element: Element | null) {
   const focused = document.activeElement
-  return focused === null || focused === document.body || focused === element || !focused.isConnected
+  return focused === null || focused === document.body || focused === element
 }
