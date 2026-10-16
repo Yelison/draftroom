@@ -1,7 +1,7 @@
 import type { Schema } from '@draftroom/contract'
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query'
 import { Button } from '@yelison/forma-ui'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { DocumentCard } from './DocumentCard.tsx'
@@ -9,6 +9,7 @@ import { ListSkeleton } from './ListSkeleton.tsx'
 import { QueryFailure } from './QueryFailure.tsx'
 import { StateMessage } from './StateMessage.tsx'
 import { documentListQuery } from './queries.ts'
+import { useFocusFirstArrival } from './useFocusFirstArrival.ts'
 import layout from './ListLayout.module.css'
 
 export interface DocumentCollectionProps {
@@ -40,13 +41,7 @@ export function DocumentCollection({ workspaceId, folderId, term, empty, onActio
   const documents = query.data?.pages.flatMap((page) => page.items) ?? []
   const list = useRef<HTMLUListElement>(null)
 
-  // "Load more" is gone once the last page is in, and with it the focus: it goes to the first document that arrived.
-  const focusFrom = useRef<number | null>(null)
-  useEffect(() => {
-    if (focusFrom.current === null || documents.length <= focusFrom.current) return
-    list.current?.querySelectorAll<HTMLElement>('a')[focusFrom.current]?.focus()
-    focusFrom.current = null
-  }, [documents.length])
+  const loadingMore = useFocusFirstArrival(list, documents.length, 'a')
 
   if (query.isPending) return <ListSkeleton />
   if (query.isError) return <QueryFailure onRetry={() => void query.refetch()} retrying={query.isFetching} />
@@ -76,7 +71,7 @@ export function DocumentCollection({ workspaceId, folderId, term, empty, onActio
           variant="secondary"
           loading={query.isFetchingNextPage}
           onClick={() => {
-            focusFrom.current = documents.length
+            loadingMore()
             void query.fetchNextPage()
           }}
         >
