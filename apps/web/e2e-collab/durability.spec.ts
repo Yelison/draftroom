@@ -16,7 +16,11 @@ test.describe('what "Synced" promises', () => {
     await expect(daniel.syncStatus).toHaveText('Sync status: Synced')
 
     // `SIGKILL` leaves the server no time to store what it holds in memory: only what was stored before "Synced" is left.
-    await server.restart('SIGKILL')
+    await server.stop('SIGKILL')
+    // And the browser that wrote the text goes before the server is back: otherwise it would send the text again, and
+    // the text would survive a "Synced" that was false.
+    await daniel.context.close()
+    await server.start()
 
     const priya = await join('priya')
     await priya.open(documentId)
