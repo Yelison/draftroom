@@ -114,8 +114,26 @@ describe('a shutdown', () => {
     expect(await storedParagraphs(db, documentId)).toEqual(['stored by the shutdown'])
   })
 
-  it('finishes within its wait and says which document it could not store, when the write never succeeds', async () => {
+  it('keeps trying within its wait, and stores the document when the database comes back during the shutdown', async () => {
     const { store, harness, clients, documentId } = await start()
+    const editor = clients.open(documentId, { email: owner.email })
+    await editor.waitForSynced()
+    store.failing = true
+    editor.edit((doc) => appendParagraph(doc, 'stored once the database came back'))
+    await store.waitForFailures(1)
+    const failedBefore = store.failed
+
+    const closing = harness.close()
+    // The shutdown's own attempts fail too: only once it has tried again, with nobody having typed, the database answers.
+    await store.waitForFailures(failedBefore + 2)
+    store.failing = false
+    await closing
+
+    expect(await storedParagraphs(db, documentId)).toEqual(['stored once the database came back'])
+  })
+
+  it('finishes within its wait and says which document it could not store, when the write never succeeds', async () => {
+    const { store, harness, clients, documentId } = await start({ ...fastTiming, shutdownWaitMs: 300 })
     const editor = clients.open(documentId, { email: owner.email })
     await editor.waitForSynced()
     store.failing = true

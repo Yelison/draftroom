@@ -22,11 +22,55 @@ async function finishesWithin(work: Promise<unknown>, ms: number): Promise<boole
   }
 }
 
+/** Resolves after `ms`, or at once when the signal is aborted: the timer never outlives either. */
+function pause(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', done)
+      resolve()
+    }
+    const timer = setTimeout(done, ms)
+    signal.addEventListener('abort', done)
+  })
+}
+
 /**
- * The orderly shutdown (protocol §7.2, step 4; ADR 0006): stop accepting connections, try again at once every document
- * whose write has not been confirmed (a retry waiting its back-off included), wait for them for at most `waitMs`, and
- * then let `destroy()` close the connections and unload what is left. A document that still could not be stored is logged
- * as it is unloaded, and its clients keep their pending changes.
+ * Tries every document whose write is not confirmed, at once and then again after each wait of the retry's back-off,
+ * until all are confirmed or the signal says the time is up. A write that fails resolves quickly, so a single attempt
+ * would give up on a database that comes back a moment later: the point of the wait is to keep trying within it.
+ */
+async function storeUntilConfirmed({
+  hocuspocus,
+  durability,
+  retry,
+  delays,
+  signal,
+}: {
+  readonly hocuspocus: Server<ConnectionContext>['hocuspocus']
+  readonly durability: DurabilityRegistry
+  readonly retry: StoreRetry
+  readonly delays: readonly number[]
+  readonly signal: AbortSignal
+}): Promise<void> {
+  const unconfirmed = () =>
+    [...hocuspocus.documents.values()].filter((document) => durability.get(document.name)?.unconfirmed)
+  for (let round = 0; !signal.aborted; round += 1) {
+    const pending = unconfirmed()
+    if (pending.length === 0) return
+    // The attempts below replace the retries that were waiting, which would otherwise store the same state a second time.
+    retry.cancelAll()
+    await Promise.all(pending.map((document) => storeNow(hocuspocus, document)))
+    if (unconfirmed().length === 0) return
+    await pause(delays[Math.min(round, delays.length - 1)] ?? 0, signal)
+  }
+}
+
+/**
+ * The orderly shutdown (protocol §7.2, step 4; ADR 0006): stop accepting connections, try every document whose write has
+ * not been confirmed, again and again, for at most `shutdownWaitMs`, and then let `destroy()` close the connections and
+ * unload what is left. A document that still could not be stored is logged as it is unloaded, and its clients keep their
+ * pending changes.
  */
 export async function shutDownCollaboration({
   server,
@@ -40,21 +84,17 @@ export async function shutDownCollaboration({
   readonly durability: DurabilityRegistry
   readonly retry: StoreRetry
   readonly sockets: OpenSockets
-  readonly timing: Pick<CollabTiming, 'shutdownWaitMs' | 'shutdownGraceMs' | 'socketCloseMs'>
+  readonly timing: Pick<CollabTiming, 'shutdownWaitMs' | 'shutdownGraceMs' | 'socketCloseMs' | 'retryDelaysMs'>
   readonly log: CollabLog
 }): Promise<void> {
   server.httpServer.close()
   const { hocuspocus } = server
-  const unconfirmed = [...hocuspocus.documents.values()].filter(
-    (document) => durability.get(document.name)?.unconfirmed,
-  )
-
-  // The attempts below replace the waiting retries, which would otherwise run a second store of the same state.
-  retry.cancelAll()
+  const timeUp = new AbortController()
   await finishesWithin(
-    Promise.all(unconfirmed.map((document) => storeNow(hocuspocus, document))),
+    storeUntilConfirmed({ hocuspocus, durability, retry, delays: timing.retryDelaysMs, signal: timeUp.signal }),
     timing.shutdownWaitMs,
   )
+  timeUp.abort()
 
   // From here a document is no longer kept in memory for its unconfirmed changes: nothing will ever store them, and
   // `destroy()` would wait for ever for an unload that the guard keeps refusing.
