@@ -13,6 +13,7 @@ import { StateMessage } from '../documents/StateMessage.tsx'
 import { WorkspaceGate } from '../documents/WorkspaceGate.tsx'
 import { documentListQuery, foldersQuery } from '../documents/queries.ts'
 import { searchTerm } from '../documents/searchTerm.ts'
+import { useSearchSubmit } from '../search/useSearchSubmit.ts'
 import { ExplorerSkeleton } from './ExplorerSkeleton.tsx'
 import { ExplorerTree, type ExplorerTreeHandle } from './tree/ExplorerTree.tsx'
 import { buildTree, type TreeItem } from './tree/treeModel.ts'
@@ -46,6 +47,7 @@ function Content({ workspaceId }: { workspaceId: string }) {
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search)
   const term = searchTerm(deferredSearch)
+  const submitSearch = useSearchSubmit(search)
   const tree = useRef<ExplorerTreeHandle>(null)
   const actions = useActionDialogs(() => tree.current?.focusTabStop())
   const create = useCreateDocument(workspaceId)
@@ -99,6 +101,7 @@ function Content({ workspaceId }: { workspaceId: string }) {
           placeholder={intl.formatMessage({ id: 'documents.search.label' })}
           value={search}
           onValueChange={setSearch}
+          onKeyDown={submitSearch}
         />
         <div className={styles.actions}>
           <Button
