@@ -13,7 +13,10 @@ import {
 import { withFreshIndexedDb } from './testing/fakeIndexedDb.ts'
 
 withFreshIndexedDb()
-afterEach(() => vi.useRealTimers())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
 
 const launchPlan: CopyKey = { userId: 'u1', workspaceId: 'w1', documentId: 'd1' }
 
@@ -93,15 +96,9 @@ describe('opening a copy', () => {
   ])('is not opened, and not waited for, where $case', async ({ arrange }) => {
     // The clock does not move: an answer that waited for the storage would never come.
     vi.useFakeTimers()
-    const storage = globalThis.indexedDB
     arrange()
 
-    try {
-      await expect(openLocalCopy(launchPlan, new Y.Doc())).resolves.toBeNull()
-    } finally {
-      Object.defineProperty(globalThis, 'indexedDB', { configurable: true, writable: true, value: storage })
-      vi.unstubAllGlobals()
-    }
+    await expect(openLocalCopy(launchPlan, new Y.Doc())).resolves.toBeNull()
   })
 
   it('gives up on storage that never answers, so the document still opens from the server', async () => {
@@ -112,7 +109,6 @@ describe('opening a copy', () => {
     await vi.advanceTimersByTimeAsync(LOAD_TIMEOUT_MS)
 
     await expect(opening).resolves.toBeNull()
-    vi.unstubAllGlobals()
   })
 })
 

@@ -9,6 +9,7 @@ import { beforeEach } from 'vitest'
  */
 export function withFreshIndexedDb(): void {
   beforeEach(() => {
-    globalThis.indexedDB = new IDBFactory()
+    // Defined, not assigned: a test that made the property throw on reading must not leave the next one without storage.
+    Object.defineProperty(globalThis, 'indexedDB', { configurable: true, writable: true, value: new IDBFactory() })
   })
 }
