@@ -1,0 +1,7 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  align-items: center;
+  margin-block: var(--space-24);
+}

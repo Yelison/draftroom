@@ -1,0 +1,51 @@
+.layout,
+.layoutWithPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-24);
+  align-items: start;
+}
+
+.layoutWithPanel {
+  grid-template-columns: minmax(0, 1fr) var(--layout-panel-width);
+}
+
+.timeline {
+  min-width: 0;
+}
+
+.row {
+  display: block;
+  width: 100%;
+  min-height: calc(var(--button-height) + var(--space-24) + var(--space-2));
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: var(--font-body);
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--color-surface-hover);
+}
+
+.row[aria-expanded='true'] {
+  border-color: var(--color-brand);
+  background: var(--color-blue-bg);
+}
+
+.row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--space-2);
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-16);
+  padding: 0;
+  list-style: none;
+}
