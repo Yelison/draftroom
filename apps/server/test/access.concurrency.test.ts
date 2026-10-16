@@ -256,7 +256,7 @@ describe('two changes that would each leave nobody as an owner', () => {
     expect(owners).toHaveLength(1)
   })
 
-  it('never leave a document without an explicit owner, when one owner is removed from the workspace as the other loses their grant', async () => {
+  it('never leave a document without an explicit owner, when one owner is removed from the workspace as the other gives up their grant', async () => {
     const workspaceId = await createWorkspace(db)
     const boss = await createPerson(db, 'Marta Ruiz')
     const first = await createPerson(db, 'Eli Vega')
@@ -269,7 +269,8 @@ describe('two changes that would each leave nobody as an owner', () => {
     const answers = await whileCommitsAreSlow(['document_access', 'memberships'], () =>
       Promise.all([
         api({ as: boss, method: 'DELETE', url: `/api/workspaces/${workspaceId}/members/${first.id}` }),
-        api({ as: boss, method: 'DELETE', url: `/api/documents/${documentId}/access/${second.id}` }),
+        // The other owner is only a member of the workspace, so the two changes meet at the document and nowhere else.
+        api({ as: second, method: 'DELETE', url: `/api/documents/${documentId}/access/${second.id}` }),
       ]),
     )
 
