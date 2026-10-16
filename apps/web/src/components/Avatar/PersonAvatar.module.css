@@ -7,8 +7,8 @@
  * status is in the shape too, not in colour alone: a filled disc is online, a ring is away and a smaller dot is offline. */
 .mark {
   position: absolute;
-  inset-block-end: calc(var(--space-2) * -1);
-  inset-inline-end: calc(var(--space-2) * -1);
+  inset-block-end: calc(var(--space-4) * -1);
+  inset-inline-end: calc(var(--space-4) * -1);
   box-sizing: border-box;
   width: var(--space-12);
   height: var(--space-12);

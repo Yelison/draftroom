@@ -4,6 +4,7 @@
 
 .labels {
   display: inline-grid;
+  padding-inline: var(--space-4);
 }
 
 /* Every label takes the one cell, so the widest decides the width; only the current one is drawn. */
