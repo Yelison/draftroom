@@ -1,8 +1,8 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { focusMainContent } from '../../app/mainContent.ts'
+import { focusRow, useFocusFirstArrival } from '../documents/useFocusFirstArrival.ts'
 
-const focusRow = (list: HTMLUListElement | null, index: number) =>
-  list?.children[index]?.querySelector('button')?.focus()
+const rowAction = 'button'
 
 /**
  * Where the focus goes when the list changes under it. A row that leaves takes the focus with it, so the first button of
@@ -13,26 +13,24 @@ const focusRow = (list: HTMLUListElement | null, index: number) =>
  */
 export function useTrashFocus(list: RefObject<HTMLUListElement | null>, ids: readonly string[]) {
   const leaving = useRef<{ id: string; index: number } | null>(null)
-  const firstArrival = useRef<number | null>(null)
 
   // Runs once the list has changed, which is when the row is gone: the server's answer comes first and the list after it.
   useEffect(() => {
     if (leaving.current !== null && !ids.includes(leaving.current.id)) {
       const row = Math.min(leaving.current.index, ids.length - 1)
       if (row < 0) focusMainContent()
-      else focusRow(list.current, row)
+      else focusRow(list.current, row, rowAction)
     }
     leaving.current = null
-    if (firstArrival.current !== null && ids.length > firstArrival.current) {
-      focusRow(list.current, firstArrival.current)
-      firstArrival.current = null
-    }
   }, [ids, list])
+
+  // Declared after the effect above: a row that leaves is given the focus before a page that arrives, as when they were one.
+  const loadingMore = useFocusFirstArrival(list, ids.length, rowAction)
 
   return {
     /** The row of this document is about to leave the list. */
     leaving: (id: string) => void (leaving.current = { id, index: ids.indexOf(id) }),
     /** A page of the list was asked for. */
-    loadingMore: () => void (firstArrival.current = ids.length),
+    loadingMore,
   }
 }
