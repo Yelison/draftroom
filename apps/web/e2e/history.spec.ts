@@ -1,7 +1,7 @@
 /* The History screen in the production build, with a real browser: the filters with the keyboard, an event opened beside the list, the focus. */
 import type { Page } from '@playwright/test'
 import { daniel } from '../src/data/mock/fixtures/people.ts'
-import { designReview } from '../src/data/mock/fixtures/documents.ts'
+import { designReview, launchPlan } from '../src/data/mock/fixtures/documents.ts'
 import { expect, test } from './fixtures.ts'
 
 test.use({ locale: 'en-US', timezoneId: 'UTC', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
@@ -82,6 +82,34 @@ test('filters the history with the keyboard, opens an event, and gives the focus
   await expect(rows(page)).toHaveCount(14)
   await expect(chip(page, 'Document')).toBeFocused()
   await expect(page).toHaveURL(/\/history$/)
+})
+
+test('goes from the History to a document and back, twice, with the filter and the explorer both working', async ({
+  page,
+}) => {
+  const rail = page.getByRole('navigation', { name: 'Main navigation' })
+  const openFirstEvent = async () => {
+    await rows(page).first().click()
+    await main(page).getByRole('complementary').getByRole('link', { name: 'Open document' }).click()
+  }
+
+  await page.goto('/history')
+  await expect(rows(page)).toHaveCount(14)
+  await openFirstEvent()
+
+  // The explorer of the editor reads the list of documents the filter read: it is there, and the app stands.
+  await expect(page.getByRole('tree')).toBeVisible()
+  await expect(page.getByText('Unexpected Application Error')).toHaveCount(0)
+
+  await rail.getByRole('link', { name: 'History' }).click()
+  await expect(rows(page)).toHaveCount(14)
+  await chip(page, 'Document').click()
+  await expect(page.getByRole('menuitemradio', { name: launchPlan.title })).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await openFirstEvent()
+  await expect(page.getByRole('tree')).toBeVisible()
+  await expect(page.getByText('Unexpected Application Error')).toHaveCount(0)
 })
 
 test('has no horizontal scroll at 1280 and 1440 px, with the panel open, in either theme', async ({ page }) => {
