@@ -17,7 +17,7 @@ const routeCases = [
   { path: '/settings/members', active: 'Settings', heading: 'Settings', rail: 'expanded' },
   { path: '/settings/appearance', active: 'Settings', heading: 'Settings', rail: 'expanded' },
   { path: '/trash', active: 'Documents', heading: 'Trash', rail: 'expanded' },
-  { path: '/search?q=budget', active: 'Documents', heading: 'Search results', rail: 'expanded' },
+  { path: '/search?q=budget', active: 'Documents', heading: 'Results for “budget”', rail: 'expanded' },
   { path: '/documents/new', active: 'Documents', heading: 'New document', rail: 'compact' },
   { path: '/documents/d1/share', active: 'Documents', heading: 'Share', rail: 'compact' },
   { path: '/documents/d1/versions', active: 'Documents', heading: 'Version history', rail: 'compact' },
