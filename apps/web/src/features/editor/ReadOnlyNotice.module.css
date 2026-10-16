@@ -1,0 +1,14 @@
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+  margin: 0;
+  padding-inline: var(--space-16);
+  color: var(--color-muted);
+  font: var(--font-body);
+}
+
+.icon {
+  flex-shrink: 0;
+}

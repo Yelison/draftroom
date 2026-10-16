@@ -15,6 +15,7 @@ import { EditorSkeleton } from './EditorSkeleton.tsx'
 import { EditorStatePanel } from './EditorStatePanel.tsx'
 import { LinkDialog, type LinkRequest } from './LinkDialog.tsx'
 import { OfflineNotice } from './OfflineNotice.tsx'
+import { ReadOnlyNotice } from './ReadOnlyNotice.tsx'
 import { SyncAlerts } from './SyncAlerts.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { TitleField } from './TitleField.tsx'
@@ -276,6 +277,7 @@ function EditorWorkspace({
     <div className={styles.column}>
       <div className={styles.toolbarBand}>
         {editable && <Toolbar editor={editor} onLinkRequest={requestLink} />}
+        {(document.role === 'viewer' || document.role === 'commenter') && <ReadOnlyNotice role={document.role} />}
         <div className={styles.status}>
           <Presence people={people} />
           <SyncStatus state={snapshot.state} keepsCopy={snapshot.keepsCopy} />

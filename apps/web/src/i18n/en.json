@@ -274,5 +274,7 @@
   "shared.preview.open": "Open document",
   "shared.preview.empty": "This document is empty.",
   "shared.preview.createdBy": "Created by {name}",
-  "shared.preview.updated": "Updated {date}"
+  "shared.preview.updated": "Updated {date}",
+  "editor.readOnly.viewer": "You can read this document but not change it.",
+  "editor.readOnly.commenter": "You can read and comment on this document but not change it."
 }
