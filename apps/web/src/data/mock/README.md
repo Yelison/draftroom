@@ -30,17 +30,31 @@ authorization is the server's and is tested there (plan, section 9.2).
 - No cookies, sessions or CSRF: a connection keeps its own sign-in, and there is no rate limiting.
 - No `400` for fields the types already forbid: a missing or unknown field, or a value outside an enum (`access`,
   `status`, `locale`, `generalAccess`). Only what a form can produce is checked: text lengths, references, cursors.
-- No content: documents are metadata, and Yjs content travels over the collaboration connection (T2.1, T2.2).
-- No connection that closes when access is revoked or a member is removed.
+- No content over REST: documents are metadata, and their Yjs content is the collaboration server's (below).
+- No connection that closes when access is revoked or a member is removed: the collaboration server below decides access when a document is opened, and nothing ends a connection afterwards.
 - No email verification: whoever signs up with an invited email claims it.
 - Made-up values: the `sizeBytes` of a version, and the label a restored version copies from the one it restores.
+
+## Collaboration
+
+`openDocument` returns the same `CollabSession` the real data source does, over the same `HocuspocusProvider`. Only the
+network is made up: `collab/SimulatedCollabServer.ts` speaks the Hocuspocus wire protocol through the provider's
+`WebSocketPolyfill` hook, inside the page, so the session code that runs against it is the code that runs against the real
+server. It follows `docs/collab/protocol.md`: authentication before anything is applied, `readonly` for a role that may only
+read (and for an archived document), a reader's updates answered "not applied", awareness rewritten to the name the server
+knows, a `stored` event a debounce after each change with a snapshot of exactly what was stored, the 2 MiB limit
+(`1009`) and the buffer before authentication (`4205`).
+
+It is a simulation, and what it proves is the screen and the states, never the server: durability, permissions and
+convergence between browsers are proved against the real stack (T2.4), and its own tests read it with the real provider.
+Documents start empty, and two tabs do not share one (each page has its own world).
 
 ## Operations it leaves out
 
 | Operation                     | Why                                                                                                    |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `getLiveness`, `getReadiness` | Probes for the orchestrator; the data source does not carry them.                                      |
-| `getVersionContent`           | The bytes are a Yjs update, which needs Yjs and a document with content (T1.2, T2.2). It fails loudly. |
+| `getVersionContent`           | The bytes are a Yjs update, which needs a document with content and the versions of the server (T5.1). It fails loudly. |
 
 An operation without a handler never answers with a made-up value: it rejects with `UnhandledOperationError` and logs
 the reason on the console, which fails the end-to-end test that reached it.
