@@ -31,6 +31,7 @@ test.describe('two people in the same paragraph', () => {
 
   test('converge after one of them wrote without a connection and came back, with nothing lost or doubled', async ({
     join,
+    server,
   }) => {
     const documentId = await createDocument('daniel', ['priya'])
     const daniel = await join('daniel')
@@ -64,6 +65,12 @@ test.describe('two people in the same paragraph', () => {
     expect(occurrences(merged, base)).toBe(1)
     expect(occurrences(merged, 'Daniel adds the dates.')).toBe(1)
     expect(occurrences(merged, 'Priya adds the budget, offline.')).toBe(1)
-    await expect.poll(() => storedText(documentId)).toBe(merged)
+
+    // Both say "Synced", which promises that the merge is in the database. The server is killed and the database read once,
+    // with no waiting: with the server gone no browser can send anything, so what is there was stored before they said it.
+    daniel.toleratesConnectionErrors()
+    await server.stop('SIGKILL')
+    expect(storedText(documentId)).toBe(merged)
+    await server.start()
   })
 })
