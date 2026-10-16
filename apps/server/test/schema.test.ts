@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto'
 import { sql, type Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { z } from 'zod'
+import { readContractDocument } from '../src/http/contract-document.ts'
 import type { Database } from '../src/db/tables.ts'
 import { addMember, createDocument, createPopulatedWorkspace, createUser, type Workspace } from './support/fixtures.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
@@ -97,6 +99,15 @@ describe('a reference to another workspace', () => {
       'pins_document_fkey',
     ],
     [
+      'an event on a document of another workspace',
+      (a, b) =>
+        db
+          .insertInto('activity_events')
+          .values({ workspace_id: b.id, document_id: a.documentId, type: 'document.created', actor_id: b.userId })
+          .execute(),
+      'activity_events_document_fkey',
+    ],
+    [
       'a pin by a person who is not a member of the workspace',
       (a, b) =>
         db.insertInto('pins').values({ workspace_id: b.id, document_id: b.documentId, user_id: a.userId }).execute(),
@@ -159,6 +170,46 @@ describe('removing rows that others hang from', () => {
       .where('document_id', '=', workspace.documentId)
       .execute()
     expect([states, grants]).toEqual([[], []])
+  })
+
+  it('removes the history of a deleted document', async () => {
+    const workspace = await createPopulatedWorkspace(db)
+    await db
+      .insertInto('activity_events')
+      .values({
+        workspace_id: workspace.id,
+        document_id: workspace.documentId,
+        type: 'document.created',
+        actor_id: workspace.userId,
+      })
+      .execute()
+
+    await db.deleteFrom('documents').where('id', '=', workspace.documentId).execute()
+
+    expect(
+      await db.selectFrom('activity_events').select('id').where('document_id', '=', workspace.documentId).execute(),
+    ).toEqual([])
+  })
+
+  it('keeps the history of a member who leaves the workspace', async () => {
+    const workspace = await createPopulatedWorkspace(db)
+    const member = await createUser(db)
+    await addMember(db, workspace.id, member)
+    await db
+      .insertInto('activity_events')
+      .values({
+        workspace_id: workspace.id,
+        document_id: workspace.documentId,
+        type: 'document.renamed',
+        actor_id: member,
+      })
+      .execute()
+
+    await db.deleteFrom('memberships').where('workspace_id', '=', workspace.id).where('user_id', '=', member).execute()
+
+    expect(await db.selectFrom('activity_events').select('actor_id').where('actor_id', '=', member).execute()).toEqual([
+      { actor_id: member },
+    ])
   })
 
   it('removes the sessions of a person who is deleted', async () => {
@@ -413,6 +464,36 @@ describe('the rules of a row', () => {
       revision: 1,
       archived_at: null,
     })
+  })
+})
+
+describe('the kinds of event the history keeps', () => {
+  const contractKinds = (): string[] => {
+    const schema = z
+      .object({ enum: z.array(z.string()) })
+      .parse(readContractDocument().components.schemas['ActivityType'])
+    return schema.enum
+  }
+
+  it('are exactly the contract list, so an event the API serves can always be stored', async () => {
+    const { rows } = await sql<{ definition: string }>`
+      select pg_get_constraintdef(oid) as definition from pg_constraint
+      where conname = 'activity_events_type_valid'`.execute(db)
+
+    const stored = [...(rows[0]?.definition.matchAll(/'([^']+)'/g) ?? [])].map((match) => match[1])
+    expect(stored.sort()).toEqual(contractKinds().sort())
+  })
+
+  it('refuse a kind that is not in the list', async () => {
+    const workspace = await createPopulatedWorkspace(db)
+
+    await expect(
+      db
+        .insertInto('activity_events')
+        // @ts-expect-error `document.exploded` is not a kind: the database has to refuse it all the same
+        .values({ workspace_id: workspace.id, document_id: workspace.documentId, type: 'document.exploded' })
+        .execute(),
+    ).rejects.toEqual(refusedBy(checkViolation, 'activity_events_type_valid'))
   })
 })
 

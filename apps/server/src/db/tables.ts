@@ -1,3 +1,4 @@
+import type { Schema } from '@draftroom/contract'
 import type { Generated } from 'kysely'
 
 // The shape of every table, for Kysely's query builder. Kept beside the migration that creates it: a column that
@@ -6,6 +7,7 @@ import type { Generated } from 'kysely'
 export type WorkspaceRole = 'owner' | 'member'
 export type DocumentRole = 'viewer' | 'commenter' | 'editor' | 'owner'
 export type GeneralAccess = 'none' | 'viewer' | 'commenter' | 'editor'
+export type ActivityType = Schema<'ActivityType'>
 
 export interface UsersTable {
   id: Generated<string>
@@ -87,6 +89,18 @@ export interface PinsTable {
   created_at: Generated<Date>
 }
 
+export interface ActivityEventsTable {
+  id: Generated<string>
+  workspace_id: string
+  document_id: string
+  type: ActivityType
+  /** `null` when the server acted. */
+  actor_id: string | null
+  /** The person an access change is about. */
+  target_user_id: string | null
+  created_at: Generated<Date>
+}
+
 export interface Database {
   users: UsersTable
   sessions: SessionsTable
@@ -97,4 +111,5 @@ export interface Database {
   document_access: DocumentAccessTable
   document_states: DocumentStatesTable
   pins: PinsTable
+  activity_events: ActivityEventsTable
 }
