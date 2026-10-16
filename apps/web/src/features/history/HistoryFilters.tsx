@@ -40,8 +40,7 @@ function ChoiceFilter({
   const value =
     chosen === undefined
       ? undefined
-      : (label ??
-        intl.formatMessage({ id: extraItems.length > 0 ? 'history.filters.loading' : 'history.filters.unavailable' }))
+      : (label ?? intl.formatMessage({ id: pending ? 'history.filters.loading' : 'history.filters.unavailable' }))
   const items: MenuItem[] = [
     {
       id: 'any',
