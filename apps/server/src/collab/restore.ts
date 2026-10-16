@@ -11,6 +11,7 @@ import type { CapturedWrite, DocumentDurability, DurabilityRegistry } from './du
 import type { CollabLog } from './log.ts'
 import { captureStorable } from './persistence.ts'
 import type { RestoreVersions } from './restoreVersions.ts'
+import { holdingStoreMutex, unloadIfAbandoned } from './storeMutex.ts'
 import type { StoreRetry } from './storeRetry.ts'
 
 // Restoring a version replaces the content of a document that people may be editing (protocol §11.4, ADR 0007, ADR 0014).
@@ -45,7 +46,7 @@ export async function restoreVersion(dependencies: RestoreDependencies, request:
     const restoreId = randomUUID()
     // The whole sequence runs holding the store mutex, which is what keeps a store that captured the old state from
     // writing it after the restore and bringing the old content back. The mutex is released when this returns.
-    return await document.saveMutex.runExclusive(() =>
+    return await holdingStoreMutex(hocuspocus, document, () =>
       replaceUnderMutex(dependencies, request, restoreId, document, content),
     )
   } finally {
@@ -54,6 +55,9 @@ export async function restoreVersion(dependencies: RestoreDependencies, request:
     await connection.disconnect().catch((error: unknown) => {
       log.error({ documentId: request.documentId, error }, 'closing the direct connection of a restore failed')
     })
+    // The direct connection counted as a connection while the mutex was released, so the check made then found the document
+    // in use; and `disconnect()` unloads only if nobody else holds the mutex at that moment.
+    await unloadIfAbandoned(hocuspocus, document)
   }
 }
 

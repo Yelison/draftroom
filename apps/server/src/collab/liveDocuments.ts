@@ -11,6 +11,7 @@ import { captureStorable } from './persistence.ts'
 import { restoreVersion } from './restore.ts'
 import type { RestoreVersions } from './restoreVersions.ts'
 import type { StateStore } from './stateStore.ts'
+import { holdingStoreMutex } from './storeMutex.ts'
 import type { StoreRetry } from './storeRetry.ts'
 
 export interface LiveDocumentsOptions {
@@ -39,7 +40,7 @@ export function createLiveDocuments({
       const durable = document === undefined ? undefined : durability.get(document.name)
       if (document !== undefined && durable !== undefined) {
         // The state is captured as the store captures it, so that a version is always content the schema can read.
-        return document.saveMutex.runExclusive(() => task(captureStorable(document, durable, log).state))
+        return holdingStoreMutex(hocuspocus, document, () => task(captureStorable(document, durable, log).state))
       }
       const state = await store.load(documentId)
       if (state === undefined) throw new DocumentGoneError(documentId)
