@@ -58,6 +58,10 @@ describe('loading the templates', () => {
     ['a name longer than the contract allows', sources(source({ name: 'n'.repeat(101) }))],
     ['an empty description', sources(source({ description: '' }))],
     ['a language that lacks a template', { en: { notes: source() }, es: {} }],
+    [
+      'a language with a template the other lacks',
+      { en: { notes: source() }, es: { notes: source(), extra: source() } },
+    ],
     ['an id the contract does not allow', { en: { 'Not Valid': source() }, es: { 'Not Valid': source() } }],
   ]
   it.each(invalid)('refuses %s, so that the server does not start', (_reason, input) => {
