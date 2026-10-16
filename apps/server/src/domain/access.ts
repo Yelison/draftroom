@@ -1,4 +1,4 @@
-import type { DocumentRole, Schema } from '@draftroom/contract'
+import type { DocumentRole } from '@draftroom/contract'
 import type { AuthorizedScope } from '@draftroom/contract/collab'
 
 // What changing someone's access means: which event the history records, when a change would leave a document or a
@@ -6,14 +6,13 @@ import type { AuthorizedScope } from '@draftroom/contract/collab'
 // that is already open. The permission rules (who may change access at all) are `manage-access` and `manage-members` in
 // `permissions.ts`; this is what is decided once they have said yes. No input or output of its own.
 
-type ActivityType = Schema<'ActivityType'>
-
-/** The event of a grant that goes from `previous` to `next`, or `null` when nothing changed and so nothing is recorded. */
-export function grantActivity(previous: DocumentRole | null, next: DocumentRole | null): ActivityType | null {
-  if (previous === next) return null
-  if (previous === null) return 'access.granted'
-  if (next === null) return 'access.revoked'
-  return 'access.changed'
+/**
+ * The event of a grant to a role the person did not have, from the grant they held: a first grant, or a change of role. A
+ * grant to the role they already hold is not a change and records nothing, so the caller does not ask; and the removal of
+ * a grant is always `access.revoked`.
+ */
+export function grantActivity(previous: DocumentRole | null): 'access.granted' | 'access.changed' {
+  return previous === null ? 'access.granted' : 'access.changed'
 }
 
 /**

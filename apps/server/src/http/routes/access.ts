@@ -53,8 +53,8 @@ export const accessRoutes: FastifyPluginCallback<RouteDependencies> = (
         if (!(await isMemberOf(trx, record.workspace_id, targetId))) throw new ProblemError('not-found')
 
         const previous = await findGrant(trx, documentId, targetId)
-        const activity = grantActivity(previous?.role ?? null, role)
-        if (previous !== undefined && activity === null) return { entry: previous, changed: false }
+        // A grant to the role the person already holds is not a change: nothing is written, recorded or announced.
+        if (previous?.role === role) return { entry: previous, changed: false }
         if (previous?.role === 'owner' && role !== 'owner') {
           const owners = (await explicitOwners(trx, [documentId])).get(documentId) ?? []
           if (leavesNoOwner(owners, targetId)) throw new ProblemError('last-owner')
@@ -64,7 +64,7 @@ export const accessRoutes: FastifyPluginCallback<RouteDependencies> = (
           {
             workspaceId: record.workspace_id,
             documentId,
-            type: activity ?? 'access.granted',
+            type: grantActivity(previous?.role ?? null),
             actorId,
             targetUserId: targetId,
           },

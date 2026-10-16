@@ -10,20 +10,16 @@ import {
   type OwnerCandidate,
 } from './access.ts'
 
-describe('the event of a change of grant', () => {
-  const rows: readonly (readonly [DocumentRole | null, DocumentRole | null, string | null])[] = [
+describe('the event of a grant to a role the person did not have', () => {
+  const rows: readonly (readonly [DocumentRole | null, DocumentRole, string])[] = [
     [null, 'viewer', 'access.granted'],
     [null, 'owner', 'access.granted'],
     ['viewer', 'editor', 'access.changed'],
     ['owner', 'viewer', 'access.changed'],
-    ['editor', null, 'access.revoked'],
-    ['owner', null, 'access.revoked'],
-    ['editor', 'editor', null],
-    [null, null, null],
   ]
 
-  it.each(rows)('from %s to %s records %s', (previous, next, expected) => {
-    expect(grantActivity(previous, next)).toBe(expected)
+  it.each(rows)('from %s to %s records %s', (previous, _next, expected) => {
+    expect(grantActivity(previous)).toBe(expected)
   })
 })
 
