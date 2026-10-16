@@ -41,25 +41,41 @@ async function seedWorkspace(
       folderId,
       createdBy: userOf(document.creator),
     })
-    // The document, and the event that says it was created, are as old as its last change: a demo workspace that
-    // shows documents "created today, changed nine days ago" would not read as real.
-    const ago = sql<Date>`now() - make_interval(days => ${document.daysAgo})`
+    // The document, and the event that says it was created, are as old as it is, and the last change is as recent as
+    // it says: a demo workspace that shows documents "created today, changed nine days ago" would not read as real.
+    // An archived document also has the event of its archiving, on the day it was archived and after its creation, so
+    // the history shows how it got there; archiving moved its revision on, as it does for a person.
+    const ago = (days: number) => sql<Date>`now() - make_interval(days => ${days})`
+    const archived = document.archived === true
     await trx
       .updateTable('documents')
       .set({
         general_access: document.generalAccess ?? 'none',
-        archived_at: document.archived === true ? ago : null,
-        created_at: ago,
-        updated_at: ago,
+        archived_at: archived ? ago(document.daysAgo) : null,
+        revision: archived ? 2 : 1,
+        created_at: ago(document.createdDaysAgo ?? document.daysAgo),
+        updated_at: ago(document.daysAgo),
       })
       .where('id', '=', id)
       .execute()
     await trx
       .updateTable('activity_events')
-      .set({ created_at: ago })
+      .set({ created_at: ago(document.createdDaysAgo ?? document.daysAgo) })
       .where('document_id', '=', id)
       .where('type', '=', 'document.created')
       .execute()
+    if (archived) {
+      await trx
+        .insertInto('activity_events')
+        .values({
+          workspace_id: workspace.id,
+          document_id: id,
+          type: 'document.archived',
+          actor_id: userOf(document.creator),
+          created_at: ago(document.daysAgo),
+        })
+        .execute()
+    }
     for (const [email, role] of Object.entries(document.grants ?? {})) {
       await trx
         .insertInto('document_access')

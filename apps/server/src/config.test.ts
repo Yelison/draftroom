@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ConfigError, loadConfig, loadDatabaseUrl } from './config.ts'
+import { ConfigError, isDevelopmentEnvironment, loadConfig, loadDatabaseUrl } from './config.ts'
 
 const database = 'postgres://draftroom:draftroom@127.0.0.1:5460/draftroom'
 const secret = 'a-secret-of-at-least-thirty-two-characters'
@@ -13,6 +13,20 @@ function problemsOf(environment: NodeJS.ProcessEnv): readonly string[] {
   }
   return []
 }
+
+describe('whether the environment is a development one', () => {
+  it.each([
+    ['development', { NODE_ENV: 'development' }, true],
+    ['test', { NODE_ENV: 'test' }, true],
+    ['production', { NODE_ENV: 'production' }, false],
+    ['not set', {}, false],
+    ['empty', { NODE_ENV: '' }, false],
+    ['written in capitals', { NODE_ENV: 'Development' }, false],
+    ['something else', { NODE_ENV: 'staging' }, false],
+  ])('is decided by NODE_ENV alone when it is %s', (_name, environment, expected) => {
+    expect(isDevelopmentEnvironment(environment)).toBe(expected)
+  })
+})
 
 describe('whether the development identity may serve', () => {
   const production = { NODE_ENV: 'production', SESSION_SECRET: secret, ALLOWED_ORIGINS: 'https://draftroom.example' }

@@ -113,25 +113,72 @@ describe('the demo seed', () => {
     expect(withParts.every((parts) => parts.states === 1 && parts.owners === 1 && parts.created === 1)).toBe(true)
   })
 
-  it('dates the creation of a document, and its event, as far back as its last change', async () => {
-    const documents = await database.db
-      .selectFrom('documents')
-      .select(['id', 'created_at', 'updated_at', 'title'])
-      .execute()
-    const created = await database.db
-      .selectFrom('activity_events')
-      .select(['document_id', 'created_at'])
-      .where('type', '=', 'document.created')
-      .execute()
-    const eventOf = new Map(created.map((event) => [event.document_id, event.created_at.getTime()]))
+  describe('the dates of the documents and their history', () => {
+    async function seeded() {
+      const documents = await database.db
+        .selectFrom('documents')
+        .select(['id', 'title', 'revision', 'archived_at', 'created_at', 'updated_at'])
+        .execute()
+      const events = await database.db
+        .selectFrom('activity_events')
+        .select(['document_id', 'type', 'created_at'])
+        .execute()
+      const eventAt = (documentId: string, type: string): number[] =>
+        events
+          .filter((event) => event.document_id === documentId && event.type === type)
+          .map((event) => event.created_at.getTime())
+      return { documents, eventAt }
+    }
 
-    const mismatches = documents.filter(
-      (document) =>
-        document.created_at.getTime() !== document.updated_at.getTime() ||
-        eventOf.get(document.id) !== document.created_at.getTime(),
-    )
-    expect(mismatches).toEqual([])
-    const oldest = documents.find((document) => document.title === 'Catálogo de la temporada anterior')
-    expect(Date.now() - (oldest?.created_at.getTime() ?? Date.now())).toBeGreaterThan(39 * 24 * 3_600_000)
+    it('dates the creation event of every document when the document was created', async () => {
+      const { documents, eventAt } = await seeded()
+
+      const wrong = documents.filter(
+        (document) => eventAt(document.id, 'document.created')[0] !== document.created_at.getTime(),
+      )
+
+      expect(wrong).toEqual([])
+    })
+
+    it('dates a live document, created and last changed, on the same day', async () => {
+      const { documents } = await seeded()
+
+      const wrong = documents.filter(
+        (document) => document.archived_at === null && document.created_at.getTime() !== document.updated_at.getTime(),
+      )
+
+      expect(wrong).toEqual([])
+    })
+
+    it('gives an archived document the event of its archiving, on the day it was archived and after it was created', async () => {
+      const { documents, eventAt } = await seeded()
+      const archived = documents.filter((document) => document.archived_at !== null)
+
+      expect(archived).toHaveLength(2)
+      for (const document of archived) {
+        const archivedAt = document.archived_at?.getTime() ?? 0
+        expect(eventAt(document.id, 'document.archived')).toEqual([archivedAt])
+        expect(archivedAt).toBeGreaterThan(document.created_at.getTime())
+        expect(document.updated_at.getTime()).toBe(archivedAt)
+        expect(document.revision).toBe(2)
+      }
+    })
+
+    it('gives a live document no event of archiving', async () => {
+      const { documents, eventAt } = await seeded()
+
+      const wrong = documents.filter(
+        (document) => document.archived_at === null && eventAt(document.id, 'document.archived').length > 0,
+      )
+
+      expect(wrong).toEqual([])
+    })
+
+    it('dates the oldest document more than a month back', async () => {
+      const { documents } = await seeded()
+      const oldest = documents.find((document) => document.title === 'Catálogo de la temporada anterior')
+
+      expect(Date.now() - (oldest?.created_at.getTime() ?? Date.now())).toBeGreaterThan(100 * 24 * 3_600_000)
+    })
   })
 })

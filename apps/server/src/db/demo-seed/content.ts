@@ -20,8 +20,10 @@ export interface DemoDocument {
   readonly grants?: Readonly<Record<string, Exclude<DocumentRole, 'owner'>>>
   readonly pinnedBy?: readonly string[]
   readonly archived?: boolean
-  /** How long ago it last changed, which orders the lists. */
+  /** How long ago it last changed (an archived document: was archived), which orders the lists. */
   readonly daysAgo: number
+  /** How long ago it was created, when that was before its last change; as old as `daysAgo` when omitted. */
+  readonly createdDaysAgo?: number
 }
 
 export interface DemoWorkspace {
@@ -101,7 +103,7 @@ export const harborAndPine: DemoWorkspace = {
       generalAccess: 'viewer',
       daysAgo: 9,
     },
-    { title: 'Press kit, 2025 edition', creator: people.marta.email, archived: true, daysAgo: 30 },
+    { title: 'Press kit, 2025 edition', creator: people.marta.email, archived: true, daysAgo: 30, createdDaysAgo: 96 },
   ],
 }
 
@@ -146,6 +148,12 @@ export const almazara: DemoWorkspace = {
       daysAgo: 5,
     },
     { title: 'Borrador de la carta de precios', folder: 'Equipo', creator: people.mateo.email, daysAgo: 7 },
-    { title: 'Catálogo de la temporada anterior', creator: people.lucia.email, archived: true, daysAgo: 40 },
+    {
+      title: 'Catálogo de la temporada anterior',
+      creator: people.lucia.email,
+      archived: true,
+      daysAgo: 40,
+      createdDaysAgo: 120,
+    },
   ],
 }
