@@ -112,11 +112,19 @@ export async function readVersionState(db: Kysely<Database>, versionId: string):
   return row?.state
 }
 
-/** The newest version of a document of any kind, with the state it holds, or nothing when it has none. */
-export async function newestVersionState(db: Kysely<Database>, documentId: string): Promise<Uint8Array | undefined> {
+/**
+ * The newest version of a document of any kind, with the state it holds, or nothing when it has none. The workspace is
+ * part of the question because the index of the table starts with it: without it every version of every workspace is read.
+ */
+export async function newestVersionState(
+  db: Kysely<Database>,
+  workspaceId: string,
+  documentId: string,
+): Promise<Uint8Array | undefined> {
   const row = await db
     .selectFrom('document_versions')
     .select('state')
+    .where('workspace_id', '=', workspaceId)
     .where('document_id', '=', documentId)
     .orderBy('created_at', 'desc')
     .orderBy('id', 'desc')
@@ -126,10 +134,15 @@ export async function newestVersionState(db: Kysely<Database>, documentId: strin
 }
 
 /** When the newest automatic version of a document was made, or `null` when there is none. */
-export async function newestAutoVersionAt(db: Kysely<Database>, documentId: string): Promise<Date | null> {
+export async function newestAutoVersionAt(
+  db: Kysely<Database>,
+  workspaceId: string,
+  documentId: string,
+): Promise<Date | null> {
   const row = await db
     .selectFrom('document_versions')
     .select(sql<Date | null>`max(created_at)`.as('at'))
+    .where('workspace_id', '=', workspaceId)
     .where('document_id', '=', documentId)
     .where('kind', '=', 'auto')
     .executeTakeFirstOrThrow()

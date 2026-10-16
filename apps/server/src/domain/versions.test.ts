@@ -1,19 +1,19 @@
 import { AUTO_VERSION_IDLE_MS, AUTO_VERSION_MIN_INTERVAL_MS } from '@draftroom/contract/collab'
 import { describe, expect, it } from 'vitest'
-import { autoVersionDecision, versionActivity, type AutoVersionFacts, type AutoVersionDecision } from './versions.ts'
+import { autoVersionSchedule, versionActivity, type AutoVersionTiming, type AutoVersionSchedule } from './versions.ts'
 
 // Protocol §11.2: an automatic version is made when the document has been idle for ten minutes, it has edits since its
-// newest version, and the newest automatic version is at least thirty minutes old; when only the last of those is missing
-// the version is deferred to the end of the interval, not skipped.
+// newest version, and the newest automatic version is at least thirty minutes old; when only time is missing the version
+// is deferred to the end of the wait, not skipped. The schedule is the part that depends on time alone, so it is known
+// without reading what the document holds; whether there are edits is asked of the state, only once the version is due.
 
 const minute = 60_000
 const start = Date.UTC(2026, 9, 16, 9, 0, 0)
 const at = (minutes: number): Date => new Date(start + minutes * minute)
 
-const facts = (changes: Partial<AutoVersionFacts> = {}): AutoVersionFacts => ({
+const facts = (changes: Partial<AutoVersionTiming> = {}): AutoVersionTiming => ({
   now: at(60),
   lastEditAt: at(0),
-  editedSinceNewestVersion: true,
   newestAutoAt: null,
   ...changes,
 })
@@ -24,54 +24,45 @@ describe('the constants of the protocol', () => {
   })
 })
 
-describe('the decision on an automatic version', () => {
-  const cases: ReadonlyArray<readonly [string, Partial<AutoVersionFacts>, AutoVersionDecision]> = [
-    [
-      'no edits since the newest version: nothing, however long it has been',
-      { editedSinceNewestVersion: false },
-      { action: 'none' },
-    ],
-    ['idle for an hour with edits and no automatic version yet: create', {}, { action: 'create' }],
-    ['idle for exactly ten minutes: create', { now: at(10) }, { action: 'create' }],
+describe('the schedule of an automatic version', () => {
+  const cases: ReadonlyArray<readonly [string, Partial<AutoVersionTiming>, AutoVersionSchedule]> = [
+    ['idle for an hour and no automatic version yet: due', {}, { due: true }],
+    ['idle for exactly ten minutes: due', { now: at(10) }, { due: true }],
     [
       'idle for nine minutes and fifty-nine seconds: wait for the tenth minute',
       { now: new Date(start + 10 * minute - 1000) },
-      { action: 'wait', until: at(10) },
+      { due: false, until: at(10) },
     ],
     [
       'edited a minute ago: wait until it has been idle for ten minutes',
       { now: at(1), lastEditAt: at(0) },
-      { action: 'wait', until: at(10) },
+      { due: false, until: at(10) },
     ],
     [
       'an automatic version twenty minutes ago: defer to the end of the thirty',
       { now: at(60), newestAutoAt: at(40) },
-      { action: 'wait', until: at(70) },
+      { due: false, until: at(70) },
     ],
-    [
-      'an automatic version exactly thirty minutes ago: create',
-      { now: at(60), newestAutoAt: at(30) },
-      { action: 'create' },
-    ],
+    ['an automatic version exactly thirty minutes ago: due', { now: at(60), newestAutoAt: at(30) }, { due: true }],
     [
       'an automatic version a minute ago and idle too short: wait for whichever comes later',
       { now: at(61), lastEditAt: at(55), newestAutoAt: at(60) },
-      { action: 'wait', until: at(90) },
+      { due: false, until: at(90) },
     ],
     [
       'an edit after the deferral was set restarts the idle clock',
       { now: at(65), lastEditAt: at(64), newestAutoAt: at(40) },
-      { action: 'wait', until: at(74) },
+      { due: false, until: at(74) },
     ],
     [
       'an automatic version in the future (a skewed clock): wait for its thirty minutes',
       { now: at(60), newestAutoAt: at(70) },
-      { action: 'wait', until: at(100) },
+      { due: false, until: at(100) },
     ],
   ]
 
   it.each(cases)('%s', (_name, changes, expected) => {
-    expect(autoVersionDecision(facts(changes))).toEqual(expected)
+    expect(autoVersionSchedule(facts(changes))).toEqual(expected)
   })
 })
 

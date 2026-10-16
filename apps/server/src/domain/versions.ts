@@ -11,38 +11,30 @@ export const RESTORE_CAPTURE_ATTEMPTS = 3
 /** Attempts to commit what a restore wrote, which is already in memory and which the store retry persists if they all fail (step 6). */
 export const RESTORE_COMMIT_ATTEMPTS = 3
 
-export interface AutoVersionFacts {
+export interface AutoVersionTiming {
   readonly now: Date
   /** When the document last changed, wherever the change is: in memory, or in what is stored. */
   readonly lastEditAt: Date
-  /** The document differs from its newest version of any kind (from the empty document when it has none). */
-  readonly editedSinceNewestVersion: boolean
   /** When the newest automatic version was made, or `null` when there is none. */
   readonly newestAutoAt: Date | null
 }
 
-export type AutoVersionDecision =
-  | { readonly action: 'create' }
-  /** The version is deferred, not skipped: it is made at this instant, unless an edit arrives first and restarts the idle clock. */
-  | { readonly action: 'wait'; readonly until: Date }
-  | { readonly action: 'none' }
+export type AutoVersionSchedule =
+  | { readonly due: true }
+  /** Not yet: it is due at this instant, unless an edit arrives first and restarts the idle clock. Deferred, not skipped. */
+  | { readonly due: false; readonly until: Date }
 
 /**
- * Whether to make an automatic version now (protocol §11.2): the document has to have been idle for ten minutes, to have
- * edits since its newest version, and its newest automatic version has to be thirty minutes old. When only time is
- * missing, it says when the version is due, so that edits never stay unversioned for ever.
+ * When an automatic version may be made (protocol §11.2), by time alone: the document has to have been idle for ten
+ * minutes and the newest automatic version has to be thirty minutes old. Whether there is anything to version, which needs
+ * the state of the document and its newest version, is asked only once this says it is due, so a document that is still
+ * waiting costs a clock and not a load.
  */
-export function autoVersionDecision({
-  now,
-  lastEditAt,
-  editedSinceNewestVersion,
-  newestAutoAt,
-}: AutoVersionFacts): AutoVersionDecision {
-  if (!editedSinceNewestVersion) return { action: 'none' }
+export function autoVersionSchedule({ now, lastEditAt, newestAutoAt }: AutoVersionTiming): AutoVersionSchedule {
   const idleAt = lastEditAt.getTime() + AUTO_VERSION_IDLE_MS
   const intervalAt = newestAutoAt === null ? 0 : newestAutoAt.getTime() + AUTO_VERSION_MIN_INTERVAL_MS
   const dueAt = Math.max(idleAt, intervalAt)
-  return now.getTime() >= dueAt ? { action: 'create' } : { action: 'wait', until: new Date(dueAt) }
+  return now.getTime() >= dueAt ? { due: true } : { due: false, until: new Date(dueAt) }
 }
 
 /**

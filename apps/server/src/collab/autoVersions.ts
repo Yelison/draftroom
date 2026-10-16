@@ -5,7 +5,7 @@ import type { Database } from '../db/tables.ts'
 import { findUnexaminedStores, markExamined, type UnexaminedStore } from '../db/versions/auto.ts'
 import { insertVersion } from '../db/versions/commands.ts'
 import { newestAutoVersionAt, newestVersionState } from '../db/versions/queries.ts'
-import { autoVersionDecision } from '../domain/versions.ts'
+import { autoVersionSchedule } from '../domain/versions.ts'
 import type { LiveDocuments } from '../http/live-documents.ts'
 import type { DurabilityRegistry } from './durability.ts'
 import type { CollabLog } from './log.ts'
@@ -61,19 +61,18 @@ export function createAutoVersions({
     const lastLiveChange = durability.get(documentName(store.documentId))?.lastChangeAt ?? 0
     const lastEditAt = new Date(Math.max(store.updatedAt.getTime(), lastLiveChange))
 
+    // By time alone first: a document that is still waiting, which is most of the ones this finds, costs two small reads
+    // and not the load and the decoding of its state and of its newest version. It stays unexamined, so the next sweep
+    // decides again with whatever has happened by then.
+    const newestAutoAt = await newestAutoVersionAt(database, store.workspaceId, store.documentId)
+    if (!autoVersionSchedule({ now: at, lastEditAt, newestAutoAt }).due) return false
+
     return documents.withState(store.documentId, async (state) => {
-      const newest = await newestVersionState(database, store.documentId)
-      const decision = autoVersionDecision({
-        now: at,
-        lastEditAt,
-        editedSinceNewestVersion: !holdSameContent(state, newest ?? emptyState),
-        newestAutoAt: await newestAutoVersionAt(database, store.documentId),
-      })
-      // Due later: it stays unexamined, so the next sweep decides again with whatever has happened by then.
-      if (decision.action === 'wait') return false
+      const newest = await newestVersionState(database, store.workspaceId, store.documentId)
+      const edited = !holdSameContent(state, newest ?? emptyState)
 
       await database.transaction().execute(async (trx) => {
-        if (decision.action === 'create') {
+        if (edited) {
           await insertVersion(trx, {
             workspaceId: store.workspaceId,
             documentId: store.documentId,
@@ -84,8 +83,8 @@ export function createAutoVersions({
         }
         await markExamined(trx, store)
       })
-      if (decision.action === 'create') broadcast(store.documentId, { type: 'versions-changed' })
-      return decision.action === 'create'
+      if (edited) broadcast(store.documentId, { type: 'versions-changed' })
+      return edited
     })
   }
 

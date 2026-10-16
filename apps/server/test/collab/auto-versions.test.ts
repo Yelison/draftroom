@@ -2,6 +2,7 @@ import { documentName } from '@draftroom/contract/collab'
 import { sql, type Kysely } from 'kysely'
 import * as Y from 'yjs'
 import { afterEach, describe, expect, it } from 'vitest'
+import { createPostgresStateStore, type StateStore } from '../../src/collab/stateStore.ts'
 import type { CollabTiming } from '../../src/collab/timing.ts'
 import type { Database } from '../../src/db/tables.ts'
 import { appendParagraph, documentWith, paragraphsOf, storeState } from '../support/collab/content.ts'
@@ -44,7 +45,10 @@ class FakeClock {
 let clock: FakeClock
 let collab: CollabHarness
 let clients: ClientSet
-async function startServer(timing: Partial<CollabTiming> = {}): Promise<void> {
+async function startServer(
+  timing: Partial<CollabTiming> = {},
+  store?: (real: StateStore) => StateStore,
+): Promise<void> {
   database = await provisionDatabase()
   db = database.db
   workspaceId = await createWorkspace(db)
@@ -53,7 +57,11 @@ async function startServer(timing: Partial<CollabTiming> = {}): Promise<void> {
   await join(db, workspaceId, owner, 'owner')
   await join(db, workspaceId, editor)
   clock = new FakeClock()
-  collab = await startCollab(db, { now: clock.now, timing: { ...fastTiming, ...timing } })
+  collab = await startCollab(db, {
+    now: clock.now,
+    timing: { ...fastTiming, ...timing },
+    ...(store === undefined ? {} : { store: store(createPostgresStateStore(db)) }),
+  })
   clients = new ClientSet(collab.url)
 }
 afterEach(async () => {
@@ -186,6 +194,34 @@ describe('a document nobody has open', () => {
     expect(await collab.server.sweepAutoVersions()).toBe(0)
     clock.at(50)
     expect(await collab.server.sweepAutoVersions()).toBe(1)
+    expect((await versionsOf(db, documentId)).map((version) => version.kind)).toEqual(['auto', 'auto'])
+  })
+
+  it('does not read the document while its version is still deferred, and reads it once it is due', async () => {
+    let loads = 0
+    await startServer({}, (real) => ({
+      ...real,
+      load(documentId) {
+        loads += 1
+        return real.load(documentId)
+      },
+    }))
+    const documentId = await storedDocument(40, stateOf('Draft', 'More'))
+    await createVersion(db, {
+      workspaceId,
+      documentId,
+      kind: 'auto',
+      state: stateOf('Draft'),
+      createdAt: clock.iso(20),
+    })
+
+    clock.at(49)
+    await collab.server.sweepAutoVersions()
+    expect(loads).toBe(0)
+    clock.at(50)
+    await collab.server.sweepAutoVersions()
+
+    expect(loads).toBe(1)
     expect((await versionsOf(db, documentId)).map((version) => version.kind)).toEqual(['auto', 'auto'])
   })
 
