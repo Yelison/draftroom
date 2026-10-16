@@ -219,8 +219,8 @@ describe('limits and timings', () => {
     expect(RECONNECT_STABLE_MS).toBeGreaterThan(RECONNECT_MAX_DELAY_MS)
   })
 
-  it('refuses an authentication with exactly the two reasons that cannot be used to probe ids', () => {
-    expect(authDeniedReasons).toEqual(['unauthenticated', 'not-found'])
+  it('refuses an authentication with the two reasons that cannot be used to probe ids, and one for a failure of the server', () => {
+    expect(authDeniedReasons).toEqual(['unauthenticated', 'not-found', 'unavailable'])
     expect(authorizedScopes).toEqual(['read-write', 'readonly'])
   })
 })
