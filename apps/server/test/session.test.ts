@@ -102,7 +102,8 @@ describe('who is calling', () => {
     const pending = await createPendingPerson(db)
     await join(db, studio.workspaceId, pending)
 
-    const response = await api({ as: pending, method: 'GET', url: '/api/me' })
+    // A route that does not need the person's name, so only the identity check can refuse it.
+    const response = await api({ as: pending, method: 'GET', url: '/api/workspaces' })
 
     expect(response.statusCode).toBe(401)
   })
