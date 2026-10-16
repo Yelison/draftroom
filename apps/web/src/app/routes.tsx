@@ -5,6 +5,7 @@ import { FolderScreen } from '../features/documents/FolderScreen.tsx'
 import { EditorSkeleton } from '../features/editor/EditorSkeleton.tsx'
 import { HistoryScreen } from '../features/history/HistoryScreen.tsx'
 import { SearchScreen } from '../features/search/SearchScreen.tsx'
+import { SharedScreen } from '../features/shared/SharedScreen.tsx'
 import { TemplateScreen } from '../features/templates/TemplateScreen.tsx'
 import { TrashScreen } from '../features/trash/TrashScreen.tsx'
 import type { MessageId } from '../i18n/messages.ts'
@@ -42,7 +43,7 @@ export const routes: RouteObject[] = [
             Component: TemplateScreen,
             handle: { section: 'documents' } satisfies RouteHandle,
           },
-          { path: 'shared', ...screen('nav.shared', 'shared') },
+          { path: 'shared', Component: SharedScreen, handle: { section: 'shared' } satisfies RouteHandle },
           { path: 'history', Component: HistoryScreen, handle: { section: 'history' } satisfies RouteHandle },
           {
             path: 'settings',
