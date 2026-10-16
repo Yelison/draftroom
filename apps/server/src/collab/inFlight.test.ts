@@ -7,7 +7,7 @@ import { inFlightExtension, RevocationMarks } from './inFlight.ts'
 const documentName = 'doc:00000000-0000-4000-8000-000000000001'
 const otherDocumentName = 'doc:00000000-0000-4000-8000-000000000002'
 const revoked: ClosePlan = { code: 'access-revoked' }
-const lifetimeMs = 30_000
+const stuckAfterMs = 10 * 60 * 1000
 
 const contextOf = (sequence: number, overrides: Partial<ConnectionContext> = {}): ConnectionContext => ({
   userId: 'person-1',
@@ -21,7 +21,7 @@ const contextOf = (sequence: number, overrides: Partial<ConnectionContext> = {})
 
 function marksWithClock() {
   const clock = { now: 0 }
-  return { clock, marks: new RevocationMarks(lifetimeMs, () => clock.now) }
+  return { clock, marks: new RevocationMarks(stuckAfterMs, () => clock.now) }
 }
 
 describe('what a revocation leaves for the connections that are being established', () => {
@@ -65,15 +65,48 @@ describe('what a revocation leaves for the connections that are being establishe
     expect(marks.planFor(otherDocumentName, contextOf(ticket))).toBeUndefined()
   })
 
-  it('is forgotten once no connection can still be establishing, which is after the time Hocuspocus allows it', () => {
+  it('lives for as long as a connection that took its ticket before it is in flight, however long that is', () => {
     const { clock, marks } = marksWithClock()
     const ticket = marks.ticket()
     marks.leave({ userId: 'person-1' }, revoked)
 
-    clock.now = lifetimeMs - 1
+    // A load of a minute and a half: no clock gives a connection that is loading a deadline.
+    clock.now = 90_000
     expect(marks.planFor(documentName, contextOf(ticket))).toEqual(revoked)
-    clock.now = lifetimeMs
+  })
+
+  it('is forgotten once every connection that took its ticket before it is registered, refused or gone', () => {
+    const { marks } = marksWithClock()
+    const ticket = marks.ticket()
+    marks.leave({ userId: 'person-1' }, revoked)
+    expect(marks.planFor(documentName, contextOf(ticket))).toEqual(revoked)
+
+    marks.settle(ticket)
+
     expect(marks.planFor(documentName, contextOf(ticket))).toBeUndefined()
+  })
+
+  it('is kept by the oldest connection still in flight, and forgotten when that one settles', () => {
+    const { marks } = marksWithClock()
+    const older = marks.ticket()
+    marks.leave({ userId: 'person-1' }, revoked)
+    const newer = marks.ticket()
+    marks.settle(newer)
+
+    expect(marks.planFor(documentName, contextOf(older))).toEqual(revoked)
+    marks.settle(older)
+    expect(marks.planFor(documentName, contextOf(older))).toBeUndefined()
+  })
+
+  it('does not keep a ticket for ever when its connection died without a hook to say so', () => {
+    const { clock, marks } = marksWithClock()
+    const lost = marks.ticket()
+    marks.leave({ userId: 'person-1' }, revoked)
+
+    clock.now = stuckAfterMs - 1
+    expect(marks.planFor(documentName, contextOf(lost))).toEqual(revoked)
+    clock.now = stuckAfterMs
+    expect(marks.planFor(documentName, contextOf(lost))).toBeUndefined()
   })
 
   it('gives the plan of the mark that names the connection when several were left', () => {
@@ -144,7 +177,7 @@ describe('a connection that registers after a revocation', () => {
   })
 
   function withExtension() {
-    const marks = new RevocationMarks(lifetimeMs, () => 0)
+    const marks = new RevocationMarks(stuckAfterMs, () => 0)
     return { marks, extension: inFlightExtension(marks) }
   }
 })

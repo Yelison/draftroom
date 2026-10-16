@@ -59,6 +59,8 @@ export interface CollabServer {
 const unauthenticatedQueueBytes = 256 * 1024
 const unauthenticatedQueueMessages = 64
 const connectionTimeoutMs = 30_000
+/** A connection that has not been registered after this long is taken for dead by the marks of a revocation. */
+const stuckConnectionMs = 10 * 60 * 1000
 /** A socket carries one document (protocol §2): the server refuses to hold more names open before authentication. */
 const pendingDocuments = 2
 
@@ -71,7 +73,7 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
   const durability = new DurabilityRegistry()
   const retry = new StoreRetry(timing.retryDelaysMs, log)
   const sockets = new OpenSockets()
-  const marks = new RevocationMarks(connectionTimeoutMs, now)
+  const marks = new RevocationMarks(stuckConnectionMs, now)
 
   const server = new Server<ConnectionContext>({
     port: config.collabPort,
@@ -92,9 +94,10 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
     extensions: [
       upgradeGuardExtension({ allowedOrigins: config.allowedOrigins, development: config.devIdentity }, sockets),
       authenticateExtension({ database, authProvider, sessionSecret: config.sessionSecret, log, marks }),
-      persistenceExtension({ store, durability, retry, log }),
-      durableAckExtension({ durability, log }),
+      persistenceExtension({ store, durability, retry, marks, log }),
+      // Before the acknowledgement: a connection that a revocation names is closed before it is told anything is stored.
       inFlightExtension(marks),
+      durableAckExtension({ durability, log }),
       limitsExtension({ durability, now }),
       awarenessGuardExtension(),
     ],

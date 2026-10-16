@@ -27,13 +27,14 @@ let db: Kysely<Database>
 let store: ObservedStore
 let collab: CollabHarness
 let clients: ClientSet
+let withSessions: AuthProvider
 let sockets: RawClient[] = []
 beforeAll(async () => {
   database = await provisionDatabase()
   db = database.db
   const developer = createDevIdentity(db)
   // The development identity, plus the session its caller says it has.
-  const withSessions: AuthProvider = {
+  withSessions = {
     async authenticate(request, requirement) {
       const authentication = await developer.authenticate(request, requirement)
       if (authentication.status !== 'authenticated') return authentication
@@ -80,9 +81,13 @@ const newDocument = async () => {
 }
 
 /** The editor authenticates and is told so, while the load of the document is held: the connection is in flight. */
-async function authenticateWhileLoading(documentId: string, session?: string): Promise<RawClient> {
+async function authenticateWhileLoading(
+  documentId: string,
+  session?: string,
+  harness: CollabHarness = collab,
+): Promise<RawClient> {
   store.holdLoads()
-  const socket = await RawClient.connect(collab.url, {
+  const socket = await RawClient.connect(harness.url, {
     email: editor.email,
     headers: session === undefined ? {} : { [sessionHeader]: session },
   })
@@ -94,8 +99,8 @@ async function authenticateWhileLoading(documentId: string, session?: string): P
 }
 
 /** Someone else reads the document once the load is free: what the revoked connection did, if anything, is in it. */
-async function whatIsInTheDocument(documentId: string): Promise<string[]> {
-  const witness = clients.open(documentId, { email: owner.email })
+async function whatIsInTheDocument(documentId: string, readers: ClientSet = clients): Promise<string[]> {
+  const witness = readers.open(documentId, { email: owner.email })
   await witness.waitForSynced()
   return paragraphsOfDoc(witness.doc)
 }
@@ -126,7 +131,8 @@ describe('a revocation while the connection is being established', () => {
     const told = socket.received.flatMap((frame) =>
       frame.kind === 'stateless' ? [parseStatelessEvent(frame.payload)] : [],
     )
-    expect(told.filter((event) => event?.type !== 'stored')).toEqual([{ type: 'access-changed' }])
+    // Only what explains the close: nothing, not even that something is stored, reaches a connection that is revoked.
+    expect(told).toEqual([{ type: 'access-changed' }])
     expect(socket.received.filter((frame) => frame.kind === 'sync-status')).toEqual([])
     expect(await whatIsInTheDocument(documentId)).toEqual([])
     expect(await storedParagraphs(db, documentId)).toEqual([])
@@ -160,6 +166,29 @@ describe('a revocation while the connection is being established', () => {
     expect(await socket.waitForClose()).toEqual({ code: 4401, reason: 'unauthenticated' })
     expect(await whatIsInTheDocument(documentId)).toEqual([])
     expect(other.isOpen).toBe(true)
+  })
+
+  it('reaches it however long the load takes: a mark lives for as long as a connection that is older is still in flight', async () => {
+    // A clock the test moves, as the one of the marks and of the rate limit: five minutes pass between the revocation and the
+    // end of the load, ten times what Hocuspocus allows an unauthenticated connection and more than the old life of a mark.
+    const clock = { now: Date.now() }
+    const slow = await startCollab(db, { store, authProvider: withSessions, now: () => clock.now })
+    try {
+      const documentId = await newDocument()
+      const socket = await authenticateWhileLoading(documentId, undefined, slow)
+      slow.server.endConnections({ documentId, userId: editor.id }, { code: 'access-revoked' })
+      clock.now += 5 * 60_000
+      socket.send(forged(documentId))
+      store.releaseLoads()
+
+      expect(await socket.waitForClose()).toEqual({ code: 4403, reason: 'access-revoked' })
+      // Read from the server that held the connection: what it applied in memory is what it would tell a witness.
+      const readers = new ClientSet(slow.url)
+      expect(await whatIsInTheDocument(documentId, readers)).toEqual([])
+      readers.destroyAll()
+    } finally {
+      await slow.close()
+    }
   })
 
   it('leaves alone a connection that authenticated after the revocation, which read what the database says now', async () => {

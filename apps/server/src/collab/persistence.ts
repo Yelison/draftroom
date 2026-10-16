@@ -6,12 +6,14 @@ import { documentIdOf } from './documentId.ts'
 import { snapshotOf, type CapturedWrite, type DocumentDurability, type DurabilityRegistry } from './durability.ts'
 import type { CollabLog } from './log.ts'
 import type { StateStore } from './stateStore.ts'
+import type { RevocationMarks } from './inFlight.ts'
 import type { StoreRetry } from './storeRetry.ts'
 
 export interface PersistenceOptions {
   readonly store: StateStore
   readonly durability: DurabilityRegistry
   readonly retry: StoreRetry
+  readonly marks: RevocationMarks
   readonly log: CollabLog
 }
 
@@ -20,17 +22,24 @@ export function persistenceExtension({
   store,
   durability,
   retry,
+  marks,
   log,
 }: PersistenceOptions): Extension<ConnectionContext> {
   return {
     extensionName: 'draftroom-persistence',
 
-    async onLoadDocument({ document, documentName }) {
-      const state = await store.load(documentIdOf(documentName))
-      // Authentication found the document a moment ago, so a missing state is a document deleted since: refuse to load.
-      if (state === undefined) throw new Error(`There is no stored state for ${documentName}`)
-      Y.applyUpdate(document, state)
-      durability.track(document, documentName, { snapshot: snapshotOf(document), size: state.byteLength })
+    async onLoadDocument({ document, documentName, context }) {
+      try {
+        const state = await store.load(documentIdOf(documentName))
+        // Authentication found the document a moment ago, so a missing state is a document deleted since: refuse to load.
+        if (state === undefined) throw new Error(`There is no stored state for ${documentName}`)
+        Y.applyUpdate(document, state)
+        durability.track(document, documentName, { snapshot: snapshotOf(document), size: state.byteLength })
+      } catch (error) {
+        // The connection that was loading will not be registered: it is no longer in flight.
+        marks.settle(context.sequence)
+        throw error
+      }
     },
 
     // Runs inside the document's store mutex, as does `afterStoreDocument`, so the capture, the write and the

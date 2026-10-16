@@ -87,9 +87,14 @@ export function authenticateExtension(options: AuthenticateOptions): Extension<C
       } catch (error) {
         // Not `not-found`: a client that had access would take that for the removal of it and purge its local copy.
         options.log.error({ documentName, error }, 'authenticating a connection failed')
+        options.marks.settle(sequence)
         throw { reason: 'unavailable' satisfies AuthDeniedReason }
       }
-      if ('denied' in decision) throw { reason: decision.denied }
+      if ('denied' in decision) {
+        // Refused: it will not be registered, so nothing a revocation leaves needs to wait for it.
+        options.marks.settle(sequence)
+        throw { reason: decision.denied }
+      }
       connectionConfig.readOnly = decision.readOnly
       return decision.context
     },
