@@ -69,6 +69,40 @@ describe('the History screen', () => {
     expect(within(main()).queryByText(/access to/)).not.toBeInTheDocument()
   })
 
+  it('says a version saved on its own without naming anyone, and a change of access without the person it is about', async () => {
+    renderScreen('/history', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listWorkspaceActivity: async () => ({
+          items: [
+            {
+              id: '9d1f3a5c-7c8e-4a0f-8bcd-9f1b3d5a7c01',
+              type: 'version.created',
+              createdAt: '2026-10-13T09:00:00.000Z',
+              actor: null,
+              document: { id: fixtures.launchPlan.id, title: fixtures.launchPlan.title },
+              targetUser: null,
+            },
+            {
+              id: '9d1f3a5c-7c8e-4a0f-8bcd-9f1b3d5a7c02',
+              type: 'access.revoked',
+              createdAt: '2026-10-13T08:00:00.000Z',
+              actor: { id: marta.id, name: 'Marta Ruiz' },
+              document: { id: fixtures.launchPlan.id, title: fixtures.launchPlan.title },
+              targetUser: null,
+            },
+          ],
+          nextCursor: null,
+        }),
+      }),
+    })
+
+    expect(
+      await within(main()).findByText('A version of “Autumn launch plan” was saved automatically'),
+    ).toBeInTheDocument()
+    expect(within(main()).getByText("Marta Ruiz removed someone's access to “Autumn launch plan”")).toBeInTheDocument()
+  })
+
   it('writes the days, the times and the sentences in Spanish when the app is in Spanish', async () => {
     localStorage.setItem(localeStorageKey, 'es')
     renderScreen('/history')
