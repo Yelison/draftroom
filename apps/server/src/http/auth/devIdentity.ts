@@ -1,7 +1,6 @@
-import type { FastifyRequest } from 'fastify'
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '../../db/tables.ts'
-import type { AuthProvider, Authentication } from './auth-provider.ts'
+import type { AuthProvider, AuthRequest, Authentication } from './auth-provider.ts'
 
 /** The header that names the caller while there is no sign-in: the email of a person who has signed up. */
 export const devUserHeader = 'x-dev-user'
@@ -20,7 +19,7 @@ const maxEmailLength = 254
  */
 export function createDevIdentity(database: Kysely<Database>): AuthProvider {
   return {
-    async authenticate(request: FastifyRequest): Promise<Authentication> {
+    async authenticate(request: AuthRequest): Promise<Authentication> {
       const email = request.headers[devUserHeader]
       // A repeated header arrives as a list, and a value that cannot be an email needs no query.
       if (typeof email !== 'string' || email === '' || email.length > maxEmailLength) {

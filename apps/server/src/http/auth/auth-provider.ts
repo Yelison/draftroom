@@ -20,6 +20,9 @@ export type Authentication =
   | { readonly status: 'unauthenticated' }
   | { readonly status: 'csrf-rejected' }
 
+/** What a provider reads of a request: its headers, which carry a development header today and cookies and the CSRF token later. */
+export type AuthRequest = Pick<FastifyRequest, 'headers'>
+
 export interface AuthProvider {
-  authenticate(request: FastifyRequest, requirement: AuthRequirement): Promise<Authentication>
+  authenticate(request: AuthRequest, requirement: AuthRequirement): Promise<Authentication>
 }
