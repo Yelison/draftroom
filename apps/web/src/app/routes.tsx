@@ -74,8 +74,15 @@ export const routes: RouteObject[] = [
             HydrateFallback: EditorSkeleton,
             lazy: async () => ({ Component: (await import('../features/editor/EditorScreen.tsx')).EditorScreen }),
             handle: { section: 'documents' } satisfies RouteHandle,
+            children: [
+              {
+                // A dialog over the editor, which the editor shows in its own place (an `Outlet`) once it has a document.
+                path: 'share',
+                lazy: async () => ({ Component: (await import('../features/sharing/ShareDialog.tsx')).ShareDialog }),
+                handle: { section: 'documents', dialog: true } satisfies RouteHandle,
+              },
+            ],
           },
-          { path: 'documents/:documentId/share', ...screen('screen.share', 'documents') },
           { path: 'documents/:documentId/versions', ...screen('screen.versions', 'documents') },
         ],
       },

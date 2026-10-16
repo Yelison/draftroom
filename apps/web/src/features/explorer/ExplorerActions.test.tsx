@@ -94,7 +94,8 @@ describe('archiving from the explorer', () => {
 
     await user.keyboard('{Delete}')
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // The page of the test is the share route, whose dialog tells Daniel that only owners can share: that is not the one asked for.
+    expect(screen.queryByRole('dialog', { name: /^Archive/ })).not.toBeInTheDocument()
   })
 })
 
@@ -138,7 +139,7 @@ describe('renaming and moving from the explorer', () => {
 
     await user.keyboard('{F2}')
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Rename or move' })).not.toBeInTheDocument()
   })
 
   it('shows the new title in the tree after it is saved', async () => {

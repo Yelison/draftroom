@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
-import { createMemoryRouter, type RouteObject } from 'react-router'
+import { createMemoryRouter, Outlet, type RouteObject } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { describe, expect, it } from 'vitest'
 import { DataSourceContext } from '../data/DataSourceContext.ts'
@@ -45,7 +45,7 @@ describe('the focus when the person navigates', () => {
   })
 
   it.each([
-    { to: '/documents/d1/share', page: 'a page with an id', heading: 'Share' },
+    { to: '/documents/d1/versions', page: 'a page with an id', heading: 'Version history' },
     { to: '/documents/new', page: 'a page of the other layout', heading: 'New document' },
     { to: '/settings', page: 'an address that redirects', heading: 'Settings' },
     { to: '/no/such/page', page: 'a page that does not exist', heading: 'Page not found' },
@@ -110,6 +110,69 @@ describe('a page whose headline cannot take the focus', () => {
     await act(() => router.navigate('/next'))
 
     expect(screen.getByRole('main')).toHaveFocus()
+  })
+})
+
+describe('a dialog that is a route over its page', () => {
+  const routes: RouteObject[] = [
+    {
+      Component: AppFrame,
+      children: [
+        {
+          Component: OverviewLayout,
+          children: [
+            {
+              path: 'page',
+              element: (
+                <>
+                  <h1 tabIndex={-1}>Page</h1>
+                  <button type="button">Open</button>
+                  <Outlet />
+                </>
+              ),
+              children: [{ path: 'dialog', handle: { dialog: true }, element: <p>Dialog</p> }],
+            },
+            { path: 'other', element: <h1 tabIndex={-1}>Other</h1> },
+          ],
+        },
+      ],
+    },
+  ]
+  const open = async (path: string) => {
+    const router = createMemoryRouter(routes, { initialEntries: [path] })
+    render(
+      <AppProviders>
+        <RouterProvider router={router} />
+      </AppProviders>,
+    )
+    await screen.findByRole('button', { name: 'Open' })
+    return router
+  }
+
+  it('leaves the focus where it is when it opens: the page is still there, and the dialog takes the focus itself', async () => {
+    const router = await open('/page')
+    screen.getByRole('button', { name: 'Open' }).focus()
+
+    await act(() => router.navigate('/page/dialog'))
+
+    expect(screen.getByRole('button', { name: 'Open' })).toHaveFocus()
+  })
+
+  it('leaves the focus where it is when it closes: what opened it takes it back, not the headline', async () => {
+    const router = await open('/page/dialog')
+    screen.getByRole('button', { name: 'Open' }).focus()
+
+    await act(() => router.navigate('/page'))
+
+    expect(screen.getByRole('button', { name: 'Open' })).toHaveFocus()
+  })
+
+  it('moves to the headline of the next page when the person leaves it for another page', async () => {
+    const router = await open('/page/dialog')
+
+    await act(() => router.navigate('/other'))
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Other' })).toHaveFocus()
   })
 })
 

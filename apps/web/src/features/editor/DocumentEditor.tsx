@@ -4,11 +4,12 @@ import { EditorContent } from '@tiptap/react'
 import { Button, buttonClassName } from '@yelison/forma-ui'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useIntl } from 'react-intl'
-import { Link } from 'react-router'
+import { Link, Outlet } from 'react-router'
 import { presenceLookOf } from '../../collab/presenceColor.ts'
 import type { CollabSession, CollabSnapshot } from '../../collab/session.ts'
 import { Presence, type PresenceEntry } from '../../components/Presence/Presence.tsx'
 import { SyncStatus } from '../../components/SyncStatus/SyncStatus.tsx'
+import { ShareControl } from '../sharing/ShareControl.tsx'
 import { useDataSource } from '../../data/useDataSource.ts'
 import type { CollaboratingPerson } from './CollaborationExtensions.ts'
 import { EditorSkeleton } from './EditorSkeleton.tsx'
@@ -109,8 +110,14 @@ function Shown({
   focusHeadline: () => void
 }) {
   const intl = useIntl()
-  const stopped = snapshot.state === 'revoked' || (!snapshot.loaded && snapshot.state === 'error')
-  if (snapshot.state === 'revoked') {
+  const revoked = snapshot.state === 'revoked'
+  const stopped = revoked || (!snapshot.loaded && snapshot.state === 'error')
+  // What had the focus (the text, the share dialog) goes with the editor when access is removed: the focus must not fall to
+  // the page, so it goes to the headline of the screen unless something else already has it.
+  useEffect(() => {
+    if (revoked && window.document.activeElement === window.document.body) focusHeadline()
+  }, [revoked, focusHeadline])
+  if (revoked) {
     return (
       <EditorStatePanel
         title={intl.formatMessage({ id: 'sync.revoked.title' })}
@@ -279,6 +286,7 @@ function EditorWorkspace({
         {editable && <Toolbar editor={editor} onLinkRequest={requestLink} />}
         {(document.role === 'viewer' || document.role === 'commenter') && <ReadOnlyNotice role={document.role} />}
         <div className={styles.status}>
+          <ShareControl document={document} />
           <Presence people={people} />
           <SyncStatus state={snapshot.state} keepsCopy={snapshot.keepsCopy} />
         </div>
@@ -289,6 +297,8 @@ function EditorWorkspace({
         <TitleField document={document} editable={mayEdit} onEnter={() => editor.commands.focus('start')} />
         <EditorContent editor={editor} />
       </div>
+      {/* Where a dialog of the route is shown (sharing): only while the document is, so it goes with it if access is removed. */}
+      <Outlet />
       <LinkDialog
         request={linkRequest}
         onSubmit={applyLink}

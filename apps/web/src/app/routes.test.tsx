@@ -1,5 +1,6 @@
 import { screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { launchPlan } from '../data/mock/fixtures/documents.ts'
 import { localeStorageKey } from '../i18n/locale.ts'
 import { renderApp } from '../test/renderApp.tsx'
 
@@ -19,7 +20,6 @@ const routeCases = [
   { path: '/trash', active: 'Documents', heading: 'Trash', rail: 'expanded' },
   { path: '/search?q=budget', active: 'Documents', heading: 'Results for “budget”', rail: 'expanded' },
   { path: '/documents/new', active: 'Documents', heading: 'New document', rail: 'compact' },
-  { path: '/documents/d1/share', active: 'Documents', heading: 'Share', rail: 'compact' },
   { path: '/documents/d1/versions', active: 'Documents', heading: 'Version history', rail: 'compact' },
   { path: '/no/such/page', active: undefined, heading: 'Page not found', rail: 'expanded' },
 ] as const
@@ -51,6 +51,27 @@ describe('the route table', () => {
     renderApp(path)
 
     expect(screen.getByRole('link', { name: 'Settings' })).not.toHaveAttribute('aria-current')
+  })
+})
+
+describe('the share route', () => {
+  afterEach(() => localStorage.clear())
+  const shareOf = `/documents/${launchPlan.id}/share`
+
+  it('is a dialog over the editor: Documents stays current, the rail stays compact and the document stays behind', async () => {
+    renderApp(shareOf)
+
+    expect(await screen.findByRole('dialog', { name: 'Share “Autumn launch plan”' })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass('compact')
+    expect(screen.queryAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual(['Documents'])
+    expect(screen.getByRole('heading', { level: 1, hidden: true })).toHaveTextContent('Autumn launch plan')
+  })
+
+  it('names the dialog in Spanish when the app is in Spanish', async () => {
+    localStorage.setItem(localeStorageKey, 'es')
+    renderApp(shareOf)
+
+    expect(await screen.findByRole('dialog', { name: 'Compartir «Autumn launch plan»' })).toBeInTheDocument()
   })
 })
 
@@ -101,7 +122,6 @@ describe('the texts of the shell in both languages', () => {
 
   it.each([
     { path: '/documents/d1/versions', title: 'Historial de versiones' },
-    { path: '/documents/d1/share', title: 'Compartir' },
     { path: '/documents/new', title: 'Nuevo documento' },
     { path: '/no/such/page', title: 'Página no encontrada' },
   ])('titles $path "$title" in Spanish, in the page and in the tab', ({ path, title }) => {

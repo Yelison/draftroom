@@ -183,7 +183,7 @@ describe('applying a format with the keyboard', () => {
 })
 
 describe('moving along the toolbar with the keyboard', () => {
-  it('is one tab stop, before the title: Shift+Tab from the title enters it and Tab leaves it', async () => {
+  it('is one tab stop, before the title: Shift+Tab from the title reaches it and Tab leaves it', async () => {
     const { user } = await openEditor()
     const toolbar = screen.getByRole('toolbar')
     const tabbable = [...toolbar.querySelectorAll('button')].filter((button) => button.tabIndex === 0)
@@ -191,8 +191,12 @@ describe('moving along the toolbar with the keyboard', () => {
     const title = screen.getByRole('textbox', { name: 'Document title' })
     await user.click(title)
 
+    // The Share button of an owner sits between the toolbar and the title.
+    await user.tab({ shift: true })
+    expect(screen.getByRole('button', { name: 'Share' })).toHaveFocus()
     await user.tab({ shift: true })
     expect(screen.getByRole('button', { name: 'Bold' })).toHaveFocus()
+    await user.tab()
     await user.tab()
     expect(title).toHaveFocus()
   })
