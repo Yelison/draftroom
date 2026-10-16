@@ -30,6 +30,8 @@ describe('the monospace font of the editor', () => {
 
     expect(values('font-family')).toEqual(new Set(['var(--font-family-mono)']))
     expect(values('font-size')).toEqual(new Set(['0.875em']))
+    // The `font` shorthand would reset the family and the size whatever the longhands above say.
+    expect(values('font')).toEqual(new Set())
   })
 
   it('sets the code button of the toolbar in the family token and leaves the size and weight to the button', () => {
