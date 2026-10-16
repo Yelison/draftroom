@@ -15,9 +15,9 @@ function watch(dataSource: DataSource) {
   const calls = { workspaces: 0, queries: [] as (string | undefined)[], limits: [] as (number | undefined)[] }
   const watched: DataSource = {
     ...dataSource,
-    listWorkspaces: (request) => {
+    listWorkspaces: () => {
       calls.workspaces++
-      return dataSource.listWorkspaces(request)
+      return dataSource.listWorkspaces()
     },
     listDocuments: (request) => {
       calls.queries.push(request?.params.query?.query)
