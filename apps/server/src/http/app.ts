@@ -17,6 +17,7 @@ import {
   sendProblem,
 } from './problem.ts'
 import { accessRoutes } from './routes/access.ts'
+import { activityRoutes } from './routes/activity.ts'
 import { commentRoutes } from './routes/comments.ts'
 import { documentRoutes } from './routes/documents.ts'
 import { folderRoutes } from './routes/folders.ts'
@@ -127,6 +128,7 @@ export function buildApp({
     accessRoutes,
     pinRoutes,
     commentRoutes,
+    activityRoutes,
     templateRoutes,
     versionRoutes,
   ]) {
