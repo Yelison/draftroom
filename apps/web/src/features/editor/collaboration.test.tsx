@@ -142,3 +142,51 @@ describe('the sync status of the open editor', () => {
     expect(server.collaboration.document(documentName(budget.id)).getXmlFragment('default').length).toBe(0)
   })
 })
+
+describe('when the connection stops', () => {
+  it('takes the text away from a person whose access was removed, and says so', async () => {
+    const { server, text } = await openEditor()
+    await waitFor(() => expect(server.collaboration.connectionsTo(wireName)).toBe(1))
+
+    act(() => server.collaboration.closeConnections(4403, 'access-revoked'))
+
+    expect(await screen.findByRole('heading', { name: 'Your access to this document was removed' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to Documents' })).toHaveAttribute('href', '/documents')
+    expect(text).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('says the session ended, keeps what was written, and puts the person back in the text when they try again', async () => {
+    const { server, editor, text, user } = await openEditor()
+    act(() => editor.commands.insertContent('Written before it ended'))
+    await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument(), { timeout: 5000 })
+
+    act(() => server.collaboration.closeConnections(4401, 'unauthenticated'))
+
+    const retry = await screen.findByRole('button', { name: 'Try again' })
+    expect(screen.getByText('Your session ended')).toBeInTheDocument()
+    expect(editor.getText()).toBe('Written before it ended')
+    await user.click(retry)
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument())
+    expect(text).toHaveFocus()
+    await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument(), { timeout: 5000 })
+  })
+
+  it('offers only to discard and reload for a document that is too large, and puts the person in the new text', async () => {
+    const { server, editor, user } = await openEditor()
+    act(() => editor.commands.insertContent('Stored text'))
+    await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument(), { timeout: 5000 })
+
+    act(() => server.collaboration.closeConnections(4413, 'document-too-large'))
+
+    expect(await screen.findByText('This document is too large to keep editing')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Discard my local changes and reload' }))
+
+    const reloaded = await screen.findByRole('textbox', { name: 'Document content' })
+    await waitFor(() => expect(reloaded).toHaveFocus(), { timeout: 5000 })
+    expect(reloaded).toHaveTextContent('Stored text')
+    expect(screen.queryByText('This document is too large to keep editing')).not.toBeInTheDocument()
+  })
+})
