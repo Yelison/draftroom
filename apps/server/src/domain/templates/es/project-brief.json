@@ -1,0 +1,87 @@
+{
+  "name": "Resumen de proyecto",
+  "description": "Objetivo, alcance y calendario en una página.",
+  "content": {
+    "type": "doc",
+    "content": [
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Objetivo" }] },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "En una o dos frases: ¿qué queremos conseguir y para quién?" }]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Alcance" }] },
+      { "type": "heading", "attrs": { "level": 3 }, "content": [{ "type": "text", "text": "Dentro del alcance" }] },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "El trabajo que haremos" }] }]
+          }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 3 }, "content": [{ "type": "text", "text": "Fuera del alcance" }] },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              { "type": "paragraph", "content": [{ "type": "text", "text": "Lo que dejamos para más adelante" }] }
+            ]
+          }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Calendario" }] },
+      {
+        "type": "orderedList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Arranque" }] }]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              { "type": "paragraph", "content": [{ "type": "text", "text": "Primera versión lista para revisar" }] }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Lanzamiento" }] }]
+          }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Personas" }] },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Patrocinio: ", "marks": [{ "type": "bold" }] },
+          { "type": "text", "text": "quién respalda el proyecto." }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Responsable: ", "marks": [{ "type": "bold" }] },
+          { "type": "text", "text": "quién responde del resultado." }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Riesgos" }] },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [{ "type": "text", "text": "Qué podría salir mal y qué haremos al respecto" }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

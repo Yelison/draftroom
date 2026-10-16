@@ -14,6 +14,8 @@ export interface Session {
 export interface Context {
   world: World
   session: Session
+  /** Gives a new document the content it starts with, on the collaboration server that serves it: a template's text. */
+  startContent: (documentId: string, update: Uint8Array) => void
 }
 
 type DocumentRole = Schema<'DocumentRole'>

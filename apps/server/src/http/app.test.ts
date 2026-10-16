@@ -124,6 +124,7 @@ const implementedOperations = [
   'setAccess',
   'removeAccess',
   'setGeneralAccess',
+  'listTemplates',
 ]
 
 describe('the routes of the app', () => {

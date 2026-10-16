@@ -11,11 +11,14 @@ export interface NewDocument {
   readonly title: string
   readonly folderId: string | null
   readonly createdBy: string
+  /** The Yjs state it starts with, from a template; none for a blank document. */
+  readonly state?: Uint8Array
 }
 
 /**
- * Creates a document: its row, its empty content, its creator's `owner` grant and the event that says it was created,
- * all or nothing. Sharing starts closed (`general_access` is `none` by default), and the creator is the only owner.
+ * Creates a document: its row, its initial content (empty unless it comes from a template), its creator's `owner`
+ * grant and the event that says it was created, all or nothing. Sharing starts closed (`general_access` is `none` by
+ * default), and the creator is the only owner.
  */
 export async function createDocumentRows(trx: Transaction<Database>, document: NewDocument): Promise<string> {
   const { id } = await trx
@@ -31,7 +34,7 @@ export async function createDocumentRows(trx: Transaction<Database>, document: N
     .executeTakeFirstOrThrow()
   await trx
     .insertInto('document_states')
-    .values({ workspace_id: document.workspaceId, document_id: id, state: emptyDocumentState })
+    .values({ workspace_id: document.workspaceId, document_id: id, state: document.state ?? emptyDocumentState })
     .execute()
   await trx
     .insertInto('document_access')

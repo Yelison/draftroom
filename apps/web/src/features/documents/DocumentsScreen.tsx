@@ -3,6 +3,7 @@ import { Button, buttonClassName } from '@yelison/forma-ui'
 import { useDeferredValue, useEffect, useState } from 'react'
 import { useIntl } from 'react-intl'
 import { Link, useLocation, useNavigate } from 'react-router'
+import { TemplatePickerDialog } from '../templates/TemplatePickerDialog.tsx'
 import { useSearchSubmit } from '../search/useSearchSubmit.ts'
 import { PageTitle } from '../../components/PageTitle/PageTitle.tsx'
 import { focusMainContent } from '../../app/mainContent.ts'
@@ -43,6 +44,7 @@ function Documents({ workspaceId }: { workspaceId: string }) {
   const intl = useIntl()
   const dataSource = useDataSource()
   const [search, setSearch] = useState('')
+  const [pickingTemplate, setPickingTemplate] = useState(false)
   const deferredSearch = useDeferredValue(search)
   const submitSearch = useSearchSubmit(search)
   const term = searchTerm(deferredSearch)
@@ -81,10 +83,14 @@ function Documents({ workspaceId }: { workspaceId: string }) {
         <Button variant="secondary" onClick={() => actions.open({ kind: 'create-folder', workspaceId })}>
           {intl.formatMessage({ id: 'documents.newFolder' })}
         </Button>
+        <Button variant="secondary" onClick={() => setPickingTemplate(true)}>
+          {intl.formatMessage({ id: 'templates.pick' })}
+        </Button>
         <Button loading={create.isPending} onClick={createDocument}>
           {intl.formatMessage({ id: 'documents.new' })}
         </Button>
       </ListToolbar>
+      <TemplatePickerDialog open={pickingTemplate} onClose={() => setPickingTemplate(false)} />
       {create.isError && (
         <p role="alert" className={styles.problem}>
           {intl.formatMessage({ id: problemMessageId(create.error) })}

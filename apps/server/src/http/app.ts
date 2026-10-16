@@ -22,6 +22,7 @@ import { folderRoutes } from './routes/folders.ts'
 import { healthRoutes } from './routes/health.ts'
 import { memberRoutes } from './routes/members.ts'
 import { pinRoutes } from './routes/pins.ts'
+import { templateRoutes } from './routes/templates.ts'
 import { workspaceRoutes } from './routes/workspaces.ts'
 
 declare module 'fastify' {
@@ -121,6 +122,7 @@ export function buildApp({
     accessRoutes,
     pinRoutes,
     commentRoutes,
+    templateRoutes,
   ]) {
     void app.register(routes, dependencies)
   }
