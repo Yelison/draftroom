@@ -119,7 +119,7 @@ Archive, restore, pin, resolve and reopen are idempotent and take no revision. R
 
 **Access list.** `listAccess` returns every explicit grant on the document, the creator's `owner` grant included, and the explicit grant of a workspace owner if one exists; owners who are owners only through the workspace are not listed, because their access is implicit.
 
-**Archived documents.** An archived document is readable only by its owners: `getDocument` and the document lists with `archived=true`, plus `restoreDocument` and `deleteDocument`. Every other operation on it, its threads, versions and activity included, is `404` for everyone, owners too, until it is restored.
+**Archived documents.** An archived document is readable only by its owners: `getDocument` and the document lists with `archived=true`, plus `restoreDocument` and `deleteDocument`, and `archiveDocument`, which is idempotent and answers the document unchanged. Every other operation on it, its threads, versions and activity included, is `404` for everyone, owners too, until it is restored.
 
 ## Limits
 
