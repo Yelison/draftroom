@@ -1,0 +1,22 @@
+.status {
+  flex-shrink: 0;
+}
+
+.labels {
+  display: inline-grid;
+  padding-inline: var(--space-4);
+}
+
+/* Every label takes the one cell, so the widest decides the width; only the current one is drawn. */
+.labels > * {
+  grid-area: 1 / 1;
+  text-align: center;
+}
+
+.current {
+  visibility: visible;
+}
+
+.other {
+  visibility: hidden;
+}

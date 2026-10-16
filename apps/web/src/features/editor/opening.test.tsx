@@ -3,11 +3,6 @@ import * as Y from 'yjs'
 import { describe, expect, it, vi } from 'vitest'
 import { budget, launchPlan, people, renderEditor } from './testing/renderEditor.tsx'
 
-// The screen opens whatever Yjs document this module hands it, so a test can start from one that already has content and
-// watch it from before the editor is made.
-const given = vi.hoisted(() => ({ ydoc: null as Y.Doc | null }))
-vi.mock('./useLocalYDoc.ts', () => ({ useLocalYDoc: () => given.ydoc }))
-
 function element(name: string, ...children: (Y.XmlElement | Y.XmlText)[]) {
   const node = new Y.XmlElement(name)
   node.insert(0, children)
@@ -38,22 +33,30 @@ describe('opening a document', () => {
   it.each(documents.flatMap(([name, fill]) => openers.map(([role, who, id]) => [name, role, fill, who, id] as const)))(
     'writes nothing to %s, as %s',
     async (_name, _role, fill, signedInAs, documentId) => {
-      const ydoc = new Y.Doc()
-      fill(ydoc.getXmlFragment('default'))
-      given.ydoc = ydoc
-      // Watched from before the editor exists: any update, in any root, and any change of what the document holds.
+      // The document is on the collaboration server before the editor exists, as if someone had written it there.
+      let shared: Y.Doc | undefined
+      renderEditor({
+        signedInAs,
+        documentId,
+        content: (given) => {
+          shared = given
+          fill(given.getXmlFragment('default'))
+        },
+      })
+      if (shared === undefined) throw new Error('The content was never given to the document')
+      // Watched from before the editor exists: any update the server receives, in any root, and any change of what it holds.
       const updates = vi.fn()
-      ydoc.on('update', updates)
-      const roots = [...ydoc.share.keys()]
-      const state = Y.encodeStateAsUpdate(ydoc)
+      shared.on('update', updates)
+      const roots = [...shared.share.keys()]
+      const state = Y.encodeStateAsUpdate(shared)
 
-      renderEditor({ signedInAs, documentId })
       await screen.findByRole('textbox', { name: 'Document content' })
+      await screen.findByText(/^Sync status: (Synced|Read-only)$/)
       await new Promise((resolve) => setTimeout(resolve, 100))
 
       expect(updates).not.toHaveBeenCalled()
-      expect([...ydoc.share.keys()]).toEqual(roots)
-      expect(Y.encodeStateAsUpdate(ydoc)).toEqual(state)
+      expect([...shared.share.keys()]).toEqual(roots)
+      expect(Y.encodeStateAsUpdate(shared)).toEqual(state)
     },
   )
 })

@@ -64,3 +64,30 @@
   font-size: 0.875em;
   line-height: 1;
 }
+
+/* The caret of someone else, in the colour the server relays for them. Their name shows over it, and the selection they
+ * make is tinted with the same colour. */
+.caret {
+  position: relative;
+  margin-inline: -1px;
+  border-inline-start: 2px solid var(--caret-color);
+  word-break: normal;
+  pointer-events: none;
+}
+
+.caretLabel {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-start: -2px;
+  padding: var(--space-2) var(--space-6);
+  border-radius: var(--radius-small) var(--radius-small) var(--radius-small) 0;
+  background: var(--caret-color);
+  color: var(--color-on-brand);
+  font: var(--font-caption);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.selection {
+  background: color-mix(in srgb, var(--caret-color) 24%, transparent);
+}

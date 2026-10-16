@@ -1,0 +1,32 @@
+.person {
+  position: relative;
+  display: inline-flex;
+}
+
+/* The mark sits on the lower corner of the avatar with a ring of the surface around it, so it reads on any tone. The
+ * status is in the shape too, not in colour alone: a filled disc is online, a ring is away and a smaller dot is offline. */
+.mark {
+  position: absolute;
+  inset-block-end: calc(var(--space-4) * -1);
+  inset-inline-end: calc(var(--space-4) * -1);
+  box-sizing: border-box;
+  width: var(--space-12);
+  height: var(--space-12);
+  border: var(--space-2) solid var(--color-surface);
+  border-radius: var(--radius-round);
+}
+
+.mark[data-status='online'] {
+  background: var(--color-green-ink);
+}
+
+.mark[data-status='away'] {
+  border-color: var(--color-amber-ink);
+  background: var(--color-surface);
+}
+
+.mark[data-status='offline'] {
+  width: var(--space-8);
+  height: var(--space-8);
+  background: var(--color-muted);
+}

@@ -1,4 +1,4 @@
-import type { Schema, operations } from '@draftroom/contract'
+import type { operations } from '@draftroom/contract'
 
 /**
  * Probes of the process and its database. The orchestrator and monitoring call them; the client never does, so the data
@@ -73,20 +73,23 @@ type Method<Id extends OperationId> =
       : (request: RequestOf<Id>) => Promise<ResultOf<Id>>
 
 /** One method per operation of the contract, named by its `operationId`. */
-export type DataSource = { readonly [Id in OperationId]: Method<Id> }
+export type RestSource = { readonly [Id in OperationId]: Method<Id> }
+
+/** Where and how a document is opened for collaboration: what a session needs to connect, and nothing of the session. */
+export interface CollaborationEndpoint {
+  /** The collaboration server. */
+  readonly url: string
+  /** The WebSocket to use instead of the browser's: the mock hands out the one of its simulated server. */
+  readonly webSocket?: new (url: string) => unknown
+}
 
 /**
- * A live connection to one document: its content, presence and sync state.
- *
- * Pending T2.2. The collaboration protocol (`docs/collab/protocol.md`) is implemented by T2.1 and T2.2, so this has no
- * members yet and neither data source implements `openDocument`.
- */
-export interface CollabSession {}
-
-/**
- * The collaboration half of the data source. It joins `DataSource` when T2.2 gives both implementations something to
- * return; until then, declaring it there would force each of them to throw.
+ * The collaboration half of the data source. It is where to connect and not the connection: the session, with Yjs and the
+ * provider behind it, is loaded with the editor (`useCollabSession`) and not with the app, so a screen that has no editor
+ * does not download it.
  */
 export interface CollaborationSource {
-  openDocument(documentId: Schema<'Id'>): CollabSession
+  readonly collaboration: CollaborationEndpoint
 }
+
+export type DataSource = RestSource & CollaborationSource

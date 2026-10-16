@@ -15,9 +15,11 @@
   "dependencies": {
     "@draftroom/contract": "*",
     "@draftroom/editor-schema": "*",
+    "@hocuspocus/provider": "4.7.1",
     "@tanstack/react-query": "5.104.2",
     "@tiptap/core": "3.31.4",
     "@tiptap/extension-collaboration": "3.31.4",
+    "@tiptap/extension-collaboration-caret": "3.31.4",
     "@tiptap/pm": "3.31.4",
     "@tiptap/react": "3.31.4",
     "@tiptap/y-tiptap": "3.0.10",

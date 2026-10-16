@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Button, buttonClassName } from '@yelison/forma-ui'
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useIntl } from 'react-intl'
 import { Link, useParams } from 'react-router'
 import { isApiError } from '../../data/errors.ts'
@@ -37,6 +37,8 @@ export function EditorScreen() {
   // does when a page opens, instead of falling to the page.
   const recovered = query.isSuccess && query.errorUpdateCount > 0
   const headline = useRef<HTMLHeadingElement>(null)
+  // The same function every render: an effect that depends on it must not run again just because the screen rendered.
+  const focusHeadline = useCallback(() => headline.current?.focus(), [])
   useEffect(() => {
     if (recovered) headline.current?.focus()
   }, [recovered])
@@ -68,7 +70,7 @@ export function EditorScreen() {
         </EditorStatePanel>
       )}
       {query.isPending && !retrying && <EditorSkeleton />}
-      {query.isSuccess && <DocumentEditor key={query.data.id} document={query.data} />}
+      {query.isSuccess && <DocumentEditor key={query.data.id} document={query.data} focusHeadline={focusHeadline} />}
     </>
   )
 }
