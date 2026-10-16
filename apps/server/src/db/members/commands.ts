@@ -34,7 +34,7 @@ export async function lockMembers(
     .where('m.workspace_id', '=', workspaceId)
     .where((eb) => eb.or([eb('m.role', '=', 'owner'), eb('m.user_id', 'in', [...new Set(userIds)])]))
     .orderBy('m.user_id')
-    .forUpdate('m')
+    .forNoKeyUpdate('m')
     .execute()
   return rows.map(({ signedUpAt, ...member }) => ({ ...member, signedUp: signedUpAt !== null }))
 }
