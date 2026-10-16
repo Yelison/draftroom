@@ -30,11 +30,11 @@ function requireManager(locked: readonly LockedMember[], actorId: string): void 
   if (!canInWorkspace(actor.role, 'manage-members')) throw new ProblemError('forbidden')
 }
 
-const memberOf = (locked: readonly LockedMember[], userId: string): LockedMember =>
-  locked.find((member) => member.userId === userId) ?? failWith('not-found')
-
-const failWith = (code: 'not-found'): never => {
-  throw new ProblemError(code)
+/** The member the request names, as the locked memberships hold them, or the 404 of somebody who is not in the workspace. */
+function requireMember(locked: readonly LockedMember[], userId: string): LockedMember {
+  const member = locked.find((candidate) => candidate.userId === userId)
+  if (member === undefined) throw new ProblemError('not-found')
+  return member
 }
 
 export const memberRoutes: FastifyPluginCallback<RouteDependencies> = (
@@ -77,7 +77,7 @@ export const memberRoutes: FastifyPluginCallback<RouteDependencies> = (
       const { member, changed } = await database.transaction().execute(async (trx) => {
         const locked = await lockMembers(trx, workspaceId, [actorId, targetId])
         requireManager(locked, actorId)
-        const target = memberOf(locked, targetId)
+        const target = requireMember(locked, targetId)
         const changed = target.role !== role
         if (changed && role === 'member' && leavesNoOwner(ownersOf(locked), targetId)) {
           throw new ProblemError('last-owner')
@@ -105,7 +105,7 @@ export const memberRoutes: FastifyPluginCallback<RouteDependencies> = (
       const withAGrant = await database.transaction().execute(async (trx) => {
         const locked = await lockMembers(trx, workspaceId, [actorId, targetId])
         requireManager(locked, actorId)
-        memberOf(locked, targetId)
+        requireMember(locked, targetId)
         if (leavesNoOwner(ownersOf(locked), targetId)) throw new ProblemError('last-owner')
         return removeMember(trx, { workspaceId, actorId, removedId: targetId, owners: ownersOf(locked) })
       })
