@@ -29,16 +29,25 @@ afterEach(() => {
 })
 
 /** The copy of a document of an account, with something written in it, and with or without changes that were never stored. */
-async function keepCopy(userId: string, documentId: string, { unstored }: { unstored: boolean }): Promise<LocalCopy> {
+async function keepCopy(
+  userId: string,
+  documentId: string,
+  { unstored }: { unstored: boolean },
+): Promise<{ copy: LocalCopy; doc: Y.Doc }> {
   const doc = new Y.Doc()
   const opening = openLocalCopy({ userId, workspaceId: 'w1', documentId }, doc)
   await advance(50)
   const copy = await opening
   if (copy === null) throw new Error('The copy should have opened')
   doc.getText('t').insert(0, `written in ${documentId}`)
-  if (unstored) copy.markUnsynced()
   await advance(50)
-  return copy
+  // What the server stored: the copy marked what the person wrote, and the marker goes when the server says it has it all.
+  if (!unstored) {
+    const settling = copy.settle(Y.snapshot(doc))
+    await advance(50)
+    await settling
+  }
+  return { copy, doc }
 }
 
 async function copiesOnDevice(userId: string): Promise<string[]> {
@@ -83,10 +92,10 @@ describe('leaving an account whose copies hold nothing that was never stored', (
 
 describe('leaving an account with copies that hold changes that were never stored', () => {
   it('waits for them to be stored while online, and purges without asking once they are', async () => {
-    const copy = await keepCopy('u1', 'd1', { unstored: true })
+    const { copy, doc } = await keepCopy('u1', 'd1', { unstored: true })
     const confirm = answering(true)
     // The server stores it a second and a half into the wait.
-    setTimeout(() => copy.clearUnsynced(), 1500)
+    setTimeout(() => void copy.settle(Y.snapshot(doc)), 1500)
 
     const outcome = await leaving({ userId: 'u1', network: fakeNetwork(), confirm })
 

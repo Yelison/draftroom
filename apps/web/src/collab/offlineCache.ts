@@ -24,20 +24,23 @@ export const copyName = ({ userId, workspaceId, documentId }: CopyKey): string =
 // deletes it and it can never outlive what it describes.
 const UNSYNCED = 'unsynced'
 const CUSTOM_STORE = 'custom'
+const UPDATES_STORE = 'updates'
 const MARKED = 1
 
 /** Storage that never answers (blocked, or a failed open) must not keep the person from the document. */
 export const LOAD_TIMEOUT_MS = 3_000
 
-/** A copy that is open: the document it follows and the marker of what was never stored. */
+/**
+ * A copy that is open: the document it follows and the marker of what was never stored. The copy sets the marker itself,
+ * with every change of the person (see `PersistedCopy`); what it is told is what the server stored.
+ */
 export interface LocalCopy {
   /** The copy held content when it was opened: there is something to show before any connection. */
   readonly hadContent: boolean
   /** The marker was set when it was opened: changes of this device that the server was not shown to have stored. */
   readonly hadUnstoredChanges: boolean
-  /** Written in order with the document's updates, and only when it changes. */
-  markUnsynced(): void
-  clearUnsynced(): void
+  /** The server stored this much: the marker goes if the snapshot contains everything the copy holds. */
+  settle(snapshot: Y.Snapshot): Promise<void>
   /** Stops following the document; the copy stays on the device. */
   close(): void
   /** Stops following the document and deletes the copy. */
@@ -47,25 +50,58 @@ export interface LocalCopy {
 const openCopies = new Set<PersistedCopy>()
 const deletions = new Map<string, Promise<void>>()
 
+/**
+ * The copy is a database every tab of the account shares, so it is the copy, and not the session, that knows whether it
+ * holds something never stored: a session only knows about its own changes.
+ *
+ * - **Setting.** On every change of the person, before `y-indexeddb` writes it. The marker goes in a transaction whose scope
+ *   includes the updates, created while the change is still being announced (`afterTransaction` comes before `update`, which
+ *   is where `y-indexeddb` creates its own). IndexedDB runs transactions with overlapping scopes in the order they were
+ *   created, so the marker is committed first: a tab that dies in between leaves a marker without its change, never a change
+ *   without its marker. Nothing remembers that it was set, so another tab clearing it is put back by the next change.
+ * - **Clearing.** Only when the snapshot the server stored contains everything the copy holds, which is read, merged and
+ *   compared in the same transaction that deletes the marker, so a change that arrives meanwhile is not missed. What a tab
+ *   itself has pending is not enough: another tab may have written more.
+ */
 class PersistedCopy implements LocalCopy {
-  private marked: boolean
   private closed = false
+  /** Only to spare the reading of the copy when nothing could have been marked; it is never a reason not to write. */
+  private mayHoldUnstored: boolean
 
   constructor(
     private readonly persistence: IndexeddbPersistence,
+    private readonly ydoc: Y.Doc,
     readonly name: string,
     readonly hadContent: boolean,
     readonly hadUnstoredChanges: boolean,
   ) {
-    this.marked = hadUnstoredChanges
+    this.mayHoldUnstored = hadUnstoredChanges
+    ydoc.on('afterTransaction', this.onTransaction)
   }
 
-  markUnsynced(): void {
-    this.write(true)
-  }
-
-  clearUnsynced(): void {
-    this.write(false)
+  settle(snapshot: Y.Snapshot): Promise<void> {
+    const database = this.persistence.db
+    if (!this.mayHoldUnstored || this.closed || database === null) return Promise.resolve()
+    return new Promise((resolve) => {
+      try {
+        const transaction = database.transaction([UPDATES_STORE, CUSTOM_STORE], 'readwrite')
+        const rows = transaction.objectStore(UPDATES_STORE).getAll()
+        rows.onsuccess = () => {
+          const updates: Uint8Array[] = rows.result
+          // An unreadable or empty copy holds nothing a snapshot could lack.
+          if (updates.length === 0 || Y.snapshotContainsUpdate(snapshot, Y.mergeUpdates(updates))) {
+            transaction.objectStore(CUSTOM_STORE).delete(UNSYNCED)
+            this.mayHoldUnstored = false
+          }
+        }
+        transaction.oncomplete = () => resolve()
+        transaction.onerror = () => resolve()
+        transaction.onabort = () => resolve()
+      } catch {
+        // A connection that is closing: the marker stays, which is the safe side.
+        resolve()
+      }
+    })
   }
 
   close(): void {
@@ -80,18 +116,29 @@ class PersistedCopy implements LocalCopy {
   stop(): Promise<void> {
     this.closed = true
     openCopies.delete(this)
+    this.ydoc.off('afterTransaction', this.onTransaction)
     return this.persistence.destroy()
   }
 
-  private write(marked: boolean): void {
-    if (this.closed || marked === this.marked) return
-    this.marked = marked
-    const written = marked ? this.persistence.set(UNSYNCED, MARKED) : this.persistence.del(UNSYNCED)
-    // A marker that could not be written is written again by the next change that needs it.
-    written.catch(() => {
-      this.marked = !marked
-    })
+  private readonly onTransaction = (transaction: Y.Transaction): void => {
+    // What the cache itself loads and what the server sends are not the person's.
+    if (!transaction.local || !changesTheDocument(transaction)) return
+    this.mayHoldUnstored = true
+    const database = this.persistence.db
+    if (this.closed || database === null) return
+    try {
+      database.transaction([CUSTOM_STORE, UPDATES_STORE], 'readwrite').objectStore(CUSTOM_STORE).put(MARKED, UNSYNCED)
+    } catch {
+      // A connection that is closing keeps nothing of what follows either.
+    }
   }
+}
+
+/** Whether a transaction added any struct or deleted anything: the ones that make `y-indexeddb` write an update. */
+function changesTheDocument({ beforeState, afterState, deleteSet }: Y.Transaction): boolean {
+  if (deleteSet.clients.size > 0) return true
+  for (const [client, clock] of afterState) if ((beforeState.get(client) ?? 0) < clock) return true
+  return false
 }
 
 /**
@@ -115,7 +162,7 @@ export async function openLocalCopy(key: CopyKey, ydoc: Y.Doc): Promise<LocalCop
     (value: unknown) => value !== undefined,
     () => true,
   )
-  const copy = new PersistedCopy(persistence, name, Y.encodeStateVector(ydoc).byteLength > 1, hadUnstoredChanges)
+  const copy = new PersistedCopy(persistence, ydoc, name, Y.encodeStateVector(ydoc).byteLength > 1, hadUnstoredChanges)
   openCopies.add(copy)
   return copy
 }

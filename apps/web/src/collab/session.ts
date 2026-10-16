@@ -442,7 +442,6 @@ class ProviderSession implements CollabSession {
     // after access was removed is nothing kept: nothing is uploaded after it.
     if (this.model.state === 'revoked') return
     this.pending.add(update)
-    this.link?.copy?.markUnsynced()
     this.dispatch({ type: 'local-change' })
     this.measureUnsent()
   }
@@ -468,10 +467,9 @@ class ProviderSession implements CollabSession {
     }
     this.lastStored = snapshot
     const coversLocalChanges = this.pending.isContainedIn(snapshot)
-    if (coversLocalChanges) {
-      this.pending.clear()
-      this.link?.copy?.clearUnsynced()
-    }
+    if (coversLocalChanges) this.pending.clear()
+    // Whether the copy holds more than this tab has pending is the copy's to know: another tab may have written to it.
+    void this.link?.copy?.settle(snapshot)
     this.dispatch({ type: 'stored', coversLocalChanges })
     this.measureUnsent()
   }

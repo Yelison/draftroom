@@ -2,6 +2,7 @@ import { MAX_MESSAGE_BYTES } from '@draftroom/contract/collab'
 import * as Y from 'yjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { toBase64 } from './base64.ts'
+import { UNSTORED_WAIT_MS, leaveAccount } from './leaveAccount.ts'
 import { copiesOf, hasUnstoredChanges } from './offlineCache.ts'
 import { withFreshIndexedDb } from './testing/fakeIndexedDb.ts'
 import {
@@ -93,6 +94,31 @@ describe('the marker of changes that were never stored', () => {
     await advance(100)
 
     expect(await documentsWithUnstoredChanges()).toBe(1)
+  })
+
+  it('stays set when another tab of the account wrote what the stored event lacks, and leaving asks about it', async () => {
+    world = createWorld()
+    const thisTab = await opened()
+    const otherTab = await opened()
+    world.server.holdStores()
+    typeInto(otherTab.doc, 'written in the other tab')
+    await advance(100)
+    const stored = toBase64(Y.encodeSnapshot(Y.snapshot(world.server.document(wireName))))
+    typeInto(thisTab.doc, 'written in this tab, after that snapshot ')
+    await advance(100)
+
+    // The stored event covers everything the other tab wrote and nothing of this one's.
+    world.server.broadcast(wireName, { type: 'stored', snapshot: stored })
+    await advance(100)
+
+    expect(state(otherTab)).toBe('synced')
+    expect(state(thisTab)).toBe('synchronising')
+    expect(await documentsWithUnstoredChanges()).toBe(1)
+    const confirm = vi.fn(() => Promise.resolve(false))
+    const leaving = leaveAccount({ userId: editor.userId, network: world.network, confirm })
+    await advance(UNSTORED_WAIT_MS + 1000)
+    await leaving
+    expect(confirm).toHaveBeenCalledExactlyOnceWith(1)
   })
 
   it('is set for what is written offline and is still set after the page was left', async () => {
