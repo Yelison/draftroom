@@ -26,7 +26,9 @@ export function SharedPreview({ document, onClose }: SharedPreviewProps) {
         <h2 className={styles.previewTitle}>{document.title}</h2>
         <IconButton icon="close" label={intl.formatMessage({ id: 'shared.preview.close' })} onClick={onClose} />
       </div>
-      <Permission role={document.role} />
+      <div className={styles.previewRole}>
+        <Permission role={document.role} />
+      </div>
       <p className={styles.previewExcerpt}>{document.excerpt ?? intl.formatMessage({ id: 'shared.preview.empty' })}</p>
       <p className={styles.previewMeta}>
         {intl.formatMessage({ id: 'shared.preview.createdBy' }, { name: document.createdBy.name })}

@@ -114,6 +114,7 @@ function SharedResults({ documents, selectedId, onSelect }: SharedResultsProps) 
         <SharedTable
           documents={shown}
           selectedId={selected?.id}
+          previewing={selected !== undefined}
           onSelect={(document) => onSelect(document.id === selected?.id ? undefined : document.id)}
           previewButton={previewButton}
         />

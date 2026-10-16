@@ -8,23 +8,31 @@ import styles from './Shared.module.css'
 export interface SharedTableProps {
   documents: readonly Schema<'Document'>[]
   selectedId: string | undefined
+  /** A preview is open beside the table: it says who made the document and when it changed, so the table gives the room back. */
+  previewing: boolean
   onSelect: (document: Schema<'Document'>) => void
   /** Hands the button that previews a document to the list, which puts the focus back on it when the preview closes. */
   previewButton: (documentId: string) => (button: HTMLButtonElement | null) => void
 }
 
 /** The documents shared with the person: who made each, what the person can do with it and when it changed. */
-export function SharedTable({ documents, selectedId, onSelect, previewButton }: SharedTableProps) {
+export function SharedTable({ documents, selectedId, previewing, onSelect, previewButton }: SharedTableProps) {
   const intl = useIntl()
 
   return (
-    <table className={styles.table} aria-label={intl.formatMessage({ id: 'shared.table.label' })}>
+    <table
+      className={styles.table}
+      data-previewing={previewing ? '' : undefined}
+      aria-label={intl.formatMessage({ id: 'shared.table.label' })}
+    >
       <thead>
         <tr>
           <th scope="col" className={styles.nameColumn}>
             {intl.formatMessage({ id: 'shared.column.name' })}
           </th>
-          <th scope="col">{intl.formatMessage({ id: 'shared.column.createdBy' })}</th>
+          <th scope="col" className={styles.createdByColumn}>
+            {intl.formatMessage({ id: 'shared.column.createdBy' })}
+          </th>
           <th scope="col" className={styles.permissionColumn}>
             {intl.formatMessage({ id: 'shared.column.permission' })}
           </th>
@@ -50,11 +58,11 @@ export function SharedTable({ documents, selectedId, onSelect, previewButton }: 
                 {document.title}
               </button>
             </td>
-            <td>{document.createdBy.name}</td>
+            <td className={styles.createdByColumn}>{document.createdBy.name}</td>
             <td>
               <Permission role={document.role} />
             </td>
-            <td>{intl.formatDate(document.updatedAt, { dateStyle: 'medium' })}</td>
+            <td className={styles.updatedColumn}>{intl.formatDate(document.updatedAt, { dateStyle: 'medium' })}</td>
             <td>
               <Link
                 to={`/documents/${document.id}`}

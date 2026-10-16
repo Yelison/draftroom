@@ -56,6 +56,20 @@
   width: 40%;
 }
 
+.createdByColumn {
+  width: 160px;
+}
+
+/* With the preview open the creator and the date are in the preview, and the name gets the room. */
+.table[data-previewing] .createdByColumn,
+.table[data-previewing] .updatedColumn {
+  display: none;
+}
+
+.table[data-previewing] .nameColumn {
+  width: auto;
+}
+
 .permissionColumn {
   width: 128px;
 }
@@ -98,6 +112,10 @@
   gap: var(--space-8);
   align-items: start;
   justify-content: space-between;
+}
+
+.previewRole {
+  display: flex;
 }
 
 .previewTitle {
