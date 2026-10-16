@@ -608,24 +608,35 @@ describe('pins and the documents shared with a person', () => {
   })
 
   describe('the shared list', () => {
+    // A workspace of its own: the pins above gave Carol access to documents of the other one.
+    let own: Studio
+    let reader: Person
     let shared: { edit: string; view: string; own: string; none: string; raised: string }
+    const sharedIds = async (as: Person, path = 'shared'): Promise<string[]> =>
+      bodyAs<Schema<'DocumentList'>>(
+        await api({ as, method: 'GET', url: `/api/workspaces/${own.workspaceId}/${path}` }),
+      ).items.map((item) => item.id)
+
     beforeAll(async () => {
-      const workspaceId = studio.workspaceId
+      own = await createStudio(db)
+      reader = await createPerson(db, 'Carol Nwosu')
+      await join(db, own.workspaceId, reader)
+      const workspaceId = own.workspaceId
       const make = (title: string, generalAccess: 'none' | 'viewer' | 'editor' = 'none') =>
-        createDocument(db, { workspaceId, creator: studio.owner, title, generalAccess })
+        createDocument(db, { workspaceId, creator: own.owner, title, generalAccess })
       shared = {
         edit: await make('Edit by grant'),
         view: await make('View by general access', 'viewer'),
-        own: await createDocument(db, { workspaceId, creator: carol, title: 'Her own' }),
+        own: await createDocument(db, { workspaceId, creator: reader, title: 'Her own' }),
         none: await make('Private'),
         raised: await make('Viewer grant raised by general access', 'editor'),
       }
-      await grant(db, { workspaceId, documentId: shared.edit, person: carol, role: 'editor' })
-      await grant(db, { workspaceId, documentId: shared.raised, person: carol, role: 'viewer' })
+      await grant(db, { workspaceId, documentId: shared.edit, person: reader, role: 'editor' })
+      await grant(db, { workspaceId, documentId: shared.raised, person: reader, role: 'viewer' })
     })
 
     it('holds what the person can read and does not own, and nothing else', async () => {
-      expect((await ids(carol, 'shared')).sort()).toEqual([shared.edit, shared.view, shared.raised].sort())
+      expect((await sharedIds(reader)).sort()).toEqual([shared.edit, shared.view, shared.raised].sort())
     })
 
     it.each([
@@ -633,11 +644,11 @@ describe('pins and the documents shared with a person', () => {
       ['view', ['view']],
       ['comment', []],
     ] as const)('keeps, for access=%s, the documents on which the person’s role is that one', async (access, keys) => {
-      expect((await ids(carol, `shared?access=${access}`)).sort()).toEqual(keys.map((key) => shared[key]).sort())
+      expect((await sharedIds(reader, `shared?access=${access}`)).sort()).toEqual(keys.map((key) => shared[key]).sort())
     })
 
     it('is empty for an owner of the workspace, who owns every document', async () => {
-      expect(await ids(studio.owner, 'shared')).toEqual([])
+      expect(await sharedIds(own.owner)).toEqual([])
     })
   })
 })

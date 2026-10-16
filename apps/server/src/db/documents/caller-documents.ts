@@ -126,10 +126,14 @@ export async function listDocuments(db: Kysely<Database>, search: DocumentSearch
   )
   if (search.folderId !== undefined) query = query.where('d.folder_id', '=', search.folderId)
   if (search.query !== undefined) {
-    // `strpos` and not LIKE: the text is the person's, and `%` and `_` in it must mean themselves.
+    // `strpos` and not LIKE: the text is the person's, and `%` and `_` in it must mean themselves. Parenthesised on
+    // purpose: an `or` that is not would let the excerpt match skip every other condition of the query.
     const text = search.query
-    query = query.where(
-      sql<boolean>`strpos(lower(d.title), lower(${text})) > 0 or strpos(lower(coalesce(d.excerpt, '')), lower(${text})) > 0`,
+    query = query.where((eb) =>
+      eb.or([
+        eb(sql<number>`strpos(lower(d.title), lower(${text}))`, '>', 0),
+        eb(sql<number>`strpos(lower(coalesce(d.excerpt, '')), lower(${text}))`, '>', 0),
+      ]),
     )
   }
   if (search.after !== undefined) {
