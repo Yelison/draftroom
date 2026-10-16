@@ -15,9 +15,11 @@ import { daniel, marta, sofia } from '../../../data/mock/fixtures/index.ts'
 import { vi } from 'vitest'
 import './jsdomShims.ts'
 
-// The screen is a lazy route: the first test of a file waits for Vitest to load and transform Tiptap, which takes longer than
-// the default second, and the retry of a request that never arrived waits one second by itself.
-configure({ asyncUtilTimeout: 5000 })
+// The screen is a lazy route and the editor mounts Tiptap in StrictMode: the first test of a file waits for Vitest to load
+// and transform it, and the retry of a request that never arrived waits one second by itself. On a runner that is busy
+// the five seconds a wait has by default ran out (5.16 s in CI, in the test of the skeleton) though nothing was wrong, so
+// every wait of these tests has half of the twenty seconds a test has: one that never arrives still fails.
+configure({ asyncUtilTimeout: 10_000 })
 // A test that waits for the lazy screen and then for the editor can take longer than Vitest's default five seconds on a
 // machine that is busy with something else.
 vi.setConfig({ testTimeout: 20_000 })

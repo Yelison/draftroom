@@ -29,7 +29,6 @@ export function Trash({ workspaceId }: { workspaceId: string }) {
   const ids = useMemo(() => documents.map((document) => document.id), [documents])
   const list = useRef<HTMLUListElement>(null)
   const focus = useTrashFocus(list, ids)
-  const restore = useRestoreDocument()
   const [deleting, setDeleting] = useState<Schema<'Document'> | null>(null)
   const [announcement, setAnnouncement] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
@@ -45,14 +44,15 @@ export function Trash({ workspaceId }: { workspaceId: string }) {
     setProblem(intl.formatMessage({ id: 'trash.gone' }, { title: document.title }))
     setDeleting(null)
   }
+  const { restore, restoring } = useRestoreDocument({
+    onRestored: (document) => done(document, 'trash.restore.announcement'),
+    onFailed: (document, error) =>
+      isGone(error) ? gone(document) : setProblem(intl.formatMessage({ id: problemMessageId(error) })),
+  })
 
   const restoreDocument = (document: Schema<'Document'>) => {
     setProblem(null)
-    restore.mutate(document, {
-      onSuccess: () => done(document, 'trash.restore.announcement'),
-      onError: (error) =>
-        isGone(error) ? gone(document) : setProblem(intl.formatMessage({ id: problemMessageId(error) })),
-    })
+    restore(document)
   }
 
   if (query.isPending) return <TrashSkeleton />
@@ -76,7 +76,7 @@ export function Trash({ workspaceId }: { workspaceId: string }) {
             <li key={document.id}>
               <TrashRow
                 document={document}
-                restoring={restore.isPending && restore.variables.id === document.id}
+                restoring={restoring.has(document.id)}
                 onRestore={restoreDocument}
                 onDelete={setDeleting}
               />

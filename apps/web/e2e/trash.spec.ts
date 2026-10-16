@@ -25,6 +25,22 @@ async function archiveFromDocuments(page: Page, title: string) {
   await expect(main(page).getByRole('link', { name: title })).toHaveCount(0)
 }
 
+/** The same, with the keyboard alone: the way a person who does not use a pointer gets a document into the trash. */
+async function archiveWithKeyboard(page: Page, title: string) {
+  await main(page)
+    .getByRole('button', { name: `Actions for ${title}` })
+    .focus()
+  await page.keyboard.press('Enter')
+  await page.getByRole('dialog', { name: 'Rename or move' }).getByRole('button', { name: 'Archive' }).focus()
+  await page.keyboard.press('Enter')
+  const confirmation = page.getByRole('dialog', { name: `Archive “${title}”?` })
+  await expect(confirmation.getByRole('button', { name: 'Close' })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(confirmation.getByRole('button', { name: 'Archive' })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(main(page).getByRole('link', { name: title })).toHaveCount(0)
+}
+
 /** Goes to the Trash by its link, as a person does; the mock keeps its data until the page is loaded again. */
 async function openTrash(page: Page) {
   await main(page).getByRole('link', { name: 'Trash' }).click()
@@ -58,14 +74,14 @@ test('archives a document, finds it in the Trash, restores it, then archives it 
   await expect(main(page).getByRole('link', { name: launchPlan.title })).toBeVisible()
 
   // Archive it again and delete it for good, with the keyboard.
-  await archiveFromDocuments(page, launchPlan.title)
+  await archiveWithKeyboard(page, launchPlan.title)
   await openTrash(page)
   await deleteButton(page, launchPlan.title).focus()
   await page.keyboard.press('Enter')
 
   const confirmation = page.getByRole('dialog', { name: `Delete “${launchPlan.title}” permanently?` })
   await expect(confirmation).toContainText("This can't be undone.")
-  // Cancel is the first answer and has the focus; Escape closes the dialog and the focus goes back to what opened it.
+  // Closing is the first answer and has the focus (the plan calls it Cancel; the dialog's own word is Close); Escape closes the dialog and the focus goes back to what opened it.
   await expect(confirmation.getByRole('button', { name: 'Close' })).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(confirmation).toBeHidden()

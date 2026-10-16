@@ -9,8 +9,10 @@ export { fixtures, renderScreen }
 export const archived = { first: fixtures.oldPricingSpanish, second: fixtures.oldPricing }
 
 export const main = () => screen.getByRole('main')
-export const rowButton = (verb: 'Restore' | 'Delete', title: string, name = verb === 'Restore' ? '' : ' permanently') =>
-  within(main()).getByRole('button', { name: `${verb} “${title}”${name}` })
+export const rowButton = (verb: 'Restore' | 'Delete', title: string) =>
+  within(main()).getByRole('button', {
+    name: verb === 'Restore' ? `Restore “${title}”` : `Delete “${title}” permanently`,
+  })
 /** What the live regions of the work area say now. */
 export const spoken = () =>
   within(main())

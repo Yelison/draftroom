@@ -19,7 +19,9 @@ export function ArchiveDocumentDialog({ document, onClose, onArchived }: Archive
   const { dialogClose } = useFormaStrings()
   const archive = useArchiveDocument()
 
+  // Whoever has confirmed waits for the answer: a dialog that went away would leave them not knowing what happened.
   const close = () => {
+    if (archive.isPending) return
     archive.reset()
     onClose()
   }
@@ -32,7 +34,7 @@ export function ArchiveDocumentDialog({ document, onClose, onArchived }: Archive
       description={intl.formatMessage({ id: 'documents.archive.description' })}
       footer={
         <>
-          <Button variant="secondary" onClick={close}>
+          <Button variant="secondary" disabled={archive.isPending} onClick={close}>
             {dialogClose}
           </Button>
           <Button

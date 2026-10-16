@@ -25,7 +25,9 @@ export function DeleteDocumentDialog({ document, onClose, onDeleted, onGone }: D
   const { dialogClose } = useFormaStrings()
   const deletion = useDeleteDocument()
 
+  // Whoever has confirmed waits for the answer: a dialog that went away would leave them not knowing what happened.
   const close = () => {
+    if (deletion.isPending) return
     deletion.reset()
     onClose()
   }
@@ -53,7 +55,7 @@ export function DeleteDocumentDialog({ document, onClose, onDeleted, onGone }: D
       description={intl.formatMessage({ id: 'trash.delete.description' })}
       footer={
         <>
-          <Button variant="secondary" onClick={close}>
+          <Button variant="secondary" disabled={deletion.isPending} onClick={close}>
             {dialogClose}
           </Button>
           <Button variant="danger" loading={deletion.isPending} onClick={confirm}>

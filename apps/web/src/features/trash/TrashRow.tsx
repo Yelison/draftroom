@@ -42,6 +42,8 @@ export function TrashRow({ document, restoring, onRestore, onDelete }: TrashRowP
           <Button
             size="compact"
             variant="secondary"
+            // A restore is on its way: deleting now would only be refused, blaming someone who did nothing.
+            disabled={restoring}
             aria-label={intl.formatMessage({ id: 'trash.row.deleteLabel' }, { title: document.title })}
             onClick={() => onDelete(document)}
           >

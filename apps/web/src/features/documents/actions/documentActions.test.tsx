@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../../data/errors.ts'
 import type { DataSource } from '../../../data/DataSource.ts'
@@ -220,6 +220,28 @@ describe('archiving a document', () => {
     await view.user.click(within(view.dialog).getByRole('button', { name: 'Archive' }))
     return { ...view, confirmation: await screen.findByRole('dialog', { name: `Archive “${title}”?` }) }
   }
+
+  it('cannot be closed while the archive is on its way', async () => {
+    let answer: (() => void) | undefined
+    const { user, confirmation } = await openArchive('Autumn launch plan', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        archiveDocument: (request) =>
+          new Promise((resolve) => (answer = () => resolve(dataSource.archiveDocument(request)))),
+      }),
+    })
+    await user.click(within(confirmation).getByRole('button', { name: 'Archive' }))
+
+    expect(within(confirmation).getByRole('button', { name: 'Close' })).toBeDisabled()
+    fireEvent(confirmation, new Event('cancel', { cancelable: true }))
+    expect(screen.getByRole('dialog', { name: 'Archive “Autumn launch plan”?' })).toBeInTheDocument()
+
+    await act(async () => answer?.())
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(within(main()).queryByRole('link', { name: 'Autumn launch plan' })).not.toBeInTheDocument(),
+    )
+  })
 
   it('asks first, and does not archive when the person says no', async () => {
     const { requests, wrap } = spyOn('archiveDocument')
