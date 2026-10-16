@@ -50,5 +50,5 @@
 }
 
 .code {
-  font: var(--font-code);
+  font-family: var(--font-family-mono);
 }

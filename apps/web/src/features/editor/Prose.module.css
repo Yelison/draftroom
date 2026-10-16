@@ -53,11 +53,14 @@
   text-decoration: underline;
 }
 
-/* Relative, so the code follows the size of the text around it, a title or a list item as much as a paragraph. */
+/* The size is relative, so the code follows the text around it, a title or a list item as much as a paragraph. The line
+ * height is the smallest: the family of the code has taller metrics than the text's, and the code must not stretch the
+ * line it is in. */
 .prose code {
   padding-inline: var(--space-4);
   border-radius: var(--radius-small);
   background: var(--color-surface-hover);
   font-family: var(--font-family-mono);
   font-size: 0.875em;
+  line-height: 1;
 }
