@@ -7,7 +7,7 @@ import { createContractClient, findOperation, ContractError } from './contract-c
 import { ContractCoverage } from './contract-coverage.ts'
 import { createDatabase } from '../../src/db/database.ts'
 import type { AuthProvider } from '../../src/http/auth/auth-provider.ts'
-import { silentBroadcaster, silentLiveAccess } from './broadcasters.ts'
+import { noLiveDocuments, silentBroadcaster, silentLiveAccess } from './broadcasters.ts'
 import { unreachableDatabaseUrl } from './unreachable-database.ts'
 
 const documentId = '3d9b2c10-5e7a-4c4d-8f21-7a6b9c0d1e22'
@@ -48,7 +48,14 @@ describe('the contract client', () => {
   it('returns a response that follows the contract and records the operation as exercised', async () => {
     const coverage = new ContractCoverage()
     const database = unusedDatabase()
-    app = buildApp({ database, authProvider, broadcaster: silentBroadcaster, liveAccess: silentLiveAccess, contract })
+    app = buildApp({
+      database,
+      authProvider,
+      broadcaster: silentBroadcaster,
+      liveAccess: silentLiveAccess,
+      liveDocuments: noLiveDocuments,
+      contract,
+    })
     const client = createContractClient(app, contract, coverage, [])
 
     const response = await client.request({ method: 'GET', url: '/api/health/live' })
@@ -77,6 +84,7 @@ describe('the contract client', () => {
       authProvider,
       broadcaster: silentBroadcaster,
       liveAccess: silentLiveAccess,
+      liveDocuments: noLiveDocuments,
       contract,
       onContractViolation: (violation) => violations.push(violation),
     })

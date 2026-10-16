@@ -27,6 +27,8 @@ export interface ContractResponse {
   readonly statusCode: number
   readonly headers: Readonly<Record<string, unknown>>
   readonly body: unknown
+  /** The bytes as they were sent: `body` is text, which would damage a binary answer. */
+  readonly rawBody: Buffer
 }
 
 /**
@@ -72,6 +74,7 @@ export function createContractClient(
         statusCode: response.statusCode,
         headers: response.headers,
         body: isJson ? response.json() : response.body,
+        rawBody: response.rawPayload,
       }
     },
   }

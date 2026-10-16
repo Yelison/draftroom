@@ -6,7 +6,7 @@ import { createDatabase } from '../db/database.ts'
 import type { Database } from '../db/tables.ts'
 import { buildApp, type ContractViolation } from './app.ts'
 import type { AuthProvider } from './auth/auth-provider.ts'
-import { silentBroadcaster, silentLiveAccess } from '../../test/support/broadcasters.ts'
+import { noLiveDocuments, silentBroadcaster, silentLiveAccess } from '../../test/support/broadcasters.ts'
 import { loadContract, type Contract } from './contract.ts'
 import { operationRoute } from './operation-route.ts'
 
@@ -59,6 +59,7 @@ function appWithoutDatabase(
     authProvider,
     broadcaster: silentBroadcaster,
     liveAccess: silentLiveAccess,
+    liveDocuments: noLiveDocuments,
     contract,
     onContractViolation: (violation) => violations.push(violation),
   })

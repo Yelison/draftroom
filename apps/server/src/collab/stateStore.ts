@@ -1,4 +1,5 @@
-import { sql, type Kysely } from 'kysely'
+import type { Kysely } from 'kysely'
+import { writeDocumentState } from '../db/documents/state.ts'
 import type { Database } from '../db/tables.ts'
 
 /** Where the binary Yjs state of documents is kept. The collaboration server is its only writer (ADR 0005). */
@@ -20,14 +21,6 @@ export function createPostgresStateStore(database: Kysely<Database>): StateStore
       return row?.state
     },
 
-    async save(documentId, state) {
-      // No row is not a failure: a document deleted for good has none left (the delete cascades), and there is nothing
-      // to keep. Failing would make the retry loop hold it in memory for ever.
-      await database
-        .updateTable('document_states')
-        .set({ state, updated_at: sql`now()` })
-        .where('document_id', '=', documentId)
-        .execute()
-    },
+    save: (documentId, state) => writeDocumentState(database, documentId, state),
   }
 }

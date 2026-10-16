@@ -26,10 +26,18 @@ export class DocumentDurability {
   private slot: StoredSlot
   private changes = 0
   private storedChanges = 0
+  private changedAt: number | null = null
+  private readonly now: () => number
 
   /** `loaded` is what the database held when the document was loaded: everything loaded is stored by definition. */
-  constructor(loaded: StoredSlot) {
+  constructor(loaded: StoredSlot, now: () => number = Date.now) {
     this.slot = loaded
+    this.now = now
+  }
+
+  /** When the document last applied an update since it was loaded, or `null` when it has applied none: the idle clock of automatic versions. */
+  get lastChangeAt(): number | null {
+    return this.changedAt
   }
 
   /** What a client that connects now is told is stored: never a snapshot of memory that has not been written. */
@@ -57,6 +65,7 @@ export class DocumentDurability {
 
   noteChange(): void {
     this.changes += 1
+    this.changedAt = this.now()
   }
 
   /**
@@ -84,10 +93,15 @@ export class DocumentDurability {
 export class DurabilityRegistry {
   private readonly documents = new Map<string, DocumentDurability>()
   private stopping = false
+  private readonly now: () => number
+
+  constructor(now: () => number = Date.now) {
+    this.now = now
+  }
 
   /** Starts tracking a document that was just loaded; its updates from now on are changes to store. */
   track(document: Y.Doc, name: string, loaded: StoredSlot): DocumentDurability {
-    const durability = new DocumentDurability(loaded)
+    const durability = new DocumentDurability(loaded, this.now)
     // A synchronous listener on the document, not `onChange`: that hook runs in a later microtask, and a capture taken
     // in between would miss the change it was meant to count.
     document.on('update', () => durability.noteChange())

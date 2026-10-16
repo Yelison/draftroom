@@ -6,6 +6,7 @@ import { requireAuthentication } from './auth/authenticate.ts'
 import { loadContract, type Contract } from './contract.ts'
 import type { DocumentBroadcaster } from './document-broadcaster.ts'
 import type { LiveAccess } from './live-access.ts'
+import type { LiveDocuments } from './live-documents.ts'
 import {
   clearHeaders,
   handleError,
@@ -23,6 +24,7 @@ import { healthRoutes } from './routes/health.ts'
 import { memberRoutes } from './routes/members.ts'
 import { pinRoutes } from './routes/pins.ts'
 import { templateRoutes } from './routes/templates.ts'
+import { versionRoutes } from './routes/versions.ts'
 import { workspaceRoutes } from './routes/workspaces.ts'
 
 declare module 'fastify' {
@@ -47,6 +49,8 @@ export interface AppDependencies {
   readonly broadcaster: DocumentBroadcaster
   /** Who holds open connections to account for a change of access. Required for the same reason: forgetting it leaves a revoked person connected. */
   readonly liveAccess: LiveAccess
+  /** Who works on documents that people have open: the state a version is saved from, and the restore. Required, since a version taken from stored state alone could miss what is being typed. */
+  readonly liveDocuments: LiveDocuments
   /** Compiled once; build it at start-up and share it (compiling takes a moment). */
   readonly contract?: Contract
   readonly logger?: FastifyServerOptions['logger']
@@ -60,6 +64,7 @@ export function buildApp({
   authProvider,
   broadcaster,
   liveAccess,
+  liveDocuments,
   contract = loadContract(),
   logger = false,
   onContractViolation,
@@ -112,7 +117,7 @@ export function buildApp({
     return JSON.stringify(problemBody('internal-error'))
   })
 
-  const dependencies = { contract, database, broadcaster, liveAccess }
+  const dependencies = { contract, database, broadcaster, liveAccess, liveDocuments }
   for (const routes of [
     healthRoutes,
     workspaceRoutes,
@@ -123,6 +128,7 @@ export function buildApp({
     pinRoutes,
     commentRoutes,
     templateRoutes,
+    versionRoutes,
   ]) {
     void app.register(routes, dependencies)
   }

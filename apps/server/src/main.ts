@@ -34,6 +34,10 @@ const app = buildApp({
   authProvider,
   logger: { level: 'info' },
   broadcaster,
+  liveDocuments: {
+    withState: (documentId, task) => collaboration.documents.withState(documentId, task),
+    restore: (request) => collaboration.documents.restore(request),
+  },
   liveAccess: {
     documentChanged: (documentId) => liveAccess.documentChanged(documentId),
     memberChanged: (workspaceId, userId) => liveAccess.memberChanged(workspaceId, userId),

@@ -13,11 +13,16 @@ type Parameters<Id extends keyof operations, Place extends 'path' | 'query'> = N
   operations[Id]['parameters'][Place]
 >
 
-type JsonBody<Id extends keyof operations> = operations[Id]['requestBody'] extends {
-  content: { 'application/json': infer Body }
-}
-  ? Body
-  : never
+type JsonContent<Body> = Body extends { content: { 'application/json': infer Json } } ? Json : never
+
+/** The JSON body of an operation, which is also `undefined` when the contract lets the request leave it out. */
+type JsonBody<Id extends keyof operations> =
+  | JsonContent<operations[Id]['requestBody']>
+  | ([JsonContent<operations[Id]['requestBody']>] extends [never]
+      ? never
+      : undefined extends operations[Id]['requestBody']
+        ? undefined
+        : never)
 
 /** A request as the contract describes it: the path, the query and the body, typed by the operation's own schemas. */
 export type OperationRequest<Id extends keyof operations> = FastifyRequest<{

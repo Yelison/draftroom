@@ -4,6 +4,7 @@ import type { Kysely } from 'kysely'
 import type { Config } from '../config.ts'
 import type { Database } from '../db/tables.ts'
 import type { AuthProvider } from '../http/auth/auth-provider.ts'
+import type { LiveDocuments } from '../http/live-documents.ts'
 import { authenticateExtension } from './authenticate.ts'
 import { awarenessGuardExtension } from './awarenessGuard.ts'
 import { endConnections, tellConnections, type ClosePlan, type ConnectionSelector } from './closeConnections.ts'
@@ -12,9 +13,11 @@ import { inFlightExtension, RevocationMarks } from './inFlight.ts'
 import { DurabilityRegistry } from './durability.ts'
 import { durableAckExtension } from './durableAck.ts'
 import { limitsExtension } from './limits.ts'
+import { createLiveDocuments } from './liveDocuments.ts'
 import type { CollabLog } from './log.ts'
 import { OpenSockets } from './openSockets.ts'
 import { persistenceExtension } from './persistence.ts'
+import { postgresRestoreVersions, type RestoreVersions } from './restoreVersions.ts'
 import { sessionKey } from './sessionKey.ts'
 import { shutDownCollaboration } from './shutdown.ts'
 import { createPostgresStateStore, type StateStore } from './stateStore.ts'
@@ -35,6 +38,8 @@ export interface CollabServerOptions {
   readonly log: CollabLog
   /** Where the Yjs state lives; PostgreSQL unless a test needs a store that fails. */
   readonly store?: StateStore
+  /** What a restore keeps in the database; PostgreSQL unless a test needs one that is slow or fails. */
+  readonly restoreVersions?: RestoreVersions
   readonly timing?: CollabTiming
   /** The clock of the rate limit. */
   readonly now?: () => number
@@ -61,6 +66,8 @@ export interface CollabServer {
   endConnections(target: ConnectionTarget, plan: ClosePlan): number
   /** Sends a stateless event to the live connections that match, with the selector of `endConnections`. It says how many it reached. */
   tell(target: ConnectionTarget, event: StatelessEvent): number
+  /** The work REST does on documents that people may have open: the state a version is saved from, and the restore. */
+  readonly documents: LiveDocuments
   /** Stores what can be stored, within the wait of protocol §7.2, and stops. */
   shutDown(): Promise<void>
   readonly hocuspocus: Hocuspocus<ConnectionContext>
@@ -114,8 +121,19 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
     ],
   })
 
+  const documents = createLiveDocuments({
+    hocuspocus: server.hocuspocus,
+    database,
+    store,
+    durability,
+    retry,
+    versions: options.restoreVersions ?? postgresRestoreVersions(database),
+    log,
+  })
+
   return {
     hocuspocus: server.hocuspocus,
+    documents,
 
     async listen() {
       await server.listen()
