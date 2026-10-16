@@ -13,10 +13,10 @@ export const people = {
 export type DemoPerson = keyof typeof people
 
 /**
- * The product's own HTTP client, as a person: the development identity header on every request, straight to the API.
- * Setting a scene up and taking access away go through REST, the way the screens of sharing will once they exist.
+ * The product's own HTTP client, as whoever has this email (nobody, without one): the development identity header on
+ * every request, straight to the API.
  */
-export function restAs(person: DemoPerson): DataSource {
+export function restWithIdentity(email?: string): DataSource {
   return createHttpDataSource({
     baseUrl: environment.apiOrigin,
     collabUrl: environment.collaborationOrigin,
@@ -24,8 +24,11 @@ export function restAs(person: DemoPerson): DataSource {
     csrfToken: () => undefined,
     fetch: (request) => {
       const headers = new Headers(request.headers)
-      headers.set('x-dev-user', people[person])
+      if (email !== undefined) headers.set('x-dev-user', email)
       return fetch(new Request(request, { headers }))
     },
   })
 }
+
+/** A person of the demo. Setting a scene up and taking access away go through REST, as the screens of sharing will once they exist. */
+export const restAs = (person: DemoPerson): DataSource => restWithIdentity(people[person])

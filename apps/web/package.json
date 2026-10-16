@@ -11,6 +11,7 @@
     "test:e2e": "playwright test",
     "test:e2e-demo": "playwright test -c e2e-demo/playwright.config.ts",
     "test:e2e-collab": "playwright test -c playwright.collab.config.ts",
+    "test:contract-real": "vitest run --config e2e-collab/contract/vitest.config.ts",
     "typecheck:e2e-collab": "tsc -b e2e-collab/tsconfig.json",
     "sync:forma-tokens": "node scripts/sync-forma-tokens.mjs"
   },
