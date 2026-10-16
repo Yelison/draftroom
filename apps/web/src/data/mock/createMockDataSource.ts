@@ -1,4 +1,6 @@
-import type { DataSource } from '../DataSource.ts'
+import { createCollabSession } from '../../collab/session.ts'
+import type { DataSource, RestSource } from '../DataSource.ts'
+import { SimulatedCollabServer, type Access, type Identity } from './collab/SimulatedCollabServer.ts'
 import { marta } from './fixtures/index.ts'
 import type { Context, Session } from './guards.ts'
 import { activityOperations } from './operations/activity.ts'
@@ -12,8 +14,10 @@ import { templateOperations } from './operations/templates.ts'
 import { threadOperations } from './operations/threads.ts'
 import { versionOperations } from './operations/versions.ts'
 import { workspaceOperations } from './operations/workspaces.ts'
+import { atLeast, documentRole } from './roles.ts'
 import { unhandled } from './unhandled.ts'
 import { createWorld, type World } from './world.ts'
+import { parseDocumentName } from '@draftroom/contract/collab'
 
 export interface ConnectOptions {
   /** The email of the person already signed in on this connection; nobody is signed in when it is left out. */
@@ -27,10 +31,21 @@ export interface ConnectOptions {
  */
 export interface MockServer {
   connect(options?: ConnectOptions): DataSource
+  /** The collaboration server of this world, which every connection's documents are opened on. */
+  readonly collaboration: SimulatedCollabServer
 }
 
-function operationsOf(ctx: Context): DataSource {
-  return {
+/** What the collaboration server lets a person do with a document: the role decides, and an archived one is only read. */
+function accessTo(world: World, documentName: string, identity: Identity | null): Access {
+  const documentId = parseDocumentName(documentName)
+  const document = world.documents.find((row) => row.id === documentId)
+  const role = document === undefined || identity === null ? undefined : documentRole(world, identity.userId, document)
+  if (document === undefined || role === undefined) return { denied: 'not-found' }
+  return { scope: atLeast(role, 'editor') && document.archivedAt === null ? 'read-write' : 'readonly' }
+}
+
+function operationsOf(ctx: Context, collaboration: SimulatedCollabServer, identity: Identity | null): DataSource {
+  const rest: RestSource = {
     ...sessionOperations(ctx),
     ...workspaceOperations(ctx),
     ...memberOperations(ctx),
@@ -44,16 +59,26 @@ function operationsOf(ctx: Context): DataSource {
     ...templateOperations(ctx),
     getVersionContent: unhandled('getVersionContent'),
   }
+  return {
+    ...rest,
+    openDocument: (documentId) =>
+      createCollabSession({ documentId, url: 'ws://simulated.invalid', webSocket: collaboration.socketFor(identity) }),
+  }
 }
 
 export function createMockServer(): MockServer {
   const world: World = createWorld()
+  const collaboration = new SimulatedCollabServer({
+    authorize: (documentName, identity) => accessTo(world, documentName, identity),
+  })
   return {
+    collaboration,
     connect({ signedInAs } = {}) {
       const person = signedInAs === undefined ? undefined : world.people.find((row) => row.email === signedInAs)
       if (signedInAs !== undefined && person === undefined) throw new Error(`The mock has no account for ${signedInAs}`)
       const session: Session = { userId: person?.id ?? null }
-      return operationsOf({ world, session })
+      const identity = person === undefined ? null : { userId: person.id, displayName: person.name ?? person.email }
+      return operationsOf({ world, session }, collaboration, identity)
     },
   }
 }

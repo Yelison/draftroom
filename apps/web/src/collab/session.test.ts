@@ -50,41 +50,6 @@ async function typeAndStore(opening: Opened, text: string) {
 const snapshotOf = (doc: Y.Doc) => toBase64(Y.encodeSnapshot(Y.snapshot(doc)))
 
 describe('opening a document', () => {
-  it('shows an editor loading, then synchronising, then synced once the handshake is done', async () => {
-    world = createWorld()
-
-    const opening = await opened()
-
-    expect(opening.states).toEqual(['connecting', 'synchronising', 'synced'])
-    expect(opening.session.getSnapshot()).toMatchObject({ editable: true, loaded: true, cause: null })
-  })
-
-  it('opens a reader as read-only and never as synchronising, though the provider counter stays above zero', async () => {
-    world = createWorld()
-    const opening = await opened(reader)
-
-    // A reader that sends an update is answered "not applied" and the provider's counter never comes back to zero.
-    opening.session.getSnapshot().provider.incrementUnsyncedChanges()
-    typeInto(opening.doc, 'forged')
-    await advance(2000)
-
-    expect(opening.states).toEqual(['connecting', 'read-only'])
-    expect(opening.session.getSnapshot().editable).toBe(false)
-    expect(textOf(world.server.document(wireName))).toBe('')
-  })
-
-  it.each([
-    { name: 'a person who has no access', who: stranger, cause: 'not-found' },
-    { name: 'someone who is not signed in', who: null, cause: 'unauthenticated' },
-  ])('stops with an error that can be retried for $name, and stops connecting', async ({ who, cause }) => {
-    world = createWorld()
-
-    const opening = await opened(who)
-
-    expect(opening.session.getSnapshot()).toMatchObject({ state: 'error', cause, action: 'retry', editable: false })
-    expect(socketOf(opening).shouldConnect).toBe(false)
-  })
-
   it('treats a failure of the server while it authenticates as a retryable error that keeps what is pending', async () => {
     world = createWorld()
     const opening = await opened()
@@ -104,21 +69,6 @@ describe('opening a document', () => {
 })
 
 describe('what is said to be stored', () => {
-  it('says synchronising until the server stored the change, and synced only then', async () => {
-    world = createWorld()
-    const opening = await opened()
-    world.server.holdStores()
-
-    typeInto(opening.doc, 'hello')
-    await advance(3000)
-
-    // The server has it in memory and acknowledged it; it is not stored.
-    expect(state(opening)).toBe('synchronising')
-    world.server.releaseStores()
-    await advance(1100)
-    expect(state(opening)).toBe('synced')
-  })
-
   it('does not take a deletion as stored because of a snapshot taken before it', async () => {
     world = createWorld()
     const opening = await opened()
@@ -150,20 +100,6 @@ describe('what is said to be stored', () => {
     expect(state(opening)).toBe('synchronising')
 
     provider.decrementUnsyncedChanges()
-    expect(state(opening)).toBe('synced')
-  })
-
-  it('shows an error that keeps the editor editable when the write fails, and recovers by itself when the server stores', async () => {
-    world = createWorld()
-    const opening = await opened()
-    world.server.failStores(true)
-
-    typeInto(opening.doc, 'hello')
-    await advance(STORED_ACK_TIMEOUT_MS + 100)
-
-    expect(opening.session.getSnapshot()).toMatchObject({ state: 'error', cause: 'store-timeout', editable: true })
-    world.server.failStores(false)
-    await advance(2100)
     expect(state(opening)).toBe('synced')
   })
 

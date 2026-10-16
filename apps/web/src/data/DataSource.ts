@@ -1,4 +1,5 @@
 import type { Schema, operations } from '@draftroom/contract'
+import type { CollabSession } from '../collab/session.ts'
 
 /**
  * Probes of the process and its database. The orchestrator and monitoring call them; the client never does, so the data
@@ -73,20 +74,15 @@ type Method<Id extends OperationId> =
       : (request: RequestOf<Id>) => Promise<ResultOf<Id>>
 
 /** One method per operation of the contract, named by its `operationId`. */
-export type DataSource = { readonly [Id in OperationId]: Method<Id> }
+export type RestSource = { readonly [Id in OperationId]: Method<Id> }
 
-/**
- * A live connection to one document: its content, presence and sync state.
- *
- * Pending T2.2. The collaboration protocol (`docs/collab/protocol.md`) is implemented by T2.1 and T2.2, so this has no
- * members yet and neither data source implements `openDocument`.
- */
-export interface CollabSession {}
-
-/**
- * The collaboration half of the data source. It joins `DataSource` when T2.2 gives both implementations something to
- * return; until then, declaring it there would force each of them to throw.
- */
+/** The collaboration half of the data source: the live connection to one document, which is not a request and an answer. */
 export interface CollaborationSource {
+  /**
+   * Opens the document for editing: its content, who else is in it and whether what the person wrote is stored. The
+   * caller owns the session and ends it with `destroy()`.
+   */
   openDocument(documentId: Schema<'Id'>): CollabSession
 }
+
+export type DataSource = RestSource & CollaborationSource

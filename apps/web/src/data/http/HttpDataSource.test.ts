@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, isApiError, TransportError } from '../errors.ts'
 import { createHttpDataSource } from './HttpDataSource.ts'
 
@@ -311,5 +311,42 @@ describe('HttpDataSource answers', () => {
 
     expect(error).toBeInstanceOf(TransportError)
     expect(error).toMatchObject({ status: null, cause })
+  })
+})
+
+describe('opening a document for collaboration', () => {
+  /** A WebSocket that never connects and remembers where it was asked to: enough to see what the session dials. */
+  const dialled: string[] = []
+  class RecordingSocket {
+    binaryType = ''
+    readyState = 0
+    constructor(url: string) {
+      dialled.push(url)
+    }
+    addEventListener() {}
+    removeEventListener() {}
+    close() {}
+  }
+
+  afterEach(() => {
+    dialled.length = 0
+    vi.unstubAllGlobals()
+  })
+
+  it('connects to the collaboration server it was given, without a token in the address', () => {
+    vi.stubGlobal('WebSocket', RecordingSocket)
+    const source = createHttpDataSource({ collabUrl: 'wss://collab.draftroom.test' })
+
+    source.openDocument(documentId).destroy()
+
+    expect(dialled).toEqual(['wss://collab.draftroom.test'])
+  })
+
+  it('connects to /collab on its own origin when no address was given', () => {
+    vi.stubGlobal('WebSocket', RecordingSocket)
+
+    createHttpDataSource().openDocument(documentId).destroy()
+
+    expect(dialled).toEqual([`ws://${location.host}/collab`])
   })
 })

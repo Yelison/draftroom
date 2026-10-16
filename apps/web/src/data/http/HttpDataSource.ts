@@ -1,5 +1,6 @@
 import type { paths } from '@draftroom/contract'
 import createClient, { type ClientOptions } from 'openapi-fetch'
+import { createCollabSession } from '../../collab/session.ts'
 import type { DataSource } from '../DataSource.ts'
 import { TransportError } from '../errors.ts'
 import { changesState, csrfHeaderName, csrfTokenFromCookie } from './csrf.ts'
@@ -12,7 +13,11 @@ export interface HttpDataSourceOptions {
   fetch?: ClientOptions['fetch']
   /** The CSRF token to echo; the `dr_csrf` cookie by default. */
   csrfToken?: () => string | undefined
+  /** Where the collaboration server listens; `/collab` on the app's own origin by default (plan, section 3.3). */
+  collabUrl?: string
 }
+
+const ownOrigin = () => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/collab`
 
 interface Answer<Data> {
   data?: Data | undefined
@@ -61,6 +66,7 @@ export function createHttpDataSource({
   baseUrl = '',
   fetch,
   csrfToken = csrfTokenFromCookie,
+  collabUrl,
 }: HttpDataSourceOptions = {}): DataSource {
   const client = createClient<paths>({
     baseUrl,
@@ -135,5 +141,7 @@ export function createHttpDataSource({
     listWorkspaceActivity: (request) => data(client.GET('/api/workspaces/{workspaceId}/activity', request)),
     listDocumentActivity: (request) => data(client.GET('/api/documents/{documentId}/activity', request)),
     listTemplates: (request) => data(client.GET('/api/templates', request)),
+    // The identity is the session cookie the browser sends with the upgrade; nothing is read from the address.
+    openDocument: (documentId) => createCollabSession({ documentId, url: collabUrl ?? ownOrigin() }),
   }
 }
