@@ -224,6 +224,7 @@ class ProviderSession implements CollabSession {
         break
       case 'discard-offline-changes':
         this.discardLocalState()
+        this.start()
         this.notice = 'offline-changes-discarded'
         break
     }
@@ -371,14 +372,16 @@ class ProviderSession implements CollabSession {
     link.ydoc.destroy()
   }
 
-  /** What is not stored is dropped and the document made again; the next connection loads the server's state. */
+  /**
+   * What is not stored is dropped, with the document and the connection that carried it. Whoever calls this makes the
+   * connection again (`start`), which loads the server's state; a socket is never closed while it is still connecting.
+   */
   private discardLocalState(): void {
     this.teardown()
     this.pending.clear()
     this.lastStored = null
     this.overBudget = false
     this.peers = []
-    this.start()
   }
 
   // --- What the document and the server tell ------------------------------------------------------------------------

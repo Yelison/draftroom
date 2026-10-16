@@ -51,6 +51,7 @@ const defaults = {
 }
 
 // `readyState` values of a WebSocket.
+const CONNECTING = 0
 const OPEN = 1
 const CLOSED = 3
 
@@ -83,6 +84,8 @@ export class SimulatedSocket {
 
   /** The client ends the connection; like a browser's, the close is reported afterwards and without a code. */
   close(): void {
+    // A socket closed before it opened is an error in a real one: the browser logs it and `ws` raises it.
+    if (this.readyState === CONNECTING) this.peer.aborted()
     this.end(1005, '')
   }
 
@@ -414,6 +417,11 @@ export class Connection {
     this.scope = null
   }
 
+  /** @internal The client closed the socket before it opened. */
+  aborted(): void {
+    this.server.abortedConnections += 1
+  }
+
   /** @internal The socket is gone. */
   drop(): void {
     this.closed = true
@@ -437,6 +445,8 @@ export class SimulatedCollabServer {
   readonly settings: Required<SimulatedServerOptions>
   private readonly rooms = new Map<string, DocumentRoom>()
   private readonly open = new Set<Connection>()
+  /** How many sockets a client closed before they opened: what a browser logs as an error and `ws` raises. */
+  abortedConnections = 0
   /** Every close the server made, in order: what a test reads to know that the server ended a connection and why. */
   readonly closes: { code: number; reason: string }[] = []
   private storesFail = false

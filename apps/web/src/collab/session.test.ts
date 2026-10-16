@@ -258,6 +258,8 @@ describe('when the server ends the connection', () => {
     expect(reopened.generation).toBe(generation + 1)
     expect(textOf(reopened.ydoc)).toBe('stored text')
     expect(reopened.state).toBe('synced')
+    // One new connection, not one that is closed while it is still opening.
+    expect(world.server.abortedConnections).toBe(0)
   })
 
   it('does nothing when asked to discard and reload from an error that is not about size', async () => {
