@@ -277,6 +277,23 @@ describe('what was written offline by someone who can only read now', () => {
   })
 })
 
+describe('a dialog that was open when the connection stopped', () => {
+  it('goes with the right to edit: the link it would apply is never made', async () => {
+    const { server, editor, user } = await openEditor()
+    await screen.findByText('Sync status: Synced')
+    act(() => editor.commands.insertContent('Some words'))
+    act(() => editor.commands.selectAll())
+    await user.click(screen.getByRole('button', { name: 'Link' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Add a link' })
+    await user.type(within(dialog).getByLabelText('Link address'), 'https://example.com')
+
+    act(() => server.collaboration.closeConnections(4401, 'unauthenticated'))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(JSON.stringify(editor.getJSON())).not.toContain('link')
+  })
+})
+
 describe('opening the editor', () => {
   it('connects once and never closes a connection that is still opening, though React makes the screen twice', async () => {
     const { server } = await openEditor()

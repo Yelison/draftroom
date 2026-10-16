@@ -158,6 +158,57 @@ describe('what is said to be stored', () => {
   })
 })
 
+describe('a change that the editor should not have accepted', () => {
+  // Tiptap's commands and a dialog that was open do not stop for `setEditable(false)`: the change gets into the document, and
+  // what the session says must still be true about it.
+
+  it('is not called synced when the person tries again after a stopped error, while the server holds the writes', async () => {
+    world = createWorld()
+    const opening = await opened()
+    await typeAndStore(opening, 'hello')
+    world.server.closeConnections(4401, 'unauthenticated')
+    await advance(50)
+    expect(opening.session.getSnapshot()).toMatchObject({ state: 'error', editable: false })
+
+    typeInto(opening.doc, ' X', 5)
+    world.server.holdStores()
+    const before = opening.states.length
+    opening.session.retry()
+    await advance(STORED_ACK_TIMEOUT_MS + 1000)
+
+    expect(opening.states.slice(before)).not.toContain('synced')
+    expect(opening.session.getSnapshot()).toMatchObject({ state: 'error', cause: 'store-timeout' })
+    expect(textOf(world.server.document(wireName))).toBe('hello X')
+    world.server.releaseStores()
+    await advance(2000)
+    expect(opening.session.getSnapshot().state).toBe('synced')
+  })
+
+  it('is not called synced when the role comes back after a change made while read-only, while the server holds the writes', async () => {
+    world = createWorld()
+    const opening = await opened()
+    await typeAndStore(opening, 'hello')
+    world.setAccess(editor, { scope: 'readonly' })
+    world.server.closeConnections(4409, 'role-changed')
+    await advance(1100)
+    expect(opening.session.getSnapshot()).toMatchObject({ state: 'read-only', editable: false })
+
+    typeInto(opening.doc, ' Y', 5)
+    world.setAccess(editor, { scope: 'read-write' })
+    world.server.holdStores()
+    const before = opening.states.length
+    world.server.closeConnections(4409, 'role-changed')
+    await advance(STORED_ACK_TIMEOUT_MS + 3000)
+
+    expect(opening.states.slice(before)).not.toContain('synced')
+    expect(opening.session.getSnapshot()).toMatchObject({ state: 'error', cause: 'store-timeout' })
+    world.server.releaseStores()
+    await advance(2000)
+    expect(opening.session.getSnapshot().state).toBe('synced')
+    expect(textOf(world.server.document(wireName))).toBe('hello Y')
+  })
+})
+
 describe('when the server ends the connection', () => {
   it('calls disconnect and then connect after an in-band close, and comes back', async () => {
     world = createWorld()

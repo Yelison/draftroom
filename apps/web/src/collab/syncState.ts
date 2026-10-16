@@ -242,7 +242,9 @@ function apply(model: SyncModel, event: SyncEvent): SyncStep {
       return model.state === 'synchronising' ? unchanged(settle({ ...model, handshakeDone: true })) : unchanged(model)
 
     case 'local-change':
-      if (model.state === 'read-only' || model.state === 'initial' || isStopped(model)) return unchanged(model)
+      // Whatever the state, a change of this client is pending until a snapshot says it is stored: one that is made when the
+      // editor should not accept it (a command, a dialog that was open) must not be forgotten, or the next `stored` would
+      // cover nothing and say synced for a change the server never saw.
       return unchanged({ ...model, hasPending: true, state: model.state === 'synced' ? 'synchronising' : model.state })
 
     case 'unsynced-changes-changed': {

@@ -144,6 +144,26 @@ describe('the cases the protocol requires (section 8.3)', () => {
       },
     },
     {
+      name: 'A change made while read-only, then the role comes back: synchronising, synced only after a covering `stored`',
+      events: [
+        open,
+        { type: 'authenticated', scope: 'readonly' },
+        change,
+        closed(null),
+        readWrite,
+        handshake,
+        unsynced(0),
+      ],
+      state: 'synchronising',
+      check: ({ model }) => expect(model.hasPending).toBe(true),
+    },
+    {
+      name: 'A change made in a stopped error, then a retry: synchronising, synced only after a covering `stored`',
+      events: [...synced, closed(4401), change, open, readWrite, handshake, unsynced(0)],
+      state: 'synchronising',
+      check: ({ model }) => expect(model.hasPending).toBe(true),
+    },
+    {
       name: 'Close `4403`',
       events: [...synced, closed(4403)],
       state: 'revoked',
@@ -475,6 +495,21 @@ describe('the transitions of section 8.2', () => {
       from: { state: 'error', cause: 'store-timeout' },
       event: change,
       to: 'error',
+      pending: true,
+    },
+    {
+      row: 'a local change in read-only is recorded, so the reconnection leads to the discard of section 12.4',
+      from: { state: 'read-only', scope: 'readonly' },
+      event: change,
+      to: 'read-only',
+      pending: true,
+    },
+    {
+      row: 'a local change in a stopped error is recorded',
+      from: { state: 'error', cause: 'unauthenticated', scope: 'read-write' },
+      event: change,
+      to: 'error',
+      pending: true,
     },
     {
       row: 'the counter above zero in synced',

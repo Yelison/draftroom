@@ -235,6 +235,7 @@ function EditorWorkspace({
   }
 
   function applyLink(href: string) {
+    if (!editable) return
     const chain = editor.chain()
     const insideLink = editor.isActive('link')
     if (insideLink) chain.extendMarkRange('link')
@@ -249,6 +250,7 @@ function EditorWorkspace({
   }
 
   function removeLink() {
+    if (!editable) return
     editor.chain().extendMarkRange('link').unsetLink().run()
     finishLink('removed')
   }
@@ -268,7 +270,8 @@ function EditorWorkspace({
         <EditorContent editor={editor} />
       </div>
       <LinkDialog
-        request={linkRequest}
+        // A dialog that was open when the text stopped taking edits goes with them: what it would apply is not the person's to make.
+        request={editable ? linkRequest : null}
         onSubmit={applyLink}
         onRemove={removeLink}
         onClose={() => setLinkRequest(null)}

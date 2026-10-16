@@ -387,8 +387,11 @@ class ProviderSession implements CollabSession {
   private readonly onDocumentUpdate = (update: Uint8Array, origin: unknown): void => {
     // What the provider applied is the server's, not the person's.
     if (origin === this.link?.provider) return
+    // Every change of this client is pending, whatever state the editor was in when it was made (protocol section 7.4). Only
+    // after access was removed is nothing kept: nothing is uploaded after it.
+    if (this.model.state === 'revoked') return
+    this.pending.add(update)
     this.dispatch({ type: 'local-change' })
-    if (this.model.hasPending) this.pending.add(update)
     this.measureUnsent()
   }
 
