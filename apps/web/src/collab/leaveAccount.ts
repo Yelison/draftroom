@@ -5,6 +5,12 @@ import { copiesOf, hasUnstoredChanges, purgeCopies } from './offlineCache.ts'
  * Leaving an account, by signing out or by switching to another (protocol section 12.2): what this device kept of its
  * documents is removed. Some of it may be changes the server never stored, which the removal would destroy, so those are
  * waited for first and, if they are still there, the person is asked.
+ *
+ * It **rejects** when the browser keeps copies and cannot list them (no `indexedDB.databases()`), instead of going on as if
+ * there were none: nothing was removed, and the copies of the account stay on this device. Whoever calls it must catch that,
+ * tell the person that this browser cannot clear what it kept of their account, and let them choose between leaving anyway
+ * (the sign-out without the purge) and staying. A browser that keeps nothing is not that case: it resolves with
+ * `{ purged: true }` and asks nothing.
  */
 
 /** A few seconds: long enough for what is on its way to be stored, short enough for a person who is leaving. */

@@ -55,6 +55,7 @@
   "sync.state.synchronising": "Sincronizando",
   "sync.state.synced": "Sincronizado",
   "sync.state.offline-local": "Sin conexión, con copia local",
+  "sync.state.offline-tab": "Sin conexión, sin copia local",
   "sync.state.reconnecting": "Reconectando",
   "sync.state.error": "Error",
   "sync.state.revoked": "Acceso retirado",

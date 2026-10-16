@@ -278,7 +278,7 @@ function EditorWorkspace({
         {editable && <Toolbar editor={editor} onLinkRequest={requestLink} />}
         <div className={styles.status}>
           <Presence people={people} />
-          <SyncStatus state={snapshot.state} />
+          <SyncStatus state={snapshot.state} keepsCopy={snapshot.keepsCopy} />
         </div>
       </div>
       <SyncAlerts snapshot={snapshot} onRetry={retry} onDiscard={discard} onDismissNotice={dismissNotice} />

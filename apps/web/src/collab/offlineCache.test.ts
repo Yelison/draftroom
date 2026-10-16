@@ -189,6 +189,26 @@ describe('the marker of changes that were never stored', () => {
     expect(await hasUnstoredChanges(copyName(aCopy))).toBe(true)
   })
 
+  it('is not forgotten because of a change made while the copy was being read, and goes once a snapshot covers it all', async () => {
+    const { copy, doc } = await open()
+    write(doc, 'First')
+    await settle()
+    const stored = Y.snapshot(doc)
+
+    // Written in the same turn as the reading: it marks the copy again after the marker was deleted, and it is not in what
+    // was read, so nothing may conclude that the copy holds nothing unstored any more.
+    const settling = copy.settle(stored)
+    write(doc, 'Second')
+    await settling
+    await settle()
+    expect(await hasUnstoredChanges(copyName(aCopy))).toBe(true)
+
+    await copy.settle(Y.snapshot(doc))
+    await settle()
+
+    expect(await hasUnstoredChanges(copyName(aCopy))).toBe(false)
+  })
+
   it('is set again by the next change of a tab after another tab cleared it', async () => {
     const thisTab = await open()
     const otherTab = await open()

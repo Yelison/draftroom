@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { documentName } from '@draftroom/contract/collab'
 import { openEditor, launchPlan } from './testing/renderEditor.tsx'
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 
 const wireName = documentName(launchPlan.id)
 
@@ -47,5 +50,19 @@ describe('a document written offline', () => {
       'Written offline',
     )
     expect(screen.queryByText(/stays on this device/)).not.toBeInTheDocument()
+  })
+
+  it('says in the pill, in the notice and in the live region that nothing is kept on the device where the browser keeps nothing', async () => {
+    vi.stubGlobal('indexedDB', undefined)
+    const { editor } = await openEditor()
+    await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument())
+
+    goOffline()
+    act(() => editor.commands.insertContent('Written offline'))
+
+    await waitFor(() => expect(screen.getByText('Sync status: Offline, no local copy')).toBeInTheDocument())
+    expect(screen.getByText(/only in this tab/)).toBeInTheDocument()
+    expect(screen.queryByText(/stays on this device/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Sync status: Offline with local copy')).not.toBeInTheDocument()
   })
 })

@@ -59,14 +59,16 @@ const deletions = new Map<string, Promise<void>>()
  *   is where `y-indexeddb` creates its own). IndexedDB runs transactions with overlapping scopes in the order they were
  *   created, so the marker is committed first: a tab that dies in between leaves a marker without its change, never a change
  *   without its marker. Nothing remembers that it was set, so another tab clearing it is put back by the next change.
- * - **Clearing.** Only when the snapshot the server stored contains everything the copy holds, which is read, merged and
- *   compared in the same transaction that deletes the marker, so a change that arrives meanwhile is not missed. What a tab
+ * - **Clearing.** Only when the snapshot the server stored contains everything the copy holds, which is read and compared
+ *   in the same transaction that deletes the marker, so a change that arrives meanwhile is not missed. What a tab
  *   itself has pending is not enough: another tab may have written more.
  */
 class PersistedCopy implements LocalCopy {
   private closed = false
   /** Only to spare the reading of the copy when nothing could have been marked; it is never a reason not to write. */
   private mayHoldUnstored: boolean
+  /** How many changes of the person the copy has seen: a reading of the copy that a change overtook proves nothing about it. */
+  private localChanges = 0
 
   constructor(
     private readonly persistence: IndexeddbPersistence,
@@ -82,16 +84,20 @@ class PersistedCopy implements LocalCopy {
   settle(snapshot: Y.Snapshot): Promise<void> {
     const database = this.persistence.db
     if (!this.mayHoldUnstored || this.closed || database === null) return Promise.resolve()
+    const changesSeen = this.localChanges
     return new Promise((resolve) => {
       try {
         const transaction = database.transaction([UPDATES_STORE, CUSTOM_STORE], 'readwrite')
         const rows = transaction.objectStore(UPDATES_STORE).getAll()
         rows.onsuccess = () => {
           const updates: Uint8Array[] = rows.result
-          // An unreadable or empty copy holds nothing a snapshot could lack.
-          if (updates.length === 0 || Y.snapshotContainsUpdate(snapshot, Y.mergeUpdates(updates))) {
+          // Containing every update is containing their merge, and checking them one by one is several times cheaper than
+          // merging them first (ADR 0013). A copy with no updates holds nothing to lack.
+          if (updates.every((update) => Y.snapshotContainsUpdate(snapshot, update))) {
             transaction.objectStore(CUSTOM_STORE).delete(UNSYNCED)
-            this.mayHoldUnstored = false
+            // A change made while the copy was being read marks it again after this transaction, and is not in what was read:
+            // forgetting then that it may hold changes would leave that marker for good.
+            if (this.localChanges === changesSeen) this.mayHoldUnstored = false
           }
         }
         transaction.oncomplete = () => resolve()
@@ -124,6 +130,7 @@ class PersistedCopy implements LocalCopy {
     // What the cache itself loads and what the server sends are not the person's.
     if (!transaction.local || !changesTheDocument(transaction)) return
     this.mayHoldUnstored = true
+    this.localChanges += 1
     const database = this.persistence.db
     if (this.closed || database === null) return
     try {
