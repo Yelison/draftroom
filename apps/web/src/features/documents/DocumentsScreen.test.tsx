@@ -320,3 +320,34 @@ describe('the Documents screen in Spanish', () => {
     await waitFor(() => expect(spoken()).toContain('1 resultado'))
   })
 })
+
+describe('the search typed while "Load more" is on its way', () => {
+  it('keeps the focus and what was typed in the search field when the results come in', async () => {
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const { user } = renderScreen('/documents', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listDocuments: async (request) => {
+          if (request?.params.query?.cursor !== undefined) await held
+          return dataSource.listDocuments({
+            params: {
+              path: { workspaceId: request?.params.path.workspaceId ?? '' },
+              query: { ...request?.params.query, limit: 4 },
+            },
+          })
+        },
+      }),
+    })
+    const documents = await screen.findByRole('region', { name: 'All documents' })
+    await user.click(await within(documents).findByRole('button', { name: 'Load more' }))
+
+    await user.type(searchbox(), 'weekly')
+
+    await waitFor(() => expect(within(documents).getAllByRole('link')).toHaveLength(1))
+    expect(searchbox()).toHaveValue('weekly')
+    expect(searchbox()).toHaveFocus()
+    await act(async () => release())
+    expect(searchbox()).toHaveFocus()
+  })
+})
