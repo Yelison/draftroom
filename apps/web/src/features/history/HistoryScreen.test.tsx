@@ -343,6 +343,33 @@ describe('opening an event of the History screen', () => {
     expect(within(main()).queryByRole('button', { name: /Presupuesto 2027/ })).not.toBeInTheDocument()
   })
 
+  it('does not open a row of the list that is still on screen while the filtered one is on its way', async () => {
+    let answer: () => void = () => undefined
+    const { user } = renderScreen('/history', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listWorkspaceActivity: (request) =>
+          request?.params.query?.actorId === undefined
+            ? dataSource.listWorkspaceActivity(request)
+            : new Promise((resolve) => {
+                answer = () => resolve(dataSource.listWorkspaceActivity(request))
+              }),
+      }),
+    })
+    const newest = await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await user.click(chip('Person'))
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Daniel Okafor' }))
+    await waitFor(() => expect(newest).toHaveAttribute('aria-disabled', 'true'))
+
+    await user.click(newest)
+    answer()
+
+    await waitFor(() => expect(rows()).toHaveLength(3))
+    expect(within(main()).queryByRole('complementary')).not.toBeInTheDocument()
+    expect(within(main()).queryByText('This event is no longer available')).not.toBeInTheDocument()
+    expect(rows()[0]).not.toHaveAttribute('aria-disabled')
+  })
+
   it('closes when another filter is chosen, instead of saying the event is gone', async () => {
     const { user } = renderScreen('/history')
     await user.click(await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) }))

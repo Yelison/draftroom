@@ -49,3 +49,7 @@
   padding: 0;
   list-style: none;
 }
+
+.row[aria-disabled='true'] {
+  cursor: progress;
+}

@@ -94,7 +94,12 @@ export function History({ workspaceId }: { workspaceId: string }) {
             className={styles.row}
             aria-expanded={event.id === openedId}
             aria-controls={event.id === openedId ? panelId : undefined}
-            onClick={() => setOpened({ id: event.id, listKey })}
+            // The rows of the list that was there are on screen until the filtered one arrives, and an event opened now would
+            // be kept with the new filters, where the list that comes does not have it, and be told gone for no loss of access.
+            aria-disabled={query.isPlaceholderData || undefined}
+            onClick={() => {
+              if (!query.isPlaceholderData) setOpened({ id: event.id, listKey })
+            }}
           >
             <ActivityEventSummary event={event} />
           </button>
