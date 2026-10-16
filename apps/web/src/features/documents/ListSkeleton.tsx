@@ -6,7 +6,7 @@ import styles from './ListSkeleton.module.css'
 export interface ListSkeletonProps {
   rows?: number
   /** The class of the real list, so the rows lie where the real ones will. The grid of the documents unless said. */
-  listClassName?: string
+  listClassName?: string | undefined
   /** What the live region says while the list is on its way. */
   label?: MessageId
 }
