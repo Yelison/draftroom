@@ -163,5 +163,13 @@
   "trash.delete.description": "This can't be undone. The document, its version history and its comments will be gone for everyone.",
   "trash.delete.action": "Delete permanently",
   "trash.delete.announcement": "“{title}” was deleted permanently.",
-  "trash.gone": "“{title}” isn't in the trash any more: someone else restored or deleted it."
+  "trash.gone": "“{title}” isn't in the trash any more: someone else restored or deleted it.",
+  "templates.pick": "From a template",
+  "templates.picker.title": "Choose a template",
+  "templates.loading": "Loading templates",
+  "templates.error.title": "We couldn't load the templates",
+  "templates.use": "Use this template",
+  "templates.back": "Back to documents",
+  "templates.notFound.title": "This template doesn't exist",
+  "templates.notFound.description": "Pick another one from the list."
 }

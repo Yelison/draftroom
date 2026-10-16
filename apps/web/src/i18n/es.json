@@ -163,5 +163,13 @@
   "trash.delete.description": "No se puede deshacer. El documento, su historial de versiones y sus comentarios desaparecerán para todos.",
   "trash.delete.action": "Eliminar para siempre",
   "trash.delete.announcement": "«{title}» se ha eliminado para siempre.",
-  "trash.gone": "«{title}» ya no está en la papelera: otra persona lo ha restaurado o eliminado."
+  "trash.gone": "«{title}» ya no está en la papelera: otra persona lo ha restaurado o eliminado.",
+  "templates.pick": "Desde una plantilla",
+  "templates.picker.title": "Elige una plantilla",
+  "templates.loading": "Cargando plantillas",
+  "templates.error.title": "No hemos podido cargar las plantillas",
+  "templates.use": "Usar esta plantilla",
+  "templates.back": "Volver a documentos",
+  "templates.notFound.title": "Esta plantilla no existe",
+  "templates.notFound.description": "Elige otra de la lista."
 }
