@@ -58,7 +58,10 @@ function TemplateList({ templates }: { templates: readonly Schema<'Template'>[] 
   useEffect(() => {
     const dialog = list.current?.closest('dialog, [role="dialog"]')
     const focused = document.activeElement
-    if (dialog?.contains(focused) && !list.current?.contains(focused)) list.current?.querySelector('a')?.focus()
+    // The focus is on the button that closes the dialog while the templates load, or on the page when the button that
+    // asked to try again went away with the failure.
+    const stranded = focused === document.body || (dialog?.contains(focused) && !list.current?.contains(focused))
+    if (stranded) list.current?.querySelector('a')?.focus()
   }, [])
 
   return (

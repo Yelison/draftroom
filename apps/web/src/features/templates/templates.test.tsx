@@ -125,7 +125,9 @@ describe('choosing a template', () => {
     expect(await within(dialog).findByRole('alert')).toHaveTextContent("We couldn't load the templates")
     await user.click(within(dialog).getByRole('button', { name: 'Try again' }))
 
-    expect(await within(dialog).findByRole('link', { name: /Meeting notes/ })).toBeInTheDocument()
+    const first = await within(dialog).findByRole('link', { name: /Meeting notes/ })
+    // The button that was pressed went away with the failure: the focus must not be left on the page.
+    await waitFor(() => expect(first).toHaveFocus())
   })
 })
 
@@ -193,7 +195,7 @@ describe('the page of a template', () => {
     expect(router.state.location.pathname).toBe('/templates/meeting-notes')
   })
 
-  it('says it is loading, with room for what comes, and then shows the template', async () => {
+  it('says it is loading, and then shows the template', async () => {
     let arrive: (() => void) | undefined
     renderScreen('/templates/meeting-notes', {
       wrap: (dataSource) => ({
@@ -231,6 +233,7 @@ describe('the page of a template', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent("We couldn't load the templates")
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
-    expect(await screen.findByRole('button', { name: 'Use this template' })).toBeInTheDocument()
+    const use = await screen.findByRole('button', { name: 'Use this template' })
+    await waitFor(() => expect(use).toHaveFocus())
   })
 })

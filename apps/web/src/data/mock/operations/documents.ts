@@ -1,4 +1,5 @@
-// The mock plays the server here (a document made from a template is written by the server), so it may do what the server does.
+// The mock plays the server here (a document made from a template is written by the server), so it may do what
+// the server does.
 // oxlint-disable-next-line no-restricted-imports
 import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
 import type { DataSource } from '../../DataSource.ts'
@@ -114,7 +115,8 @@ export function documentOperations(ctx: Context): DocumentOperations {
       world.grants.push({ documentId: document.id, userId: user.id, role: 'owner', createdAt: at })
       record(world, 'document.created', user.id, document.id)
       if (template !== undefined) {
-        // The mock is the server here: it writes the template's content as the server does, so the client never builds it.
+        // The mock is the server here: it writes the template's content as the server does, so the client never
+        // builds it.
         const content = templateContent[body.locale ?? 'en'][template.id] ?? []
         ctx.startContent(document.id, jsonToYUpdate({ type: 'doc', content: [...content] }))
       }

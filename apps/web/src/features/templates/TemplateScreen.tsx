@@ -1,4 +1,5 @@
 import { Button, buttonClassName } from '@yelison/forma-ui'
+import { useEffect, useRef } from 'react'
 import { useIntl } from 'react-intl'
 import { Link, useParams } from 'react-router'
 import type { Locale } from '../../i18n/locale.ts'
@@ -79,9 +80,15 @@ interface UseTemplateProps {
 function UseTemplate({ workspaceId, template }: UseTemplateProps) {
   const intl = useIntl()
   const create = useCreateDocument(workspaceId)
+  const actions = useRef<HTMLDivElement>(null)
+  // After a failure to load the template the button that asked to try again is gone; the focus goes to the action that
+  // has taken its place. On a first visit the focus is on the headline, which this leaves alone.
+  useEffect(() => {
+    if (document.activeElement === document.body) actions.current?.querySelector('button')?.focus()
+  }, [])
 
   return (
-    <div className={styles.actions}>
+    <div ref={actions} className={styles.actions}>
       <Button
         loading={create.isPending}
         onClick={() => create.mutate({ title: template.name, template: { id: template.id, locale: template.locale } })}

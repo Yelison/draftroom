@@ -6,7 +6,7 @@ test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, heigh
 
 const main = (page: Page) => page.getByRole('main')
 
-/** Reaches a control the way a person does, by tabbing from where the focus is; the focus never starts on the page body. */
+/** Reaches a control the way a person does, by tabbing from where the focus is, never from the page body. */
 async function tabTo(page: Page, target: ReturnType<Page['getByRole']>, key: 'Tab' | 'Shift+Tab' = 'Tab') {
   for (let presses = 0; presses < 40; presses += 1) {
     if (await target.evaluate((element) => element === document.activeElement)) return
@@ -49,4 +49,28 @@ test('puts the focus back on the button that opened the picker when it is closed
   await page.keyboard.press('Escape')
 
   await expect(trigger).toBeFocused()
+})
+
+/** The sum of the layout shifts the page has had since it loaded, which the browser measures. */
+const shifts = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        let total = 0
+        const observer = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            const shift = entry as PerformanceEntry & { value: number; hadRecentInput: boolean }
+            if (!shift.hadRecentInput) total += shift.value
+          }
+        })
+        observer.observe({ type: 'layout-shift', buffered: true })
+        setTimeout(() => resolve(total), 500)
+      }),
+  )
+
+test('does not shift while the page of a template arrives', async ({ page }) => {
+  await page.goto('/templates/meeting-notes')
+  await expect(main(page).getByRole('button', { name: 'Use this template' })).toBeVisible()
+
+  expect(await shifts(page)).toBeLessThan(0.01)
 })
