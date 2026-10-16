@@ -651,6 +651,41 @@ const shifts = (page: Page) =>
       }),
   )
 
+test.describe('the code mark', () => {
+  const plain = 'Run it again today'
+  const heights = (blocks: Locator) =>
+    blocks.evaluateAll((elements) => elements.map((e) => e.getBoundingClientRect().height))
+
+  /** Types a line, with `it` in code when asked. */
+  async function typeLine(page: Page, withCode: boolean) {
+    if (!withCode) return page.keyboard.type(plain)
+    await page.keyboard.type('Run ')
+    await page.keyboard.press('ControlOrMeta+E')
+    await page.keyboard.type('it')
+    await page.keyboard.press('ControlOrMeta+E')
+    await page.keyboard.type(' again today')
+  }
+
+  test('does not make a line taller than the same line without it, in a paragraph or in a title', async ({ page }) => {
+    const text = await open(page)
+    await typeLine(page, false)
+    await page.keyboard.press('Enter')
+    await typeLine(page, true)
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('ControlOrMeta+Alt+2')
+    await typeLine(page, false)
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('ControlOrMeta+Alt+2')
+    await typeLine(page, true)
+
+    await expect(text.locator('code')).toHaveCount(2)
+    const [paragraph, paragraphWithCode] = await heights(text.locator('p'))
+    const [title, titleWithCode] = await heights(text.locator('h2'))
+    expect(paragraphWithCode).toBe(paragraph)
+    expect(titleWithCode).toBe(title)
+  })
+})
+
 test.describe('the layout', () => {
   for (const width of [1440, 1280]) {
     test.describe(`at ${width} px`, () => {
