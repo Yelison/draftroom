@@ -53,14 +53,15 @@ test.describe('the network', () => {
     })
     page.on('websocket', (webSocket) => webSockets.push(webSocket.url()))
 
-    // The screens that ask for the most: the lists, the editor with its own chunk, and the Trash.
+    // The screens that ask for the most: the lists, the editor with its own chunk, and the Trash. The waits are soft so
+    // that a screen that never comes, because its request was refused, still ends in the list of what was refused.
     await page.goto('')
     await page.goto('documents')
-    await expect(page.getByRole('heading', { level: 1, name: 'Documents' })).toBeVisible()
+    await expect.soft(page.getByRole('heading', { level: 1, name: 'Documents' })).toBeVisible()
     await page.goto(`documents/${weeklyEnglish.id}`)
-    await expect(page.getByRole('textbox', { name: 'Document title' })).toBeVisible()
+    await expect.soft(page.getByRole('textbox', { name: 'Document title' })).toBeVisible()
     await page.goto('trash')
-    await expect(page.getByRole('heading', { level: 1, name: 'Trash' })).toBeVisible()
+    await expect.soft(page.getByRole('heading', { level: 1, name: 'Trash' })).toBeVisible()
 
     await test.info().attach('requests.txt', { body: seen.join('\n') })
     expect(seen.length, 'the page asked for nothing, so the check saw nothing').toBeGreaterThan(5)
