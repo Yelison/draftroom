@@ -109,9 +109,12 @@ describe('a shutdown', () => {
     await store.waitForFailures(1)
     store.failing = false
 
+    const started = performance.now()
     await harness.close()
 
     expect(await storedParagraphs(db, documentId)).toEqual(['stored by the shutdown'])
+    // Stored by the first attempt of the shutdown: it did not wait out a back-off, nor the whole of its wait (3 s).
+    expect(performance.now() - started).toBeLessThan(1_500)
   })
 
   it('keeps trying within its wait, and stores the document when the database comes back during the shutdown', async () => {
