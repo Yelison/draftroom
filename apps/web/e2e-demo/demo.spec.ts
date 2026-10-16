@@ -62,8 +62,8 @@ test.describe('a route reloaded', () => {
 })
 
 test('the state starts again on reload: a document that was created is gone', async ({ page }) => {
-  // The explorer, where a document is created, is on the screens of a document; the share route has no editor.
-  await page.goto(`documents/${weeklyEnglish.id}/share`)
+  // The explorer, where a document is created, is on the screens of a document.
+  await page.goto(`documents/${weeklyEnglish.id}`)
   await page.getByRole('complementary', { name: 'Explorer' }).getByRole('button', { name: 'New document' }).click()
   await expect(page.getByRole('textbox', { name: 'Document title' })).toHaveValue('Untitled document')
 
