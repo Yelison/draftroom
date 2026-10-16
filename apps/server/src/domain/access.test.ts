@@ -11,14 +11,16 @@ import {
 } from './access.ts'
 
 describe('the event of a grant to a role the person did not have', () => {
-  const rows: readonly (readonly [DocumentRole | null, DocumentRole, string])[] = [
-    [null, 'viewer', 'access.granted'],
-    [null, 'owner', 'access.granted'],
-    ['viewer', 'editor', 'access.changed'],
-    ['owner', 'viewer', 'access.changed'],
+  // It depends only on the grant they held: none is a first grant, any other is a change of role.
+  const rows: readonly (readonly [DocumentRole | null, string])[] = [
+    [null, 'access.granted'],
+    ['viewer', 'access.changed'],
+    ['commenter', 'access.changed'],
+    ['editor', 'access.changed'],
+    ['owner', 'access.changed'],
   ]
 
-  it.each(rows)('from %s to %s records %s', (previous, _next, expected) => {
+  it.each(rows)('after the grant %s records %s', (previous, expected) => {
     expect(grantActivity(previous)).toBe(expected)
   })
 })

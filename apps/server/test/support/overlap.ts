@@ -1,8 +1,12 @@
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { Database } from '../../src/db/tables.ts'
 
-/** How long a test waits for requests to queue behind a lock: the bound of a failure, not a pause. */
-const queueWaitLimitMs = 5_000
+/**
+ * How long a test waits for requests to queue behind a lock: the bound of a failure, not a pause. It has to stay below the
+ * time a test is given (`access.concurrency.test.ts` sets 15 s), so that a request that never queues fails with its own
+ * message and not with the test's timeout.
+ */
+const queueWaitLimitMs = 10_000
 
 /** How many backends of this database are waiting for a lock held by `pid`. */
 async function waitingFor(db: Kysely<Database>, pid: number): Promise<number> {

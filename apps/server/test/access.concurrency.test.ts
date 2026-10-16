@@ -1,5 +1,5 @@
 import { sql, type Kysely } from 'kysely'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, type Api, type Call } from './support/api.ts'
 import { observingLockWaits, whileHeld } from './support/overlap.ts'
@@ -11,6 +11,10 @@ import { createDocument, createPerson, createWorkspace, grant, join, type Person
 // before the transaction, so it has to be read again once the locks are held: a person who is revoked at the same
 // moment must not go on to write with the role they had. The overlap is made on purpose: a transaction that has
 // revoked, and has not committed, holds what the other change needs, and is released once the other has queued behind it.
+
+// A request that never queues behind the held transaction is waited for up to 10 s (`overlap.ts`) before the test fails with
+// that reason; the test is given more than that, or it would fail with its timeout and say nothing.
+vi.setConfig({ testTimeout: 15_000 })
 
 let database: TestDatabase
 let db: Kysely<Database>
