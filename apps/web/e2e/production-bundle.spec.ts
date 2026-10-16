@@ -43,7 +43,9 @@ const forbiddenMarkers = [
   'The mock does not implement',
   'createMockDataSource',
   'YAMLParseError',
-  'json-schema.org/draft/2020-12/schema',
+  // The vocabulary URLs of the 2020-12 metaschema, which only the schema validator carries. The `$schema` URL itself is
+  // not a marker: zod, which the client runs to read what the collaboration server sends, writes it too.
+  'json-schema.org/draft/2020-12/vocab',
 ]
 
 function filesOf(directory: string): { name: string; content: string }[] {
