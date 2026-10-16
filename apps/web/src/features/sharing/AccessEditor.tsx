@@ -14,17 +14,17 @@ export interface AccessEditorProps {
   access: Schema<'AccessList'>
   members: readonly Schema<'Member'>[]
   meId: string | undefined
+  /** Says something in the live region of the dialog, which is above this editor and outlives it. */
+  announce: (text: string) => void
 }
 
 /**
  * Who has access to the document and how: the people with a role, the people who can still be added, and how the whole
- * workspace can open it. Each change is said in a live region that was in the page before there was anything to say, and
+ * workspace can open it. Each change is said in the live region of the dialog, and
  * each refusal in an alert, in the words of its `code`.
  */
-export function AccessEditor({ document, access, members, meId }: AccessEditorProps) {
+export function AccessEditor({ document, access, members, meId, announce }: AccessEditorProps) {
   const intl = useIntl()
-  // Counted, so that the same change twice in a row is a new message in the live region and is announced again.
-  const [announcement, setAnnouncement] = useState({ count: 0, text: '' })
   const [problem, setProblem] = useState<string | null>(null)
   const ids = { people: useId(), add: useId(), general: useId() }
   const picker = useRef<HTMLSelectElement>(null)
@@ -34,12 +34,12 @@ export function AccessEditor({ document, access, members, meId }: AccessEditorPr
 
   const say = (change: AccessChange) => {
     setProblem(null)
-    setAnnouncement(({ count }) => ({ count: count + 1, text: announce(change) }))
+    announce(textOf(change))
     if (change.kind === 'added') focusAfterRefresh.current = 'picker'
     if (change.kind === 'removed') focusAfterRefresh.current = 'people'
   }
 
-  const announce = (change: AccessChange) => {
+  const textOf = (change: AccessChange) => {
     switch (change.kind) {
       case 'added':
         return intl.formatMessage(
@@ -65,7 +65,7 @@ export function AccessEditor({ document, access, members, meId }: AccessEditorPr
     document,
     onDone: say,
     onFailed: (error) => {
-      setAnnouncement({ count: 0, text: '' })
+      announce('')
       setProblem(intl.formatMessage({ id: sharingProblemId(error) }))
     },
   })
@@ -129,9 +129,6 @@ export function AccessEditor({ document, access, members, meId }: AccessEditorPr
           onChange={(value) => changes.setGeneral(value)}
         />
       </section>
-      <p role="status" className="forma-visually-hidden">
-        {announcement.text !== '' && <span key={announcement.count}>{announcement.text}</span>}
-      </p>
     </div>
   )
 }

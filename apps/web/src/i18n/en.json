@@ -308,5 +308,6 @@
   "sharing.error.description": "Check your connection and try again.",
   "sharing.error.retry": "Try again",
   "sharing.forbidden.title": "Only owners can change who has access",
-  "sharing.forbidden.description": "Ask an owner of this document to share it for you."
+  "sharing.forbidden.description": "Ask an owner of this document to share it for you.",
+  "sharing.announce.ownerLost": "You are no longer an owner of this document."
 }

@@ -15,7 +15,14 @@ import { ShareSkeleton } from './ShareSkeleton.tsx'
  * change the access of a document, so anyone else is told so without a request; and a refusal from the server, which has
  * the last word (the role may have changed since the screen last heard of it), is the same message.
  */
-export function ShareBody({ document }: { document: Schema<'Document'> }) {
+export function ShareBody({
+  document,
+  announce,
+}: {
+  document: Schema<'Document'>
+  /** Says something in the live region of the dialog. */
+  announce: (text: string) => void
+}) {
   const intl = useIntl()
   const dataSource = useDataSource()
   const owner = document.role === 'owner'
@@ -52,5 +59,13 @@ export function ShareBody({ document }: { document: Schema<'Document'> }) {
     )
   }
   if (access.data === undefined || members.data === undefined) return <ShareSkeleton />
-  return <AccessEditor document={document} access={access.data} members={members.data.items} meId={me.data?.id} />
+  return (
+    <AccessEditor
+      document={document}
+      access={access.data}
+      announce={announce}
+      members={members.data.items}
+      meId={me.data?.id}
+    />
+  )
 }

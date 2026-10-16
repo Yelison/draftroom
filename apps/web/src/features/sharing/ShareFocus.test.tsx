@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import type { DataSource } from '../../data/DataSource.ts'
 import { daniel } from '../../data/mock/fixtures/index.ts'
 import { answer, dialog, launchPlan, renderScreen, roleOf } from './testing/openShare.tsx'
 
@@ -103,6 +104,53 @@ describe('the focus around the share dialog', () => {
   })
 })
 
+describe('an owner who loses the ownership with the dialog open', () => {
+  /** A server that, once the change is made, says the person is an editor now and that the list is not theirs to read. */
+  const afterwards = (operation: 'setAccess' | 'removeAccess') => {
+    let changed = false
+    return (dataSource: DataSource): DataSource => ({
+      ...dataSource,
+      getDocument: async (request) => {
+        const document = await dataSource.getDocument(request)
+        return changed ? { ...document, role: 'editor', generalAccess: null } : document
+      },
+      listAccess: async (request) => {
+        if (changed) throw answer(403, 'forbidden')
+        return dataSource.listAccess(request)
+      },
+      setAccess: async (request) => {
+        if (operation === 'setAccess') changed = true
+        return dataSource.setAccess(request)
+      },
+      removeAccess: async (request) => {
+        if (operation === 'removeAccess') changed = true
+        return dataSource.removeAccess(request)
+      },
+    })
+  }
+
+  it('keeps the focus in the dialog, on the Done button, and says so, when they lower their own role', async () => {
+    const { user, share } = await openFromButton({ wrap: afterwards('setAccess') })
+    await within(share).findByRole('combobox', { name: 'Role of Marta Ruiz' })
+
+    await user.selectOptions(within(share).getByRole('combobox', { name: 'Role of Sofía Lindqvist' }), 'editor')
+
+    expect(await within(share).findByText('Only owners can change who has access')).toBeInTheDocument()
+    expect(within(share).getByRole('button', { name: 'Done' })).toHaveFocus()
+    expect(within(share).getByRole('status')).toHaveTextContent('You are no longer an owner of this document.')
+  })
+
+  it('keeps the focus in the dialog, on the Done button, and says so, when they remove their own role', async () => {
+    const { user, share } = await openFromButton({ wrap: afterwards('removeAccess') })
+
+    await user.click(await within(share).findByRole('button', { name: 'Remove Sofía Lindqvist' }))
+
+    expect(await within(share).findByText('Only owners can change who has access')).toBeInTheDocument()
+    expect(within(share).getByRole('button', { name: 'Done' })).toHaveFocus()
+    expect(within(share).getByRole('status')).toHaveTextContent('You are no longer an owner of this document.')
+  })
+})
+
 describe('the history around the share dialog', () => {
   it('does not open the dialog again when the person goes Back after closing it', async () => {
     const { share, user, router } = await openFromButton()
@@ -113,6 +161,19 @@ describe('the history around the share dialog', () => {
 
     expect(router.state.location.pathname).toBe(editorPath)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('leaves the page the person came from when they go Back after closing, not the editor again', async () => {
+    const { user, router } = renderScreen('/documents')
+    await act(() => router.navigate(editorPath))
+    await user.click(await shareButton())
+    const share = await dialog()
+    await user.click(within(share).getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    await act(() => router.navigate(-1))
+
+    expect(router.state.location.pathname).toBe('/documents')
   })
 
   it('puts the editor in the place of a dialog that was opened from its address, so Back leaves it behind', async () => {

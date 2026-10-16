@@ -1,6 +1,13 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { createMemoryRouter } from 'react-router'
+import { RouterProvider } from 'react-router/dom'
+import { AppProviders } from '../../app/AppProviders.tsx'
+import { DataSourceContext } from '../../data/DataSourceContext.ts'
+import { createMockServer } from '../../data/mock/createMockDataSource.ts'
+import { marta } from '../../data/mock/fixtures/index.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
+import { ShareDialog } from './ShareDialog.tsx'
 import { answer, dialog, interviews, launchPlan, openShare, pathOf, renderScreen } from './testing/openShare.tsx'
 
 describe('the share dialog', () => {
@@ -129,5 +136,23 @@ describe('the close of the share dialog', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe(`/documents/${launchPlan.id}`))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})
+
+describe('the title of the share dialog', () => {
+  it('does not name an empty document while the document is on its way', async () => {
+    const router = createMemoryRouter([{ path: '/documents/:documentId/share', element: <ShareDialog /> }], {
+      initialEntries: [pathOf(launchPlan.id)],
+    })
+    const dataSource = createMockServer().connect({ signedInAs: marta.email })
+    render(
+      <DataSourceContext value={{ ...dataSource, getDocument: () => new Promise(() => undefined) }}>
+        <AppProviders>
+          <RouterProvider router={router} />
+        </AppProviders>
+      </DataSourceContext>,
+    )
+
+    expect(await screen.findByRole('dialog', { name: 'Share' })).toBeInTheDocument()
   })
 })
