@@ -3,6 +3,7 @@ import { PageTitle } from '../components/PageTitle/PageTitle.tsx'
 import { DocumentsScreen } from '../features/documents/DocumentsScreen.tsx'
 import { FolderScreen } from '../features/documents/FolderScreen.tsx'
 import { EditorSkeleton } from '../features/editor/EditorSkeleton.tsx'
+import { TrashScreen } from '../features/trash/TrashScreen.tsx'
 import type { MessageId } from '../i18n/messages.ts'
 import { AppFrame } from './AppFrame.tsx'
 import { EditorLayout } from './layouts/EditorLayout.tsx'
@@ -47,7 +48,7 @@ export const routes: RouteObject[] = [
               { path: 'appearance', ...screen('nav.settings', 'settings') },
             ],
           },
-          { path: 'trash', ...screen('screen.trash', 'documents') },
+          { path: 'trash', Component: TrashScreen, handle: { section: 'documents' } satisfies RouteHandle },
           { path: 'search', ...screen('screen.search', 'documents') },
           { path: '*', ...screen('screen.notFound') },
         ],

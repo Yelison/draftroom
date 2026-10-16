@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { Button } from '@yelison/forma-ui'
+import { Button, buttonClassName } from '@yelison/forma-ui'
 import { useDeferredValue, useEffect, useState } from 'react'
 import { useIntl } from 'react-intl'
-import { useLocation, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { PageTitle } from '../../components/PageTitle/PageTitle.tsx'
 import { focusMainContent } from '../../app/mainContent.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
@@ -73,6 +73,9 @@ function Documents({ workspaceId }: { workspaceId: string }) {
   return (
     <>
       <ListToolbar search={search} onSearch={setSearch}>
+        <Link to="/trash" className={buttonClassName({ variant: 'ghost' })}>
+          {intl.formatMessage({ id: 'screen.trash' })}
+        </Link>
         <Button variant="secondary" onClick={() => actions.open({ kind: 'create-folder', workspaceId })}>
           {intl.formatMessage({ id: 'documents.newFolder' })}
         </Button>
