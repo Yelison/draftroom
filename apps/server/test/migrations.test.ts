@@ -53,6 +53,7 @@ describe('the migrations, on a database that starts empty', () => {
       '0002_activity_events',
       '0003_comments',
       '0004_versions',
+      '0005_activity_events_workspace_idx',
     ])
     expect(await tablesOf()).toEqual(tablesOfTheMigrations)
     expect(await migrationStatus(database.db)).toEqual({ current: true })

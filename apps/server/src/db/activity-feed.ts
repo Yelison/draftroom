@@ -53,10 +53,11 @@ const createdAtKey = sql<string>`to_char(e.created_at at time zone 'UTC', 'YYYY-
 const instant = (timestamp: string) => sql<Date>`${timestamp}::timestamptz`
 
 /**
- * A page of the history of the documents the person can read, newest first, ties by id. One row more than `limit` says
- * there is a next page. The events that reveal how a document is shared are only for the owners of that document.
+ * The query of a page of the history of the documents the person can read, newest first, ties by id, with one row more
+ * than `limit`: that row says there is a next page. The events that reveal how a document is shared are only for the
+ * owners of that document. Apart from `listActivity` so that a test can ask the database for its plan.
  */
-export async function listActivity(db: Kysely<Database>, search: ActivitySearch): Promise<ActivityPage> {
+export function activityPageQuery(db: Kysely<Database>, search: ActivitySearch) {
   let query = memberDocuments(db, search.userId)
     .innerJoin('activity_events as e', (join) =>
       join.onRef('e.workspace_id', '=', 'd.workspace_id').onRef('e.document_id', '=', 'd.id'),
@@ -89,11 +90,15 @@ export async function listActivity(db: Kysely<Database>, search: ActivitySearch)
     query = query.where(sql<boolean>`(e.created_at, e.id) < (${timestamp}::timestamptz, ${id}::uuid)`)
   }
 
-  const rows = await query
+  return query
     .orderBy('e.created_at', 'desc')
     .orderBy('e.id', 'desc')
     .limit(search.limit + 1)
-    .execute()
+}
+
+/** A page of the history of the documents the person can read. */
+export async function listActivity(db: Kysely<Database>, search: ActivitySearch): Promise<ActivityPage> {
+  const rows = await activityPageQuery(db, search).execute()
   const records = rows.slice(0, search.limit).map((row): ActivityRecord => ({
     id: row.id,
     type: row.type,
