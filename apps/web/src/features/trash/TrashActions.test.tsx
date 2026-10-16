@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { DataSource } from '../../data/DataSource.ts'
 import { keysAfterMutation } from '../../data/queryKeys.ts'
 import { workspaceFixtures } from '../documents/testing/renderScreen.tsx'
-import { answer, archived, main, onePerPage, openTrash, renderScreen, rowButton, spoken } from './testing/openTrash.tsx'
+import { answer, archived, fixtures, main, openTrash, renderScreen, rowButton, spoken } from './testing/openTrash.tsx'
 
 const workspaceId = workspaceFixtures.harborPine.id
 const { first, second } = archived
@@ -126,30 +126,42 @@ describe('restoring a document', () => {
   })
 })
 
-describe('restoring a document while the next page is on its way', () => {
-  it('leaves the focus on the first row of the page when it arrives, not on the one after it', async () => {
-    // The page that was asked for is held, so the restore answers before it.
+describe('restoring a document while "Load more" is on its way', () => {
+  /** Three archived documents in pages of two, with the second page held until the test lets it go. */
+  function threeInPagesOfTwo() {
     let release = () => {}
-    const pageInFlight = new Promise<void>((resolve) => (release = resolve))
-    const slowSecondPage = (dataSource: DataSource): DataSource => {
-      const paged = onePerPage(dataSource)
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const wrap = (dataSource: DataSource): DataSource => {
+      const archivedThird = dataSource.archiveDocument({ params: { path: { documentId: fixtures.launchPlan.id } } })
       return {
-        ...paged,
+        ...dataSource,
         listDocuments: async (request) => {
-          if (request?.params.query?.cursor !== undefined) await pageInFlight
-          return paged.listDocuments(request)
+          await archivedThird
+          if (request?.params.query?.cursor !== undefined) await held
+          return dataSource.listDocuments({
+            params: {
+              path: { workspaceId: request?.params.path.workspaceId ?? '' },
+              query: { ...request?.params.query, limit: 2 },
+            },
+          })
         },
       }
     }
-    const { user } = renderScreen('/trash', { wrap: slowSecondPage })
-    await within(main()).findByText(first.title)
-    await user.click(within(main()).getByRole('button', { name: 'Load more' }))
+    return { wrap, release: () => act(async () => release()) }
+  }
 
-    await user.click(rowButton('Restore', first.title))
-    await waitFor(() => expect(within(main()).queryByText(first.title)).not.toBeInTheDocument())
-    await act(async () => release())
+  // Restoring marks the lists stale, which cancels the page that was on its way and reads the loaded ones again. The page
+  // never arrives, so the focus is the one of any row that leaves: the row that takes its place, not the one after it.
+  it('cancels the page and keeps the focus on the row that took its place', async () => {
+    const { wrap, release } = threeInPagesOfTwo()
+    const { user } = renderScreen('/trash', { wrap })
+    await user.click(await within(main()).findByRole('button', { name: 'Load more' }))
 
-    await waitFor(() => expect(rowButton('Restore', second.title)).toHaveFocus())
+    await user.click(rowButton('Restore', fixtures.launchPlan.title))
+    await waitFor(() => expect(within(main()).queryByText(fixtures.launchPlan.title)).not.toBeInTheDocument())
+    await release()
+
+    expect(rowButton('Restore', first.title)).toHaveFocus()
   })
 })
 

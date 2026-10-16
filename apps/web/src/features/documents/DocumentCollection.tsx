@@ -42,7 +42,7 @@ export function DocumentCollection({ workspaceId, folderId, term, empty, onActio
   const ids = useMemo(() => documents.map((document) => document.id), [documents])
   const list = useRef<HTMLUListElement>(null)
 
-  const loadingMore = useFocusFirstArrival(list, ids, 'a')
+  const loadingMore = useFocusFirstArrival(list, ids, 'a', [workspaceId, folderId, term].join('/'))
 
   if (query.isPending) return <DocumentsSkeleton />
   if (query.isError) return <QueryFailure onRetry={() => void query.refetch()} retrying={query.isFetching} />

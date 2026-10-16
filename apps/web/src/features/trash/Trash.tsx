@@ -28,7 +28,7 @@ export function Trash({ workspaceId }: { workspaceId: string }) {
   const documents = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data])
   const ids = useMemo(() => documents.map((document) => document.id), [documents])
   const list = useRef<HTMLUListElement>(null)
-  const focus = useTrashFocus(list, ids)
+  const focus = useTrashFocus(list, ids, workspaceId)
   const [deleting, setDeleting] = useState<Schema<'Document'> | null>(null)
   const [announcement, setAnnouncement] = useState('')
   const [problem, setProblem] = useState<string | null>(null)

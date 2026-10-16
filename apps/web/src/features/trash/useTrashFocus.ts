@@ -11,7 +11,7 @@ const rowAction = 'button'
  *
  * `ids` must keep its identity until the list changes, or the effect would run on every render.
  */
-export function useTrashFocus(list: RefObject<HTMLUListElement | null>, ids: readonly string[]) {
+export function useTrashFocus(list: RefObject<HTMLUListElement | null>, ids: readonly string[], workspaceId: string) {
   const leaving = useRef<{ id: string; index: number } | null>(null)
 
   // Runs once the list has changed, which is when the row is gone: the server's answer comes first and the list after it.
@@ -25,7 +25,7 @@ export function useTrashFocus(list: RefObject<HTMLUListElement | null>, ids: rea
   }, [ids, list])
 
   // Declared after the effect above: a row that leaves is given the focus before a page that arrives, as when they were one.
-  const loadingMore = useFocusFirstArrival(list, ids, rowAction)
+  const loadingMore = useFocusFirstArrival(list, ids, rowAction, workspaceId)
 
   return {
     /** The row of this document is about to leave the list. */

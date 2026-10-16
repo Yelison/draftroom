@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest'
 import { useFocusFirstArrival } from './useFocusFirstArrival.ts'
 
 /** A list with a link and a button on each row, and the "Load more" that sits after it. */
-function List({ ids, selector }: { ids: readonly string[]; selector: string }) {
+function List({ ids, selector, query = 'all' }: { ids: readonly string[]; selector: string; query?: string }) {
   const list = useRef<HTMLUListElement>(null)
-  const loadingMore = useFocusFirstArrival(list, ids, selector)
+  const loadingMore = useFocusFirstArrival(list, ids, selector, query)
 
   return (
     <>
@@ -76,6 +76,27 @@ describe('the focus when a page of a list arrives', () => {
     rerender(<List ids={['a', 'b', 'c']} selector="a" />)
     rerender(<List ids={['a', 'b', 'c', 'd']} selector="a" />)
 
+    expect(loadMoreButton()).toHaveFocus()
+  })
+
+  it('does not take the focus from the person who went on to something else while the page was on its way', async () => {
+    const { rerender } = render(<List ids={['a', 'b', 'c']} selector="a" />)
+    await loadMore()
+    screen.getByRole('button', { name: 'Act on a' }).focus()
+
+    rerender(<List ids={['a', 'b', 'c', 'd']} selector="a" />)
+
+    expect(screen.getByRole('button', { name: 'Act on a' })).toHaveFocus()
+  })
+
+  it('gives up when the query changes, and the rows of another query do not take the focus', async () => {
+    const { rerender } = render(<List ids={['a', 'b', 'c']} selector="a" query="all" />)
+    await loadMore()
+
+    rerender(<List ids={['x', 'y']} selector="a" query="weekly" />)
+
+    expect(loadMoreButton()).toHaveFocus()
+    rerender(<List ids={['x', 'y', 'z']} selector="a" query="weekly" />)
     expect(loadMoreButton()).toHaveFocus()
   })
 
