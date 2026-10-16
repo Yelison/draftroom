@@ -27,7 +27,7 @@ describe('a document written offline', () => {
     act(() => first.editor.commands.insertContent('Written offline'))
 
     await waitFor(() => expect(screen.getByText('Sync status: Offline with local copy')).toBeInTheDocument())
-    expect(screen.getByText("You're working offline")).toBeInTheDocument()
+    expect(screen.getByText(/stays on this device until the connection is back/)).toBeInTheDocument()
     expect(screen.queryByText(/saved/i)).not.toBeInTheDocument()
 
     // Opened again, as after a reload: a new page, a server that has never heard of the text, and still no network.
@@ -46,6 +46,6 @@ describe('a document written offline', () => {
     expect(again.server.collaboration.document(wireName).getXmlFragment('default').toString()).toContain(
       'Written offline',
     )
-    expect(screen.queryByText("You're working offline")).not.toBeInTheDocument()
+    expect(screen.queryByText(/stays on this device/)).not.toBeInTheDocument()
   })
 })

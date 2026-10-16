@@ -57,7 +57,7 @@ test.describe('in English', () => {
     await page.keyboard.type('Written on the train')
 
     await expect(syncRegion(page)).toHaveText('Sync status: Offline with local copy')
-    await expect(page.getByText("You're working offline")).toBeVisible()
+    await expect(page.getByText(/stays on this device until the connection is back/)).toBeVisible()
     await expect(syncRegion(page)).not.toHaveText(/synced|saved/i)
 
     await page.reload()
@@ -70,8 +70,56 @@ test.describe('in English', () => {
     await setOffline(false)
 
     await expect(syncRegion(page)).toHaveText('Sync status: Synced', { timeout: 15_000 })
-    await expect(page.getByText("You're working offline")).toBeHidden()
+    await expect(page.getByText(/stays on this device/)).toBeHidden()
     // Once, not twice: the copy and the server met in one document.
     expect(((await text.innerText()).match(/Written on the train/g) ?? []).length).toBe(1)
   })
 })
+
+const titleField = (page: Page) => page.getByRole('textbox', { name: /Document title|Título del documento/ })
+
+/** Where the sheet's two text areas are: the title and the text. */
+async function positionsOf(page: Page) {
+  return { title: await titleField(page).boundingBox(), text: await textArea(page).boundingBox() }
+}
+
+for (const { locale, colorScheme, notice } of [
+  { locale: 'en-US', colorScheme: 'light', notice: /stays on this device until the connection is back/ },
+  { locale: 'es-ES', colorScheme: 'dark', notice: /se queda en este dispositivo hasta que vuelva la conexión/ },
+] as const) {
+  for (const width of [1280, 1440]) {
+    test.describe(`the notice about working offline, in ${locale} at ${width} px`, () => {
+      test.use({ locale, colorScheme, viewport: { width, height: 900 } })
+
+      test('is laid over the top of the sheet, on one line above the title, and moves nothing when the network goes or comes back', async ({
+        page,
+        context,
+      }) => {
+        await page.goto(documentPath)
+        await textArea(page).click()
+        await expect(syncRegion(page)).toHaveText(/Synced|Sincronizado/)
+        const before = await positionsOf(page)
+
+        await context.setOffline(true)
+        const shown = page.getByText(notice)
+        await expect(shown).toBeVisible()
+        await page.keyboard.type('Written offline')
+
+        // Nothing under it moved, it does not cover the title, and it fits the sheet on one line.
+        expect(await positionsOf(page)).toEqual(before)
+        const box = await shown.boundingBox()
+        expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(before.title?.y ?? 0)
+        expect(box?.height).toBeLessThanOrEqual(34)
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        )
+        expect(overflow).toBeLessThanOrEqual(0)
+
+        await context.setOffline(false)
+        await expect(shown).toBeHidden()
+        await expect(syncRegion(page)).toHaveText(/Synced|Sincronizado/, { timeout: 15_000 })
+        expect(await positionsOf(page)).toEqual(before)
+      })
+    })
+  }
+}

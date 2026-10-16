@@ -62,6 +62,27 @@ async function documentsWithUnstoredChanges(who: Identity = editor): Promise<num
   return flags.filter(Boolean).length
 }
 
+describe('whether the device keeps the document', () => {
+  it('is said by the session: a copy is kept, or what is written offline is only in the tab', async () => {
+    world = createWorld()
+    const withCopy = await opened()
+    const withoutCopy = world.open(editor)
+    await advance(100)
+
+    expect(withCopy.session.getSnapshot().keepsCopy).toBe(true)
+    expect(withoutCopy.session.getSnapshot().keepsCopy).toBe(false)
+  })
+
+  it('is false where the browser keeps nothing for the page, though a copy was asked for', async () => {
+    world = createWorld()
+    vi.stubGlobal('indexedDB', undefined)
+
+    const opening = await opened()
+
+    expect(opening.session.getSnapshot().keepsCopy).toBe(false)
+  })
+})
+
 describe('the marker of changes that were never stored', () => {
   it('is set while what the person wrote is not stored and cleared when a stored event that covers it arrives', async () => {
     world = createWorld()

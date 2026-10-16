@@ -34,6 +34,8 @@ export interface CollabSnapshot {
   readonly editable: boolean
   /** True once the document has been opened in this session, so a retry does not take the editor away. */
   readonly loaded: boolean
+  /** Whether this device keeps a copy of the document: what is written offline is on the device, and not only in the tab. */
+  readonly keepsCopy: boolean
   readonly peers: readonly Peer[]
   readonly notice: SessionNotice | null
   /** Changes when the document and the provider are made again, which is when an editor bound to them must be too. */
@@ -98,6 +100,7 @@ const sameSnapshot = (a: CollabSnapshot, b: CollabSnapshot): boolean =>
   a.action === b.action &&
   a.editable === b.editable &&
   a.loaded === b.loaded &&
+  a.keepsCopy === b.keepsCopy &&
   a.notice === b.notice &&
   a.generation === b.generation &&
   a.peers.length === b.peers.length &&
@@ -512,6 +515,7 @@ class ProviderSession implements CollabSession {
       action: cause === null ? null : errorAction(cause),
       editable: isEditable(this.model) && !this.overBudget,
       loaded: this.loaded,
+      keepsCopy: link.copy !== null,
       peers: this.peers,
       notice: this.notice,
       generation: this.generation,

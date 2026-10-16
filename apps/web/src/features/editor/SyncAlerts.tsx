@@ -4,7 +4,7 @@ import type { CollabSnapshot } from '../../collab/session.ts'
 import styles from './SyncAlerts.module.css'
 
 export interface SyncAlertsProps {
-  snapshot: Pick<CollabSnapshot, 'state' | 'editable' | 'cause' | 'action' | 'notice'>
+  snapshot: Pick<CollabSnapshot, 'cause' | 'action' | 'notice'>
   onRetry: () => void
   onDiscard: () => void
   onDismissNotice: () => void
@@ -12,25 +12,17 @@ export interface SyncAlertsProps {
 
 /**
  * What the person needs to know and may do about their changes: why the connection stopped or could not confirm them, and
- * the one thing they can do (try again, or discard what was not stored and reload); that what they wrote offline was not
- * kept; and that what they write while offline is only on this device. They are above the text, where they are seen. They
- * are not live regions of their own: a region that arrives with its text may go unheard, so the editor says the same in
- * one that was already in the page, and the sync status announces going offline.
+ * the one thing they can do (try again, or discard what was not stored and reload), and the notice that what they wrote
+ * offline was not kept. They are above the text, where they are seen. They are not live regions of their own: a region
+ * that arrives with its text may go unheard, so the editor says the same in one that was already in the page.
  */
 export function SyncAlerts({ snapshot, onRetry, onDiscard, onDismissNotice }: SyncAlertsProps) {
   const intl = useIntl()
-  const { state, editable, cause, action, notice } = snapshot
-  // A reader who is offline has nothing of their own on the device to be told about.
-  const keptOnDevice = state === 'offline-local' && editable
-  if (cause === null && notice === null && !keptOnDevice) return null
+  const { cause, action, notice } = snapshot
+  if (cause === null && notice === null) return null
 
   return (
     <div className={styles.alerts}>
-      {keptOnDevice && (
-        <Alert tone="amber" title={intl.formatMessage({ id: 'sync.notice.offlineLocal.title' })}>
-          <p className={styles.description}>{intl.formatMessage({ id: 'sync.notice.offlineLocal.description' })}</p>
-        </Alert>
-      )}
       {cause !== null && (
         <Alert
           tone={cause === 'store-timeout' ? 'amber' : 'red'}

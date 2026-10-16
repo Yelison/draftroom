@@ -14,6 +14,7 @@ import type { CollaboratingPerson } from './CollaborationExtensions.ts'
 import { EditorSkeleton } from './EditorSkeleton.tsx'
 import { EditorStatePanel } from './EditorStatePanel.tsx'
 import { LinkDialog, type LinkRequest } from './LinkDialog.tsx'
+import { OfflineNotice } from './OfflineNotice.tsx'
 import { SyncAlerts } from './SyncAlerts.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { TitleField } from './TitleField.tsx'
@@ -282,6 +283,7 @@ function EditorWorkspace({
       </div>
       <SyncAlerts snapshot={snapshot} onRetry={retry} onDiscard={discard} onDismissNotice={dismissNotice} />
       <div className={styles.sheet}>
+        <OfflineNotice snapshot={snapshot} />
         <TitleField document={document} editable={mayEdit} onEnter={() => editor.commands.focus('start')} />
         <EditorContent editor={editor} />
       </div>
