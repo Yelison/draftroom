@@ -85,6 +85,19 @@ describe('changing a role in the share dialog', () => {
   })
 })
 
+describe('a change that is on its way in the share dialog', () => {
+  it('leaves the controls alone until the server answers, so two answers never cross', async () => {
+    const setAccess = vi.fn(() => new Promise<never>(() => undefined))
+    const { user, share } = await openShare({ wrap: (dataSource) => ({ ...dataSource, setAccess }) })
+
+    await user.selectOptions(roleOf(share, 'Sofía Lindqvist'), 'editor')
+    await user.selectOptions(roleOf(share, 'Daniel Okafor'), 'viewer')
+
+    expect(setAccess).toHaveBeenCalledTimes(1)
+    expect(roleOf(share, 'Daniel Okafor')).toHaveAttribute('aria-disabled', 'true')
+  })
+})
+
 describe('adding someone in the share dialog', () => {
   it('gives the chosen person the chosen role, announces it, makes stale what the table names and lists them', async () => {
     const setAccess = vi.fn()
