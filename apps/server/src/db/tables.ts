@@ -101,6 +101,32 @@ export interface ActivityEventsTable {
   created_at: Generated<Date>
 }
 
+export interface ThreadsTable {
+  id: Generated<string>
+  workspace_id: string
+  document_id: string
+  /** The two ends of the range, as the client encoded them. The server never decodes them (protocol §10). */
+  anchor_start: string
+  anchor_end: string
+  /** The text the range covered when the thread was started, kept so a thread whose text is gone still says what it was about. */
+  quote: string
+  created_by: string
+  created_at: Generated<Date>
+  /** Set together with `resolved_by`; a thread is resolved when they are. */
+  resolved_at: Date | null
+  resolved_by: string | null
+}
+
+export interface CommentsTable {
+  id: Generated<string>
+  workspace_id: string
+  thread_id: string
+  author_id: string
+  body: string
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
 export interface Database {
   users: UsersTable
   sessions: SessionsTable
@@ -112,4 +138,6 @@ export interface Database {
   document_states: DocumentStatesTable
   pins: PinsTable
   activity_events: ActivityEventsTable
+  threads: ThreadsTable
+  comments: CommentsTable
 }
