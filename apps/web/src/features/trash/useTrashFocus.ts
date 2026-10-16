@@ -2,7 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { focusMainContent } from '../../app/mainContent.ts'
 import { focusRow, useFocusFirstArrival } from '../documents/useFocusFirstArrival.ts'
 
-const firstButton = 'button'
+const rowAction = 'button'
 
 /**
  * Where the focus goes when the list changes under it. A row that leaves takes the focus with it, so the first button of
@@ -19,13 +19,13 @@ export function useTrashFocus(list: RefObject<HTMLUListElement | null>, ids: rea
     if (leaving.current !== null && !ids.includes(leaving.current.id)) {
       const row = Math.min(leaving.current.index, ids.length - 1)
       if (row < 0) focusMainContent()
-      else focusRow(list.current, row, firstButton)
+      else focusRow(list.current, row, rowAction)
     }
     leaving.current = null
   }, [ids, list])
 
   // Declared after the effect above: a row that leaves is given the focus before a page that arrives, as when they were one.
-  const loadingMore = useFocusFirstArrival(list, ids.length, firstButton)
+  const loadingMore = useFocusFirstArrival(list, ids.length, rowAction)
 
   return {
     /** The row of this document is about to leave the list. */

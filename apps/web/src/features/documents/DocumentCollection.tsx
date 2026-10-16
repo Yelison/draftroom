@@ -5,7 +5,7 @@ import { useRef, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { DocumentCard } from './DocumentCard.tsx'
-import { ListSkeleton } from './ListSkeleton.tsx'
+import { DocumentsSkeleton } from './ListSkeleton.tsx'
 import { QueryFailure } from './QueryFailure.tsx'
 import { StateMessage } from './StateMessage.tsx'
 import { documentListQuery } from './queries.ts'
@@ -43,7 +43,7 @@ export function DocumentCollection({ workspaceId, folderId, term, empty, onActio
 
   const loadingMore = useFocusFirstArrival(list, documents.length, 'a')
 
-  if (query.isPending) return <ListSkeleton />
+  if (query.isPending) return <DocumentsSkeleton />
   if (query.isError) return <QueryFailure onRetry={() => void query.refetch()} retrying={query.isFetching} />
 
   if (documents.length === 0) {

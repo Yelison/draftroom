@@ -13,7 +13,7 @@ import { useCreateDocument } from './actions/useCreateDocument.ts'
 import { archivedTitleFrom } from './archivedNotice.ts'
 import { DocumentCollection } from './DocumentCollection.tsx'
 import { FolderCard } from './FolderCard.tsx'
-import { ListSkeleton } from './ListSkeleton.tsx'
+import { DocumentsSkeleton } from './ListSkeleton.tsx'
 import { ListToolbar } from './ListToolbar.tsx'
 import { QueryFailure } from './QueryFailure.tsx'
 import { StateMessage } from './StateMessage.tsx'
@@ -31,7 +31,7 @@ export function DocumentsScreen() {
   return (
     <div className={layout.screen}>
       <PageTitle titleId="nav.documents" />
-      <WorkspaceGate loading={<ListSkeleton />}>
+      <WorkspaceGate loading={<DocumentsSkeleton />}>
         {(workspaceId) => <Documents workspaceId={workspaceId} />}
       </WorkspaceGate>
     </div>
@@ -89,7 +89,7 @@ function Documents({ workspaceId }: { workspaceId: string }) {
         </p>
       )}
       {/* Folders first, then documents: the page is not shown until the folders are in, or the documents would move down when they arrive. */}
-      {folders.isPending && <ListSkeleton />}
+      {folders.isPending && <DocumentsSkeleton />}
       {showFolders && !folders.isPending && (
         <section aria-labelledby="documents-folders">
           <h2 id="documents-folders" className={styles.group}>

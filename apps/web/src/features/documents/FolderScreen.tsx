@@ -9,7 +9,7 @@ import { DocumentActionDialogs } from './actions/DocumentActionDialogs.tsx'
 import { useActionDialogs } from './actions/useActionDialogs.ts'
 import { useCreateDocument } from './actions/useCreateDocument.ts'
 import { DocumentCollection } from './DocumentCollection.tsx'
-import { ListSkeleton } from './ListSkeleton.tsx'
+import { DocumentsSkeleton } from './ListSkeleton.tsx'
 import { ListToolbar } from './ListToolbar.tsx'
 import { NoWorkspace } from './NoWorkspace.tsx'
 import { QueryFailure } from './QueryFailure.tsx'
@@ -66,7 +66,7 @@ export function FolderScreen() {
       </StateMessage>
     )
   } else if (folder === undefined || workspaceId === undefined) {
-    body = <ListSkeleton />
+    body = <DocumentsSkeleton />
   } else {
     body = <FolderDocuments workspaceId={workspaceId} folderId={folder.id} />
   }
