@@ -1,11 +1,11 @@
 import { useIntl } from 'react-intl'
 import { useSearchParams } from 'react-router'
+import { PageTitle } from '../../components/PageTitle/PageTitle.tsx'
 import layout from '../documents/ListLayout.module.css'
 import { StateMessage } from '../documents/StateMessage.tsx'
 import { searchTerm } from '../documents/searchTerm.ts'
 import { SearchForm } from './SearchForm.tsx'
 import { SearchResults } from './SearchResults.tsx'
-import styles from './SearchScreen.module.css'
 
 /**
  * The screen of `/search?q=`: the documents that match what the URL searches for, a page at a time. The URL is the
@@ -25,10 +25,7 @@ export function SearchScreen() {
 
   return (
     <div className={layout.screen}>
-      <title>{intl.formatMessage({ id: 'app.documentTitle' }, { page: heading })}</title>
-      <h1 tabIndex={-1} className={styles.heading}>
-        {heading}
-      </h1>
+      <PageTitle title={heading} />
       <SearchForm term={term} />
       {term === undefined ? (
         <StateMessage

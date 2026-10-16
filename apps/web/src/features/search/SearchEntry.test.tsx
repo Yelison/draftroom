@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { fixtures, renderScreen } from '../documents/testing/renderScreen.tsx'
 
@@ -58,6 +58,20 @@ describe.each([
     await user.type(await field(), 'weekly')
 
     expect(router.state.location.pathname).toBe(path)
+  })
+})
+
+describe('Enter twice on the same search', () => {
+  it('leaves one place in the history, so Back goes to the screen before the results', async () => {
+    const { user, router } = renderScreen('/documents')
+    await user.type(await documentsSearch(), 'weekly{Enter}')
+    await screen.findByRole('heading', { level: 1, name: 'Results for “weekly”' })
+
+    await user.type(within(screen.getByRole('main')).getByRole('searchbox'), '{Enter}')
+    await act(() => router.navigate(-1))
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Documents' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/documents')
   })
 })
 

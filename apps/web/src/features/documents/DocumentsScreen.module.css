@@ -8,8 +8,3 @@
   color: var(--color-red-ink);
   font: var(--font-body);
 }
-
-.heading {
-  margin: 0;
-  font: var(--font-title);
-}

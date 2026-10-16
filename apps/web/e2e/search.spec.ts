@@ -55,3 +55,14 @@ test('walks back and forward through the searches', async ({ page }) => {
   await page.goForward()
   await expect(field).toHaveValue('launch')
 })
+
+test('breaks a long search instead of widening the page', async ({ page }) => {
+  await page.goto(`/search?q=${'x'.repeat(200)}`)
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('xxxx')
+  await expect(page.getByText(/^No results for/)).toBeVisible()
+
+  const overflows = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  )
+  expect(overflows).toBe(false)
+})

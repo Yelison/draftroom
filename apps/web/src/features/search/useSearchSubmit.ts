@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react'
-import { createSearchParams, useNavigate } from 'react-router'
+import { createSearchParams, useLocation, useNavigate } from 'react-router'
 import { searchTerm } from '../documents/searchTerm.ts'
 
 /**
@@ -8,11 +8,15 @@ import { searchTerm } from '../documents/searchTerm.ts'
  */
 export function useSearchSubmit(text: string) {
   const navigate = useNavigate()
+  const location = useLocation()
 
   return (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
     const term = searchTerm(text)
     if (term === undefined) return
-    void navigate({ pathname: '/search', search: createSearchParams({ q: term }).toString() })
+    const search = `?${createSearchParams({ q: term })}`
+    // The same search again is not a new place: Back must leave the results, not land on them once more.
+    const here = location.pathname === '/search' && location.search === search
+    void navigate({ pathname: '/search', search }, { replace: here })
   }
 }

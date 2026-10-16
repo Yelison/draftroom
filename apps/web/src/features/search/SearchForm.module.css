@@ -1,8 +1,3 @@
-.heading {
-  margin: 0;
-  font: var(--font-title);
-}
-
 /* The measures of the search come from `.screen` of the list layout, which is where this sits. */
 .search {
   max-width: var(--list-search-width);

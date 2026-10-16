@@ -1,7 +1,7 @@
 import { SearchField } from '@yelison/forma-ui'
 import { useState } from 'react'
 import { useIntl } from 'react-intl'
-import styles from './SearchScreen.module.css'
+import styles from './SearchForm.module.css'
 import { useSearchSubmit } from './useSearchSubmit.ts'
 
 export interface SearchFormProps {
