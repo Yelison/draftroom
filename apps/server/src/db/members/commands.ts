@@ -86,6 +86,21 @@ export async function updateMemberRole(
     .execute()
 }
 
+/**
+ * Of the documents a person holds an owner grant on, the ones where nobody else who can act does. The documents are locked
+ * first, so a change that would take the other owner away waits and is seen when they are counted.
+ */
+async function soleOwnedBy(
+  trx: Transaction<Database>,
+  userId: string,
+  documentIds: readonly string[],
+): Promise<string[]> {
+  if (documentIds.length === 0) return []
+  await trx.selectFrom('documents').select('id').where('id', 'in', documentIds).orderBy('id').forNoKeyUpdate().execute()
+  const owners = await explicitOwners(trx, documentIds)
+  return documentIds.filter((documentId) => leavesNoOwner(owners.get(documentId) ?? [], userId))
+}
+
 export interface Removal {
   readonly workspaceId: string
   readonly actorId: string
@@ -114,11 +129,7 @@ export async function removeMember(trx: Transaction<Database>, removal: Removal)
     .orderBy('document_id')
     .execute()
   const documentIds = held.map(({ document_id }) => document_id)
-  // Locked before the owners are counted, so a change that would take the other owner away waits and is seen.
-  await trx.selectFrom('documents').select('id').where('id', 'in', documentIds).orderBy('id').forNoKeyUpdate().execute()
-
-  const otherOwners = await explicitOwners(trx, documentIds)
-  const alone = documentIds.filter((documentId) => leavesNoOwner(otherOwners.get(documentId) ?? [], removedId))
+  const alone = await soleOwnedBy(trx, removedId, documentIds)
   if (alone.length > 0) {
     const recipient = transferRecipient({ actorId, removedId }, owners)
     // Refused before this point: a workspace never loses its last owner who can act, and the actor is one.
