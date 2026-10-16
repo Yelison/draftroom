@@ -12,6 +12,8 @@ export interface CollabTiming {
   readonly shutdownWaitMs: number
   /** How long it then waits for the connections to close and the documents to unload, which a write that hangs would prevent. */
   readonly shutdownGraceMs: number
+  /** How long it waits for the sockets it asked to close to do so, before it destroys what is still open. */
+  readonly socketCloseMs: number
 }
 
 export const productionTiming: CollabTiming = {
@@ -20,4 +22,5 @@ export const productionTiming: CollabTiming = {
   retryDelaysMs: RETRY_DELAYS_MS,
   shutdownWaitMs: 30_000,
   shutdownGraceMs: 5_000,
+  socketCloseMs: 1_000,
 }

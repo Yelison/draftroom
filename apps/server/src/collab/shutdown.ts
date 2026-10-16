@@ -3,6 +3,7 @@ import type { ConnectionContext } from './context.ts'
 import type { DurabilityRegistry } from './durability.ts'
 import type { CollabLog } from './log.ts'
 import { storeNow, type StoreRetry } from './storeRetry.ts'
+import type { OpenSockets } from './openSockets.ts'
 import type { CollabTiming } from './timing.ts'
 
 /** The WebSocket close code for an endpoint that is going away, such as a server that shuts down (RFC 6455, 7.4.1). */
@@ -31,13 +32,15 @@ export async function shutDownCollaboration({
   server,
   durability,
   retry,
+  sockets,
   timing,
   log,
 }: {
   readonly server: Server<ConnectionContext>
   readonly durability: DurabilityRegistry
   readonly retry: StoreRetry
-  readonly timing: Pick<CollabTiming, 'shutdownWaitMs' | 'shutdownGraceMs'>
+  readonly sockets: OpenSockets
+  readonly timing: Pick<CollabTiming, 'shutdownWaitMs' | 'shutdownGraceMs' | 'socketCloseMs'>
   readonly log: CollabLog
 }): Promise<void> {
   server.httpServer.close()
@@ -64,7 +67,7 @@ export async function shutDownCollaboration({
   // alive: it would not exit after its shutdown. The sockets are taken before `destroy()` forgets the connections, and
   // closed with the code for a server that is going away, which a client treats as a lost connection and answers by
   // reconnecting to whoever is serving next.
-  const sockets = [...hocuspocus.documents.values()].flatMap((document) =>
+  const established = [...hocuspocus.documents.values()].flatMap((document) =>
     document.getConnections().map((connection) => connection.webSocket),
   )
   // A write that hangs (a database that stopped answering) holds the document's mutex, and a document that is being written
@@ -75,5 +78,7 @@ export async function shutDownCollaboration({
       'shutting down with documents that are still being written',
     )
   }
-  for (const socket of sockets) socket.close(GOING_AWAY, 'going-away')
+  for (const socket of established) socket.close(GOING_AWAY, 'going-away')
+  // The ones with no document, which nobody can ask to close, and any that does not answer, are destroyed.
+  await sockets.closeAll(timing.socketCloseMs)
 }

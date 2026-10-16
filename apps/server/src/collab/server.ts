@@ -12,6 +12,7 @@ import { DurabilityRegistry } from './durability.ts'
 import { durableAckExtension } from './durableAck.ts'
 import { limitsExtension } from './limits.ts'
 import type { CollabLog } from './log.ts'
+import { OpenSockets } from './openSockets.ts'
 import { persistenceExtension } from './persistence.ts'
 import { sessionKey } from './sessionKey.ts'
 import { shutDownCollaboration } from './shutdown.ts'
@@ -68,6 +69,7 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
 
   const durability = new DurabilityRegistry()
   const retry = new StoreRetry(timing.retryDelaysMs, log)
+  const sockets = new OpenSockets()
 
   const server = new Server<ConnectionContext>({
     port: config.collabPort,
@@ -86,7 +88,7 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
     // Versions are full updates because the documents are garbage collected (protocol §11).
     yDocOptions: { gc: true, gcFilter: () => true },
     extensions: [
-      upgradeGuardExtension({ allowedOrigins: config.allowedOrigins, development: config.devIdentity }),
+      upgradeGuardExtension({ allowedOrigins: config.allowedOrigins, development: config.devIdentity }, sockets),
       authenticateExtension({ database, authProvider, sessionSecret: config.sessionSecret }),
       persistenceExtension({ store, durability, retry, log }),
       durableAckExtension({ durability, log }),
@@ -109,6 +111,6 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
       return endConnections(server.hocuspocus, selector, plan)
     },
 
-    shutDown: () => shutDownCollaboration({ server, durability, retry, timing, log }),
+    shutDown: () => shutDownCollaboration({ server, durability, retry, sockets, timing, log }),
   }
 }
