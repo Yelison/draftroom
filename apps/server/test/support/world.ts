@@ -11,6 +11,13 @@ export interface Person {
   readonly name: string
 }
 
+/** Someone added by email who has not signed up: an address and an id, and no name. */
+export interface PendingPerson {
+  readonly id: string
+  readonly email: string
+  readonly name: null
+}
+
 export async function createPerson(db: Kysely<Database>, name: string): Promise<Person> {
   const email = `${randomUUID()}@harborpine.example`
   const { id } = await db
@@ -22,10 +29,10 @@ export async function createPerson(db: Kysely<Database>, name: string): Promise<
 }
 
 /** Someone added to a workspace by email who has not signed up yet: no name, and nobody who can be calling. */
-export async function createPendingPerson(db: Kysely<Database>): Promise<Person> {
+export async function createPendingPerson(db: Kysely<Database>): Promise<PendingPerson> {
   const email = `${randomUUID()}@harborpine.example`
   const { id } = await db.insertInto('users').values({ email, name: null }).returning('id').executeTakeFirstOrThrow()
-  return { id, email, name: '' }
+  return { id, email, name: null }
 }
 
 export async function createWorkspace(db: Kysely<Database>, name = 'Harbor & Pine'): Promise<string> {
@@ -36,7 +43,7 @@ export async function createWorkspace(db: Kysely<Database>, name = 'Harbor & Pin
 export async function join(
   db: Kysely<Database>,
   workspaceId: string,
-  person: Person,
+  person: { readonly id: string },
   role: WorkspaceRole = 'member',
 ): Promise<void> {
   await db.insertInto('memberships').values({ workspace_id: workspaceId, user_id: person.id, role }).execute()

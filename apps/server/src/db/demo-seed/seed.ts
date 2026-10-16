@@ -41,14 +41,24 @@ async function seedWorkspace(
       folderId,
       createdBy: userOf(document.creator),
     })
+    // The document, and the event that says it was created, are as old as its last change: a demo workspace that
+    // shows documents "created today, changed nine days ago" would not read as real.
+    const ago = sql<Date>`now() - make_interval(days => ${document.daysAgo})`
     await trx
       .updateTable('documents')
       .set({
         general_access: document.generalAccess ?? 'none',
-        archived_at: document.archived === true ? sql`now() - make_interval(days => ${document.daysAgo})` : null,
-        updated_at: sql`now() - make_interval(days => ${document.daysAgo})`,
+        archived_at: document.archived === true ? ago : null,
+        created_at: ago,
+        updated_at: ago,
       })
       .where('id', '=', id)
+      .execute()
+    await trx
+      .updateTable('activity_events')
+      .set({ created_at: ago })
+      .where('document_id', '=', id)
+      .where('type', '=', 'document.created')
       .execute()
     for (const [email, role] of Object.entries(document.grants ?? {})) {
       await trx

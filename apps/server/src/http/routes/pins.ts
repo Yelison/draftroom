@@ -1,4 +1,4 @@
-import type { DocumentRole, Schema } from '@draftroom/contract'
+import type { DocumentRole, Schema, operations } from '@draftroom/contract'
 import type { FastifyPluginCallback } from 'fastify'
 import { listPinned, listSharedCandidates, roleOf } from '../../db/documents/caller-documents.ts'
 import { pinDocument, unpinDocument } from '../../db/documents/commands.ts'
@@ -8,8 +8,10 @@ import { operationRoute } from '../operation-route.ts'
 import { presentReadable } from '../presenters.ts'
 import type { RouteDependencies } from './dependencies.ts'
 
+type Access = NonNullable<NonNullable<operations['listSharedDocuments']['parameters']['query']>['access']>
+
 /** The role each value of the `access` filter stands for. */
-const roleOfAccess: Readonly<Record<'edit' | 'comment' | 'view', DocumentRole>> = {
+const roleOfAccess: Readonly<Record<Access, DocumentRole>> = {
   edit: 'editor',
   comment: 'commenter',
   view: 'viewer',

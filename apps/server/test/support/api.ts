@@ -5,7 +5,7 @@ import type { Person } from './world.ts'
 
 /** What a test says about a request; the person is who `X-Dev-User` names, or nobody. */
 export interface Call {
-  readonly as?: Person
+  readonly as?: Pick<Person, 'email'>
   readonly method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   readonly url: string
   readonly body?: object

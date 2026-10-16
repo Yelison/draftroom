@@ -112,4 +112,26 @@ describe('the demo seed', () => {
     expect(withParts).toHaveLength(harborAndPine.documents.length + almazara.documents.length)
     expect(withParts.every((parts) => parts.states === 1 && parts.owners === 1 && parts.created === 1)).toBe(true)
   })
+
+  it('dates the creation of a document, and its event, as far back as its last change', async () => {
+    const documents = await database.db
+      .selectFrom('documents')
+      .select(['id', 'created_at', 'updated_at', 'title'])
+      .execute()
+    const created = await database.db
+      .selectFrom('activity_events')
+      .select(['document_id', 'created_at'])
+      .where('type', '=', 'document.created')
+      .execute()
+    const eventOf = new Map(created.map((event) => [event.document_id, event.created_at.getTime()]))
+
+    const mismatches = documents.filter(
+      (document) =>
+        document.created_at.getTime() !== document.updated_at.getTime() ||
+        eventOf.get(document.id) !== document.created_at.getTime(),
+    )
+    expect(mismatches).toEqual([])
+    const oldest = documents.find((document) => document.title === 'Catálogo de la temporada anterior')
+    expect(Date.now() - (oldest?.created_at.getTime() ?? Date.now())).toBeGreaterThan(39 * 24 * 3_600_000)
+  })
 })
