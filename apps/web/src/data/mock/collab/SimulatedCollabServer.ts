@@ -1,5 +1,6 @@
 import {
   LIBRARY_CLOSE_CODES,
+  MAX_MESSAGE_BYTES,
   STORE_DEBOUNCE_MS,
   parseDocumentName,
   serializeStatelessEvent,
@@ -110,13 +111,13 @@ export type SimulatedSocketConstructor = new (url: string) => SimulatedSocket
 function socketClass(
   server: SimulatedCollabServer,
   identity: Identity | null,
-  register: (socket: SimulatedSocket) => void,
+  register: (connection: Connection) => void,
 ): SimulatedSocketConstructor {
   return class extends SimulatedSocket {
     constructor(url: string) {
       const peer = new Connection(server, identity)
       super(url, peer)
-      register(this)
+      register(peer)
       peer.attach(this)
     }
   }
@@ -178,6 +179,11 @@ export class Connection {
   /** @internal Called by the socket for each frame the client sends. */
   receive(data: Uint8Array): void {
     if (this.closed) return
+    // The transport refuses a message above `maxPayload` before the server sees it, and closes with 1009 (F7).
+    if (data.length > MAX_MESSAGE_BYTES) {
+      this.end(LIBRARY_CLOSE_CODES['message-too-big'], 'message-too-big')
+      return
+    }
     const reader = new FrameReader(data)
     let documentName: string
     let type: number
@@ -394,6 +400,8 @@ export class Connection {
 
   /** Ends the WebSocket with a code, the way the server ends a connection (protocol section 6.1). */
   end(code: number, reason: string): void {
+    if (this.closed) return
+    this.server.closes.push({ code, reason })
     this.socket?.end(code, reason)
   }
 
@@ -409,6 +417,7 @@ export class Connection {
   /** @internal The socket is gone. */
   drop(): void {
     this.closed = true
+    this.server.forget(this)
     if (this.ping !== null) clearInterval(this.ping)
     this.leave()
   }
@@ -427,7 +436,9 @@ function guardedState(state: unknown, { userId, displayName }: Identity): Record
 export class SimulatedCollabServer {
   readonly settings: Required<SimulatedServerOptions>
   private readonly rooms = new Map<string, DocumentRoom>()
-  private readonly sockets = new Set<SimulatedSocket>()
+  private readonly open = new Set<Connection>()
+  /** Every close the server made, in order: what a test reads to know that the server ended a connection and why. */
+  readonly closes: { code: number; reason: string }[] = []
   private storesFail = false
   private storesHeld = false
 
@@ -437,7 +448,7 @@ export class SimulatedCollabServer {
 
   /** The WebSocket the provider is given: every connection made with it is `identity`, who is `null` when signed out. */
   socketFor(identity: Identity | null): SimulatedSocketConstructor {
-    return socketClass(this, identity, (socket) => this.sockets.add(socket))
+    return socketClass(this, identity, (connection) => this.open.add(connection))
   }
 
   /** The Yjs document of a name: what a test seeds, and what the server stores and serves. */
@@ -472,6 +483,11 @@ export class SimulatedCollabServer {
     })
     this.rooms.set(documentName, room)
     return room
+  }
+
+  /** @internal */
+  forget(connection: Connection): void {
+    this.open.delete(connection)
   }
 
   /** @internal Tells the others in the room what changed in the awareness of `from`. */
@@ -525,7 +541,7 @@ export class SimulatedCollabServer {
 
   /** Ends every connection with a close code, as the server does (revocation, rate limit, a restart). */
   closeConnections(code: number, reason: string): void {
-    for (const socket of [...this.sockets]) socket.end(code, reason)
+    for (const connection of [...this.open]) connection.end(code, reason)
   }
 
   /** Ends every document connection in band, leaving the sockets open. */
