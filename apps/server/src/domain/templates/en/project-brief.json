@@ -1,0 +1,87 @@
+{
+  "name": "Project brief",
+  "description": "Goal, scope and timeline on one page.",
+  "content": {
+    "type": "doc",
+    "content": [
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Goal" }] },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "In one or two sentences: what do we want to achieve, and for whom?" }]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Scope" }] },
+      { "type": "heading", "attrs": { "level": 3 }, "content": [{ "type": "text", "text": "In scope" }] },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "The work we will do" }] }]
+          }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 3 }, "content": [{ "type": "text", "text": "Out of scope" }] },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              { "type": "paragraph", "content": [{ "type": "text", "text": "What we are leaving for later" }] }
+            ]
+          }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Timeline" }] },
+      {
+        "type": "orderedList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Kick-off" }] }]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              { "type": "paragraph", "content": [{ "type": "text", "text": "First version ready for review" }] }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Launch" }] }]
+          }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "People" }] },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Sponsor: ", "marks": [{ "type": "bold" }] },
+          { "type": "text", "text": "who backs this project." }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Lead: ", "marks": [{ "type": "bold" }] },
+          { "type": "text", "text": "who is accountable for the result." }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Risks" }] },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [{ "type": "text", "text": "What could go wrong, and what we will do about it" }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

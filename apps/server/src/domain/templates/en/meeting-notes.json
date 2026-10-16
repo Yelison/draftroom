@@ -1,0 +1,69 @@
+{
+  "name": "Meeting notes",
+  "description": "Agenda, decisions and who does what next.",
+  "content": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Date: ", "marks": [{ "type": "bold" }] },
+          { "type": "text", "text": "Add the date and who is in the room." }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Agenda" }] },
+      {
+        "type": "orderedList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Where we left off last time" }] }]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              { "type": "paragraph", "content": [{ "type": "text", "text": "The topic that needs a decision today" }] }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Anything blocking the team" }] }]
+          }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Discussion" }] },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "Capture the main points as they come up, and who raised them." }]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Decisions" }] },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "What was decided, and why" }] }]
+          }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Next steps" }] },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  { "type": "text", "text": "Owner: ", "marks": [{ "type": "bold" }] },
+                  { "type": "text", "text": "the action, and the day it is due" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

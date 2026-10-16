@@ -1,0 +1,73 @@
+{
+  "name": "Notas de reunión",
+  "description": "Orden del día, decisiones y quién hace qué después.",
+  "content": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Fecha: ", "marks": [{ "type": "bold" }] },
+          { "type": "text", "text": "Anota la fecha y quién asiste." }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Orden del día" }] },
+      {
+        "type": "orderedList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              { "type": "paragraph", "content": [{ "type": "text", "text": "Dónde lo dejamos la última vez" }] }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              { "type": "paragraph", "content": [{ "type": "text", "text": "El tema que hoy necesita una decisión" }] }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              { "type": "paragraph", "content": [{ "type": "text", "text": "Lo que está frenando al equipo" }] }
+            ]
+          }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Conversación" }] },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "Recoge los puntos principales según salgan y quién los planteó." }]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Decisiones" }] },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Qué se decidió y por qué" }] }]
+          }
+        ]
+      },
+      { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Próximos pasos" }] },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  { "type": "text", "text": "Responsable: ", "marks": [{ "type": "bold" }] },
+                  { "type": "text", "text": "la acción y el día en que vence" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -250,7 +250,7 @@ describe('the order of the checks', () => {
         as,
         method: 'POST',
         url: `/api/workspaces/${studio.workspaceId}/documents`,
-        body: { title: 'Budget', templateId: 'meeting-notes' },
+        body: { title: 'Budget', templateId: 'no-such-template' },
       })
 
     expect((await create(outsider)).statusCode).toBe(404)

@@ -310,6 +310,8 @@ describe('the lists of documents', () => {
 
 interface WorkspaceCase {
   readonly operationId: string
+  /** Tells apart two rows of one operation, such as a document created from a template. */
+  readonly label?: string
   call(ids: { workspaceId: string; folderId: string }): Omit<Call, 'as'>
   readonly allowed: number
 }
@@ -363,6 +365,16 @@ const workspaceCases: readonly WorkspaceCase[] = [
     allowed: 201,
   },
   {
+    operationId: 'createDocument',
+    label: 'from a template',
+    call: ({ workspaceId }) => ({
+      method: 'POST',
+      url: `/api/workspaces/${workspaceId}/documents`,
+      body: { title: 'Notas', templateId: 'meeting-notes', locale: 'es' },
+    }),
+    allowed: 201,
+  },
+  {
     operationId: 'listPinnedDocuments',
     call: ({ workspaceId }) => ({ method: 'GET', url: `/api/workspaces/${workspaceId}/pinned` }),
     allowed: 200,
@@ -376,18 +388,27 @@ const workspaceCases: readonly WorkspaceCase[] = [
 
 const workspaceRoles = ['owner', 'member', 'outsider'] as const
 
-describe.each(workspaceCases)('$operationId in a workspace', ({ operationId, call, allowed }) => {
-  it.each(workspaceRoles)('as a workspace %s', async (workspaceRole) => {
-    const subject = await createPerson(db, `A ${workspaceRole}`)
-    if (workspaceRole !== 'outsider') await join(db, studio.workspaceId, subject, workspaceRole)
-    const folderId = await createFolder(db, studio.workspaceId)
+describe.each(workspaceCases.map((row) => ({ ...row, title: [row.operationId, row.label].filter(Boolean).join(' ') })))(
+  '$title in a workspace',
+  ({ operationId, call, allowed }) => {
+    it.each(workspaceRoles)('as a workspace %s', async (workspaceRole) => {
+      const subject = await createPerson(db, `A ${workspaceRole}`)
+      if (workspaceRole !== 'outsider') await join(db, studio.workspaceId, subject, workspaceRole)
+      const folderId = await createFolder(db, studio.workspaceId)
 
-    const response = await api({ as: subject, ...call({ workspaceId: studio.workspaceId, folderId }) })
+      const response = await api({ as: subject, ...call({ workspaceId: studio.workspaceId, folderId }) })
 
-    const mayDo = workspaceRole !== 'outsider' && rolesOf(operationId).roles.includes(workspaceRole)
-    expect(response.statusCode).toBe(workspaceRole === 'outsider' ? 404 : mayDo ? allowed : 403)
-  })
-})
+      const mayDo = workspaceRole !== 'outsider' && rolesOf(operationId).roles.includes(workspaceRole)
+      expect(response.statusCode).toBe(workspaceRole === 'outsider' ? 404 : mayDo ? allowed : 403)
+    })
+  },
+)
+
+const sessionOperations = [
+  ['getMe', '/api/me'],
+  ['listWorkspaces', '/api/workspaces'],
+  ['listTemplates', '/api/templates'],
+] as const
 
 interface MemberCase {
   readonly operationId: string
@@ -453,14 +474,14 @@ describe.each(memberCases)('$operationId in a workspace', ({ operationId, call, 
 })
 
 describe('the operations that need a session and nothing else', () => {
-  it.each(['getMe', 'listWorkspaces'])('%s answers anyone who is signed in', async (operationId) => {
+  it.each(sessionOperations)('%s answers anyone who is signed in', async (operationId, url) => {
     const subject = await createPerson(db, 'Someone with no workspace')
     expect(rolesOf(operationId).scope).toBe('session')
 
     const response = await api({
       as: subject,
       method: 'GET',
-      url: operationId === 'getMe' ? '/api/me' : '/api/workspaces',
+      url,
     })
 
     expect(response.statusCode).toBe(200)

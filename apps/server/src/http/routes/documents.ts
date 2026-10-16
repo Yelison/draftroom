@@ -4,6 +4,7 @@ import type { FastifyPluginCallback } from 'fastify'
 import { listDocuments } from '../../db/documents/caller-documents.ts'
 import { createDocumentRows, deleteArchivedDocument, setArchived, updateMetadata } from '../../db/documents/commands.ts'
 import { folderBelongsTo, isForeignKeyViolation } from '../../db/folders.ts'
+import { builtInTemplates } from '../../domain/templates/built-in.ts'
 import { metadataChanges } from '../../domain/documents.ts'
 import { decodeCursor, encodeCursor, type CursorFilters } from '../../domain/pagination.ts'
 import { principalOf } from '../auth/authenticate.ts'
@@ -73,21 +74,27 @@ export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { 
     operationRoute(contract, 'createDocument', async (request, reply) => {
       const { userId } = principalOf(request)
       const { workspaceId } = request.params
-      const { title, folderId, templateId } = request.body
+      const { title, folderId, templateId, locale = 'en' } = request.body
       await authoriseWorkspace(database, workspaceId, userId, 'create-content')
 
       const errors: FieldError[] = []
       if (folderId !== undefined && folderId !== null && !(await folderBelongsTo(database, workspaceId, folderId))) {
         errors.push(invalidValue('/folderId'))
       }
-      // Templates arrive with their own task: until then every template is one the server does not know.
-      if (templateId !== undefined) errors.push(invalidValue('/templateId'))
+      const template = templateId === undefined ? undefined : builtInTemplates.find(locale, templateId)
+      if (templateId !== undefined && template === undefined) errors.push(invalidValue('/templateId'))
       if (errors.length > 0) throw new ProblemError('validation-failed', { errors })
 
       const documentId = await database
         .transaction()
         .execute((trx) =>
-          createDocumentRows(trx, { workspaceId, title, folderId: folderId ?? null, createdBy: userId }),
+          createDocumentRows(trx, {
+            workspaceId,
+            title,
+            folderId: folderId ?? null,
+            createdBy: userId,
+            ...(template === undefined ? {} : { state: template.state }),
+          }),
         )
         .catch((error: unknown) => {
           throw folderWentAway(error)

@@ -1,6 +1,9 @@
 import type { Schema } from '@draftroom/contract'
+import { yUpdateToJson } from '@draftroom/editor-schema/convert'
 import { sql, type Kysely } from 'kysely'
+import * as Y from 'yjs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { builtInTemplates } from '../src/domain/templates/built-in.ts'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, bodyAs, type Api } from './support/api.ts'
 import { whileFolderIsBeingDeleted, whileRowIsLocked } from './support/overlap.ts'
@@ -104,11 +107,11 @@ describe('creating a document', () => {
     expect(bodyAs<Document>(response).folderId).toBe(folderId)
   })
 
-  it('refuses a template, which this server has none of yet, together with a folder that is not there', async () => {
+  it('refuses a template that is not known, together with a folder that is not there', async () => {
     const response = await create({
       title: 'Budget',
       folderId: 'a3d5c7e9-1b2f-4a6c-8d0e-3f5a7c9e1b33',
-      templateId: 'meeting-notes',
+      templateId: 'no-such-template',
       locale: 'es',
     })
 
@@ -119,6 +122,41 @@ describe('creating a document', () => {
         { pointer: '/folderId', code: 'invalid-value' },
         { pointer: '/templateId', code: 'invalid-value' },
       ],
+    })
+  })
+
+  describe('from a template', () => {
+    /** The content stored for the document, read the way a client reads it: a fresh `Y.Doc` loaded from the state. */
+    const storedContent = async (documentId: string) => {
+      const row = await db
+        .selectFrom('document_states')
+        .select('state')
+        .where('document_id', '=', documentId)
+        .executeTakeFirstOrThrow()
+      const loaded = new Y.Doc()
+      Y.applyUpdate(loaded, row.state)
+      return yUpdateToJson(Y.encodeStateAsUpdate(loaded))
+    }
+    const contentOf = (locale: 'en' | 'es', id: string) => {
+      const template = builtInTemplates.find(locale, id)
+      if (template === undefined) throw new Error(`No template ${id} in ${locale}`)
+      return yUpdateToJson(template.state)
+    }
+
+    it('stores its content, in the language asked for, as the initial state of the document', async () => {
+      const { id } = bodyAs<Document>(await create({ title: 'Reunión', templateId: 'meeting-notes', locale: 'es' }))
+
+      const content = await storedContent(id)
+      expect(content).toEqual(contentOf('es', 'meeting-notes'))
+      expect(JSON.stringify(content)).toContain('Orden del día')
+    })
+
+    it('uses English when no language is given', async () => {
+      const { id } = bodyAs<Document>(await create({ title: 'Meeting', templateId: 'meeting-notes' }))
+
+      const content = await storedContent(id)
+      expect(content).toEqual(contentOf('en', 'meeting-notes'))
+      expect(JSON.stringify(content)).toContain('Agenda')
     })
   })
 
