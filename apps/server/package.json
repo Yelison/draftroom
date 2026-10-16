@@ -9,7 +9,8 @@
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "seed:demo": "node --env-file-if-exists=../../.env src/db/demo-seed/run.ts"
+    "seed:demo": "node --env-file-if-exists=../../.env src/db/demo-seed/run.ts",
+    "measure:position-migrations": "node scripts/measure-position-migrations.ts"
   },
   "dependencies": {
     "@draftroom/contract": "*",
@@ -27,8 +28,12 @@
   "devDependencies": {
     "@hocuspocus/provider": "4.7.1",
     "@testcontainers/postgresql": "12.2.1",
+    "@tiptap/core": "3.31.4",
+    "@tiptap/extension-collaboration": "3.31.4",
+    "@tiptap/pm": "3.31.4",
     "@types/node": "24.19.2",
     "@types/pg": "8.23.1",
+    "jsdom": "30.1.2",
     "testcontainers": "12.2.1",
     "ws": "8.22.0"
   }
