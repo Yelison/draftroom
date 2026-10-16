@@ -146,6 +146,8 @@ describe('a revocation while the connection is being established', () => {
     store.releaseLoads()
 
     expect(await socket.waitForClose()).toEqual({ code: 4409, reason: 'role-changed' })
+    // It sent nothing, so `connected` is what closed it, and it did so before the acknowledgement: nothing is said to be stored.
+    expect(socket.received.filter((frame) => frame.kind === 'stateless')).toEqual([])
   })
 
   it('closes it with 4401 when it is the session that ended', async () => {
