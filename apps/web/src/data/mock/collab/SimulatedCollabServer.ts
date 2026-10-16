@@ -289,6 +289,7 @@ export class Connection {
       }
     } catch {
       // A message that cannot be read ends that document connection in band, with the socket left open (F8).
+      // This text is also what `e2e/production-bundle.spec.ts` looks for, to know that the simulator is not in a real build.
       this.endInBand('malformed-message')
     }
   }

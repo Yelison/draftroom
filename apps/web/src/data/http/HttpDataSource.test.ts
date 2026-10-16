@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, isApiError, TransportError } from '../errors.ts'
+import { createCollabSession } from '../../collab/session.ts'
 import { createHttpDataSource } from './HttpDataSource.ts'
 
 const workspaceId = '5f0f4c9e-2b1c-4a8e-9d0e-3a6b7c8d9e01'
@@ -314,7 +315,7 @@ describe('HttpDataSource answers', () => {
   })
 })
 
-describe('opening a document for collaboration', () => {
+describe('where the collaboration of the HTTP source connects', () => {
   /** A WebSocket that never connects and remembers where it was asked to: enough to see what the session dials. */
   const dialled: string[] = []
   class RecordingSocket {
@@ -337,7 +338,7 @@ describe('opening a document for collaboration', () => {
     vi.stubGlobal('WebSocket', RecordingSocket)
     const source = createHttpDataSource({ collabUrl: 'wss://collab.draftroom.test' })
 
-    const session = source.openDocument(documentId)
+    const session = createCollabSession({ documentId, ...source.collaboration })
     await vi.waitFor(() => expect(dialled).toEqual(['wss://collab.draftroom.test']))
     session.destroy()
   })
@@ -345,7 +346,10 @@ describe('opening a document for collaboration', () => {
   it('does not connect at all for a session that was ended in the turn it was made', async () => {
     vi.stubGlobal('WebSocket', RecordingSocket)
 
-    createHttpDataSource({ collabUrl: 'wss://collab.draftroom.test' }).openDocument(documentId).destroy()
+    createCollabSession({
+      documentId,
+      ...createHttpDataSource({ collabUrl: 'wss://collab.draftroom.test' }).collaboration,
+    }).destroy()
     await new Promise((resolve) => setTimeout(resolve, 20))
 
     expect(dialled).toEqual([])
@@ -354,7 +358,7 @@ describe('opening a document for collaboration', () => {
   it('connects to /collab on its own origin when no address was given', async () => {
     vi.stubGlobal('WebSocket', RecordingSocket)
 
-    const session = createHttpDataSource().openDocument(documentId)
+    const session = createCollabSession({ documentId, ...createHttpDataSource().collaboration })
     await vi.waitFor(() => expect(dialled).toEqual([`ws://${location.host}/collab`]))
     session.destroy()
   })

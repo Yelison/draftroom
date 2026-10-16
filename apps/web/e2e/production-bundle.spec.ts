@@ -46,7 +46,13 @@ const forbiddenMarkers = [
   // The vocabulary URLs of the 2020-12 metaschema, which only the schema validator carries. The `$schema` URL itself is
   // not a marker: zod, which the client runs to read what the collaboration server sends, writes it too.
   'json-schema.org/draft/2020-12/vocab',
+  // The reason the simulated collaboration server gives when it ends a connection over a message it cannot read: its own
+  // text, which the real server and the client do not have. It is what tells that the simulator did not come in alone.
+  'malformed-message',
 ]
+
+/** What the provider and Yjs write into the chunk that holds them, and the app's own session over them. */
+const collaborationMarkers = ['HocuspocusProvider', 'sessionAwareness', 'Yjs was already imported']
 
 function filesOf(directory: string): { name: string; content: string }[] {
   return readdirSync(directory, { recursive: true, withFileTypes: true })
@@ -117,11 +123,37 @@ test.describe('the production bundle', () => {
     expect(found).toEqual([])
   })
 
+  // The collaboration is the heaviest thing an editor needs and no other screen does: it is loaded with the editor, so that
+  // the first load of the app (the entry and the chunks it preloads) holds neither the provider nor Yjs.
+  test('keeps the provider and Yjs out of the first load', () => {
+    const files = productionBundle()
+    const html = files.find(({ name }) => name === 'index.html')?.content ?? ''
+    const entry = html.match(/<script[^>]*type="module"[^>]*src="\/assets\/([^"]+\.js)"/)?.[1]
+    const preloaded = [...html.matchAll(/modulepreload"[^>]*href="\/assets\/([^"]+\.js)"/g)].map(([, name]) => name)
+    expect(entry).toBeDefined()
+    const firstLoad = files.filter(({ name }) => [entry, ...preloaded].some((chunk) => name === `assets/${chunk}`))
+    expect(firstLoad.length).toBeGreaterThan(0)
+
+    const found = firstLoad.flatMap(({ name, content }) =>
+      collaborationMarkers.filter((marker) => content.includes(marker)).map((marker) => `${name}: ${marker}`),
+    )
+
+    expect(found).toEqual([])
+    // The search can see them: they are in the build, in the chunk of the editor.
+    for (const marker of collaborationMarkers) {
+      expect(
+        files.some(({ name, content }) => name.endsWith('.js') && content.includes(marker)),
+        marker,
+      ).toBe(true)
+    }
+  })
+
   test('is searched with texts that the build with the mock does contain', () => {
     const served = filesOf(join(servedBuild, 'assets')).filter(({ name }) => name.endsWith('.js'))
     const missing = fixtureTexts.filter((text) => !served.some(({ content }) => content.includes(text)))
 
     expect(missing, 'fixture texts the search could not find even where they are').toEqual([])
     expect(served.some(({ content }) => content.includes('UnhandledOperationError'))).toBe(true)
+    expect(served.some(({ content }) => content.includes('malformed-message'))).toBe(true)
   })
 })

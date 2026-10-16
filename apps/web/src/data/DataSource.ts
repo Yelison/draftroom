@@ -1,5 +1,4 @@
-import type { Schema, operations } from '@draftroom/contract'
-import type { CollabSession } from '../collab/session.ts'
+import type { operations } from '@draftroom/contract'
 
 /**
  * Probes of the process and its database. The orchestrator and monitoring call them; the client never does, so the data
@@ -76,13 +75,21 @@ type Method<Id extends OperationId> =
 /** One method per operation of the contract, named by its `operationId`. */
 export type RestSource = { readonly [Id in OperationId]: Method<Id> }
 
-/** The collaboration half of the data source: the live connection to one document, which is not a request and an answer. */
+/** Where and how a document is opened for collaboration: what a session needs to connect, and nothing of the session. */
+export interface CollaborationEndpoint {
+  /** The collaboration server. */
+  readonly url: string
+  /** The WebSocket to use instead of the browser's: the mock hands out the one of its simulated server. */
+  readonly webSocket?: new (url: string) => unknown
+}
+
+/**
+ * The collaboration half of the data source. It is where to connect and not the connection: the session, with Yjs and the
+ * provider behind it, is loaded with the editor (`useCollabSession`) and not with the app, so a screen that has no editor
+ * does not download it.
+ */
 export interface CollaborationSource {
-  /**
-   * Opens the document for editing: its content, who else is in it and whether what the person wrote is stored. The
-   * caller owns the session and ends it with `destroy()`.
-   */
-  openDocument(documentId: Schema<'Id'>): CollabSession
+  readonly collaboration: CollaborationEndpoint
 }
 
 export type DataSource = RestSource & CollaborationSource

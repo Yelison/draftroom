@@ -1,4 +1,3 @@
-import { createCollabSession } from '../../collab/session.ts'
 import type { DataSource, RestSource } from '../DataSource.ts'
 import { SimulatedCollabServer, type Access, type Identity } from './collab/SimulatedCollabServer.ts'
 import { marta } from './fixtures/index.ts'
@@ -61,8 +60,7 @@ function operationsOf(ctx: Context, collaboration: SimulatedCollabServer, identi
   }
   return {
     ...rest,
-    openDocument: (documentId) =>
-      createCollabSession({ documentId, url: 'ws://simulated.invalid', webSocket: collaboration.socketFor(identity) }),
+    collaboration: { url: 'ws://simulated.invalid', webSocket: collaboration.socketFor(identity) },
   }
 }
 

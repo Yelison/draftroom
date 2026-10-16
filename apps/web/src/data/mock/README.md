@@ -37,8 +37,8 @@ authorization is the server's and is tested there (plan, section 9.2).
 
 ## Collaboration
 
-`openDocument` returns the same `CollabSession` the real data source does, over the same `HocuspocusProvider`. Only the
-network is made up: `collab/SimulatedCollabServer.ts` speaks the Hocuspocus wire protocol through the provider's
+`collaboration` is where the editor connects, as the real data source has it, and the session it opens is the same one, over the
+same `HocuspocusProvider`. Only the network is made up: `collab/SimulatedCollabServer.ts` speaks the Hocuspocus wire protocol through the provider's
 `WebSocketPolyfill` hook, inside the page, so the session code that runs against it is the code that runs against the real
 server. It follows `docs/collab/protocol.md`: authentication before anything is applied, `readonly` for a role that may only
 read (and for an archived document), a reader's updates answered "not applied", awareness rewritten to the name the server

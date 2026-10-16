@@ -1,6 +1,5 @@
 import type { paths } from '@draftroom/contract'
 import createClient, { type ClientOptions } from 'openapi-fetch'
-import { createCollabSession } from '../../collab/session.ts'
 import type { DataSource } from '../DataSource.ts'
 import { TransportError } from '../errors.ts'
 import { changesState, csrfHeaderName, csrfTokenFromCookie } from './csrf.ts'
@@ -142,6 +141,6 @@ export function createHttpDataSource({
     listDocumentActivity: (request) => data(client.GET('/api/documents/{documentId}/activity', request)),
     listTemplates: (request) => data(client.GET('/api/templates', request)),
     // The identity is the session cookie the browser sends with the upgrade; nothing is read from the address.
-    openDocument: (documentId) => createCollabSession({ documentId, url: collabUrl ?? ownOrigin() }),
+    collaboration: { url: collabUrl ?? ownOrigin() },
   }
 }
