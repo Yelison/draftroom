@@ -25,7 +25,8 @@ const workspace = { id: workspaceId, name: 'Harbor & Pine', role: 'owner', creat
 // with the real ones, and a route cannot be declared twice. The tests of the real routes are in test/. A task that
 // brings a route for one of them moves these tests to another that is still free.
 const workspaceUrl = `/api/workspaces/${workspaceId}`
-const activityUrl = `${workspaceUrl}/activity`
+const rename = (application: FastifyInstance) =>
+  application.inject({ method: 'PATCH', url: workspaceUrl, payload: { name: 'Almazara' } })
 
 /** Everyone is Marta, and the provider records what it was asked: the app's checks, not an identity, are under test. */
 const signedInAsMarta: AuthProvider = {
@@ -272,11 +273,11 @@ describe('a handler that fails', () => {
   const failWith = (error: Error) => {
     const application = appWithoutDatabase()
     application.route(
-      operationRoute(contract, 'listWorkspaceActivity', () => {
+      operationRoute(contract, 'updateWorkspace', () => {
         throw error
       }),
     )
-    return application.inject(activityUrl)
+    return rename(application)
   }
 
   it('answers the internal-error problem and keeps the cause to itself', async () => {
@@ -306,13 +307,13 @@ describe('a handler that fails', () => {
   it("does not carry the handler's headers into the 500, a session cookie included", async () => {
     const application = appWithoutDatabase()
     application.route(
-      operationRoute(contract, 'listWorkspaceActivity', (_request, reply) => {
+      operationRoute(contract, 'updateWorkspace', (_request, reply) => {
         reply.header('set-cookie', 'dr_session=abc; HttpOnly').header('etag', '"v1"')
         throw new Error('failed after the session was started')
       }),
     )
 
-    const response = await application.inject(activityUrl)
+    const response = await rename(application)
 
     expect(response.statusCode).toBe(500)
     expect(response.headers).not.toHaveProperty('set-cookie')
@@ -334,37 +335,33 @@ describe('a response that breaks the contract', () => {
   it('never leaves the server: it becomes a 500, and the violation is reported with its reason', async () => {
     const violations: ContractViolation[] = []
     const application = appWithoutDatabase(violations)
-    application.route(
-      operationRoute(contract, 'listWorkspaceActivity', () => ({
-        items: [{ id: eventId, actor: marta }],
-      })),
-    )
+    application.route(operationRoute(contract, 'updateWorkspace', () => ({ id: eventId, role: 'owner' })))
 
-    const response = await application.inject(activityUrl)
+    const response = await rename(application)
 
     expect(response.statusCode).toBe(500)
     expect(response.json()).toMatchObject({ code: 'internal-error' })
     expect(response.body).not.toContain(eventId)
     expect(violations).toHaveLength(1)
-    expect(violations[0]).toMatchObject({ operationId: 'listWorkspaceActivity', status: 200 })
-    expect(violations[0]?.reason).toContain('type')
+    expect(violations[0]).toMatchObject({ operationId: 'updateWorkspace', status: 200 })
+    expect(violations[0]?.reason).toContain('name')
   })
 
   it("does not carry the handler's headers, a session cookie included", async () => {
     const application = appWithoutDatabase()
     application.route(
-      operationRoute(contract, 'listWorkspaceActivity', (_request, reply) =>
+      operationRoute(contract, 'updateWorkspace', (_request, reply) =>
         reply
           .header('set-cookie', 'dr_session=abc; HttpOnly')
           .header('etag', '"v1"')
           .header('location', '/api/me')
           .header('retry-after', '3')
           .header('cache-control', 'max-age=60')
-          .send({ items: [{ userId: 'not-a-uuid' }] }),
+          .send({ id: 'not-a-uuid' }),
       ),
     )
 
-    const response = await application.inject(activityUrl)
+    const response = await rename(application)
 
     expect(response.statusCode).toBe(500)
     expect(response.headers).not.toHaveProperty('set-cookie')
@@ -378,9 +375,9 @@ describe('a response that breaks the contract', () => {
   it('is let through when the contract accepts it', async () => {
     const violations: ContractViolation[] = []
     const application = appWithoutDatabase(violations)
-    application.route(operationRoute(contract, 'listWorkspaceActivity', () => ({ items: [], nextCursor: null })))
+    application.route(operationRoute(contract, 'updateWorkspace', (_request, reply) => reply.send(workspace)))
 
-    expect((await application.inject(activityUrl)).statusCode).toBe(200)
+    expect((await rename(application)).statusCode).toBe(200)
     expect(violations).toEqual([])
   })
 })
@@ -401,7 +398,6 @@ describe('the session check', () => {
   function withWorkspaceRoute(provider: AuthProvider): FastifyInstance {
     const application = appWithoutDatabase([], provider)
     application.route(operationRoute(contract, 'updateWorkspace', (_request, reply) => reply.send(workspace)))
-    application.route(operationRoute(contract, 'listWorkspaceActivity', () => ({ items: [], nextCursor: null })))
     return application
   }
   const post = (application: FastifyInstance, payload: string) =>
@@ -436,7 +432,8 @@ describe('the session check', () => {
     const application = withWorkspaceRoute(recording({ status: 'authenticated', principal: { userId: marta.id } }))
 
     await post(application, JSON.stringify({ body: 'Yes' }))
-    await application.inject(activityUrl)
+    // A read, which the real route of the app answers: only what the provider was asked matters.
+    await application.inject(workspaceUrl)
 
     expect(requests).toEqual(['with csrf', 'without csrf'])
   })

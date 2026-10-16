@@ -88,13 +88,13 @@ describe('the contract client', () => {
       contract,
       onContractViolation: (violation) => violations.push(violation),
     })
-    // `listWorkspaceActivity` has no route of its own yet, so the test brings one that answers against the contract.
-    app.route(operationRoute(contract, 'listWorkspaceActivity', () => ({ items: [{ id: 'not-a-uuid' }] })))
+    // `updateWorkspace` has no route of its own yet, so the test brings one that answers against the contract.
+    app.route(operationRoute(contract, 'updateWorkspace', () => ({ id: 'not-a-uuid' })))
     const client = createContractClient(app, contract, new ContractCoverage(), violations)
 
-    await expect(client.request({ method: 'GET', url: `/api/workspaces/${workspaceId}/activity` })).rejects.toThrow(
-      /answered listWorkspaceActivity against the contract/,
-    )
+    await expect(
+      client.request({ method: 'PATCH', url: `/api/workspaces/${workspaceId}`, payload: { name: 'Almazara' } }),
+    ).rejects.toThrow(/answered updateWorkspace against the contract/)
     await database.destroy()
   })
 
