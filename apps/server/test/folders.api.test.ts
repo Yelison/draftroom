@@ -3,6 +3,7 @@ import type { Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, bodyAs, type Api } from './support/api.ts'
+import { whileRowIsLocked } from './support/overlap.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
 import { createDocument, createFolder, createPerson, createWorkspace, join, type Person } from './support/world.ts'
@@ -110,7 +111,8 @@ describe('renaming a folder', () => {
   it('lets exactly one of two renames made at the same time win', async () => {
     const folderId = await createFolder(db, workspaceId, 'Launch')
 
-    const answers = await Promise.all([
+    // Both are held at the write by a lock on the row, so both have read revision 1 when the lock is let go.
+    const answers = await whileRowIsLocked(db, { table: 'folders', id: folderId }, () => [
       rename(folderId, { name: 'First', revision: 1 }),
       rename(folderId, { name: 'Second', revision: 1 }),
     ])

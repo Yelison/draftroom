@@ -3,6 +3,7 @@ import { sql, type Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, bodyAs, type Api } from './support/api.ts'
+import { whileRowIsLocked } from './support/overlap.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
 import {
@@ -299,7 +300,8 @@ describe('changing the title or the folder of a document', () => {
     it('lets exactly one of two changes made at the same time win', async () => {
       const documentId = await fresh()
 
-      const answers = await Promise.all([
+      // Both are held at the write by a lock on the row, so both have read revision 1 when the lock is let go.
+      const answers = await whileRowIsLocked(db, { table: 'documents', id: documentId }, () => [
         patch(documentId, { title: 'First', revision: 1 }),
         patch(documentId, { title: 'Second', revision: 1 }),
       ])
