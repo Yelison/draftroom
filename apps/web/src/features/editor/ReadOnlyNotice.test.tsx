@@ -34,9 +34,10 @@ describe('the notice a reader of a document sees', () => {
   })
 
   it('is not there for an editor, who has the toolbar', async () => {
-    renderEditor()
+    const view = renderEditor()
     await textArea()
 
+    expect(band(view.container).querySelector('.notice')).toBeNull()
     expect(screen.queryByText(/You can read/)).not.toBeInTheDocument()
   })
 })
