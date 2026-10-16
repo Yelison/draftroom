@@ -99,6 +99,29 @@ export async function findDocumentFor(
   return row === undefined ? undefined : toRecord(row)
 }
 
+/** A document with the person's facts, and the name they are known by: what a live connection needs, in one query. */
+export interface DocumentAccess {
+  readonly record: DocumentRecord
+  /** `null` only for someone who has not signed up, who cannot be connected. */
+  readonly personName: string | null
+}
+
+/** The same facts as {@link findDocumentFor}, plus the person's name, for the collaboration server's one query per connection. */
+export async function findDocumentAccess(
+  db: Kysely<Database>,
+  documentId: string,
+  userId: string,
+): Promise<DocumentAccess | undefined> {
+  const row = await callerDocuments(db, userId)
+    .innerJoin('users as person', 'person.id', 'm.user_id')
+    .select('person.name as personName')
+    .where('d.id', '=', documentId)
+    .executeTakeFirst()
+  if (row === undefined) return undefined
+  const { personName, ...documentRow } = row
+  return { record: toRecord(documentRow), personName }
+}
+
 export interface DocumentSearch {
   readonly userId: string
   readonly workspaceId: string

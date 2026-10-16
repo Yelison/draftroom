@@ -6,6 +6,12 @@ import type { FastifyRequest } from 'fastify'
 
 export interface Principal {
   readonly userId: string
+  /**
+   * The opaque id of the session the caller signed in with, for a provider that has sessions. The collaboration server
+   * finds the connections of a session that ends by a keyed hash of it (protocol §6.3); a provider without sessions,
+   * such as the development identity, leaves it out and its connections can only be found by person or document.
+   */
+  readonly sessionId?: string | undefined
 }
 
 /** What the operation asked for beyond a session. */

@@ -69,8 +69,9 @@ The identity is never taken from a token: the provider is created with `token: n
 | 3   | One query returns the person's effective role on the document (§4.3 of the plan). A missing document, a document in another workspace, no role, and an archived document the person does not own all give the same result and take the same path. | `not-found`       |
 | 4   | The connection mode is decided (§4) and written to `data.connectionConfig.readOnly`.                                                                                                        | (never refuses)   |
 | 5   | The hook returns `{ userId, workspaceId, role, displayName, sessionId }`, which becomes the connection context. `sessionId` is opaque: a keyed hash of the session id, never the cookie value, never sent to the client; it is how a session that ends finds its connections (§6.3).                                                                                        | (never refuses)   |
+| any | The server fails for a reason of its own while it decides: the identity provider or the database does not answer, or a hook throws something that is not a refusal of the checks above. The failure is logged. | `unavailable` |
 
-`not-found` stands for "missing" and "forbidden" alike, as REST does, so a document id cannot be probed. The reasons are exactly `authDeniedReasons`. `onLoadDocument` runs only after step 5 (Hocuspocus loads the document after authentication), so no document data is sent to a refused connection.
+`not-found` stands for "missing" and "forbidden" alike, as REST does, so a document id cannot be probed. `unavailable` is the one reason that says nothing about the person or the document: it is sent when the server failed, and the same failure answers every id the same way, so it probes nothing. The server MUST NOT answer `not-found` or `unauthenticated` for a failure of its own, because a client that had access would take it for the removal of that access and purge its local copy (§12.4). A client treats `unavailable` as a connection that could not be made: it goes on as in `reconnecting` (§8.2). The reasons are exactly `authDeniedReasons`. `onLoadDocument` runs only after step 5 (Hocuspocus loads the document after authentication), so no document data is sent to a refused connection.
 
 Because of F5, the server does not close the socket after a refusal. The client does: on `authenticationFailed` it calls `disconnect()` on its websocket provider. The deadline of F9 bounds a client that does not.
 
@@ -200,6 +201,8 @@ Used by every case above, for the connections of the affected person (matched by
 2. Send the stateless event that explains the change, if there is one (`access-changed`, `document-archived`). `ws` delivers frames in order, so the event arrives before the close.
 3. `connection.webSocket.close(code, name)`.
 
+The procedure is called **after** the change that causes it is committed to the database, never inside its transaction: a connection that is still being established (it has authenticated and its document is loading) is not live yet, so it is closed by a mark the call leaves, and the mark can tell that such a connection read the database after the change only if the change was already committed.
+
 Which event and code a change causes:
 
 | Change                                                                 | Affected connections          | Stateless event       | Code   |
@@ -306,7 +309,7 @@ The machine is implemented by T2.2; its types are `SyncState`, `SyncEvent` and `
 | `synchronising` | Authorised read-write; the handshake is running, or changes are not yet stored.                                    | Synchronising           | editable                              |
 | `synced`        | The rule of §7.4 holds.                                                                                            | Synced                  | editable                              |
 | `offline-local` | No connection and the browser is offline. Changes are kept in the local copy, not on the server.                   | Offline with local copy | editable (a reader sees the same label, has no local changes, and the editor stays read-only) |
-| `reconnecting`  | No connection but the browser is online (server unreachable or restarting). Retrying.                              | Reconnecting            | editable                              |
+| `reconnecting`  | No connection but the browser is online (server unreachable or restarting, or failed while it authenticated: `unavailable`). Retrying.                              | Reconnecting            | editable                              |
 | `error`         | A problem, with a `SyncErrorCause`. `store-timeout` is *transient*: the connection stays up and the state ends as soon as a covering `stored` arrives. The other causes (`unauthenticated`, `not-found`, `document-too-large`) are *stopped*: the connection is closed. | Error                   | editable for `store-timeout`, not editable for the stopped causes |
 | `revoked`       | Access was removed. Terminal for this editor session.                                                              | Access removed          | not editable                          |
 | `read-only`     | Authorised read-only, including archived documents. Never unsynced.                                                | Read-only               | not editable                          |
@@ -326,6 +329,7 @@ The action offered in `error` is a retry (`open`; `pending` survives) for every 
 | `authentication-denied`    | any state                                                                  | `reason = 'unauthenticated'`                       | `error` (cause `unauthenticated`)                          |
 | `authentication-denied`    | any state                                                                  | `reason = 'not-found'` and `hasBeenAuthorized`     | `revoked`                                                  |
 | `authentication-denied`    | any state                                                                  | `reason = 'not-found'` and not `hasBeenAuthorized` | `error` (cause `not-found`)                                |
+| `authentication-denied`    | any state                                                                  | `reason = 'unavailable'`                           | as `connection-closed` with any other code or `null` (the rows above, by `online` and `hasLocalCopy`): `reconnecting`, `offline-local` or `connecting`; the local copy and `pending` are kept; the provider is closed with `disconnect()` and reopened after the back-off of §6.5 |
 | `document-too-large`       | any state                                                                  |                                                    | `error` (cause `document-too-large`); stop reconnecting    |
 | `connection-closed`        | any state                                                                  | `code = 4403`                                      | `revoked`                                                  |
 | `connection-closed`        | any state                                                                  | `code = 4401`                                      | `error` (cause `unauthenticated`)                          |
@@ -369,10 +373,11 @@ A `stored` that arrives in a state that does not settle (`connecting`, `reconnec
 | Close `4413` or `1009`                                                        | `error` (`document-too-large`) offering only "discard my local changes and reload"                         |
 | Retry from `error` (`store-timeout`) while the socket is still open           | `connecting`, and the provider is reopened (`disconnect()`, then `connect()`), so authentication and the handshake run again instead of waiting for an event that never comes |
 | In-band close (`1000`) with the socket open                                   | `reconnecting`, and `disconnect()` then `connect()` (§6.5)                                                 |
+| `PermissionDenied` `unavailable`, on a first connection or on the reconnection of a document that was open | `reconnecting` (or `offline-local` / `connecting` as for any other lost connection): the editor stays editable, the client reopens the provider by itself with the back-off of §6.5, and nothing is purged or uploaded; never `revoked`, never a stopped `error` |
 
 ### 8.4 Effects
 
-Entering `revoked` purges the local copy and never uploads (§12). Entering a stopped `error` (`document-too-large`, `unauthenticated`, `not-found`) calls `disconnect()` so the provider stops retrying. Reconnection after a close by the server follows §6.5. Announcing a state in a live region is done once per change of state, never per keystroke.
+Entering `revoked` purges the local copy and never uploads (§12). Entering a stopped `error` (`document-too-large`, `unauthenticated`, `not-found`) calls `disconnect()` so the provider stops retrying. A refusal `unavailable` also calls `disconnect()` (F5), and the client then reconnects with the back-off of §6.5, as it does after a close by the server. Reconnection after a close by the server follows §6.5. Announcing a state in a live region is done once per change of state, never per keystroke.
 
 ## 9. Stateless events
 
@@ -544,6 +549,7 @@ Nothing is applied before authentication finishes (F9), so a refusal or a downgr
 | Authorised `read-write`                                         | handshake; offline edits reach the server; `synchronising`, then `synced` after a covering `stored`.                                                                                                                                    |
 | `PermissionDenied` `not-found` for a document that was open (or has a local copy), or close `4403` | `revoked`: purge the copy, discard the in-memory document, show that access was removed. Nothing is uploaded.                                                         |
 | Authorised `readonly` while `pending` is not nothing (downgrade)  | **`read-only`, not `revoked`**: the person can still read. The offline changes are not uploaded (the server refuses them, F2): the client purges the copy, destroys the document and provider, and reopens from the server state, then tells the person the offline changes were not saved. **Deviation from the plan,** which says `revoked` here; telling someone with read access that access was removed would be false. |
+| `PermissionDenied` `unavailable`                                | **`reconnecting`, not `revoked`**: the server failed, which says nothing about access. Keep the copy and `pending`, stay editable, retry with the back-off of §6.5, and upload nothing until an authorisation succeeds. |
 
 A removed account's `PermissionDenied` is `not-found`, never a distinct "forbidden" (§3.3), so the client treats `not-found` after a prior authorisation as removal.
 
@@ -568,7 +574,7 @@ The handshake after a reconnection sends everything the server lacks in one Sync
 | Closing a connection               | close the WebSocket, one per document, flip `readOnly` first (§6)                                                | F5, F6                                                           |
 | Oversize message                   | transport close `1009`, handled like `4413`, with "discard and reload" instead of a retry (§5.1, §8.1)          | F7                                                               |
 | Oversized document                 | refuse only writes that add content; reads and deletions pass (§5.2)                                            | every client sends a SyncStep2 at the handshake (F16)            |
-| Authentication refusal reasons     | `unauthenticated` and `not-found` only (§3.3)                                                                   | no id probing                                                    |
+| Authentication refusal reasons     | `unauthenticated`, `not-found` and `unavailable` (§3.3)                                                          | no id probing; a failure of the server is not a verdict on access |
 | Connection context                 | `{ userId, workspaceId, role, displayName, sessionId }`                                                         | awareness name rewrite (§5.3), session end (§6.3)                |
 | `stored` on connection             | send the last stored snapshot (§7.3)                                                                            | a reopen with nothing new would never become Synced              |
 | Snapshot slot                      | assigned after the commit, from variables captured before the `await` (§7.2)                                   | a failed write must not look stored                              |

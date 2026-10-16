@@ -40,7 +40,7 @@ export interface Config {
    */
   readonly devIdentity: boolean
   readonly apiPort: number
-  /** Reserved for the collaboration server (phase 2); validated now so a clash is found at start-up. */
+  /** The port of the collaboration WebSocket, in the same process as the API. */
   readonly collabPort: number
   readonly apiHost: string
   readonly databaseUrl: string

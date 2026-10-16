@@ -219,8 +219,8 @@ describe('limits and timings', () => {
     expect(RECONNECT_STABLE_MS).toBeGreaterThan(RECONNECT_MAX_DELAY_MS)
   })
 
-  it('refuses an authentication with exactly the two reasons that cannot be used to probe ids', () => {
-    expect(authDeniedReasons).toEqual(['unauthenticated', 'not-found'])
+  it('refuses an authentication with the two reasons that cannot be used to probe ids, and one for a failure of the server', () => {
+    expect(authDeniedReasons).toEqual(['unauthenticated', 'not-found', 'unavailable'])
     expect(authorizedScopes).toEqual(['read-write', 'readonly'])
   })
 })
@@ -279,5 +279,13 @@ describe('docs/collab/protocol.md', () => {
 
   it.each(authDeniedReasons)('documents the authentication refusal reason %s in the table of §3.3', (reason) => {
     expect(section('### 3.3')).toContain(`| \`${reason}\` `)
+  })
+
+  it('has the refusal unavailable go on as a lost connection in the transitions of §8.2, and never to a stopped error', () => {
+    const row = section('### 8.2')
+      .split('\n')
+      .find((line) => line.includes("`reason = 'unavailable'`"))
+    expect(row).toContain('`reconnecting`')
+    expect(row).not.toContain('`error`')
   })
 })

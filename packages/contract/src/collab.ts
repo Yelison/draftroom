@@ -62,9 +62,11 @@ export const libraryCloseCodeNames = Object.keys(LIBRARY_CLOSE_CODES) as Library
 
 /**
  * Reasons sent in the `PermissionDenied` authentication message. There is deliberately no "forbidden": a document the
- * person cannot read looks exactly like one that does not exist, so ids cannot be probed.
+ * person cannot read looks exactly like one that does not exist, so ids cannot be probed. `unavailable` says nothing
+ * about the person or the document: the server failed while it decided (the identity provider or the database did not
+ * answer), so it is never a reason to think access was removed and to purge a local copy.
  */
-export const authDeniedReasons = ['unauthenticated', 'not-found'] as const
+export const authDeniedReasons = ['unauthenticated', 'not-found', 'unavailable'] as const
 
 export type AuthDeniedReason = (typeof authDeniedReasons)[number]
 
