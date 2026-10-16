@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify'
 import type { Kysely } from 'kysely'
 import type { Database } from '../../src/db/tables.ts'
 import { buildApp, type ContractViolation } from '../../src/http/app.ts'
+import type { AuthProvider } from '../../src/http/auth/auth-provider.ts'
+import { createDevIdentity } from '../../src/http/auth/devIdentity.ts'
 import { loadContract } from '../../src/http/contract.ts'
 import { createContractClient } from './contract-client.ts'
 import { runCoverage } from './run-coverage.ts'
@@ -15,8 +17,16 @@ export interface TestApp {
 }
 
 /** The real app on a given database, and a client that holds every response of the test to the contract. */
-export function createTestApp(database: Kysely<Database>): TestApp {
+export function createTestApp(
+  database: Kysely<Database>,
+  authProvider: AuthProvider = createDevIdentity(database),
+): TestApp {
   const violations: ContractViolation[] = []
-  const app = buildApp({ database, contract, onContractViolation: (violation) => violations.push(violation) })
+  const app = buildApp({
+    database,
+    authProvider,
+    contract,
+    onContractViolation: (violation) => violations.push(violation),
+  })
   return { app, request: createContractClient(app, contract, runCoverage, violations).request }
 }

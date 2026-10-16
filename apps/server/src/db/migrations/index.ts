@@ -1,5 +1,6 @@
 import type { Migration, MigrationProvider } from 'kysely/migration'
 import * as initial from './0001_initial.ts'
+import * as activityEvents from './0002_activity_events.ts'
 
 /**
  * Every migration, by name, in the order they ran. Kysely sorts by name, hence the numeric prefix. A static list rather
@@ -8,6 +9,7 @@ import * as initial from './0001_initial.ts'
  */
 export const migrations: Readonly<Record<string, Migration>> = {
   '0001_initial': initial,
+  '0002_activity_events': activityEvents,
 }
 
 export const migrationProvider: MigrationProvider = {

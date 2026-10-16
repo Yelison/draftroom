@@ -6,7 +6,10 @@ import { operationRoute } from '../../src/http/operation-route.ts'
 import { createContractClient, findOperation, ContractError } from './contract-client.ts'
 import { ContractCoverage } from './contract-coverage.ts'
 import { createDatabase } from '../../src/db/database.ts'
+import type { AuthProvider } from '../../src/http/auth/auth-provider.ts'
 import { unreachableDatabaseUrl } from './unreachable-database.ts'
+
+const workspaceId = '0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01'
 
 let contract: Contract
 beforeAll(() => {
@@ -35,12 +38,16 @@ describe('findOperation', () => {
 })
 
 describe('the contract client', () => {
+  // These tests are about the client, not about who is calling: everyone is the same person.
+  const authProvider: AuthProvider = {
+    authenticate: () => Promise.resolve({ status: 'authenticated', principal: { userId: 'someone' } }),
+  }
   const unusedDatabase = () => createDatabase(unreachableDatabaseUrl)
 
   it('returns a response that follows the contract and records the operation as exercised', async () => {
     const coverage = new ContractCoverage()
     const database = unusedDatabase()
-    app = buildApp({ database, contract })
+    app = buildApp({ database, authProvider, contract })
     const client = createContractClient(app, contract, coverage, [])
 
     const response = await client.request({ method: 'GET', url: '/api/health/live' })
@@ -64,12 +71,13 @@ describe('the contract client', () => {
   it('fails the test when the server replaced a response, whose 500 would pass the contract by itself', async () => {
     const violations: ContractViolation[] = []
     const database = unusedDatabase()
-    app = buildApp({ database, contract, onContractViolation: (violation) => violations.push(violation) })
-    app.route(operationRoute(contract, 'getMe', () => ({ id: 'not-a-uuid' })))
+    app = buildApp({ database, authProvider, contract, onContractViolation: (violation) => violations.push(violation) })
+    // `listMembers` has no route of its own yet, so the test brings one that answers against the contract.
+    app.route(operationRoute(contract, 'listMembers', () => ({ items: [{ userId: 'not-a-uuid' }] })))
     const client = createContractClient(app, contract, new ContractCoverage(), violations)
 
-    await expect(client.request({ method: 'GET', url: '/api/me' })).rejects.toThrow(
-      /answered getMe against the contract/,
+    await expect(client.request({ method: 'GET', url: `/api/workspaces/${workspaceId}/members` })).rejects.toThrow(
+      /answered listMembers against the contract/,
     )
     await database.destroy()
   })

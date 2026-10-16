@@ -22,6 +22,34 @@ describe('the loaded contract', () => {
     expect(contract.operations.size).toBeGreaterThan(40)
   })
 
+  it.each([
+    ['getLiveness', { session: false, csrf: false }],
+    ['signIn', { session: false, csrf: false }],
+    ['getDocument', { session: true, csrf: false }],
+    ['listDocuments', { session: true, csrf: false }],
+    ['updateDocument', { session: true, csrf: true }],
+    ['pinDocument', { session: true, csrf: true }],
+    ['deleteFolder', { session: true, csrf: true }],
+  ])(
+    'knows what %s asks of the caller: a session, and the CSRF token where it changes state',
+    (operationId, security) => {
+      expect(contract.operation(operationId).security).toEqual(security)
+    },
+  )
+
+  it('asks for a session on every operation that is not public, and for CSRF exactly on the methods that change state', () => {
+    const publicOperations = ['signUp', 'signIn', 'getLiveness', 'getReadiness']
+    const wrong = [...contract.operations.values()]
+      .filter((operation) => !publicOperations.includes(operation.id))
+      .filter((operation) => {
+        const changesState = operation.method !== 'GET'
+        return !operation.security.session || operation.security.csrf !== changesState
+      })
+      .map((operation) => operation.id)
+
+    expect(wrong).toEqual([])
+  })
+
   it('refuses an operation it does not have', () => {
     expect(() => contract.operation('dropEverything')).toThrow('no operation')
   })

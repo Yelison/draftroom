@@ -22,7 +22,17 @@ const catalogue: Readonly<Record<ErrorCode, { readonly status: number; readonly 
   unavailable: { status: 503, title: 'The server is not ready.' },
 }
 
-export function problemBody(code: ErrorCode, errors?: readonly FieldError[]): Problem {
+/** What a problem can carry besides its code: the fields at fault, or the resource a stale revision lost against. */
+export interface ProblemDetails {
+  readonly errors?: readonly FieldError[]
+  /** The resource as the server holds it now, for a `revision-conflict`. */
+  readonly current?: Schema<'Document'> | Schema<'Folder'>
+}
+
+/** A `Problem`, or the `revision-conflict` variant that adds `current`. */
+export type ProblemBody = Problem & Pick<ProblemDetails, 'current'>
+
+export function problemBody(code: ErrorCode, { errors, current }: ProblemDetails = {}): ProblemBody {
   const { status, title } = catalogue[code]
   return {
     type: `/problems/${code}`,
@@ -30,11 +40,29 @@ export function problemBody(code: ErrorCode, errors?: readonly FieldError[]): Pr
     status,
     code,
     ...(errors === undefined || errors.length === 0 ? {} : { errors: [...errors] }),
+    ...(current === undefined ? {} : { current }),
   }
 }
 
-export function sendProblem(reply: FastifyReply, code: ErrorCode, errors?: readonly FieldError[]): FastifyReply {
-  return reply.code(catalogue[code].status).type(problemMediaType).send(problemBody(code, errors))
+export function sendProblem(reply: FastifyReply, code: ErrorCode, details?: ProblemDetails): FastifyReply {
+  return reply.code(catalogue[code].status).type(problemMediaType).send(problemBody(code, details))
+}
+
+/**
+ * An answer the contract defines, thrown from anywhere below a handler (a loader, a transaction) so that the handler
+ * reads straight down. Throwing inside a transaction also rolls it back, which a `reply.send` could not do. Anything
+ * else that is thrown is a bug of the server and still leaves as a 500.
+ */
+export class ProblemError extends Error {
+  readonly code: ErrorCode
+  readonly details: ProblemDetails
+
+  constructor(code: ErrorCode, details: ProblemDetails = {}) {
+    super(`The request is answered with ${code}`)
+    this.name = 'ProblemError'
+    this.code = code
+    this.details = details
+  }
 }
 
 /**
@@ -64,9 +92,10 @@ const isParserError = (error: FastifyError, status: number): boolean =>
 
 /** Maps what the framework or a handler throws to a problem; what the contract does not define is a 500, logged. */
 export function handleError(error: FastifyError, request: FastifyRequest, reply: FastifyReply): FastifyReply {
+  if (error instanceof ProblemError) return sendProblem(reply, error.code, error.details)
   const status = error.statusCode ?? 500
   if (error.code === 'FST_ERR_CTP_BODY_TOO_LARGE') return sendProblem(reply, 'too-large')
-  if (isParserError(error, status)) return sendProblem(reply, 'validation-failed', [wholeBody])
+  if (isParserError(error, status)) return sendProblem(reply, 'validation-failed', { errors: [wholeBody] })
   const code = codeByStatus.get(status)
   if (code !== undefined) return sendProblem(reply, code)
 
@@ -81,7 +110,7 @@ export function handleError(error: FastifyError, request: FastifyRequest, reply:
  */
 export function handleFrameworkError(error: FastifyError, request: FastifyRequest, reply: FastifyReply): void {
   if (error.code === 'FST_ERR_BAD_URL') {
-    sendProblem(reply, 'validation-failed', [wholeBody])
+    sendProblem(reply, 'validation-failed', { errors: [wholeBody] })
     return
   }
   request.log.error({ err: error }, 'framework error')

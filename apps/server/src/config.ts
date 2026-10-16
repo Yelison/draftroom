@@ -33,6 +33,12 @@ const environmentSchema = z.object({
 
 export interface Config {
   readonly nodeEnv: NodeEnvironment
+  /**
+   * Whether the development identity (`X-Dev-User`) may serve. Only when `NODE_ENV` was set, to `development` or `test`:
+   * a missing or empty variable still means `development` for everything else here, but must never open a door that lets
+   * anyone act as anyone, because forgetting the variable is the likeliest mistake in a deployment.
+   */
+  readonly devIdentity: boolean
   readonly apiPort: number
   /** Reserved for the collaboration server (phase 2); validated now so a clash is found at start-up. */
   readonly collabPort: number
@@ -87,6 +93,14 @@ function inconsistencies(picked: Picked): string[] {
 }
 
 /**
+ * Whether `NODE_ENV` is set, explicitly, to `development` or `test`: the one rule behind everything that exists only for
+ * development (the `X-Dev-User` identity, the demo seed). A missing or empty variable is not it, although the rest of the
+ * configuration reads it as `development`, because forgetting the variable is the likeliest mistake in a deployment.
+ */
+export const isDevelopmentEnvironment = (environment: NodeJS.ProcessEnv): boolean =>
+  environment['NODE_ENV'] === 'development' || environment['NODE_ENV'] === 'test'
+
+/**
  * Reads the configuration from the environment and refuses to start on anything missing or wrong, naming every problem
  * at once. Only the variables below are read: the rest of the environment is not ours to judge.
  */
@@ -99,6 +113,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config
 
   return {
     nodeEnv: env.NODE_ENV,
+    devIdentity: isDevelopmentEnvironment(environment),
     apiPort: env.API_PORT,
     collabPort: env.COLLAB_PORT,
     // Loopback while developing, so a laptop does not serve a development database to its network; a container

@@ -1,6 +1,7 @@
 import { ConfigError, loadConfig } from './config.ts'
 import { createDatabase } from './db/database.ts'
 import { buildApp } from './http/app.ts'
+import { authProviderFor } from './http/auth/select.ts'
 
 // The entry point of the server: `npm start`, or `npm run dev` with a watcher. Run by Node itself, with no build step.
 
@@ -16,7 +17,11 @@ function readConfig() {
 
 const config = readConfig()
 const database = createDatabase(config.databaseUrl)
-const app = buildApp({ database, logger: { level: 'info' } })
+const app = buildApp({
+  database,
+  authProvider: authProviderFor(config, database),
+  logger: { level: 'info' },
+})
 
 async function shutDown(signal: NodeJS.Signals): Promise<void> {
   app.log.info({ signal }, 'shutting down')
