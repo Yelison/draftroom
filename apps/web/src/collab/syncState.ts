@@ -19,11 +19,9 @@ import type {
 export type SyncPhase = SyncState | 'initial'
 
 /**
- * Causes of `error` that the protocol lists, and the one the server's transient authentication failure adds: it ends
- * the connection like a stopped cause but is retried, and it never purges the local copy.
+ * The reasons a refusal can carry: the contract's two, and the one the server sends when it failed while authenticating
+ * (a fault of its own, which says nothing about the person).
  */
-export type SyncFault = SyncErrorCause | 'unavailable'
-
 export type SyncDenial = AuthDeniedReason | 'unavailable'
 
 /** The contract's events, with the refusal reasons of `SyncDenial`. */
@@ -34,7 +32,7 @@ export type SyncInput =
 export interface SyncModel {
   readonly state: SyncPhase
   /** Why the state is `error`; `null` in every other state. */
-  readonly cause: SyncFault | null
+  readonly cause: SyncErrorCause | null
   /** What the server authorised for this connection; `null` until the first authentication of the session. */
   readonly scope: AuthorizedScope | null
   /** The provider's `synced`: the server's SyncStep2 of the current connection arrived. */
@@ -58,6 +56,8 @@ export type SyncEffect =
   | { readonly type: 'connect' }
   /** `disconnect()` and then `connect()`, also when the socket is still open. */
   | { readonly type: 'reopen' }
+  /** Close the connection and open it again after the delay of the client's own back-off (protocol section 6.5). */
+  | { readonly type: 'retry-with-backoff' }
   | { readonly type: 'purge-local-copy' }
   /** A downgrade to read-only with changes that were never stored: drop them and open again from the server. */
   | { readonly type: 'discard-offline-changes' }
@@ -108,7 +108,7 @@ export function isEditable(model: SyncModel): boolean {
 }
 
 /** The action `error` offers: everything is retried except a document that is too large, which has to be reloaded. */
-export const errorAction = (cause: SyncFault): 'retry' | 'discard-and-reload' =>
+export const errorAction = (cause: SyncErrorCause): 'retry' | 'discard-and-reload' =>
   cause === 'document-too-large' ? 'discard-and-reload' : 'retry'
 
 /** In `synchronising` when the guard does not hold, in `synced` when it does. */
@@ -121,7 +121,7 @@ const settle = (model: SyncModel): SyncModel => ({
 /** What a connection that is gone leaves behind: the handshake and the counter belong to the connection. */
 const withoutConnection = (model: SyncModel): SyncModel => ({ ...model, handshakeDone: false, unsyncedChanges: 0 })
 
-function stop(model: SyncModel, cause: SyncFault): SyncStep {
+function stop(model: SyncModel, cause: SyncErrorCause): SyncStep {
   return { model: { ...withoutConnection(model), state: 'error', cause }, effects: [{ type: 'disconnect' }] }
 }
 
@@ -129,6 +129,14 @@ function revoke(model: SyncModel): SyncStep {
   return {
     model: { ...withoutConnection(model), state: 'revoked', cause: null, hasPending: false },
     effects: [{ type: 'purge-local-copy' }, { type: 'disconnect' }],
+  }
+}
+
+/** The server could not answer: no connection for now, and the client tries again on its own schedule. */
+function retryLater(model: SyncModel): SyncStep {
+  return {
+    model: { ...withoutConnection(model), state: 'reconnecting', cause: null },
+    effects: [{ type: 'retry-with-backoff' }],
   }
 }
 
@@ -185,8 +193,9 @@ function deny(model: SyncModel, reason: SyncDenial): SyncStep {
       // the second, and the copy must go. Before, it is a document that was never theirs.
       return model.hasBeenAuthorized ? revoke(model) : stop(model, 'not-found')
     default:
-      // A fault of the server, not an answer about the person: the copy stays, and so does the offer to try again.
-      return stop(model, 'unavailable')
+      // A fault of the server, not an answer about the person: nothing stops, the copy stays and the editor stays as it
+      // was, and the connection is tried again by itself.
+      return isStopped(model) ? unchanged(model) : retryLater(model)
   }
 }
 

@@ -35,7 +35,6 @@ describe('what is said about the changes when the connection has a problem', () 
     { cause: 'store-timeout', title: "We can't confirm that your latest changes are stored" },
     { cause: 'unauthenticated', title: 'Your session ended' },
     { cause: 'not-found', title: "We couldn't open this document" },
-    { cause: 'unavailable', title: "The document isn't available right now" },
   ] as const)('offers a retry for $cause, and presses it once', async ({ cause, title }) => {
     const { user, onRetry, onDiscard } = show({ cause, action: 'retry', notice: null })
 

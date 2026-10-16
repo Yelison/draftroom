@@ -5,6 +5,7 @@ import {
   parseStatelessEvent,
   type AuthorizedScope,
   type StatelessEvent,
+  type SyncErrorCause,
   type SyncState,
 } from '@draftroom/contract/collab'
 import { HocuspocusProvider, HocuspocusProviderWebsocket, WebSocketStatus } from '@hocuspocus/provider'
@@ -21,7 +22,6 @@ import {
   transition,
   type SyncDenial,
   type SyncEffect,
-  type SyncFault,
   type SyncInput,
   type SyncModel,
 } from './syncState.ts'
@@ -33,7 +33,7 @@ export type SessionNotice = 'offline-changes-discarded'
 export interface CollabSnapshot {
   readonly state: SyncState
   /** Why the state is `error`; `null` in every other state. */
-  readonly cause: SyncFault | null
+  readonly cause: SyncErrorCause | null
   /** What `error` offers: a retry, or discarding the local changes and reloading (a retry would send the same message). */
   readonly action: 'retry' | 'discard-and-reload' | null
   /** Whether the editor accepts edits: the state allows it and what is unsent is within its budget. */
@@ -217,6 +217,9 @@ class ProviderSession implements CollabSession {
         break
       case 'reopen':
         this.reopen()
+        break
+      case 'retry-with-backoff':
+        this.reconnectAfter(null)
         break
       case 'purge-local-copy':
         // There is no copy outside this page yet: what is pending leaves with the session. Nothing is uploaded after it.

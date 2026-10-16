@@ -24,7 +24,7 @@ export function SyncAlerts({ snapshot, onRetry, onDiscard, onDismissNotice }: Sy
     <div className={styles.alerts}>
       {cause !== null && (
         <Alert
-          tone={cause === 'store-timeout' || cause === 'unavailable' ? 'amber' : 'red'}
+          tone={cause === 'store-timeout' ? 'amber' : 'red'}
           live
           title={intl.formatMessage({ id: `sync.problem.${cause}.title` })}
         >

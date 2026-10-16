@@ -26,6 +26,7 @@ const disconnect: SyncEffect = { type: 'disconnect' }
 const connect: SyncEffect = { type: 'connect' }
 const reopen: SyncEffect = { type: 'reopen' }
 const purge: SyncEffect = { type: 'purge-local-copy' }
+const retryWithBackoff: SyncEffect = { type: 'retry-with-backoff' }
 const start: SyncEffect = { type: 'start-ack-timer' }
 const stopTimer: SyncEffect = { type: 'stop-ack-timer' }
 
@@ -301,11 +302,26 @@ describe('the transitions of section 8.2', () => {
       effects: [disconnect],
     },
     {
-      row: 'denied for a fault of the server is a retryable error that purges nothing',
-      from: { state: 'reconnecting', hasBeenAuthorized: true, hasPending: true },
+      row: 'denied for a fault of the server is a reconnection that purges nothing and keeps what was pending',
+      from: { state: 'synced', scope: 'read-write', hasBeenAuthorized: true, hasPending: true },
+      event: { type: 'authentication-denied', reason: 'unavailable' },
+      to: 'reconnecting',
+      effects: [retryWithBackoff],
+      pending: true,
+    },
+    {
+      row: 'denied for a fault of the server while opening for the first time keeps waiting',
+      from: { state: 'connecting' },
+      event: { type: 'authentication-denied', reason: 'unavailable' },
+      to: 'reconnecting',
+      effects: [retryWithBackoff],
+    },
+    {
+      row: 'denied for a fault of the server does not restart a stopped error',
+      from: { state: 'error', cause: 'not-found' },
       event: { type: 'authentication-denied', reason: 'unavailable' },
       to: 'error',
-      effects: [disconnect],
+      effects: [],
     },
     {
       row: 'document-too-large',
@@ -520,6 +536,29 @@ describe('the transitions of section 8.2', () => {
   })
 })
 
+describe('a refusal for a fault of the server', () => {
+  it('leaves the editor editable and never says error, from the first answer to the recovery', () => {
+    const end = play([...waiting, { type: 'authentication-denied', reason: 'unavailable' }])
+
+    expect(end.state).toBe('reconnecting')
+    expect(isEditable(end.model)).toBe(true)
+    expect(end.effects).not.toContainEqual(purge)
+  })
+
+  it('ends synced only after the next connection is authorised, handshaken and covered by a stored', () => {
+    const end = play([
+      ...waiting,
+      { type: 'authentication-denied', reason: 'unavailable' },
+      readWrite,
+      handshake,
+      unsynced(0),
+      covered,
+    ])
+
+    expect(end.state).toBe('synced')
+  })
+})
+
 describe('what a state ignores', () => {
   const everyEvent: SyncEvent[] = [
     open,
@@ -638,7 +677,6 @@ describe('what the editor and the person are offered', () => {
     { cause: 'store-timeout', editable: true, action: 'retry' },
     { cause: 'unauthenticated', editable: false, action: 'retry' },
     { cause: 'not-found', editable: false, action: 'retry' },
-    { cause: 'unavailable', editable: false, action: 'retry' },
     { cause: 'document-too-large', editable: false, action: 'discard-and-reload' },
   ] as const)('an error with cause $cause: editable $editable, offers $action', ({ cause, editable, action }) => {
     const model = {

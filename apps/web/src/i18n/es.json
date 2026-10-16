@@ -65,8 +65,6 @@
   "sync.problem.unauthenticated.description": "Vuelve a conectarte para seguir editando. Lo que escribiste sigue aquí.",
   "sync.problem.not-found.title": "No pudimos abrir este documento",
   "sync.problem.not-found.description": "Puede que se haya eliminado o que no tengas acceso a él.",
-  "sync.problem.unavailable.title": "El documento no está disponible ahora mismo",
-  "sync.problem.unavailable.description": "Es algo temporal. Lo que escribiste sigue aquí.",
   "sync.problem.document-too-large.title": "Este documento es demasiado grande para seguir editándolo",
   "sync.problem.document-too-large.description": "No se pueden enviar tus últimos cambios. Puedes descartar lo que no se guardó y cargar el documento de nuevo.",
   "sync.problem.retry": "Reintentar",
