@@ -2,6 +2,7 @@ import {
   CLOSE_CODES,
   serializeStatelessEvent,
   documentName as documentNameOf,
+  parseDocumentName,
   type CloseCodeName,
   type StatelessEvent,
 } from '@draftroom/contract/collab'
@@ -35,8 +36,11 @@ export interface ConnectionSelector {
   readonly userId?: string
   /** The keyed hash kept in the connection context, not the session id itself. */
   readonly sessionId?: string
-  /** For the cases that split people, such as the owners and the others of a document that is archived. */
-  readonly where?: (context: ConnectionContext) => boolean
+  /**
+   * For the cases that split people, such as the owners and the others of a document that is archived, or each person by
+   * what they hold now on the document they have open.
+   */
+  readonly where?: (context: ConnectionContext, documentId: string) => boolean
 }
 
 const hasCondition = ({ documentId, userId, sessionId, where }: ConnectionSelector): boolean =>
@@ -48,7 +52,9 @@ export function selects(selector: ConnectionSelector, documentName: string, cont
   if (selector.userId !== undefined && context.userId !== selector.userId) return false
   // A connection without a session never matches one: two absences are not the same session.
   if (selector.sessionId !== undefined && context.sessionId !== selector.sessionId) return false
-  return selector.where === undefined || selector.where(context)
+  if (selector.where === undefined) return true
+  const documentId = parseDocumentName(documentName)
+  return documentId !== null && selector.where(context, documentId)
 }
 
 /**
