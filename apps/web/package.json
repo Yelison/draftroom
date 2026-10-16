@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:e2e-demo": "playwright test -c e2e-demo/playwright.config.ts",
+    "test:e2e-collab": "playwright test -c playwright.collab.config.ts",
+    "typecheck:e2e-collab": "tsc -p e2e-collab/tsconfig.json",
     "sync:forma-tokens": "node scripts/sync-forma-tokens.mjs"
   },
   "dependencies": {

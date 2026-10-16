@@ -1,0 +1,15 @@
+{
+  // The type check of the real-stack suite. The root `tsc -b` does not reach it: `tsconfig.node.json` lists what it covers.
+  "extends": "../tsconfig.node.json",
+  "compilerOptions": { "tsBuildInfoFile": "${configDir}/../node_modules/.tmp/tsconfig.e2e-collab.tsbuildinfo" },
+  // The suite talks to the server with the product's own HTTP client, so the client's modules are part of what it checks.
+  "include": [
+    "./*.ts",
+    "../playwright.collab.config.ts",
+    "../src/data/DataSource.ts",
+    "../src/data/errors.ts",
+    "../src/data/http/*.ts"
+  ],
+  "exclude": ["../src/data/http/*.test.ts"],
+  "references": [{ "path": "../../../packages/contract" }]
+}
