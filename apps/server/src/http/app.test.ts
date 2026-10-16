@@ -15,22 +15,17 @@ import { operationRoute } from './operation-route.ts'
 
 const problemType = 'application/problem+json'
 
-const documentId = 'c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44'
+const workspaceId = '0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01'
+const eventId = '08c0e2f4-6b7d-4f9e-9abc-8e0a2c4f6b88'
 const marta = { id: '5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11', name: 'Marta Ruiz' }
 
-const version = {
-  id: '08c0e2f4-6b7d-4f9e-9abc-8e0a2c4f6b88',
-  documentId,
-  kind: 'manual',
-  label: 'Before the workshop edits',
-  createdBy: marta,
-  createdAt: '2026-10-13T14:00:00Z',
-  sizeBytes: 2048,
-}
+const workspace = { id: workspaceId, name: 'Harbor & Pine', role: 'owner', createdAt: '2026-10-13T14:00:00Z' }
 
 // The operations below are the ones nobody has a route for yet: the app is tested with the handlers of the test, not
-// with the real ones, and a route cannot be declared twice. The tests of the real routes are in test/.
-const versionsUrl = `/api/documents/${documentId}/versions`
+// with the real ones, and a route cannot be declared twice. The tests of the real routes are in test/. A task that
+// brings a route for one of them moves these tests to another that is still free.
+const workspaceUrl = `/api/workspaces/${workspaceId}`
+const activityUrl = `${workspaceUrl}/activity`
 
 /** Everyone is Marta, and the provider records what it was asked: the app's checks, not an identity, are under test. */
 const signedInAsMarta: AuthProvider = {
@@ -126,6 +121,10 @@ const implementedOperations = [
   'removeAccess',
   'setGeneralAccess',
   'listTemplates',
+  'listVersions',
+  'createVersion',
+  'getVersionContent',
+  'restoreVersion',
 ]
 
 describe('the routes of the app', () => {
@@ -176,21 +175,21 @@ describe('the routes of the app', () => {
 })
 
 describe('a request that breaks the contract', () => {
-  function withVersionRoute(): FastifyInstance {
+  function withWorkspaceRoute(): FastifyInstance {
     const application = appWithoutDatabase()
-    application.route(operationRoute(contract, 'createVersion', (_request, reply) => reply.code(201).send(version)))
+    application.route(operationRoute(contract, 'updateWorkspace', (_request, reply) => reply.send(workspace)))
     return application
   }
   const create = (application: FastifyInstance, payload: unknown) =>
     application.inject({
-      method: 'POST',
-      url: `/api/documents/${documentId}/versions`,
+      method: 'PATCH',
+      url: workspaceUrl,
       payload: JSON.stringify(payload),
       headers: { 'content-type': 'application/json' },
     })
 
   it('gets the validation-failed problem of the contract, with the field and its code', async () => {
-    const response = await create(withVersionRoute(), { label: '' })
+    const response = await create(withWorkspaceRoute(), { name: '' })
 
     expect(response.statusCode).toBe(400)
     expect(response.headers['content-type']).toContain(problemType)
@@ -199,40 +198,40 @@ describe('a request that breaks the contract', () => {
       title: 'The request is not valid.',
       status: 400,
       code: 'validation-failed',
-      errors: [{ pointer: '/label', code: 'too-short' }],
+      errors: [{ pointer: '/name', code: 'too-short' }],
     })
   })
 
   it('gets too-large for a text over its limit', async () => {
-    const response = await create(withVersionRoute(), { label: 'a'.repeat(101) })
+    const response = await create(withWorkspaceRoute(), { name: 'a'.repeat(81) })
 
     expect(response.statusCode).toBe(413)
-    expect(response.json()).toMatchObject({ code: 'too-large', errors: [{ pointer: '/label', code: 'too-long' }] })
+    expect(response.json()).toMatchObject({ code: 'too-large', errors: [{ pointer: '/name', code: 'too-long' }] })
   })
 
   it('reaches the handler once it follows the contract', async () => {
-    const response = await create(withVersionRoute(), { label: 'Before the workshop edits' })
+    const response = await create(withWorkspaceRoute(), { name: 'Almazara' })
 
-    expect(response.statusCode).toBe(201)
+    expect(response.statusCode).toBe(200)
   })
 
   it('is refused for a path parameter that is not an id', async () => {
-    const response = await withVersionRoute().inject({
-      method: 'POST',
-      url: '/api/documents/nope/versions',
-      payload: { label: 'a' },
+    const response = await withWorkspaceRoute().inject({
+      method: 'PATCH',
+      url: '/api/workspaces/nope',
+      payload: { name: 'a' },
     })
 
     expect(response.json()).toMatchObject({
       code: 'validation-failed',
-      errors: [{ pointer: '/path/documentId', code: 'invalid-format' }],
+      errors: [{ pointer: '/path/workspaceId', code: 'invalid-format' }],
     })
   })
 
   it('is refused when the JSON cannot be read', async () => {
-    const response = await withVersionRoute().inject({
-      method: 'POST',
-      url: `/api/documents/${documentId}/versions`,
+    const response = await withWorkspaceRoute().inject({
+      method: 'PATCH',
+      url: workspaceUrl,
       payload: '{"body":',
       headers: { 'content-type': 'application/json' },
     })
@@ -245,9 +244,9 @@ describe('a request that breaks the contract', () => {
   })
 
   it('is refused when it is not JSON at all, because the contract has no 415', async () => {
-    const response = await withVersionRoute().inject({
-      method: 'POST',
-      url: `/api/documents/${documentId}/versions`,
+    const response = await withWorkspaceRoute().inject({
+      method: 'PATCH',
+      url: workspaceUrl,
       payload: 'body=a',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
     })
@@ -257,7 +256,7 @@ describe('a request that breaks the contract', () => {
   })
 
   it('is refused with too-large, and no field, when the body is bigger than the server reads', async () => {
-    const response = await create(withVersionRoute(), { label: 'a', padding: 'x'.repeat(1_100_000) })
+    const response = await create(withWorkspaceRoute(), { name: 'a', padding: 'x'.repeat(1_100_000) })
 
     expect(response.statusCode).toBe(413)
     expect(response.json()).toEqual({
@@ -273,11 +272,11 @@ describe('a handler that fails', () => {
   const failWith = (error: Error) => {
     const application = appWithoutDatabase()
     application.route(
-      operationRoute(contract, 'listVersions', () => {
+      operationRoute(contract, 'listWorkspaceActivity', () => {
         throw error
       }),
     )
-    return application.inject(versionsUrl)
+    return application.inject(activityUrl)
   }
 
   it('answers the internal-error problem and keeps the cause to itself', async () => {
@@ -307,13 +306,13 @@ describe('a handler that fails', () => {
   it("does not carry the handler's headers into the 500, a session cookie included", async () => {
     const application = appWithoutDatabase()
     application.route(
-      operationRoute(contract, 'listVersions', (_request, reply) => {
+      operationRoute(contract, 'listWorkspaceActivity', (_request, reply) => {
         reply.header('set-cookie', 'dr_session=abc; HttpOnly').header('etag', '"v1"')
         throw new Error('failed after the session was started')
       }),
     )
 
-    const response = await application.inject(versionsUrl)
+    const response = await application.inject(activityUrl)
 
     expect(response.statusCode).toBe(500)
     expect(response.headers).not.toHaveProperty('set-cookie')
@@ -336,25 +335,25 @@ describe('a response that breaks the contract', () => {
     const violations: ContractViolation[] = []
     const application = appWithoutDatabase(violations)
     application.route(
-      operationRoute(contract, 'listVersions', () => ({
-        items: [{ id: version.id, createdBy: marta }],
+      operationRoute(contract, 'listWorkspaceActivity', () => ({
+        items: [{ id: eventId, actor: marta }],
       })),
     )
 
-    const response = await application.inject(versionsUrl)
+    const response = await application.inject(activityUrl)
 
     expect(response.statusCode).toBe(500)
     expect(response.json()).toMatchObject({ code: 'internal-error' })
-    expect(response.body).not.toContain(version.id)
+    expect(response.body).not.toContain(eventId)
     expect(violations).toHaveLength(1)
-    expect(violations[0]).toMatchObject({ operationId: 'listVersions', status: 200 })
-    expect(violations[0]?.reason).toContain('kind')
+    expect(violations[0]).toMatchObject({ operationId: 'listWorkspaceActivity', status: 200 })
+    expect(violations[0]?.reason).toContain('type')
   })
 
   it("does not carry the handler's headers, a session cookie included", async () => {
     const application = appWithoutDatabase()
     application.route(
-      operationRoute(contract, 'listVersions', (_request, reply) =>
+      operationRoute(contract, 'listWorkspaceActivity', (_request, reply) =>
         reply
           .header('set-cookie', 'dr_session=abc; HttpOnly')
           .header('etag', '"v1"')
@@ -365,7 +364,7 @@ describe('a response that breaks the contract', () => {
       ),
     )
 
-    const response = await application.inject(versionsUrl)
+    const response = await application.inject(activityUrl)
 
     expect(response.statusCode).toBe(500)
     expect(response.headers).not.toHaveProperty('set-cookie')
@@ -379,9 +378,9 @@ describe('a response that breaks the contract', () => {
   it('is let through when the contract accepts it', async () => {
     const violations: ContractViolation[] = []
     const application = appWithoutDatabase(violations)
-    application.route(operationRoute(contract, 'listVersions', () => ({ items: [version], nextCursor: null })))
+    application.route(operationRoute(contract, 'listWorkspaceActivity', () => ({ items: [], nextCursor: null })))
 
-    expect((await application.inject(versionsUrl)).statusCode).toBe(200)
+    expect((await application.inject(activityUrl)).statusCode).toBe(200)
     expect(violations).toEqual([])
   })
 })
@@ -399,45 +398,45 @@ describe('the session check', () => {
     requests.length = 0
   })
 
-  function withVersionRoute(provider: AuthProvider): FastifyInstance {
+  function withWorkspaceRoute(provider: AuthProvider): FastifyInstance {
     const application = appWithoutDatabase([], provider)
-    application.route(operationRoute(contract, 'createVersion', (_request, reply) => reply.code(201).send(version)))
-    application.route(operationRoute(contract, 'listVersions', () => ({ items: [], nextCursor: null })))
+    application.route(operationRoute(contract, 'updateWorkspace', (_request, reply) => reply.send(workspace)))
+    application.route(operationRoute(contract, 'listWorkspaceActivity', () => ({ items: [], nextCursor: null })))
     return application
   }
   const post = (application: FastifyInstance, payload: string) =>
     application.inject({
-      method: 'POST',
-      url: `/api/documents/${documentId}/versions`,
+      method: 'PATCH',
+      url: workspaceUrl,
       payload,
       headers: { 'content-type': 'application/json' },
     })
 
   it('answers 401 to a request without a session before it reads the body, so a broken body tells nothing', async () => {
-    const response = await post(withVersionRoute(nobody), '{"body":')
+    const response = await post(withWorkspaceRoute(nobody), '{"body":')
 
     expect(response.statusCode).toBe(401)
     expect(response.json()).toMatchObject({ status: 401, code: 'unauthenticated' })
   })
 
   it('answers 401 before it checks the shape of the request', async () => {
-    const response = await post(withVersionRoute(nobody), JSON.stringify({ label: '' }))
+    const response = await post(withWorkspaceRoute(nobody), JSON.stringify({ name: '' }))
 
     expect(response.statusCode).toBe(401)
   })
 
   it('answers 403 csrf when the provider rejects the token, also before the body is read', async () => {
-    const response = await post(withVersionRoute(recording({ status: 'csrf-rejected' })), '{"body":')
+    const response = await post(withWorkspaceRoute(recording({ status: 'csrf-rejected' })), '{"body":')
 
     expect(response.statusCode).toBe(403)
     expect(response.json()).toMatchObject({ status: 403, code: 'csrf' })
   })
 
   it('asks for the CSRF token on a method that changes state, and only there', async () => {
-    const application = withVersionRoute(recording({ status: 'authenticated', principal: { userId: marta.id } }))
+    const application = withWorkspaceRoute(recording({ status: 'authenticated', principal: { userId: marta.id } }))
 
     await post(application, JSON.stringify({ body: 'Yes' }))
-    await application.inject(versionsUrl)
+    await application.inject(activityUrl)
 
     expect(requests).toEqual(['with csrf', 'without csrf'])
   })
