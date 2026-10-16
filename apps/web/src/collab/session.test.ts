@@ -50,27 +50,33 @@ async function typeAndStore(opening: Opened, text: string) {
 const snapshotOf = (doc: Y.Doc) => toBase64(Y.encodeSnapshot(Y.snapshot(doc)))
 
 describe('opening a document', () => {
-  it('treats a failure of the server while it authenticates as a reconnection: editable, retried by itself, nothing purged', async () => {
-    world = createWorld()
-    const opening = await opened()
-    typeInto(opening.doc, 'kept')
-    world.setAccess(editor, { denied: 'unavailable' })
+  // `unavailable` is the contract's. The other is what Hocuspocus itself answers when a hook throws without a reason, and any
+  // reason the contract does not list is a server that is not answering as it should: it never says that access was removed.
+  it.each(['unavailable', 'permission-denied'])(
+    'treats a refusal with the reason "%s" as a lost connection: editable, retried by itself, nothing purged',
+    async (reason) => {
+      world = createWorld()
+      const opening = await opened()
+      typeInto(opening.doc, 'kept')
+      world.setAccess(editor, { denied: reason })
 
-    world.server.closeConnections(4429, 'rate-limited')
-    await advance(1100)
-    expect(opening.session.getSnapshot()).toMatchObject({ state: 'reconnecting', cause: null, editable: true })
-    // It goes on trying with the back-off of section 6.5, never giving up and never asking the person to retry.
-    await advance(2100)
-    await advance(4100)
-    expect(opening.session.getSnapshot()).toMatchObject({ state: 'reconnecting', editable: true })
-    typeInto(opening.doc, ' and more', 4)
+      world.server.closeConnections(4429, 'rate-limited')
+      await advance(1100)
+      expect(opening.session.getSnapshot()).toMatchObject({ state: 'reconnecting', cause: null, editable: true })
+      // It goes on trying with the back-off of section 6.5, never giving up and never asking the person to retry.
+      await advance(2100)
+      await advance(4100)
+      expect(opening.session.getSnapshot()).toMatchObject({ state: 'reconnecting', editable: true })
+      typeInto(opening.doc, ' and more', 4)
 
-    world.setAccess(editor, { scope: 'read-write' })
-    await advance(8100)
-    await advance(1100)
-    expect(state(opening)).toBe('synced')
-    expect(textOf(world.server.document(wireName))).toBe('kept and more')
-  })
+      world.setAccess(editor, { scope: 'read-write' })
+      await advance(8100)
+      await advance(1100)
+      expect(state(opening)).toBe('synced')
+      expect(textOf(world.server.document(wireName))).toBe('kept and more')
+      expect(opening.states).not.toContain('revoked')
+    },
+  )
 })
 
 describe('what is said to be stored', () => {
