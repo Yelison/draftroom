@@ -226,7 +226,20 @@ describe('the presence of another person', () => {
 
     room.hostile.terminate()
     await room.untilPresence((states) => !states.has(clientId))
-
     expect(room.presenceOf(clientId)).toBeUndefined()
+
+    // Another connection may now publish under that id: the first one no longer owns it.
+    const another = await RawClient.connect(collab.url, { email: victim.email })
+    await another.join(room.documentId)
+    another.send(
+      outgoing.awareness(documentName(room.documentId), [
+        // A later clock than the removal left behind: Yjs ignores a presence update that is not newer than what it knows.
+        { clientId, clock: 10, state: { user: { id: victim.id, name: '', color: colour } } },
+      ]),
+    )
+    await room.untilPresence((states) => states.has(clientId))
+
+    expect(room.presenceOf(clientId)).toMatchObject({ user: { id: victim.id } })
+    another.terminate()
   })
 })
