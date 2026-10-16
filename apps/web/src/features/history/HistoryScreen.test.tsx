@@ -192,12 +192,15 @@ describe('the filters of the History screen', () => {
     await waitFor(() => expect(calls).toHaveLength(1))
 
     await within(main()).findByRole('button', { name: 'Load more' })
+    // Five minutes go by before the next page is asked for: a period counted from the clock would have moved.
+    vi.setSystemTime(new Date('2026-10-14T10:05:00.000Z'))
     await user.click(within(main()).getByRole('button', { name: 'Load more' }))
     await waitFor(() => expect(calls).toHaveLength(2))
 
     const instants = calls.map((call) => call.params.query?.from)
     expect(instants[0]).toBeDefined()
     expect(instants[1]).toBe(instants[0])
+    await waitFor(() => expect(rows()).toHaveLength(2))
   })
 
   it('say that no event matches, and take every filter off from the button that says so', async () => {
