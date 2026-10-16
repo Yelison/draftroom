@@ -102,7 +102,7 @@ export const memberRoutes: FastifyPluginCallback<RouteDependencies> = (
       const { workspaceId, userId: targetId } = request.params
       await authoriseWorkspace(database, workspaceId, actorId, 'manage-members')
 
-      const handedOver = await database.transaction().execute(async (trx) => {
+      const withAGrant = await database.transaction().execute(async (trx) => {
         const locked = await lockMembers(trx, workspaceId, [actorId, targetId])
         requireManager(locked, actorId)
         memberOf(locked, targetId)
@@ -112,9 +112,9 @@ export const memberRoutes: FastifyPluginCallback<RouteDependencies> = (
       await afterCommit(request, 'closing the connections of the member who was removed', () =>
         liveAccess.memberChanged(workspaceId, targetId),
       )
-      // The documents that changed hands: their owners have the access list open, and it has a new line.
-      for (const documentId of handedOver) {
-        await afterCommit(request, 'telling the people who have a handed-over document open', () =>
+      // The documents where the person had a grant: their owners have the list of access open, and it lost a line.
+      for (const documentId of withAGrant) {
+        await afterCommit(request, 'telling the people who have a document of the removed member open', () =>
           liveAccess.documentChanged(documentId),
         )
       }

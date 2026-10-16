@@ -216,6 +216,23 @@ describe('removing a member from the workspace', () => {
   })
 })
 
+describe('removing a member who held a lower grant', () => {
+  it('tells the owner who has the document open that the list of access lost a line', async () => {
+    const world = await newWorld()
+    const documentId = await newDocument(world, [[world.editor, 'viewer']])
+    const watching = await open(documentId, world.owner)
+
+    await api({
+      as: world.owner,
+      method: 'DELETE',
+      url: `/api/workspaces/${world.workspaceId}/members/${world.editor.id}`,
+    })
+
+    await vi.waitFor(() => expect(told(watching)).toEqual([{ type: 'access-changed' }]))
+    expect(watching.isOpen).toBe(true)
+  })
+})
+
 describe('changing a role while the person has the document open', () => {
   it('forces an editor made a viewer to reconnect read-only, and the next update they send by hand is not applied', async () => {
     const world = await newWorld()

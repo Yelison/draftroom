@@ -116,20 +116,20 @@ export interface Removal {
  * that document. Archived documents are handed over too. Everything else the person held (their other grants, their
  * pins) goes with their membership.
  *
- * Returns the documents that were handed over, for the people who have them open to be told.
+ * Returns every document where the person held a grant, read before the delete that cascades them away, for the owners
+ * who have the list of access open to be told that it lost a line (and, for the ones handed over, gained one).
  */
 export async function removeMember(trx: Transaction<Database>, removal: Removal): Promise<string[]> {
   const { workspaceId, actorId, removedId, owners } = removal
   const held = await trx
     .selectFrom('document_access')
-    .select('document_id')
+    .select(['document_id', 'role'])
     .where('workspace_id', '=', workspaceId)
     .where('user_id', '=', removedId)
-    .where('role', '=', 'owner')
     .orderBy('document_id')
     .execute()
-  const documentIds = held.map(({ document_id }) => document_id)
-  const alone = await soleOwnedBy(trx, removedId, documentIds)
+  const ownedIds = held.filter(({ role }) => role === 'owner').map(({ document_id }) => document_id)
+  const alone = await soleOwnedBy(trx, removedId, ownedIds)
   if (alone.length > 0) {
     const recipient = transferRecipient({ actorId, removedId }, owners)
     // Refused before this point: a workspace never loses its last owner who can act, and the actor is one.
@@ -148,5 +148,5 @@ export async function removeMember(trx: Transaction<Database>, removal: Removal)
     )
   }
   await trx.deleteFrom('memberships').where('workspace_id', '=', workspaceId).where('user_id', '=', removedId).execute()
-  return alone
+  return held.map(({ document_id }) => document_id)
 }
