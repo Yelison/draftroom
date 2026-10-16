@@ -1,3 +1,4 @@
+import type { SyncEvent } from '@draftroom/contract/collab'
 import { describe, expect, it } from 'vitest'
 import {
   createSyncModel,
@@ -6,7 +7,6 @@ import {
   isStopped,
   transition,
   type SyncEffect,
-  type SyncInput as SyncEvent,
   type SyncModel,
 } from './syncState.ts'
 
@@ -310,11 +310,25 @@ describe('the transitions of section 8.2', () => {
       pending: true,
     },
     {
-      row: 'denied for a fault of the server while opening for the first time keeps waiting',
+      row: 'denied for a fault of the server on a first connection keeps connecting',
       from: { state: 'connecting' },
       event: { type: 'authentication-denied', reason: 'unavailable' },
-      to: 'reconnecting',
+      to: 'connecting',
       effects: [retryWithBackoff],
+    },
+    {
+      row: 'denied for a fault of the server on a first connection with a local copy while offline is offline-local',
+      from: { state: 'connecting', hasLocalCopy: true, online: false },
+      event: { type: 'authentication-denied', reason: 'unavailable' },
+      to: 'offline-local',
+      effects: [disconnect],
+    },
+    {
+      row: 'denied for a fault of the server while the browser is offline waits for the network',
+      from: { state: 'synced', scope: 'read-write', online: false },
+      event: { type: 'authentication-denied', reason: 'unavailable' },
+      to: 'offline-local',
+      effects: [disconnect],
     },
     {
       row: 'denied for a fault of the server does not restart a stopped error',

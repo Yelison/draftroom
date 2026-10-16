@@ -18,16 +18,6 @@ import type {
  */
 export type SyncPhase = SyncState | 'initial'
 
-/**
- * The reasons a refusal can carry: the contract's two, and the one the server sends when it failed while authenticating
- * (a fault of its own, which says nothing about the person).
- */
-export type SyncDenial = AuthDeniedReason | 'unavailable'
-
-/** The contract's events, with the refusal reasons of `SyncDenial`. */
-export type SyncInput =
-  Exclude<SyncEvent, { type: 'authentication-denied' }> | { type: 'authentication-denied'; reason: SyncDenial }
-
 /** The facts the machine tracks beyond its state (protocol section 8). */
 export interface SyncModel {
   readonly state: SyncPhase
@@ -132,14 +122,6 @@ function revoke(model: SyncModel): SyncStep {
   }
 }
 
-/** The server could not answer: no connection for now, and the client tries again on its own schedule. */
-function retryLater(model: SyncModel): SyncStep {
-  return {
-    model: { ...withoutConnection(model), state: 'reconnecting', cause: null },
-    effects: [{ type: 'retry-with-backoff' }],
-  }
-}
-
 /** Going without a connection while the browser is offline: nothing to retry until it is back. */
 function goOffline(model: SyncModel): SyncStep {
   return {
@@ -184,7 +166,7 @@ function changeNetwork(model: SyncModel, online: boolean): SyncStep {
   return loses ? goOffline(next) : unchanged(next)
 }
 
-function deny(model: SyncModel, reason: SyncDenial): SyncStep {
+function deny(model: SyncModel, reason: AuthDeniedReason): SyncStep {
   switch (reason) {
     case 'unauthenticated':
       return stop(model, 'unauthenticated')
@@ -192,10 +174,15 @@ function deny(model: SyncModel, reason: SyncDenial): SyncStep {
       // The server answers "not found" for a document that is gone and for one the person lost: after having had it, it is
       // the second, and the copy must go. Before, it is a document that was never theirs.
       return model.hasBeenAuthorized ? revoke(model) : stop(model, 'not-found')
-    default:
-      // A fault of the server, not an answer about the person: nothing stops, the copy stays and the editor stays as it
-      // was, and the connection is tried again by itself.
-      return isStopped(model) ? unchanged(model) : retryLater(model)
+    case 'unavailable': {
+      // A fault of the server, not an answer about the person: it is a connection that could not be made, whatever the state
+      // was, so the copy stays and the editor stays as it was. A stopped error is not one that is made again by this.
+      if (isStopped(model)) return unchanged(model)
+      const lost = lose(model, model.online)
+      const tryAgain = lost.model.state === 'reconnecting' || lost.model.state === 'connecting'
+      // The browser being offline is for the network to say when it is back, and is not retried on a schedule.
+      return tryAgain ? { model: lost.model, effects: [...lost.effects, { type: 'retry-with-backoff' }] } : lost
+    }
   }
 }
 
@@ -212,7 +199,7 @@ function authenticate(model: SyncModel, scope: AuthorizedScope): SyncStep {
   }
 }
 
-function apply(model: SyncModel, event: SyncInput): SyncStep {
+function apply(model: SyncModel, event: SyncEvent): SyncStep {
   if (model.state === 'revoked') return unchanged(model)
 
   switch (event.type) {
@@ -285,7 +272,7 @@ function apply(model: SyncModel, event: SyncInput): SyncStep {
 const waitsForStored = (model: SyncModel): boolean =>
   model.state === 'synchronising' && model.handshakeDone && model.unsyncedChanges === 0 && model.hasPending
 
-function timerEffects(before: SyncModel, after: SyncModel, event: SyncInput): SyncEffect[] {
+function timerEffects(before: SyncModel, after: SyncModel, event: SyncEvent): SyncEffect[] {
   const wasWaiting = waitsForStored(before)
   const waits = waitsForStored(after)
   // Each change of the person starts the wait over, so a document that is being typed in never times out.
@@ -294,7 +281,7 @@ function timerEffects(before: SyncModel, after: SyncModel, event: SyncInput): Sy
 }
 
 /** The next facts and the effects for an event; the effects are in the order they must run. */
-export function transition(model: SyncModel, event: SyncInput): SyncStep {
+export function transition(model: SyncModel, event: SyncEvent): SyncStep {
   const step = apply(model, event)
   return { model: step.model, effects: [...step.effects, ...timerEffects(model, step.model, event)] }
 }

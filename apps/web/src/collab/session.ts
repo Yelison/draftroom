@@ -3,9 +3,11 @@ import {
   STORED_ACK_TIMEOUT_MS,
   documentName,
   parseStatelessEvent,
+  type AuthDeniedReason,
   type AuthorizedScope,
   type StatelessEvent,
   type SyncErrorCause,
+  type SyncEvent,
   type SyncState,
 } from '@draftroom/contract/collab'
 import { HocuspocusProvider, HocuspocusProviderWebsocket, WebSocketStatus } from '@hocuspocus/provider'
@@ -15,16 +17,7 @@ import { fromBase64 } from './base64.ts'
 import { browserNetwork, type Network } from './network.ts'
 import { PendingChanges } from './PendingChanges.ts'
 import { createReconnectBackoff, reconnectsOnItsOwn, type ReconnectBackoff } from './reconnection.ts'
-import {
-  createSyncModel,
-  errorAction,
-  isEditable,
-  transition,
-  type SyncDenial,
-  type SyncEffect,
-  type SyncInput,
-  type SyncModel,
-} from './syncState.ts'
+import { createSyncModel, errorAction, isEditable, transition, type SyncEffect, type SyncModel } from './syncState.ts'
 
 /** Said to the person once, after something they did while they were away could not be kept. */
 export type SessionNotice = 'offline-changes-discarded'
@@ -87,7 +80,8 @@ interface Link {
 
 const scopeOf = (scope: string): AuthorizedScope => (scope === 'read-write' ? 'read-write' : 'readonly')
 
-const denialOf = (reason: string): SyncDenial =>
+// A reason the contract does not list is a server that is not answering as it should: it is taken as a failure of its own.
+const denialOf = (reason: string): AuthDeniedReason =>
   reason === 'unauthenticated' || reason === 'not-found' ? reason : 'unavailable'
 
 const sameSnapshot = (a: CollabSnapshot, b: CollabSnapshot): boolean =>
@@ -124,7 +118,7 @@ class ProviderSession implements CollabSession {
   private readonly stopListeningToNetwork: () => void
   private readonly listeners = new Set<() => void>()
   private readonly eventListeners = new Set<(event: StatelessEvent) => void>()
-  private readonly queue: SyncInput[] = []
+  private readonly queue: SyncEvent[] = []
   private dispatching = false
   private current: CollabSnapshot
 
@@ -178,7 +172,7 @@ class ProviderSession implements CollabSession {
 
   // --- The machine and its effects ----------------------------------------------------------------------------------
 
-  private dispatch(event: SyncInput): void {
+  private dispatch(event: SyncEvent): void {
     this.queue.push(event)
     // An effect can cause an event of its own; it waits its turn so the machine never runs inside itself.
     if (this.dispatching) return
