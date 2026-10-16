@@ -92,12 +92,6 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
       durableAckExtension({ durability, log }),
       limitsExtension({ durability, now }),
       awarenessGuardExtension(),
-      {
-        extensionName: 'draftroom-stateless-from-clients',
-        // Clients never send stateless messages (protocol §5.4): comments and metadata go through REST. Whatever arrives is
-        // ignored, and it has already counted against the rate limit.
-        async onStateless() {},
-      },
     ],
   })
 
