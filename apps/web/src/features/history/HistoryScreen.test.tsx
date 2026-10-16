@@ -123,8 +123,10 @@ describe('the History screen', () => {
     })
 
     await heading()
-    expect(await within(main()).findByText('Loading the history')).toHaveAttribute('role', 'status')
-    expect(within(main()).getByRole('group', { name: 'Filter the history' })).toBeInTheDocument()
+    // The filters are there, which the workspace's own skeleton has not: this is the history that is on its way.
+    expect(await within(main()).findByRole('group', { name: 'Filter the history' })).toBeInTheDocument()
+    expect(within(main()).getByText('Loading the history')).toHaveAttribute('role', 'status')
+    expect(within(main()).queryByText('Nothing has happened yet')).not.toBeInTheDocument()
   })
 
   it('says nothing has happened when the history is empty', async () => {
