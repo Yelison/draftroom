@@ -25,7 +25,7 @@ export function useTrashFocus(list: RefObject<HTMLUListElement | null>, ids: rea
   }, [ids, list])
 
   // Declared after the effect above: a row that leaves is given the focus before a page that arrives, as when they were one.
-  const loadingMore = useFocusFirstArrival(list, ids.length, rowAction)
+  const loadingMore = useFocusFirstArrival(list, ids, rowAction)
 
   return {
     /** The row of this document is about to leave the list. */

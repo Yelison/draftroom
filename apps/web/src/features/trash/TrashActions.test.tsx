@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { DataSource } from '../../data/DataSource.ts'
 import { keysAfterMutation } from '../../data/queryKeys.ts'
 import { workspaceFixtures } from '../documents/testing/renderScreen.tsx'
-import { answer, archived, main, openTrash, rowButton, spoken } from './testing/openTrash.tsx'
+import { answer, archived, main, onePerPage, openTrash, renderScreen, rowButton, spoken } from './testing/openTrash.tsx'
 
 const workspaceId = workspaceFixtures.harborPine.id
 const { first, second } = archived
@@ -123,6 +123,33 @@ describe('restoring a document', () => {
     )
     await waitFor(() => expect(within(main()).queryByText(second.title)).not.toBeInTheDocument())
     expect(invalidatedKeys()).toEqual(keysAfterMutation('restoreDocument', { workspaceId, documentId: second.id }))
+  })
+})
+
+describe('restoring a document while the next page is on its way', () => {
+  it('leaves the focus on the first row of the page when it arrives, not on the one after it', async () => {
+    // The page that was asked for is held, so the restore answers before it.
+    let release = () => {}
+    const pageInFlight = new Promise<void>((resolve) => (release = resolve))
+    const slowSecondPage = (dataSource: DataSource): DataSource => {
+      const paged = onePerPage(dataSource)
+      return {
+        ...paged,
+        listDocuments: async (request) => {
+          if (request?.params.query?.cursor !== undefined) await pageInFlight
+          return paged.listDocuments(request)
+        },
+      }
+    }
+    const { user } = renderScreen('/trash', { wrap: slowSecondPage })
+    await within(main()).findByText(first.title)
+    await user.click(within(main()).getByRole('button', { name: 'Load more' }))
+
+    await user.click(rowButton('Restore', first.title))
+    await waitFor(() => expect(within(main()).queryByText(first.title)).not.toBeInTheDocument())
+    await act(async () => release())
+
+    await waitFor(() => expect(rowButton('Restore', second.title)).toHaveFocus())
   })
 })
 

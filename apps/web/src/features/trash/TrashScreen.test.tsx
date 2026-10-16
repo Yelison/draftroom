@@ -1,8 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { localeStorageKey } from '../../i18n/locale.ts'
-import { answer, archived, main, renderScreen } from './testing/openTrash.tsx'
-import type { DataSource } from '../../data/DataSource.ts'
+import { answer, archived, main, onePerPage, renderScreen } from './testing/openTrash.tsx'
 
 const heading = () => screen.findByRole('heading', { level: 1, name: 'Trash' })
 
@@ -100,17 +99,6 @@ describe('the way to the Trash', () => {
 })
 
 describe('the pages of the Trash screen', () => {
-  const onePerPage = (dataSource: DataSource): DataSource => ({
-    ...dataSource,
-    listDocuments: (request) =>
-      dataSource.listDocuments({
-        params: {
-          path: { workspaceId: request?.params.path.workspaceId ?? '' },
-          query: { ...request?.params.query, limit: 1 },
-        },
-      }),
-  })
-
   it('loads the next page when asked, and moves the focus to the first document that arrived', async () => {
     const { user } = renderScreen('/trash', { wrap: onePerPage })
     await within(main()).findByText(archived.first.title)

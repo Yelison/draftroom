@@ -1,7 +1,7 @@
 import type { Schema } from '@draftroom/contract'
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query'
 import { Button } from '@yelison/forma-ui'
-import { useRef, type ReactNode } from 'react'
+import { useMemo, useRef, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { DocumentCard } from './DocumentCard.tsx'
@@ -38,10 +38,11 @@ export function DocumentCollection({ workspaceId, folderId, term, empty, onActio
     }),
     placeholderData: keepPreviousData,
   })
-  const documents = query.data?.pages.flatMap((page) => page.items) ?? []
+  const documents = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data])
+  const ids = useMemo(() => documents.map((document) => document.id), [documents])
   const list = useRef<HTMLUListElement>(null)
 
-  const loadingMore = useFocusFirstArrival(list, documents.length, 'a')
+  const loadingMore = useFocusFirstArrival(list, ids, 'a')
 
   if (query.isPending) return <DocumentsSkeleton />
   if (query.isError) return <QueryFailure onRetry={() => void query.refetch()} retrying={query.isFetching} />
