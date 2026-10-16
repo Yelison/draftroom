@@ -129,7 +129,7 @@ describe('a connection that is refused', () => {
 })
 
 describe('an authentication that fails for a reason of the server', () => {
-  it('is not answered not-found, which a client that had access would take as its access being removed', async () => {
+  it('is answered unavailable and never not-found, which a client that had access would take as its access being removed', async () => {
     const broken: AuthProvider = { authenticate: () => Promise.reject(new Error('The session store is down')) }
     const unreliable = await startCollab(db, { authProvider: broken })
     try {
@@ -138,7 +138,10 @@ describe('an authentication that fails for a reason of the server', () => {
       const reason = await failing.waitForDenied()
       failing.destroy()
 
-      expect(['unauthenticated', 'not-found']).not.toContain(reason)
+      expect(reason).toBe('unavailable')
+      expect(unreliable.log.entries).toContainEqual(
+        expect.objectContaining({ level: 'error', message: 'authenticating a connection failed' }),
+      )
     } finally {
       await unreliable.close()
     }

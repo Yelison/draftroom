@@ -89,7 +89,7 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
     yDocOptions: { gc: true, gcFilter: () => true },
     extensions: [
       upgradeGuardExtension({ allowedOrigins: config.allowedOrigins, development: config.devIdentity }, sockets),
-      authenticateExtension({ database, authProvider, sessionSecret: config.sessionSecret }),
+      authenticateExtension({ database, authProvider, sessionSecret: config.sessionSecret, log }),
       persistenceExtension({ store, durability, retry, log }),
       durableAckExtension({ durability, log }),
       limitsExtension({ durability, now }),
