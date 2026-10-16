@@ -233,6 +233,33 @@ describe('restoring a version into a document that people have open', () => {
     ).toEqual(['Old one', 'Old two'])
   })
 
+  it('tells a person who connects afterwards, with the restored content in their copy, that it is stored', async () => {
+    // From the restore on, no store can write: what the restore wrote itself is the only thing the server can say is stored.
+    let refusing = false
+    world = await startWorld({
+      store: (real) => ({
+        load: (documentId) => real.load(documentId),
+        save: (documentId, state) =>
+          refusing ? Promise.reject(new Error('The database refused the write')) : real.save(documentId, state),
+      }),
+    })
+    const documentId = await freshDocument('Current')
+    const versionId = await versionOf(documentId, 'Old one', 'Old two')
+    const present = world.clients.open(documentId, { email: editorA.email })
+    await present.waitForSynced()
+    refusing = true
+
+    const response = await restore(versionId)
+
+    expect(response.statusCode).toBe(200)
+    const restored = (await versionsOf(db, documentId)).find((version) => version.id === bodyAs<Version>(response).id)
+    const copy = new Y.Doc()
+    Y.applyUpdate(copy, restored?.state ?? new Uint8Array())
+    const person = world.clients.open(documentId, { email: editorB.email, doc: copy })
+    // The copy holds the restored content and nothing the server lacks: it is stored exactly when the server says it wrote it.
+    await person.waitForStoredCovering(Y.encodeStateAsUpdate(copy))
+  })
+
   it('keeps the nodes it did not have to change: an edit in flight to one survives, and one to a removed node is lost', async () => {
     world = await startWorld()
     const documentId = await freshDocument('Kept', 'Removed')
