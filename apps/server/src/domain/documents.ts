@@ -15,8 +15,8 @@ export interface DocumentMetadata {
 }
 
 export interface MetadataPatch {
-  readonly title?: string
-  readonly folderId?: string | null
+  readonly title?: string | undefined
+  readonly folderId?: string | null | undefined
 }
 
 /** What a patch changes about a document, and so what history records. A field sent with its current value changes nothing. */

@@ -40,9 +40,16 @@ export type RequestVerdict =
 
 export type ResponseVerdict = { readonly ok: true } | { readonly ok: false; readonly reason: string }
 
+/** What an operation asks of the caller before anything else: a session, and for a method that changes state, CSRF. */
+export interface OperationSecurity {
+  readonly session: boolean
+  readonly csrf: boolean
+}
+
 export interface ContractOperation {
   readonly id: string
   readonly method: HttpMethod
+  readonly security: OperationSecurity
   /** The path as the contract writes it: `/api/documents/{documentId}`. */
   readonly path: string
   /** The same path in the form Fastify's router reads: `/api/documents/:documentId`. */
@@ -160,9 +167,12 @@ export function loadContract(source: ContractDocument = readContractDocument()):
         }),
       )
 
+      const requirement = declared.security?.[0] ?? {}
+
       operations.set(declared.operationId, {
         id: declared.operationId,
         method,
+        security: { session: 'session' in requirement, csrf: 'csrf' in requirement },
         path,
         routePath: path.replaceAll(/\{([^}]+)\}/g, ':$1'),
         checkRequest(parts) {

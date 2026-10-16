@@ -1,18 +1,12 @@
 import type { FastifyPluginCallback } from 'fastify'
-import { sql, type Kysely } from 'kysely'
+import { sql } from 'kysely'
 import type { Schema } from '@draftroom/contract'
-import type { Database } from '../../db/tables.ts'
 import { migrationStatus } from '../../db/migrate.ts'
 import { sendProblem } from '../problem.ts'
-import type { Contract } from '../contract.ts'
+import type { RouteDependencies } from './dependencies.ts'
 import { operationRoute } from '../operation-route.ts'
 
-interface HealthOptions {
-  readonly contract: Contract
-  readonly database: Kysely<Database>
-}
-
-export const healthRoutes: FastifyPluginCallback<HealthOptions> = (app, { contract, database }, done) => {
+export const healthRoutes: FastifyPluginCallback<RouteDependencies> = (app, { contract, database }, done) => {
   // Liveness never looks at the database: a database outage must not make an orchestrator restart a healthy process.
   app.route(operationRoute(contract, 'getLiveness', () => ({ status: 'ok' }) satisfies Schema<'LiveStatus'>))
 

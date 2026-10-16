@@ -20,8 +20,12 @@ const content = z.record(z.string(), z.object({ schema: z.object({}).loose().opt
 const response = z.object({ content: content.optional() })
 const requestBody = z.object({ required: z.boolean().optional(), content })
 
+// The first requirement is the one that matters: `session` and `csrf` sit together in it, so a request needs both.
+const securityRequirement = z.record(z.string(), z.array(z.string()))
+
 export const operationShape = z.object({
   operationId: z.string(),
+  security: z.array(securityRequirement).optional(),
   parameters: z.array(z.union([reference, parameter])).optional(),
   requestBody: z.union([reference, requestBody]).optional(),
   responses: z.record(z.string(), z.union([reference, response])),
