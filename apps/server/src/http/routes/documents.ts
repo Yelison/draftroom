@@ -3,7 +3,7 @@ import { contractLimits } from '@draftroom/contract'
 import type { FastifyPluginCallback } from 'fastify'
 import { listDocuments } from '../../db/documents/caller-documents.ts'
 import { createDocumentRows, deleteArchivedDocument, setArchived, updateMetadata } from '../../db/documents/commands.ts'
-import { folderBelongsTo } from '../../db/folders.ts'
+import { folderBelongsTo, isForeignKeyViolation } from '../../db/folders.ts'
 import { metadataChanges } from '../../domain/documents.ts'
 import { decodeCursor, encodeCursor, type CursorFilters } from '../../domain/pagination.ts'
 import { principalOf } from '../auth/authenticate.ts'
@@ -16,6 +16,15 @@ import type { RouteDependencies } from './dependencies.ts'
 type FieldError = Schema<'FieldError'>
 
 const invalidValue = (pointer: string): FieldError => ({ pointer, code: 'invalid-value' })
+
+/**
+ * A folder that was there when it was checked and is gone when the document is written: the database refuses the row.
+ * It is the same answer as a folder that was never there, not a failure of the server.
+ */
+const folderWentAway = (error: unknown): unknown =>
+  isForeignKeyViolation(error, 'documents_folder_fkey')
+    ? new ProblemError('validation-failed', { errors: [invalidValue('/folderId')] })
+    : error
 
 export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { contract, database }, done) => {
   const present = ({ record, role }: AuthorisedDocument): Schema<'Document'> => presentDocument(record, role)
@@ -80,6 +89,9 @@ export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { 
         .execute((trx) =>
           createDocumentRows(trx, { workspaceId, title, folderId: folderId ?? null, createdBy: userId }),
         )
+        .catch((error: unknown) => {
+          throw folderWentAway(error)
+        })
       return reply.code(201).send(present(await reload(documentId, userId)))
     }),
   )
@@ -115,17 +127,22 @@ export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { 
       // Nothing to change is not a change: no revision, no event, and the document is returned as it is.
       if (events.length === 0) return present(document)
 
-      const updated = await database.transaction().execute((trx) =>
-        updateMetadata(trx, {
-          documentId,
-          workspaceId: record.workspace_id,
-          actorId: userId,
-          revision,
-          title,
-          folderId,
-          events,
-        }),
-      )
+      const updated = await database
+        .transaction()
+        .execute((trx) =>
+          updateMetadata(trx, {
+            documentId,
+            workspaceId: record.workspace_id,
+            actorId: userId,
+            revision,
+            title,
+            folderId,
+            events,
+          }),
+        )
+        .catch((error: unknown) => {
+          throw folderWentAway(error)
+        })
       const current = await reload(documentId, userId)
       // Someone else changed it between the read and the write: the write refused, and the caller is told what won.
       if (!updated) throw revisionConflict(current)
@@ -137,13 +154,16 @@ export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { 
     operationRoute(contract, 'archiveDocument', async (request): Promise<Schema<'Document'>> => {
       const { userId } = principalOf(request)
       const { documentId } = request.params
-      // An archived document is not archived again: it answers 404 like everything else that is not restoring or deleting.
-      const { record } = await authoriseDocument(database, documentId, userId, 'archive-delete', { onArchived: false })
-      await database
-        .transaction()
-        .execute((trx) =>
-          setArchived(trx, { documentId, workspaceId: record.workspace_id, actorId: userId, archive: true }),
-        )
+      // Archiving is idempotent for those who may archive: an archived document is returned as it is, with no new
+      // revision and no event, as restoring a live one is. Everyone else still gets the 404 of an archived document.
+      const { record } = await authoriseDocument(database, documentId, userId, 'archive-delete', { onArchived: true })
+      if (record.archived_at === null) {
+        await database
+          .transaction()
+          .execute((trx) =>
+            setArchived(trx, { documentId, workspaceId: record.workspace_id, actorId: userId, archive: true }),
+          )
+      }
       return present(await reload(documentId, userId))
     }),
   )

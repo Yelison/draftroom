@@ -3,7 +3,7 @@ import { sql, type Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, bodyAs, type Api } from './support/api.ts'
-import { whileRowIsLocked } from './support/overlap.ts'
+import { whileFolderIsBeingDeleted, whileRowIsLocked } from './support/overlap.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
 import {
@@ -321,6 +321,52 @@ describe('changing the title or the folder of a document', () => {
   })
 })
 
+describe('a folder deleted while a document is written into it', () => {
+  let studio: Studio
+  beforeAll(async () => {
+    studio = await createStudio(db)
+  })
+  const folderGone = { errors: [{ pointer: '/folderId', code: 'invalid-value' }] }
+
+  it('answers creating a document there as it answers a folder that is not there, and creates nothing', async () => {
+    const folderId = await createFolder(db, studio.workspaceId)
+
+    const [response] = await whileFolderIsBeingDeleted(db, folderId, () => [
+      api({
+        as: studio.owner,
+        method: 'POST',
+        url: `/api/workspaces/${studio.workspaceId}/documents`,
+        body: { title: 'Written into a folder that goes away', folderId },
+      }),
+    ])
+
+    expect(response).toMatchObject({ statusCode: 400, body: { code: 'validation-failed', ...folderGone } })
+    const created = await db
+      .selectFrom('documents')
+      .select('id')
+      .where('title', '=', 'Written into a folder that goes away')
+      .execute()
+    expect(created).toEqual([])
+  })
+
+  it('answers moving a document there the same way, and leaves the document where it was', async () => {
+    const documentId = await createDocument(db, { workspaceId: studio.workspaceId, creator: studio.owner })
+    const folderId = await createFolder(db, studio.workspaceId)
+
+    const [response] = await whileFolderIsBeingDeleted(db, folderId, () => [
+      api({ as: studio.owner, method: 'PATCH', url: `/api/documents/${documentId}`, body: { folderId, revision: 1 } }),
+    ])
+
+    expect(response).toMatchObject({ statusCode: 400, body: { code: 'validation-failed', ...folderGone } })
+    const stored = await db
+      .selectFrom('documents')
+      .select(['folder_id', 'revision'])
+      .where('id', '=', documentId)
+      .executeTakeFirstOrThrow()
+    expect(stored).toEqual({ folder_id: null, revision: 1 })
+  })
+})
+
 describe('archiving, restoring and deleting', () => {
   let studio: Studio
   beforeAll(async () => {
@@ -338,14 +384,18 @@ describe('archiving, restoring and deleting', () => {
     expect(await eventsOf(documentId)).toEqual(['document.archived'])
   })
 
-  it('does not archive an archived document again: it answers 404 like everything else the archive refuses', async () => {
+  it('answers archiving an archived document with the document as it is: nothing changed, nothing recorded', async () => {
     const documentId = await createDocument(db, {
       workspaceId: studio.workspaceId,
       creator: studio.owner,
       archived: true,
     })
 
-    expect((await call('POST', `/api/documents/${documentId}/archive`)).statusCode).toBe(404)
+    const response = await call('POST', `/api/documents/${documentId}/archive`)
+
+    expect(response.statusCode).toBe(200)
+    expect(bodyAs<Document>(response)).toMatchObject({ revision: 1, archivedAt: expect.any(String) })
+    expect(await eventsOf(documentId)).toEqual([])
   })
 
   it('restores an archived document, moves its revision on and records it', async () => {

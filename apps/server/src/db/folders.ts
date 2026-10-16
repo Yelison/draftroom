@@ -11,9 +11,16 @@ export interface FolderOfMember {
 
 const foreignKeyViolation = '23503'
 
-/** Whether an error from PostgreSQL is a foreign key refusing a row, which is how a race with another request ends. */
-export const isForeignKeyViolation = (error: unknown): boolean =>
-  typeof error === 'object' && error !== null && 'code' in error && error.code === foreignKeyViolation
+/**
+ * Whether an error from PostgreSQL is a foreign key refusing a row, which is how a race with another request ends. With
+ * a `constraint`, only that one: a refusal from another foreign key is not the race the caller is waiting for.
+ */
+export const isForeignKeyViolation = (error: unknown, constraint?: string): boolean =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  error.code === foreignKeyViolation &&
+  (constraint === undefined || ('constraint' in error && error.constraint === constraint))
 
 export function listFolders(db: Kysely<Database>, workspaceId: string): Promise<FolderRow[]> {
   return db

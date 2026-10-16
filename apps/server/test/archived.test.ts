@@ -6,8 +6,9 @@ import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
 import { createDocument, createPerson, createWorkspace, grant, join, type Person } from './support/world.ts'
 
-// An archived document is the owners' and nobody else's: they can read it, restore it and delete it, and every other
-// operation, theirs included, answers 404 until it is restored. Everyone else gets the 404 for all of it.
+// An archived document is the owners' and nobody else's: they can read it, restore it and delete it, archiving it again
+// is allowed and changes nothing, and every other operation, theirs included, answers 404 until it is restored.
+// Everyone else gets the 404 for all of it.
 
 let database: TestDatabase
 let db: Kysely<Database>
@@ -52,7 +53,7 @@ const others = ['editor', 'viewer', 'member'] as const
 interface Route {
   readonly operationId: string
   call(documentId: string): Omit<Call, 'as'>
-  /** What an owner gets: only the three operations that apply to an archived document answer. */
+  /** What an owner gets: reading, restoring, deleting and archiving again (which changes nothing) answer; the rest is 404. */
   readonly ownerGets: number
 }
 
@@ -72,7 +73,7 @@ const routes: readonly Route[] = [
   {
     operationId: 'archiveDocument',
     call: (id) => ({ method: 'POST', url: `/api/documents/${id}/archive` }),
-    ownerGets: 404,
+    ownerGets: 200,
   },
   { operationId: 'pinDocument', call: (id) => ({ method: 'PUT', url: `/api/documents/${id}/pin` }), ownerGets: 404 },
   {
