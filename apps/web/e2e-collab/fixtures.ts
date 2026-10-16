@@ -32,6 +32,11 @@ export class Participant {
     return this.page.getByRole('status').filter({ hasText: /^Sync status/ })
   }
 
+  /** The avatar the screen shows for a person who is in the document; there is none for someone who is not. */
+  presenceOf(name: string): Locator {
+    return this.page.getByRole('list', { name: 'People in this document' }).getByRole('img', { name })
+  }
+
   async open(documentId: string): Promise<void> {
     await this.page.goto(`/documents/${documentId}`)
     await this.editor.waitFor()
