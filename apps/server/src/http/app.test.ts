@@ -6,14 +6,13 @@ import { createDatabase } from '../db/database.ts'
 import type { Database } from '../db/tables.ts'
 import { buildApp, type ContractViolation } from './app.ts'
 import type { AuthProvider } from './auth/auth-provider.ts'
-import { silentBroadcaster } from '../../test/support/broadcasters.ts'
+import { silentBroadcaster, silentLiveAccess } from '../../test/support/broadcasters.ts'
 import { loadContract, type Contract } from './contract.ts'
 import { operationRoute } from './operation-route.ts'
 
 // The application without a database behind it: what the server does before any handler runs, and when a handler
 // goes wrong. Checks that need a real PostgreSQL are in test/.
 
-const workspaceId = '0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01'
 const problemType = 'application/problem+json'
 
 const documentId = 'c4e6a8b0-2d3f-4b5a-9c7e-4a6c8e0b2d44'
@@ -31,7 +30,7 @@ const version = {
 
 // The operations below are the ones nobody has a route for yet: the app is tested with the handlers of the test, not
 // with the real ones, and a route cannot be declared twice. The tests of the real routes are in test/.
-const membersUrl = `/api/workspaces/${workspaceId}/members`
+const versionsUrl = `/api/documents/${documentId}/versions`
 
 /** Everyone is Marta, and the provider records what it was asked: the app's checks, not an identity, are under test. */
 const signedInAsMarta: AuthProvider = {
@@ -59,6 +58,7 @@ function appWithoutDatabase(
     database,
     authProvider,
     broadcaster: silentBroadcaster,
+    liveAccess: silentLiveAccess,
     contract,
     onContractViolation: (violation) => violations.push(violation),
   })
@@ -116,6 +116,14 @@ const implementedOperations = [
   'reopenThread',
   'updateComment',
   'deleteComment',
+  'listMembers',
+  'addMember',
+  'updateMember',
+  'removeMember',
+  'listAccess',
+  'setAccess',
+  'removeAccess',
+  'setGeneralAccess',
 ]
 
 describe('the routes of the app', () => {
@@ -263,11 +271,11 @@ describe('a handler that fails', () => {
   const failWith = (error: Error) => {
     const application = appWithoutDatabase()
     application.route(
-      operationRoute(contract, 'listMembers', () => {
+      operationRoute(contract, 'listVersions', () => {
         throw error
       }),
     )
-    return application.inject(membersUrl)
+    return application.inject(versionsUrl)
   }
 
   it('answers the internal-error problem and keeps the cause to itself', async () => {
@@ -297,13 +305,13 @@ describe('a handler that fails', () => {
   it("does not carry the handler's headers into the 500, a session cookie included", async () => {
     const application = appWithoutDatabase()
     application.route(
-      operationRoute(contract, 'listMembers', (_request, reply) => {
+      operationRoute(contract, 'listVersions', (_request, reply) => {
         reply.header('set-cookie', 'dr_session=abc; HttpOnly').header('etag', '"v1"')
         throw new Error('failed after the session was started')
       }),
     )
 
-    const response = await application.inject(membersUrl)
+    const response = await application.inject(versionsUrl)
 
     expect(response.statusCode).toBe(500)
     expect(response.headers).not.toHaveProperty('set-cookie')
@@ -326,25 +334,25 @@ describe('a response that breaks the contract', () => {
     const violations: ContractViolation[] = []
     const application = appWithoutDatabase(violations)
     application.route(
-      operationRoute(contract, 'listMembers', () => ({
-        items: [{ userId: marta.id, email: 'marta@harborpine.example' }],
+      operationRoute(contract, 'listVersions', () => ({
+        items: [{ id: version.id, createdBy: marta }],
       })),
     )
 
-    const response = await application.inject(membersUrl)
+    const response = await application.inject(versionsUrl)
 
     expect(response.statusCode).toBe(500)
     expect(response.json()).toMatchObject({ code: 'internal-error' })
-    expect(response.body).not.toContain('marta@harborpine.example')
+    expect(response.body).not.toContain(version.id)
     expect(violations).toHaveLength(1)
-    expect(violations[0]).toMatchObject({ operationId: 'listMembers', status: 200 })
-    expect(violations[0]?.reason).toContain('name')
+    expect(violations[0]).toMatchObject({ operationId: 'listVersions', status: 200 })
+    expect(violations[0]?.reason).toContain('kind')
   })
 
   it("does not carry the handler's headers, a session cookie included", async () => {
     const application = appWithoutDatabase()
     application.route(
-      operationRoute(contract, 'listMembers', (_request, reply) =>
+      operationRoute(contract, 'listVersions', (_request, reply) =>
         reply
           .header('set-cookie', 'dr_session=abc; HttpOnly')
           .header('etag', '"v1"')
@@ -355,7 +363,7 @@ describe('a response that breaks the contract', () => {
       ),
     )
 
-    const response = await application.inject(membersUrl)
+    const response = await application.inject(versionsUrl)
 
     expect(response.statusCode).toBe(500)
     expect(response.headers).not.toHaveProperty('set-cookie')
@@ -369,22 +377,9 @@ describe('a response that breaks the contract', () => {
   it('is let through when the contract accepts it', async () => {
     const violations: ContractViolation[] = []
     const application = appWithoutDatabase(violations)
-    application.route(
-      operationRoute(contract, 'listMembers', () => ({
-        items: [
-          {
-            userId: marta.id,
-            email: 'marta@harborpine.example',
-            name: marta.name,
-            role: 'owner',
-            status: 'active',
-            createdAt: '2026-10-13T14:00:00Z',
-          },
-        ],
-      })),
-    )
+    application.route(operationRoute(contract, 'listVersions', () => ({ items: [version], nextCursor: null })))
 
-    expect((await application.inject(membersUrl)).statusCode).toBe(200)
+    expect((await application.inject(versionsUrl)).statusCode).toBe(200)
     expect(violations).toEqual([])
   })
 })
@@ -405,7 +400,7 @@ describe('the session check', () => {
   function withVersionRoute(provider: AuthProvider): FastifyInstance {
     const application = appWithoutDatabase([], provider)
     application.route(operationRoute(contract, 'createVersion', (_request, reply) => reply.code(201).send(version)))
-    application.route(operationRoute(contract, 'listMembers', () => ({ items: [] })))
+    application.route(operationRoute(contract, 'listVersions', () => ({ items: [], nextCursor: null })))
     return application
   }
   const post = (application: FastifyInstance, payload: string) =>
@@ -440,7 +435,7 @@ describe('the session check', () => {
     const application = withVersionRoute(recording({ status: 'authenticated', principal: { userId: marta.id } }))
 
     await post(application, JSON.stringify({ body: 'Yes' }))
-    await application.inject(membersUrl)
+    await application.inject(versionsUrl)
 
     expect(requests).toEqual(['with csrf', 'without csrf'])
   })

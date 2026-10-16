@@ -1,4 +1,4 @@
-import { MAX_MESSAGE_BYTES } from '@draftroom/contract/collab'
+import { MAX_MESSAGE_BYTES, type StatelessEvent } from '@draftroom/contract/collab'
 import { Server, type Hocuspocus } from '@hocuspocus/server'
 import type { Kysely } from 'kysely'
 import type { Config } from '../config.ts'
@@ -6,7 +6,7 @@ import type { Database } from '../db/tables.ts'
 import type { AuthProvider } from '../http/auth/auth-provider.ts'
 import { authenticateExtension } from './authenticate.ts'
 import { awarenessGuardExtension } from './awarenessGuard.ts'
-import { endConnections, type ClosePlan, type ConnectionSelector } from './closeConnections.ts'
+import { endConnections, tellConnections, type ClosePlan, type ConnectionSelector } from './closeConnections.ts'
 import type { ConnectionContext } from './context.ts'
 import { inFlightExtension, RevocationMarks } from './inFlight.ts'
 import { DurabilityRegistry } from './durability.ts'
@@ -59,6 +59,8 @@ export interface CollabServer {
    * role and be established with it.
    */
   endConnections(target: ConnectionTarget, plan: ClosePlan): number
+  /** Sends a stateless event to the live connections that match, with the selector of `endConnections`. It says how many it reached. */
+  tell(target: ConnectionTarget, event: StatelessEvent): number
   /** Stores what can be stored, within the wait of protocol §7.2, and stops. */
   shutDown(): Promise<void>
   readonly hocuspocus: Hocuspocus<ConnectionContext>
@@ -127,6 +129,12 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
       // For the connections that are being established and so not live yet; the selector was valid, or this was not reached.
       marks.leave(selector, plan)
       return ended
+    },
+
+    tell({ sessionId, ...target }, event) {
+      const selector: ConnectionSelector =
+        sessionId === undefined ? target : { ...target, sessionId: sessionKey(config.sessionSecret, sessionId) }
+      return tellConnections(server.hocuspocus, selector, event)
     },
 
     shutDown: () => shutDownCollaboration({ server, durability, retry, sockets, timing, log }),

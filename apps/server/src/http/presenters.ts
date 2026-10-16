@@ -1,7 +1,9 @@
 import type { Schema } from '@draftroom/contract'
+import type { GrantRow } from '../db/access/queries.ts'
 import type { CommentRecord, PersonRef, ThreadRecord } from '../db/comments/queries.ts'
 import { roleOf, type DocumentRecord } from '../db/documents/caller-documents.ts'
 import type { FolderRow } from '../db/folders.ts'
+import type { MemberRow } from '../db/members/queries.ts'
 import type { WorkspaceOfMember } from '../db/workspaces.ts'
 import type { DocumentRole } from '../db/tables.ts'
 
@@ -80,4 +82,21 @@ export const presentThread = (thread: ThreadRecord): Schema<'Thread'> => ({
   resolvedAt: thread.resolved_at?.toISOString() ?? null,
   resolvedBy: thread.resolver === null ? null : presentPerson(thread.resolver, `resolver of thread ${thread.id}`),
   comments: thread.comments.map(presentComment),
+})
+
+export const presentGrant = (grant: GrantRow): Schema<'AccessEntry'> => ({
+  userId: grant.userId,
+  email: grant.email,
+  name: grant.name,
+  role: grant.role,
+  createdAt: grant.createdAt.toISOString(),
+})
+
+export const presentMember = (member: MemberRow): Schema<'Member'> => ({
+  userId: member.userId,
+  email: member.email,
+  name: member.name,
+  role: member.role,
+  status: member.signedUpAt === null ? 'pending' : 'active',
+  createdAt: member.createdAt.toISOString(),
 })

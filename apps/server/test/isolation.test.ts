@@ -61,6 +61,7 @@ beforeAll(async () => {
       documentId: foreignDocumentId,
       folderId: await createFolder(db, otherId),
       ...(await createThread(db, { workspaceId: otherId, documentId: foreignDocumentId, author: bruno })),
+      userId: bruno.id,
     },
     hidden: {
       documentId: hiddenDocumentId,
@@ -75,6 +76,8 @@ interface Ids {
   readonly folderId: string
   readonly threadId: string
   readonly commentId: string
+  /** A person the calls name: who belongs to the workspace they are about, or nobody. */
+  readonly userId: string
 }
 
 const routes: readonly (readonly [string, (ids: Ids) => Omit<Call, 'as'>])[] = [
@@ -134,6 +137,48 @@ const routes: readonly (readonly [string, (ids: Ids) => Omit<Call, 'as'>])[] = [
     ({ commentId }) => ({ method: 'PATCH', url: `/api/comments/${commentId}`, body: { body: 'Edited' } }),
   ],
   ['deleteComment', ({ commentId }) => ({ method: 'DELETE', url: `/api/comments/${commentId}` })],
+  ['listMembers', ({ workspaceId }) => ({ method: 'GET', url: `/api/workspaces/${workspaceId}/members` })],
+  [
+    'addMember',
+    ({ workspaceId }) => ({
+      method: 'POST',
+      url: `/api/workspaces/${workspaceId}/members`,
+      body: { email: 'lucia@harborpine.example', role: 'member' },
+    }),
+  ],
+  [
+    'updateMember',
+    ({ workspaceId, userId }) => ({
+      method: 'PATCH',
+      url: `/api/workspaces/${workspaceId}/members/${userId}`,
+      body: { role: 'owner' },
+    }),
+  ],
+  [
+    'removeMember',
+    ({ workspaceId, userId }) => ({ method: 'DELETE', url: `/api/workspaces/${workspaceId}/members/${userId}` }),
+  ],
+  ['listAccess', ({ documentId }) => ({ method: 'GET', url: `/api/documents/${documentId}/access` })],
+  [
+    'setAccess',
+    ({ documentId, userId }) => ({
+      method: 'PUT',
+      url: `/api/documents/${documentId}/access/${userId}`,
+      body: { role: 'editor' },
+    }),
+  ],
+  [
+    'removeAccess',
+    ({ documentId, userId }) => ({ method: 'DELETE', url: `/api/documents/${documentId}/access/${userId}` }),
+  ],
+  [
+    'setGeneralAccess',
+    ({ documentId }) => ({
+      method: 'PUT',
+      url: `/api/documents/${documentId}/general-access`,
+      body: { generalAccess: 'editor' },
+    }),
+  ],
 ]
 
 const missing = (): Ids => ({
@@ -142,6 +187,7 @@ const missing = (): Ids => ({
   folderId: randomUUID(),
   threadId: randomUUID(),
   commentId: randomUUID(),
+  userId: randomUUID(),
 })
 
 describe.each(routes)('%s', (_operationId, call) => {
@@ -166,7 +212,7 @@ describe.each(routes)('%s', (_operationId, call) => {
 })
 
 describe('a document of her own workspace that Alice cannot read', () => {
-  it.each(routes.filter(([operationId]) => /Document$/.test(operationId) && operationId !== 'createDocument'))(
+  it.each(routes.filter(([operationId]) => /(Document|Access)$/.test(operationId) && operationId !== 'createDocument'))(
     'answers %s as an id that does not exist',
     async (_operationId, call) => {
       const asked = await api({ as: setting.alice, ...call({ ...setting.foreign, ...setting.hidden }) })

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
@@ -12,6 +13,7 @@ import {
   createFolder,
   createPerson,
   createStudio,
+  grant,
   join,
   type Person,
   type Studio,
@@ -185,6 +187,90 @@ describe.each(commentCases)('$operationId on a comment', ({ operationId, call, a
   })
 })
 
+interface AccessCase {
+  readonly operationId: string
+  call(ids: { documentId: string; colleagueId: string }): Omit<Call, 'as'>
+  readonly allowed: number
+}
+
+// Who reads and changes the access of a document: only its owners, whatever the way they came to be one. The colleague is
+// somebody else with an editor grant, so that every call has something to read, change or remove.
+const accessCases: readonly AccessCase[] = [
+  {
+    operationId: 'listAccess',
+    call: ({ documentId }) => ({ method: 'GET', url: `/api/documents/${documentId}/access` }),
+    allowed: 200,
+  },
+  {
+    operationId: 'setAccess',
+    call: ({ documentId, colleagueId }) => ({
+      method: 'PUT',
+      url: `/api/documents/${documentId}/access/${colleagueId}`,
+      body: { role: 'viewer' },
+    }),
+    allowed: 200,
+  },
+  {
+    operationId: 'removeAccess',
+    call: ({ documentId, colleagueId }) => ({
+      method: 'DELETE',
+      url: `/api/documents/${documentId}/access/${colleagueId}`,
+    }),
+    allowed: 204,
+  },
+  {
+    operationId: 'setGeneralAccess',
+    call: ({ documentId }) => ({
+      method: 'PUT',
+      url: `/api/documents/${documentId}/general-access`,
+      body: { generalAccess: 'viewer' },
+    }),
+    allowed: 200,
+  },
+]
+
+describe.each(accessCases)('$operationId on the access of a document', ({ operationId, call, allowed }) => {
+  it.each(scenarios)('as a $name ($role)', async (scenario) => {
+    const { subject, documentId } = await arranged(scenario)
+    const colleague = await createPerson(db, 'A colleague')
+    await join(db, studio.workspaceId, colleague)
+    await grant(db, { workspaceId: studio.workspaceId, documentId, person: colleague, role: 'editor' })
+
+    const response = await api({ as: subject, ...call({ documentId, colleagueId: colleague.id }) })
+
+    const mayDo = scenario.role !== null && rolesOf(operationId).roles.includes(scenario.role)
+    expect(response.statusCode).toBe(scenario.role === null ? 404 : mayDo ? allowed : 403)
+  })
+
+  it.each(scenarios.filter((scenario) => scenario.role !== null && scenario.role !== 'owner'))(
+    'is refused to a $name before anyone is told whether the person it names exists',
+    async (scenario) => {
+      const { subject, documentId } = await arranged(scenario)
+
+      const response = await api({ as: subject, ...call({ documentId, colleagueId: randomUUID() }) })
+
+      expect(response.statusCode).toBe(403)
+    },
+  )
+})
+
+describe('the access of an archived document', () => {
+  it.each(accessCases)('is not reachable by $operationId, not even by the owner', async ({ call }) => {
+    const documentId = await createDocument(db, {
+      workspaceId: studio.workspaceId,
+      creator: studio.owner,
+      archived: true,
+    })
+    const colleague = await createPerson(db, 'A colleague')
+    await join(db, studio.workspaceId, colleague)
+    await grant(db, { workspaceId: studio.workspaceId, documentId, person: colleague, role: 'editor' })
+
+    const response = await api({ as: studio.owner, ...call({ documentId, colleagueId: colleague.id }) })
+
+    expect(response.statusCode).toBe(404)
+  })
+})
+
 describe('the document a person reads', () => {
   it.each(scenarios.filter((scenario) => scenario.role !== null))(
     'shows the effective role of a $name, and the sharing settings only to an owner',
@@ -300,6 +386,69 @@ describe.each(workspaceCases)('$operationId in a workspace', ({ operationId, cal
 
     const mayDo = workspaceRole !== 'outsider' && rolesOf(operationId).roles.includes(workspaceRole)
     expect(response.statusCode).toBe(workspaceRole === 'outsider' ? 404 : mayDo ? allowed : 403)
+  })
+})
+
+interface MemberCase {
+  readonly operationId: string
+  call(ids: { workspaceId: string; colleagueId: string }): Omit<Call, 'as'>
+  readonly allowed: number
+}
+
+const memberCases: readonly MemberCase[] = [
+  {
+    operationId: 'listMembers',
+    call: ({ workspaceId }) => ({ method: 'GET', url: `/api/workspaces/${workspaceId}/members` }),
+    allowed: 200,
+  },
+  {
+    operationId: 'addMember',
+    call: ({ workspaceId }) => ({
+      method: 'POST',
+      url: `/api/workspaces/${workspaceId}/members`,
+      body: { email: `${randomUUID()}@harborpine.example`, role: 'member' },
+    }),
+    allowed: 201,
+  },
+  {
+    operationId: 'updateMember',
+    call: ({ workspaceId, colleagueId }) => ({
+      method: 'PATCH',
+      url: `/api/workspaces/${workspaceId}/members/${colleagueId}`,
+      body: { role: 'owner' },
+    }),
+    allowed: 200,
+  },
+  {
+    operationId: 'removeMember',
+    call: ({ workspaceId, colleagueId }) => ({
+      method: 'DELETE',
+      url: `/api/workspaces/${workspaceId}/members/${colleagueId}`,
+    }),
+    allowed: 204,
+  },
+]
+
+describe.each(memberCases)('$operationId in a workspace', ({ operationId, call, allowed }) => {
+  it.each(workspaceRoles)('as a workspace %s', async (workspaceRole) => {
+    const subject = await createPerson(db, `A ${workspaceRole}`)
+    if (workspaceRole !== 'outsider') await join(db, studio.workspaceId, subject, workspaceRole)
+    const colleague = await createPerson(db, 'A colleague')
+    await join(db, studio.workspaceId, colleague)
+
+    const response = await api({ as: subject, ...call({ workspaceId: studio.workspaceId, colleagueId: colleague.id }) })
+
+    const mayDo = workspaceRole !== 'outsider' && rolesOf(operationId).roles.includes(workspaceRole)
+    expect(response.statusCode).toBe(workspaceRole === 'outsider' ? 404 : mayDo ? allowed : 403)
+  })
+
+  it('is refused to a member before anyone is told whether the person it names is in the workspace', async () => {
+    const subject = await createPerson(db, 'A member')
+    await join(db, studio.workspaceId, subject)
+
+    const response = await api({ as: subject, ...call({ workspaceId: studio.workspaceId, colleagueId: randomUUID() }) })
+
+    expect(response.statusCode).toBe(operationId === 'listMembers' ? 200 : 403)
   })
 })
 

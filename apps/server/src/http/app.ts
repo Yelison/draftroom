@@ -5,6 +5,7 @@ import type { AuthProvider } from './auth/auth-provider.ts'
 import { requireAuthentication } from './auth/authenticate.ts'
 import { loadContract, type Contract } from './contract.ts'
 import type { DocumentBroadcaster } from './document-broadcaster.ts'
+import type { LiveAccess } from './live-access.ts'
 import {
   clearHeaders,
   handleError,
@@ -14,10 +15,12 @@ import {
   problemMediaType,
   sendProblem,
 } from './problem.ts'
+import { accessRoutes } from './routes/access.ts'
 import { commentRoutes } from './routes/comments.ts'
 import { documentRoutes } from './routes/documents.ts'
 import { folderRoutes } from './routes/folders.ts'
 import { healthRoutes } from './routes/health.ts'
+import { memberRoutes } from './routes/members.ts'
 import { pinRoutes } from './routes/pins.ts'
 import { workspaceRoutes } from './routes/workspaces.ts'
 
@@ -41,6 +44,8 @@ export interface AppDependencies {
   readonly authProvider: AuthProvider
   /** Who hears about a change to a document that people have open. Required, so that an app cannot forget to tell them. */
   readonly broadcaster: DocumentBroadcaster
+  /** Who holds open connections to account for a change of access. Required for the same reason: forgetting it leaves a revoked person connected. */
+  readonly liveAccess: LiveAccess
   /** Compiled once; build it at start-up and share it (compiling takes a moment). */
   readonly contract?: Contract
   readonly logger?: FastifyServerOptions['logger']
@@ -53,6 +58,7 @@ export function buildApp({
   database,
   authProvider,
   broadcaster,
+  liveAccess,
   contract = loadContract(),
   logger = false,
   onContractViolation,
@@ -105,8 +111,17 @@ export function buildApp({
     return JSON.stringify(problemBody('internal-error'))
   })
 
-  const dependencies = { contract, database, broadcaster }
-  for (const routes of [healthRoutes, workspaceRoutes, folderRoutes, documentRoutes, pinRoutes, commentRoutes]) {
+  const dependencies = { contract, database, broadcaster, liveAccess }
+  for (const routes of [
+    healthRoutes,
+    workspaceRoutes,
+    memberRoutes,
+    folderRoutes,
+    documentRoutes,
+    accessRoutes,
+    pinRoutes,
+    commentRoutes,
+  ]) {
     void app.register(routes, dependencies)
   }
 

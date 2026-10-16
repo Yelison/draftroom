@@ -2,6 +2,7 @@ import {
   CLOSE_CODES,
   serializeStatelessEvent,
   documentName as documentNameOf,
+  parseDocumentName,
   type CloseCodeName,
   type StatelessEvent,
 } from '@draftroom/contract/collab'
@@ -35,8 +36,11 @@ export interface ConnectionSelector {
   readonly userId?: string
   /** The keyed hash kept in the connection context, not the session id itself. */
   readonly sessionId?: string
-  /** For the cases that split people, such as the owners and the others of a document that is archived. */
-  readonly where?: (context: ConnectionContext) => boolean
+  /**
+   * For the cases that split people, such as the owners and the others of a document that is archived, or each person by
+   * what they hold now on the document they have open.
+   */
+  readonly where?: (context: ConnectionContext, documentId: string) => boolean
 }
 
 const hasCondition = ({ documentId, userId, sessionId, where }: ConnectionSelector): boolean =>
@@ -48,7 +52,31 @@ export function selects(selector: ConnectionSelector, documentName: string, cont
   if (selector.userId !== undefined && context.userId !== selector.userId) return false
   // A connection without a session never matches one: two absences are not the same session.
   if (selector.sessionId !== undefined && context.sessionId !== selector.sessionId) return false
-  return selector.where === undefined || selector.where(context)
+  if (selector.where === undefined) return true
+  const documentId = parseDocumentName(documentName)
+  return documentId !== null && selector.where(context, documentId)
+}
+
+/**
+ * Sends a stateless event to every live connection the selector matches, and says how many it reached. It is for the
+ * connections that a change touches without ending them, such as a role that changes with the mode kept (protocol §6.3).
+ */
+export function tellConnections(
+  instance: Hocuspocus<ConnectionContext>,
+  selector: ConnectionSelector,
+  event: StatelessEvent,
+): number {
+  if (!hasCondition(selector)) throw new RangeError('Telling connections needs at least one condition')
+  const payload = serializeStatelessEvent(event)
+  let told = 0
+  for (const document of instance.documents.values()) {
+    for (const connection of document.getConnections() as Connection<ConnectionContext>[]) {
+      if (!selects(selector, document.name, connection.context)) continue
+      connection.sendStateless(payload)
+      told += 1
+    }
+  }
+  return told
 }
 
 /**

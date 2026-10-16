@@ -7,10 +7,10 @@ import { createContractClient, findOperation, ContractError } from './contract-c
 import { ContractCoverage } from './contract-coverage.ts'
 import { createDatabase } from '../../src/db/database.ts'
 import type { AuthProvider } from '../../src/http/auth/auth-provider.ts'
-import { silentBroadcaster } from './broadcasters.ts'
+import { silentBroadcaster, silentLiveAccess } from './broadcasters.ts'
 import { unreachableDatabaseUrl } from './unreachable-database.ts'
 
-const workspaceId = '0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01'
+const documentId = '3d9b2c10-5e7a-4c4d-8f21-7a6b9c0d1e22'
 
 let contract: Contract
 beforeAll(() => {
@@ -48,7 +48,7 @@ describe('the contract client', () => {
   it('returns a response that follows the contract and records the operation as exercised', async () => {
     const coverage = new ContractCoverage()
     const database = unusedDatabase()
-    app = buildApp({ database, authProvider, broadcaster: silentBroadcaster, contract })
+    app = buildApp({ database, authProvider, broadcaster: silentBroadcaster, liveAccess: silentLiveAccess, contract })
     const client = createContractClient(app, contract, coverage, [])
 
     const response = await client.request({ method: 'GET', url: '/api/health/live' })
@@ -76,15 +76,16 @@ describe('the contract client', () => {
       database,
       authProvider,
       broadcaster: silentBroadcaster,
+      liveAccess: silentLiveAccess,
       contract,
       onContractViolation: (violation) => violations.push(violation),
     })
-    // `listMembers` has no route of its own yet, so the test brings one that answers against the contract.
-    app.route(operationRoute(contract, 'listMembers', () => ({ items: [{ userId: 'not-a-uuid' }] })))
+    // `listVersions` has no route of its own yet, so the test brings one that answers against the contract.
+    app.route(operationRoute(contract, 'listVersions', () => ({ items: [{ id: 'not-a-uuid' }] })))
     const client = createContractClient(app, contract, new ContractCoverage(), violations)
 
-    await expect(client.request({ method: 'GET', url: `/api/workspaces/${workspaceId}/members` })).rejects.toThrow(
-      /answered listMembers against the contract/,
+    await expect(client.request({ method: 'GET', url: `/api/documents/${documentId}/versions` })).rejects.toThrow(
+      /answered listVersions against the contract/,
     )
     await database.destroy()
   })
