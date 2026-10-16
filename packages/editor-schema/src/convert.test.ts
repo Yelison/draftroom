@@ -1,7 +1,8 @@
 import type { JSONContent } from '@tiptap/core'
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { InvalidDocumentError, jsonToYUpdate, yUpdateToJson } from './convert.ts'
+import { InvalidDocumentError, jsonToYUpdate, replaceFragmentContent, yUpdateToJson } from './convert.ts'
+import { fragmentName } from './extensions.ts'
 
 type Mark = { type: string; attrs?: Record<string, unknown> }
 
@@ -241,5 +242,93 @@ describe('the Yjs document', () => {
     // The package compiles without the DOM types, so this only guards the environment the tests run in.
     expect('document' in globalThis).toBe(false)
     expect('window' in globalThis).toBe(false)
+  })
+})
+
+describe('replacing the content of a live fragment', () => {
+  /** A live document that holds this content, as a server holds one that was loaded from its stored state. */
+  const liveWith = (json: JSONContent): Y.Doc => {
+    const live = new Y.Doc()
+    Y.applyUpdate(live, jsonToYUpdate(json))
+    return live
+  }
+  const replace = (live: Y.Doc, json: JSONContent, origin?: unknown): void =>
+    live.transact(() => replaceFragmentContent(live.getXmlFragment(fragmentName), json), origin)
+  const contentOf = (live: Y.Doc): JSONContent => yUpdateToJson(Y.encodeStateAsUpdate(live))
+
+  it('leaves the fragment holding exactly the new content', () => {
+    const live = liveWith(doc(paragraph(text('First')), paragraph(text('Second'))))
+    const restored = doc({ type: 'heading', attrs: { level: 2 }, content: [text('Title')] }, paragraph(text('Body')))
+
+    replace(live, restored)
+
+    expect(contentOf(live)).toEqual(restored)
+  })
+
+  it('keeps the nodes it does not have to change, so an edit made to one of them meanwhile survives', () => {
+    const live = liveWith(doc(paragraph(text('Kept')), paragraph(text('Removed'))))
+    const kept = live.getXmlFragment(fragmentName).get(0)
+    const peer = new Y.Doc()
+    Y.applyUpdate(peer, Y.encodeStateAsUpdate(live))
+    const peerParagraph = peer.getXmlFragment(fragmentName).get(0)
+    if (!(peerParagraph instanceof Y.XmlElement)) throw new Error('The paragraph is missing')
+    const peerText = peerParagraph.get(0)
+    if (!(peerText instanceof Y.XmlText)) throw new Error('The text is missing')
+
+    replace(live, doc(paragraph(text('Kept')), paragraph(text('Added'))))
+    peerText.insert(4, ' and edited')
+    Y.applyUpdate(live, Y.encodeStateAsUpdate(peer, Y.encodeStateVector(live)))
+
+    expect(live.getXmlFragment(fragmentName).get(0)).toBe(kept)
+    expect(contentOf(live)).toEqual(doc(paragraph(text('Kept and edited')), paragraph(text('Added'))))
+  })
+
+  it('changes nothing for content that is already there', () => {
+    const json = doc(paragraph(text('Same')))
+    const live = liveWith(json)
+    const before = Y.encodeStateVector(live)
+
+    replace(live, json)
+
+    expect(Y.encodeStateVector(live)).toEqual(before)
+  })
+
+  it('writes in the transaction of its caller, so the update carries the origin the caller gave it', () => {
+    const live = liveWith(doc(paragraph(text('Before'))))
+    const origins: unknown[] = []
+    live.on('update', (_update: Uint8Array, origin: unknown) => origins.push(origin))
+
+    replace(live, doc(paragraph(text('After'))), 'restore')
+
+    expect(origins).toEqual(['restore'])
+  })
+
+  it('touches the fragment and no other root of the document', () => {
+    const live = liveWith(doc(paragraph(text('Before'))))
+    const positions = live.getMap('__tiptap_position_migrations:root:default')
+    positions.set('1:0', 'a state vector')
+    const changed: unknown[] = []
+    live.on('afterTransaction', (transaction) => changed.push(...transaction.changed.keys()))
+
+    replace(live, doc(paragraph(text('After'))))
+
+    expect(changed).not.toContain(positions)
+    expect([...positions.entries()]).toEqual([['1:0', 'a state vector']])
+  })
+
+  it.each<[string, JSONContent]>([
+    ['a node the schema does not have', doc({ type: 'table' })],
+    [
+      'a heading level the schema does not have',
+      doc({ type: 'heading', attrs: { level: 5 }, content: [text('Deep')] }),
+    ],
+    ['a link whose address is not allowed', doc(paragraph(text('Click', link('javascript:alert(1)'))))],
+  ])('refuses %s and leaves the live content as it was', (_name, json) => {
+    const original = doc(paragraph(text('Untouched')))
+    const live = liveWith(original)
+
+    expect(() => replace(live, json)).toThrow(InvalidDocumentError)
+
+    expect(contentOf(live)).toEqual(original)
   })
 })
