@@ -31,3 +31,9 @@ export const notFound = {
   status: 404,
   code: 'not-found',
 }
+
+/**
+ * The body of an answer as the type of the contract. The client has already held the answer to the contract, so the
+ * type is what the test just checked, not a guess.
+ */
+export const bodyAs = <T>(response: ContractResponse): T => response.body as T
