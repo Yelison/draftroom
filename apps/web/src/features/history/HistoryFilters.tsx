@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { Button, FilterChip, Menu, type MenuItem } from '@yelison/forma-ui'
 import { useRef } from 'react'
 import { useIntl } from 'react-intl'
@@ -104,7 +104,7 @@ export function HistoryFilters({ workspaceId, state }: HistoryFiltersProps) {
   const intl = useIntl()
   const dataSource = useDataSource()
   const group = useRef<HTMLDivElement>(null)
-  const documents = useQuery(documentOptionsQuery(dataSource, workspaceId))
+  const documents = useInfiniteQuery(documentOptionsQuery(dataSource, workspaceId))
   const people = useQuery(peopleOptionsQuery(dataSource, workspaceId))
   const { filters, set } = state
 
@@ -148,7 +148,7 @@ export function HistoryFilters({ workspaceId, state }: HistoryFiltersProps) {
       <ChoiceFilter
         kind="document"
         searchable
-        choices={(documents.data?.items ?? []).map(({ id, title }) => ({ id, label: title }))}
+        choices={(documents.data?.pages[0]?.items ?? []).map(({ id, title }) => ({ id, label: title }))}
         extraItems={pendingOrFailed(documents)}
         pending={documents.isPending}
         chosen={filters.documentId}

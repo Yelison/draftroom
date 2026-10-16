@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import {
@@ -352,6 +352,43 @@ describe('opening an event of the History screen', () => {
 
     await waitFor(() => expect(rows()).toHaveLength(3))
     expect(within(main()).queryByRole('complementary')).not.toBeInTheDocument()
+  })
+})
+
+// The explorer of the editor layout keeps the list of the workspace's documents under the key the filter's options are read
+// from. The two have to read it the same way, or whichever came second finds the other's data in a shape it cannot use.
+describe('the History screen and the explorer, which share the list of documents', () => {
+  const sharePath = `/documents/${fixtures.launchPlan.id}/share`
+  const crashed = () => screen.queryByText(/Unexpected Application Error/i)
+
+  it('offer the documents in the filter after the explorer has read them, and the explorer keeps working after the filter has', async () => {
+    const { user, router } = renderScreen(sharePath)
+    await screen.findByRole('tree')
+
+    await act(() => router.navigate('/history'))
+    await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await user.click(chip('Document'))
+    expect(await screen.findByRole('menuitemradio', { name: fixtures.launchPlan.title })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+
+    await act(() => router.navigate(sharePath))
+    expect(await screen.findByRole('tree')).toBeInTheDocument()
+    expect(crashed()).not.toBeInTheDocument()
+  })
+
+  it('leave the app standing when the History is opened first and a document after it', async () => {
+    const { user, router } = renderScreen('/history')
+    await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await user.click(chip('Document'))
+    expect(await screen.findByRole('menuitemradio', { name: fixtures.launchPlan.title })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+
+    await act(() => router.navigate(sharePath))
+
+    expect(await screen.findByRole('tree')).toBeInTheDocument()
+    expect(crashed()).not.toBeInTheDocument()
+    // In the folder and among the recent ones: the explorer reads the list the filter read, and has the documents.
+    expect(await screen.findAllByRole('treeitem', { name: new RegExp(fixtures.launchPlan.title) })).not.toHaveLength(0)
   })
 })
 
