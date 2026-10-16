@@ -201,6 +201,8 @@ Used by every case above, for the connections of the affected person (matched by
 2. Send the stateless event that explains the change, if there is one (`access-changed`, `document-archived`). `ws` delivers frames in order, so the event arrives before the close.
 3. `connection.webSocket.close(code, name)`.
 
+The procedure is called **after** the change that causes it is committed to the database, never inside its transaction: a connection that is still being established (it has authenticated and its document is loading) is not live yet, so it is closed by a mark the call leaves, and the mark can tell that such a connection read the database after the change only if the change was already committed.
+
 Which event and code a change causes:
 
 | Change                                                                 | Affected connections          | Stateless event       | Code   |

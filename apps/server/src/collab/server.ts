@@ -48,7 +48,16 @@ export interface ConnectionTarget extends Omit<ConnectionSelector, 'sessionId'> 
 export interface CollabServer {
   /** Starts listening, and gives the port (the one asked for, or the one the system chose for port 0). */
   listen(): Promise<number>
-  /** The procedure of protocol §6.3 for the connections that match; it says how many it ended. */
+  /**
+   * The procedure of protocol §6.3 for the connections that match; it says how many it ended.
+   *
+   * **Call it after the change is committed to the database, never inside the transaction that makes it.** A connection
+   * that is still being established has read the person's role already and is not live, so it is not among the ones ended:
+   * it is reached by a mark this call leaves, which names it only if it took its ticket before the mark. A connection that
+   * takes its ticket after the mark is taken to have read the database after the change; that is true only once the
+   * change is committed (the database reads committed data), and a call made before the commit would let it read the old
+   * role and be established with it.
+   */
   endConnections(target: ConnectionTarget, plan: ClosePlan): number
   /** Stores what can be stored, within the wait of protocol §7.2, and stops. */
   shutDown(): Promise<void>
