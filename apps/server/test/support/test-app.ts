@@ -5,7 +5,8 @@ import { buildApp, type AppDependencies, type ContractViolation } from '../../sr
 import type { AuthProvider } from '../../src/http/auth/auth-provider.ts'
 import { createDevIdentity } from '../../src/http/auth/devIdentity.ts'
 import { loadContract } from '../../src/http/contract.ts'
-import { silentBroadcaster, type DocumentBroadcaster } from '../../src/http/document-broadcaster.ts'
+import type { DocumentBroadcaster } from '../../src/http/document-broadcaster.ts'
+import { silentBroadcaster } from './broadcasters.ts'
 import { createContractClient } from './contract-client.ts'
 import { runCoverage } from './run-coverage.ts'
 

@@ -467,6 +467,23 @@ describe('the limits of a text', () => {
     },
   )
 
+  it('allows an end of the anchor up to 128 characters, the limit of the protocol, and refuses 129 with 413', async () => {
+    const documentId = await freshDocument()
+    const start = (end: string) =>
+      api({
+        as: people.commenter,
+        method: 'POST',
+        url: `/api/documents/${documentId}/threads`,
+        body: { anchor: { start: anchor.start, end }, quote, body: 'A comment' },
+      })
+
+    expect((await start('A'.repeat(128))).statusCode).toBe(201)
+    expect(await start('A'.repeat(129))).toMatchObject({
+      statusCode: 413,
+      body: { code: 'too-large', errors: [{ pointer: '/anchor/end', code: 'too-long' }] },
+    })
+  })
+
   it('refuses an empty comment with 400, which is a rule broken and not a text too long', async () => {
     const documentId = await freshDocument()
     const started = await startThread(people.commenter, documentId)

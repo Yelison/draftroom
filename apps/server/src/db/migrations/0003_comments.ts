@@ -17,7 +17,8 @@ import { sql, type ColumnDefinitionBuilder, type Kysely } from 'kysely'
 const id = (column: ColumnDefinitionBuilder) => column.primaryKey().defaultTo(sql`gen_random_uuid()`)
 const createdAt = (column: ColumnDefinitionBuilder) => column.notNull().defaultTo(sql`now()`)
 
-// What the contract says of an anchor end: base64, at most 256 characters.
+// The shape of an anchor end: base64. The contract (and the protocol) allow 128 characters; the database allows twice that,
+// so that a limit that is revised never needs a migration, and the API is the one that holds the line.
 const positionValid = (column: string) =>
   sql`char_length(${sql.ref(column)}) <= 256 and ${sql.ref(column)} ~ '^[A-Za-z0-9+/]+={0,2}$'`
 

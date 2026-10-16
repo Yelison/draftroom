@@ -1,6 +1,7 @@
 import { sql, type Transaction } from 'kysely'
 import { threadActivity, threadSurvives } from '../../domain/comments.ts'
 import { recordActivity } from '../activity.ts'
+import { commentsInThread } from './queries.ts'
 import type { Database } from '../tables.ts'
 
 // The writes of threads and comments. The callers run them in a transaction, and each one that changes a thread also
@@ -157,14 +158,11 @@ export async function deleteComment(trx: Transaction<Database>, commentId: strin
   const comment = await trx.selectFrom('comments').select('thread_id').where('id', '=', commentId).executeTakeFirst()
   if (comment === undefined) return 'missing'
   // The lock comes before the delete and the count, so that whoever deletes next counts what this one left.
-  if ((await lockThread(trx, comment.thread_id)) === undefined) return 'missing'
+  const thread = await lockThread(trx, comment.thread_id)
+  if (thread === undefined) return 'missing'
   const deleted = await trx.deleteFrom('comments').where('id', '=', commentId).returning('id').executeTakeFirst()
   if (deleted === undefined) return 'missing'
-  const { left } = await trx
-    .selectFrom('comments')
-    .select((eb) => eb.fn.countAll<string>().as('left'))
-    .where('thread_id', '=', comment.thread_id)
-    .executeTakeFirstOrThrow()
-  if (!threadSurvives(Number(left))) await trx.deleteFrom('threads').where('id', '=', comment.thread_id).execute()
+  const { total } = await commentsInThread(trx, thread.workspace_id, thread.id).executeTakeFirstOrThrow()
+  if (!threadSurvives(Number(total))) await trx.deleteFrom('threads').where('id', '=', comment.thread_id).execute()
   return 'deleted'
 }

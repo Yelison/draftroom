@@ -7,7 +7,7 @@ import { createContractClient, findOperation, ContractError } from './contract-c
 import { ContractCoverage } from './contract-coverage.ts'
 import { createDatabase } from '../../src/db/database.ts'
 import type { AuthProvider } from '../../src/http/auth/auth-provider.ts'
-import { silentBroadcaster } from '../../src/http/document-broadcaster.ts'
+import { silentBroadcaster } from './broadcasters.ts'
 import { unreachableDatabaseUrl } from './unreachable-database.ts'
 
 const workspaceId = '0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01'

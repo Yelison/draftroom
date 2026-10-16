@@ -21,6 +21,7 @@ export interface CommentRecord {
 
 export interface ThreadRecord {
   readonly id: string
+  readonly workspace_id: string
   readonly document_id: string
   readonly anchor_start: string
   readonly anchor_end: string
@@ -99,6 +100,7 @@ function threadsQuery(db: Kysely<Database>) {
     .leftJoin('users as resolver', 'resolver.id', 't.resolved_by')
     .select([
       't.id',
+      't.workspace_id',
       't.document_id',
       't.anchor_start',
       't.anchor_end',
@@ -114,18 +116,37 @@ function threadsQuery(db: Kysely<Database>) {
 
 type ThreadRow = Awaited<ReturnType<ReturnType<typeof threadsQuery>['executeTakeFirstOrThrow']>>
 
-/** The threads with their comments, in two queries however many there are. */
-async function withComments(db: Kysely<Database>, rows: readonly ThreadRow[]): Promise<ThreadRecord[]> {
-  if (rows.length === 0) return []
-  const comments = await commentsQuery(db)
-    .where(
-      'c.thread_id',
-      'in',
-      rows.map((row) => row.id),
-    )
+// Every query below names the workspace as well as the thread or the document: the indexes of `0003` lead with
+// `workspace_id`, and a query that leaves it out cannot use them for anything but a scan of the whole index. The
+// queries are built apart from running them so that a test can ask PostgreSQL for the plan of each.
+
+/** The comments of some threads of one workspace, oldest first, ties by id. */
+export function commentsOfThreads(db: Kysely<Database>, workspaceId: string, threadIds: readonly string[]) {
+  return commentsQuery(db)
+    .where('c.workspace_id', '=', workspaceId)
+    .where('c.thread_id', 'in', threadIds)
     .orderBy('c.created_at', 'asc')
     .orderBy('c.id', 'asc')
-    .execute()
+}
+
+/** How many comments a thread holds. */
+export function commentsInThread(db: Kysely<Database>, workspaceId: string, threadId: string) {
+  return db
+    .selectFrom('comments')
+    .select((eb) => eb.fn.countAll<string>().as('total'))
+    .where('workspace_id', '=', workspaceId)
+    .where('thread_id', '=', threadId)
+}
+
+/** The threads with their comments, in two queries however many there are. They all belong to one workspace. */
+async function withComments(db: Kysely<Database>, rows: readonly ThreadRow[]): Promise<ThreadRecord[]> {
+  const first = rows[0]
+  if (first === undefined) return []
+  const comments = await commentsOfThreads(
+    db,
+    first.workspace_id,
+    rows.map((row) => row.id),
+  ).execute()
   const byThread = new Map<string, CommentRecord[]>()
   for (const comment of comments.map(toComment)) {
     byThread.set(comment.thread_id, [...(byThread.get(comment.thread_id) ?? []), comment])
@@ -139,16 +160,22 @@ async function withComments(db: Kysely<Database>, rows: readonly ThreadRow[]): P
 }
 
 export interface ThreadFilter {
+  readonly workspaceId: string
   readonly documentId: string
   /** Only the threads that are open or only those that are resolved; both when left out. */
   readonly status?: 'open' | 'resolved' | undefined
 }
 
 /** The threads of a document, oldest first, ties by id. */
-export async function listThreads(db: Kysely<Database>, { documentId, status }: ThreadFilter): Promise<ThreadRecord[]> {
-  let query = threadsQuery(db).where('t.document_id', '=', documentId)
-  if (status !== undefined) query = query.where('t.resolved_at', status === 'open' ? 'is' : 'is not', null)
-  return withComments(db, await query.orderBy('t.created_at', 'asc').orderBy('t.id', 'asc').execute())
+export function threadsOfDocument(db: Kysely<Database>, { workspaceId, documentId, status }: ThreadFilter) {
+  const query = threadsQuery(db).where('t.workspace_id', '=', workspaceId).where('t.document_id', '=', documentId)
+  return (status === undefined ? query : query.where('t.resolved_at', status === 'open' ? 'is' : 'is not', null))
+    .orderBy('t.created_at', 'asc')
+    .orderBy('t.id', 'asc')
+}
+
+export async function listThreads(db: Kysely<Database>, filter: ThreadFilter): Promise<ThreadRecord[]> {
+  return withComments(db, await threadsOfDocument(db, filter).execute())
 }
 
 export async function getThread(db: Kysely<Database>, threadId: string): Promise<ThreadRecord | undefined> {

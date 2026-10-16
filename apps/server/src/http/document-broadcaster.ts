@@ -10,6 +10,3 @@ export interface DocumentBroadcaster {
   /** Tells the connections of one document. Nobody being connected is not an error: there is nobody to tell. */
   broadcast(documentId: string, event: StatelessEvent): void
 }
-
-/** For an app that has no collaboration server beside it. */
-export const silentBroadcaster: DocumentBroadcaster = { broadcast: () => undefined }

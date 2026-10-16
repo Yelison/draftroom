@@ -6,7 +6,7 @@ import { createDatabase } from '../db/database.ts'
 import type { Database } from '../db/tables.ts'
 import { buildApp, type ContractViolation } from './app.ts'
 import type { AuthProvider } from './auth/auth-provider.ts'
-import { silentBroadcaster } from './document-broadcaster.ts'
+import { silentBroadcaster } from '../../test/support/broadcasters.ts'
 import { loadContract, type Contract } from './contract.ts'
 import { operationRoute } from './operation-route.ts'
 

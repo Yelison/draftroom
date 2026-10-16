@@ -5,7 +5,7 @@ import type { TestProject } from 'vitest/node'
 import { createDatabase } from '../../src/db/database.ts'
 import { buildApp } from '../../src/http/app.ts'
 import { createDevIdentity } from '../../src/http/auth/devIdentity.ts'
-import { silentBroadcaster } from '../../src/http/document-broadcaster.ts'
+import { silentBroadcaster } from './broadcasters.ts'
 import { ContractCoverage } from './contract-coverage.ts'
 import { unreachableDatabaseUrl } from './unreachable-database.ts'
 

@@ -63,7 +63,7 @@ function presentPerson(person: PersonRef, part: string): Schema<'UserRef'> {
 export const presentComment = (comment: CommentRecord): Schema<'Comment'> => ({
   id: comment.id,
   threadId: comment.thread_id,
-  author: presentPerson(comment.author, 'author of comment ' + comment.id),
+  author: presentPerson(comment.author, `author of comment ${comment.id}`),
   body: comment.body,
   createdAt: comment.created_at.toISOString(),
   updatedAt: comment.updated_at.toISOString(),
@@ -75,9 +75,9 @@ export const presentThread = (thread: ThreadRecord): Schema<'Thread'> => ({
   status: thread.resolved_at === null ? 'open' : 'resolved',
   anchor: { start: thread.anchor_start, end: thread.anchor_end },
   quote: thread.quote,
-  createdBy: presentPerson(thread.creator, 'creator of thread ' + thread.id),
+  createdBy: presentPerson(thread.creator, `creator of thread ${thread.id}`),
   createdAt: thread.created_at.toISOString(),
   resolvedAt: thread.resolved_at?.toISOString() ?? null,
-  resolvedBy: thread.resolver === null ? null : presentPerson(thread.resolver, 'resolver of thread ' + thread.id),
+  resolvedBy: thread.resolver === null ? null : presentPerson(thread.resolver, `resolver of thread ${thread.id}`),
   comments: thread.comments.map(presentComment),
 })

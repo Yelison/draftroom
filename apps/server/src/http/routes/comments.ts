@@ -2,7 +2,7 @@ import type { Schema } from '@draftroom/contract'
 import type { FastifyPluginCallback, FastifyRequest } from 'fastify'
 import { getComment, getThread, listThreads } from '../../db/comments/queries.ts'
 import { deleteComment, insertReply, insertThread, setResolved, updateCommentBody } from '../../db/comments/commands.ts'
-import { commentVerdict, type CommentAction } from '../../domain/comments.ts'
+import { commentVerdict, type CommentAction, type CommentSubject } from '../../domain/comments.ts'
 import { principalOf } from '../auth/authenticate.ts'
 import { authoriseComment, authoriseDocument, authoriseThread } from '../authorise.ts'
 import { operationRoute } from '../operation-route.ts'
@@ -36,7 +36,7 @@ export const commentRoutes: FastifyPluginCallback<RouteDependencies> = (
     throw new ProblemError('not-found')
   }
 
-  const refuseUnless = (action: CommentAction, subject: Parameters<typeof commentVerdict>[1]): void => {
+  const refuseUnless = (action: CommentAction, subject: CommentSubject): void => {
     if (commentVerdict(action, subject) === 'forbidden') throw new ProblemError('forbidden')
   }
 
@@ -46,7 +46,11 @@ export const commentRoutes: FastifyPluginCallback<RouteDependencies> = (
       const { record } = await authoriseDocument(database, request.params.documentId, userId, 'read-comments', {
         onArchived: false,
       })
-      const threads = await listThreads(database, { documentId: record.id, status: request.query.status })
+      const threads = await listThreads(database, {
+        workspaceId: record.workspace_id,
+        documentId: record.id,
+        status: request.query.status,
+      })
       return { items: threads.map(presentThread) }
     }),
   )
