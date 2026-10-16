@@ -23,6 +23,9 @@ export function AddPerson({ candidates, busy, onAdd, pickerRef }: AddPersonProps
   const [userId, setUserId] = useState('')
   const [role, setRole] = useState<Schema<'DocumentRole'>>('viewer')
   const chosen = candidates.find((member) => member.userId === userId)
+  // Once the chosen person has a role they are no longer a candidate: the choice is over, and must not come back if they
+  // are removed later. Adjusted while rendering, so that no effect has to set state.
+  if (userId !== '' && chosen === undefined) setUserId('')
 
   if (candidates.length === 0) {
     return <p className={styles.note}>{intl.formatMessage({ id: 'sharing.add.everyone' })}</p>
@@ -34,8 +37,8 @@ export function AddPerson({ candidates, busy, onAdd, pickerRef }: AddPersonProps
       onSubmit={(event) => {
         event.preventDefault()
         if (chosen === undefined || busy) return
+        // The choice stays until the person is in the list: a refusal leaves it as it was, ready to try again.
         onAdd(chosen, role)
-        setUserId('')
       }}
     >
       <Select

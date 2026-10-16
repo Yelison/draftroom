@@ -125,6 +125,20 @@ describe('adding someone in the share dialog', () => {
     expect(await within(share).findByRole('combobox', { name: 'Role of Daniel Okafor' })).toHaveValue('editor')
   })
 
+  it('keeps the person chosen when the server refuses, ready to try again', async () => {
+    const { user, share } = await openShare({
+      documentId: interviews.id,
+      wrap: (dataSource) => ({ ...dataSource, setAccess: () => Promise.reject(answer(503, 'unavailable')) }),
+    })
+    const picker = within(share).getByRole('combobox', { name: 'Person' })
+
+    await user.selectOptions(picker, 'Daniel Okafor')
+    await user.click(within(share).getByRole('button', { name: 'Add' }))
+
+    expect(await within(share).findByRole('alert')).toBeInTheDocument()
+    expect(picker).toHaveDisplayValue('Daniel Okafor')
+  })
+
   it('takes the person out of the choices once they are in, and puts the focus back on the picker or the list', async () => {
     const { user, share } = await openShare({ documentId: interviews.id })
 
