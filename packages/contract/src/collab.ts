@@ -232,7 +232,7 @@ export type SyncState = (typeof syncStates)[number]
  * `document-too-large`, which offers "discard my local changes and reload" instead (a retry would send the same
  * oversize message again).
  */
-export type SyncErrorCause = 'store-timeout' | 'document-too-large' | 'unauthenticated' | 'not-found' | 'unavailable'
+export type SyncErrorCause = 'store-timeout' | 'document-too-large' | 'unauthenticated' | 'not-found'
 
 export type SyncEvent =
   /** The editor opens the document, or the person retries from `error`. */

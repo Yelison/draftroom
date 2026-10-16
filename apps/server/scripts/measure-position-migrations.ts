@@ -1,6 +1,6 @@
 // A measurement, not part of the product: how much the Yjs map `__tiptap_position_migrations:root:default` grows in an
-// editing session (ADR 0011, decision 2). Nothing is built from it, but `npm run typecheck` checks it with the sources, so it cannot break unnoticed when a
-// dependency changes; run it with
+// editing session (ADR 0011, decision 2). Nothing is built from it, but `npm run typecheck` checks it with the sources,
+// so it cannot break unnoticed when a dependency changes. Run it with
 //
 //   npm run measure:position-migrations -w @draftroom/server           # every scenario
 //   npm run measure:position-migrations -w @draftroom/server -- C       # one of them

@@ -280,4 +280,12 @@ describe('docs/collab/protocol.md', () => {
   it.each(authDeniedReasons)('documents the authentication refusal reason %s in the table of §3.3', (reason) => {
     expect(section('### 3.3')).toContain(`| \`${reason}\` `)
   })
+
+  it('has the refusal unavailable go on as a lost connection in the transitions of §8.2, and never to a stopped error', () => {
+    const row = section('### 8.2')
+      .split('\n')
+      .find((line) => line.includes("`reason = 'unavailable'`"))
+    expect(row).toContain('`reconnecting`')
+    expect(row).not.toContain('`error`')
+  })
 })
