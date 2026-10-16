@@ -1,6 +1,6 @@
 # 0015 · Who a browser is in the real-stack end-to-end suite, until the session cookie exists
 
-Status: accepted (2026-10-16), replaced by the session cookie when T7.1 lands
+Status: accepted (2026-10-16, coordinator, in the brief of T2.4), replaced by the session cookie when T7.1 lands
 
 ## Context
 
