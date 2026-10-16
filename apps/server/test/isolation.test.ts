@@ -27,6 +27,8 @@ afterAll(async () => {
 
 interface Setting {
   readonly alice: Person
+  /** Owns a workspace of her own and belongs to neither of the others. */
+  readonly zoe: Person
   readonly workspaceId: string
   /** What belongs to the other workspace, where Alice is nobody. */
   readonly foreign: { workspaceId: string; documentId: string; folderId: string }
@@ -38,6 +40,8 @@ let setting: Setting
 beforeAll(async () => {
   const alice = await createPerson(db, 'Alice Moreau')
   const bruno = await createPerson(db, 'Bruno Silva')
+  const zoe = await createPerson(db, 'Zoe Hartmann')
+  await join(db, await createWorkspace(db, 'Hartmann Studio'), zoe, 'owner')
   const workspaceId = await createWorkspace(db, 'Harbor & Pine')
   await join(db, workspaceId, alice)
   await join(db, workspaceId, bruno)
@@ -45,10 +49,13 @@ beforeAll(async () => {
   await join(db, otherId, bruno, 'owner')
   setting = {
     alice,
+    zoe,
     workspaceId,
     foreign: {
       workspaceId: otherId,
-      documentId: await createDocument(db, { workspaceId: otherId, creator: bruno }),
+      // Open to everyone in its workspace: if the boundary between workspaces is lost, a person who belongs to
+      // another one would read and edit it, where a private document would still look not-found.
+      documentId: await createDocument(db, { workspaceId: otherId, creator: bruno, generalAccess: 'editor' }),
       folderId: await createFolder(db, otherId),
     },
     hiddenDocumentId: await createDocument(db, { workspaceId, creator: bruno }),
@@ -103,17 +110,24 @@ const routes: readonly (readonly [string, (ids: Ids) => Omit<Call, 'as'>])[] = [
 const missing = (): Ids => ({ workspaceId: randomUUID(), documentId: randomUUID(), folderId: randomUUID() })
 
 describe.each(routes)('%s', (_operationId, call) => {
-  it('answers the id of another workspace exactly as an id that does not exist', async () => {
-    const asked = await api({ as: setting.alice, ...call(setting.foreign) })
-    const unknown = await api({ as: setting.alice, ...call(missing()) })
+  // Alice belongs to a workspace and Zoe owns one: the id of a third must not open for either.
+  it.each([
+    ['a member of another workspace', () => setting.alice],
+    ['the owner of another workspace', () => setting.zoe],
+  ])(
+    'answers the id of a workspace of which %s is not part exactly as an id that does not exist',
+    async (_who, person) => {
+      const asked = await api({ as: person(), ...call(setting.foreign) })
+      const unknown = await api({ as: person(), ...call(missing()) })
 
-    expect(unknown).toMatchObject({ statusCode: 404, body: notFound })
-    expect({ statusCode: asked.statusCode, body: asked.body, type: asked.headers['content-type'] }).toEqual({
-      statusCode: unknown.statusCode,
-      body: unknown.body,
-      type: unknown.headers['content-type'],
-    })
-  })
+      expect(unknown).toMatchObject({ statusCode: 404, body: notFound })
+      expect({ statusCode: asked.statusCode, body: asked.body, type: asked.headers['content-type'] }).toEqual({
+        statusCode: unknown.statusCode,
+        body: unknown.body,
+        type: unknown.headers['content-type'],
+      })
+    },
+  )
 })
 
 describe('a document of her own workspace that Alice cannot read', () => {
