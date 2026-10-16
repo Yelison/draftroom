@@ -333,20 +333,29 @@ describe('opening a document for collaboration', () => {
     vi.unstubAllGlobals()
   })
 
-  it('connects to the collaboration server it was given, without a token in the address', () => {
+  it('connects to the collaboration server it was given, without a token in the address', async () => {
     vi.stubGlobal('WebSocket', RecordingSocket)
     const source = createHttpDataSource({ collabUrl: 'wss://collab.draftroom.test' })
 
-    source.openDocument(documentId).destroy()
-
-    expect(dialled).toEqual(['wss://collab.draftroom.test'])
+    const session = source.openDocument(documentId)
+    await vi.waitFor(() => expect(dialled).toEqual(['wss://collab.draftroom.test']))
+    session.destroy()
   })
 
-  it('connects to /collab on its own origin when no address was given', () => {
+  it('does not connect at all for a session that was ended in the turn it was made', async () => {
     vi.stubGlobal('WebSocket', RecordingSocket)
 
-    createHttpDataSource().openDocument(documentId).destroy()
+    createHttpDataSource({ collabUrl: 'wss://collab.draftroom.test' }).openDocument(documentId).destroy()
+    await new Promise((resolve) => setTimeout(resolve, 20))
 
-    expect(dialled).toEqual([`ws://${location.host}/collab`])
+    expect(dialled).toEqual([])
+  })
+
+  it('connects to /collab on its own origin when no address was given', async () => {
+    vi.stubGlobal('WebSocket', RecordingSocket)
+
+    const session = createHttpDataSource().openDocument(documentId)
+    await vi.waitFor(() => expect(dialled).toEqual([`ws://${location.host}/collab`]))
+    session.destroy()
   })
 })
