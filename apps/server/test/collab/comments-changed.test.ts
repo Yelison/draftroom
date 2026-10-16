@@ -99,9 +99,17 @@ describe('a client with the document open', () => {
     // The last comment takes the thread with it, and the people who have it open still have to drop it.
     await api({ as: owner, method: 'DELETE', url: `/api/comments/${firstComment}` })
 
-    const events = await client.waitForCommentEvents(7)
+    // A thread of its own marks the end: events arrive in the order they were sent, so once its notice is here, every
+    // notice of the first thread that was ever going to come is counted, and one sent for a no-op would be among them.
+    const marker = await startThread(owner, documentId)
+    const events = await client
+      .waitForCommentEvents(1)
+      .then(() => client.waitForCommentEventsUntil((event) => event.threadId === marker.id))
 
-    expect(events).toEqual(Array.from({ length: 7 }, () => ({ type: 'comments-changed', threadId: thread.id })))
+    expect(events).toEqual([
+      ...Array.from({ length: 7 }, () => ({ type: 'comments-changed', threadId: thread.id })),
+      { type: 'comments-changed', threadId: marker.id },
+    ])
   })
 
   it('is told even when it can only read: a viewer hears of a comment as an editor does', async () => {

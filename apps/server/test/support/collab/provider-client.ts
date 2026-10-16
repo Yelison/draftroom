@@ -119,6 +119,16 @@ export class DocumentClient {
     )
   }
 
+  /** Every `comments-changed` event received, once one the predicate accepts has arrived. */
+  waitForCommentEventsUntil(
+    accepts: (event: Extract<StatelessEvent, { type: 'comments-changed' }>) => boolean,
+  ): Promise<readonly Extract<StatelessEvent, { type: 'comments-changed' }>[]> {
+    return this.waiter.until(
+      () => (this.commentEvents.some(accepts) ? this.commentEvents : undefined),
+      'a comments-changed event to arrive',
+    )
+  }
+
   waitForScope(): Promise<AuthorizedScope> {
     return this.waiter.until(() => this.scope, 'the connection to be authorised')
   }
