@@ -88,3 +88,50 @@ jobs:
           path: apps/server/test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  collaboration-e2e:
+    name: Collaboration e2e (real stack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      # The slot of a lone checkout: nothing else runs on the runner.
+      PLAYWRIGHT_PORT: '4173'
+      API_PORT: '8380'
+      COLLAB_PORT: '8480'
+      POSTGRES_PORT: '5460'
+      POSTGRES_DB: draftroom_e2e
+      COMPOSE_PROJECT_NAME: draftroom-collaboration-e2e
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run typecheck:e2e-collab -w @draftroom/web
+      # PostgreSQL is the stack's one piece outside the suite: the suite migrates and seeds it, starts the server itself (the
+      # tests stop and start it) and serves the production build in `http` mode behind the identity proxy.
+      - run: docker compose -p "$COMPOSE_PROJECT_NAME" up --detach --wait postgres
+      - run: npm run test:e2e-collab -w @draftroom/web -- --workers=1
+      # Only a failure leaves something to read: the traces Playwright keeps for the tests that failed, and what the server
+      # and the database said while they ran.
+      - run: |
+          mkdir -p apps/web/test-results
+          docker compose -p "$COMPOSE_PROJECT_NAME" logs --no-color postgres > apps/web/test-results/collab-postgres.log
+        if: failure()
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: collaboration-e2e-traces-and-logs
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+      - run: docker compose -p "$COMPOSE_PROJECT_NAME" down --volumes
+        if: always()
