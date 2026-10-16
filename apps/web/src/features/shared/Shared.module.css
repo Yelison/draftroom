@@ -13,8 +13,18 @@
   border: 0;
 }
 
-/* The preview takes its own column only when there is one, so the table keeps the rest of the width. */
+/*
+ * The measures of the table and its preview, in one place. They are literals until the product token layer has them, and
+ * this block is the only one to change. The columns and the preview below sit inside `.content`.
+ */
 .content {
+  --shared-preview-width: 320px;
+  --shared-created-by-width: 160px;
+  --shared-permission-width: 128px;
+  --shared-updated-width: 120px;
+  --shared-open-width: 72px;
+
+  /* The preview takes its own column only when there is one, so the table keeps the rest of the width. */
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-24);
@@ -22,7 +32,7 @@
 }
 
 .content[data-previewing] {
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) var(--shared-preview-width);
 }
 
 .table {
@@ -57,7 +67,7 @@
 }
 
 .createdByColumn {
-  width: 160px;
+  width: var(--shared-created-by-width);
 }
 
 /* With the preview open the creator and the date are in the preview, and the name gets the room. */
@@ -71,15 +81,15 @@
 }
 
 .permissionColumn {
-  width: 128px;
+  width: var(--shared-permission-width);
 }
 
 .updatedColumn {
-  width: 120px;
+  width: var(--shared-updated-width);
 }
 
 .openColumn {
-  width: 72px;
+  width: var(--shared-open-width);
 }
 
 .nameButton {
