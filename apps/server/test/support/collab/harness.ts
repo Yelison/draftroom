@@ -39,6 +39,7 @@ export const fastTiming: CollabTiming = {
   maxDebounceMs: 80,
   retryDelaysMs: [15, 30],
   shutdownWaitMs: 3_000,
+  shutdownGraceMs: 500,
 }
 
 const testConfig: CollabConfig = {

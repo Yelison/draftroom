@@ -115,6 +115,6 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
       return endConnections(server.hocuspocus, selector, plan)
     },
 
-    shutDown: () => shutDownCollaboration({ server, durability, retry, waitMs: timing.shutdownWaitMs }),
+    shutDown: () => shutDownCollaboration({ server, durability, retry, timing, log }),
   }
 }

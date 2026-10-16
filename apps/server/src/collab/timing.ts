@@ -10,6 +10,8 @@ export interface CollabTiming {
   readonly retryDelaysMs: readonly number[]
   /** How long a shutdown waits for documents whose write has not succeeded (protocol §7.2). */
   readonly shutdownWaitMs: number
+  /** How long it then waits for the connections to close and the documents to unload, which a write that hangs would prevent. */
+  readonly shutdownGraceMs: number
 }
 
 export const productionTiming: CollabTiming = {
@@ -17,4 +19,5 @@ export const productionTiming: CollabTiming = {
   maxDebounceMs: STORE_MAX_DEBOUNCE_MS,
   retryDelaysMs: RETRY_DELAYS_MS,
   shutdownWaitMs: 30_000,
+  shutdownGraceMs: 5_000,
 }

@@ -77,6 +77,24 @@ export class DocumentClient {
     return client
   }
 
+  /** Changes the document as the person would, and gives the update that change made: what `stored` has to cover. */
+  edit(change: (doc: Y.Doc) => void): Uint8Array {
+    const updates: Uint8Array[] = []
+    const collect = (update: Uint8Array) => updates.push(update)
+    this.doc.on('update', collect)
+    try {
+      this.doc.transact(() => change(this.doc))
+    } finally {
+      this.doc.off('update', collect)
+    }
+    return Y.mergeUpdates(updates)
+  }
+
+  /** The `stored` event that covers an update this client made: the rule of protocol §7.4. */
+  waitForStoredCovering(update: Uint8Array): Promise<Extract<StatelessEvent, { type: 'stored' }>> {
+    return this.waitForStored((snapshot) => Y.snapshotContainsUpdate(snapshot, update))
+  }
+
   /** The `stored` events received, in order. */
   get storedEvents(): readonly Extract<StatelessEvent, { type: 'stored' }>[] {
     return this.stateless.filter((event) => event.type === 'stored')
