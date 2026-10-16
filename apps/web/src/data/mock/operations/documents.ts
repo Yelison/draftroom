@@ -1,5 +1,7 @@
+import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
 import type { DataSource } from '../../DataSource.ts'
 import type { DocumentRecord } from '../fixtures/documents.ts'
+import { templateContent } from '../fixtures/templateContent.ts'
 import { record } from '../events.ts'
 import { caller, documentOf, requireRole, workspaceOf, type Context } from '../guards.ts'
 import { textLimits } from '../limits.ts'
@@ -109,6 +111,11 @@ export function documentOperations(ctx: Context): DocumentOperations {
       world.documents.push(document)
       world.grants.push({ documentId: document.id, userId: user.id, role: 'owner', createdAt: at })
       record(world, 'document.created', user.id, document.id)
+      if (template !== undefined) {
+        // The mock is the server here: it writes the template's content as the server does, so the client never builds it.
+        const content = templateContent[body.locale ?? 'en'][template.id] ?? []
+        ctx.startContent(document.id, jsonToYUpdate({ type: 'doc', content: [...content] }))
+      }
       return documentView(world, document, user.id)
     },
 

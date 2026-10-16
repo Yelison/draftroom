@@ -16,7 +16,8 @@ import { workspaceOperations } from './operations/workspaces.ts'
 import { atLeast, documentRole } from './roles.ts'
 import { unhandled } from './unhandled.ts'
 import { createWorld, type World } from './world.ts'
-import { parseDocumentName } from '@draftroom/contract/collab'
+import { documentName, parseDocumentName } from '@draftroom/contract/collab'
+import * as Y from 'yjs'
 
 export interface ConnectOptions {
   /** The email of the person already signed in on this connection; nobody is signed in when it is left out. */
@@ -76,7 +77,9 @@ export function createMockServer(): MockServer {
       if (signedInAs !== undefined && person === undefined) throw new Error(`The mock has no account for ${signedInAs}`)
       const session: Session = { userId: person?.id ?? null }
       const identity = person === undefined ? null : { userId: person.id, displayName: person.name ?? person.email }
-      return operationsOf({ world, session }, collaboration, identity)
+      const startContent = (documentId: string, update: Uint8Array) =>
+        Y.applyUpdate(collaboration.document(documentName(documentId)), update)
+      return operationsOf({ world, session, startContent }, collaboration, identity)
     },
   }
 }
