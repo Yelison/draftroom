@@ -19,7 +19,7 @@ const config = readConfig()
 const database = createDatabase(config.databaseUrl)
 const app = buildApp({
   database,
-  authProvider: authProviderFor(config.nodeEnv, database),
+  authProvider: authProviderFor(config, database),
   logger: { level: 'info' },
 })
 

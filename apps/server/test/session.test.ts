@@ -4,6 +4,7 @@ import type { Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
 import { devUserHeader } from '../src/http/auth/devIdentity.ts'
+import { loadConfig } from '../src/config.ts'
 import { authProviderFor } from '../src/http/auth/select.ts'
 import { apiOf, bodyAs, type Api, type Call } from './support/api.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
@@ -110,27 +111,48 @@ describe('who is calling', () => {
 })
 
 describe('the development identity outside development', () => {
+  const environments = {
+    development: { NODE_ENV: 'development' },
+    test: { NODE_ENV: 'test' },
+    production: {
+      NODE_ENV: 'production',
+      SESSION_SECRET: 'a-secret-of-at-least-thirty-two-characters',
+      ALLOWED_ORIGINS: 'https://draftroom.example',
+    },
+    'a missing NODE_ENV': {},
+    'an empty NODE_ENV': { NODE_ENV: '' },
+  }
   // The same request with the same real person, once where the header is accepted and once where it must not be: the
-  // first answer is what makes the second one mean something.
-  const request = (provider: Parameters<typeof createTestApp>[1]) =>
-    createTestApp(db, provider).request({
+  // first answer is what makes the others mean something. The provider is chosen the way the entry point chooses it,
+  // from a configuration read from the environment.
+  const request = (environment: keyof typeof environments) =>
+    createTestApp(
+      db,
+      authProviderFor(loadConfig({ DATABASE_URL: database.url, ...environments[environment] }), db),
+    ).request({
       method: 'GET',
       url: `/api/documents/${studio.documentId}`,
       headers: { [devUserHeader]: studio.owner.email },
     })
 
   it.each(['development', 'test'] as const)('is accepted in %s', async (environment) => {
-    expect((await request(authProviderFor(environment, db))).statusCode).toBe(200)
+    expect((await request(environment)).statusCode).toBe(200)
   })
 
-  it('is refused in production, for a person who is real and owns the document', async () => {
-    const response = await request(authProviderFor('production', db))
+  it.each(['production', 'a missing NODE_ENV', 'an empty NODE_ENV'] as const)(
+    'is refused with %s, for a person who is real and owns the document',
+    async (environment) => {
+      const response = await request(environment)
 
-    expect(response).toMatchObject({ statusCode: 401, body: { code: 'unauthenticated' } })
-  })
+      expect(response).toMatchObject({ statusCode: 401, body: { code: 'unauthenticated' } })
+    },
+  )
 
   it('leaves the health probes open in production, which need no one', async () => {
-    const production = createTestApp(db, authProviderFor('production', db))
+    const production = createTestApp(
+      db,
+      authProviderFor(loadConfig({ DATABASE_URL: database.url, ...environments.production }), db),
+    )
 
     const live = await production.request({ method: 'GET', url: '/api/health/live' })
 
@@ -187,6 +209,38 @@ describe('the order of the checks', () => {
     expect(response).toMatchObject({
       statusCode: 400,
       body: { errors: [{ pointer: '/folderId', code: 'invalid-value' }] },
+    })
+  })
+
+  describe('does not tell a person outside the workspace which folders it has', () => {
+    let folderId: string
+    beforeAll(async () => {
+      folderId = await createFolder(db, studio.workspaceId)
+    })
+
+    it('when listing: a folder of the workspace and one that does not exist both answer 404', async () => {
+      const list = (id: string) =>
+        api({ as: outsider, method: 'GET', url: `/api/workspaces/${studio.workspaceId}/documents?folderId=${id}` })
+
+      const real = await list(folderId)
+
+      expect(real.statusCode).toBe(404)
+      expect(real.body).toEqual((await list(randomUUID())).body)
+    })
+
+    it('when creating a document: a folder of the workspace and one that does not exist both answer 404', async () => {
+      const create = (id: string) =>
+        api({
+          as: outsider,
+          method: 'POST',
+          url: `/api/workspaces/${studio.workspaceId}/documents`,
+          body: { title: 'Budget', folderId: id },
+        })
+
+      const real = await create(folderId)
+
+      expect(real.statusCode).toBe(404)
+      expect(real.body).toEqual((await create(randomUUID())).body)
     })
   })
 

@@ -33,6 +33,12 @@ const environmentSchema = z.object({
 
 export interface Config {
   readonly nodeEnv: NodeEnvironment
+  /**
+   * Whether the development identity (`X-Dev-User`) may serve. Only when `NODE_ENV` was set, to `development` or `test`:
+   * a missing or empty variable still means `development` for everything else here, but must never open a door that lets
+   * anyone act as anyone, because forgetting the variable is the likeliest mistake in a deployment.
+   */
+  readonly devIdentity: boolean
   readonly apiPort: number
   /** Reserved for the collaboration server (phase 2); validated now so a clash is found at start-up. */
   readonly collabPort: number
@@ -99,6 +105,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config
 
   return {
     nodeEnv: env.NODE_ENV,
+    devIdentity: picked['NODE_ENV'] === 'development' || picked['NODE_ENV'] === 'test',
     apiPort: env.API_PORT,
     collabPort: env.COLLAB_PORT,
     // Loopback while developing, so a laptop does not serve a development database to its network; a container

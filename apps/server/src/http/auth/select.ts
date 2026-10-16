@@ -1,5 +1,5 @@
 import type { Kysely } from 'kysely'
-import type { NodeEnvironment } from '../../config.ts'
+import type { Config } from '../../config.ts'
 import type { Database } from '../../db/tables.ts'
 import type { AuthProvider } from './auth-provider.ts'
 import { createDevIdentity } from './devIdentity.ts'
@@ -8,9 +8,13 @@ import { createDevIdentity } from './devIdentity.ts'
 const nobody: AuthProvider = { authenticate: () => Promise.resolve({ status: 'unauthenticated' }) }
 
 /**
- * The provider for an environment. The development identity is only ever chosen for `development` and `test`; every
- * other value gets a provider that refuses everyone, so a mistake in the environment fails closed.
+ * The provider for a configuration. The development identity is chosen only when the configuration says it may serve,
+ * which it does only for an explicit `NODE_ENV` of `development` or `test`; in every other case, a missing variable
+ * and `production` included, the provider refuses everyone, so a mistake in the environment fails closed.
  */
-export function authProviderFor(nodeEnv: NodeEnvironment, database: Kysely<Database>): AuthProvider {
-  return nodeEnv === 'development' || nodeEnv === 'test' ? createDevIdentity(database) : nobody
+export function authProviderFor(
+  { devIdentity }: Pick<Config, 'devIdentity'>,
+  database: Kysely<Database>,
+): AuthProvider {
+  return devIdentity ? createDevIdentity(database) : nobody
 }
