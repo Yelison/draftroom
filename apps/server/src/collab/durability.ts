@@ -45,6 +45,16 @@ export class DocumentDurability {
     return this.changes > this.storedChanges
   }
 
+  /** How many updates the document has applied since it was loaded: a mark to ask later whether they are stored. */
+  get changeCount(): number {
+    return this.changes
+  }
+
+  /** Whether everything the document had applied when it counted `mark` changes is in what was last written. */
+  hasStored(mark: number): boolean {
+    return this.storedChanges >= mark
+  }
+
   noteChange(): void {
     this.changes += 1
   }

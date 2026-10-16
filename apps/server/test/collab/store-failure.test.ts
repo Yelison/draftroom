@@ -135,6 +135,33 @@ describe('a shutdown', () => {
     expect(await storedParagraphs(db, documentId)).toEqual(['stored once the database came back'])
   })
 
+  it('does not use up its wait on the changes that arrive while it runs, when somebody keeps typing', async () => {
+    // The debounce is longer than the test: the document is unconfirmed when the shutdown begins, and only it stores it.
+    const { store, harness, clients, documentId } = await start({
+      ...fastTiming,
+      debounceMs: 5_000,
+      maxDebounceMs: 5_000,
+    })
+    const editor = clients.open(documentId, { email: owner.email })
+    await editor.waitForSynced()
+    store.writeDelayMs = 50
+    editor.edit((doc) => appendParagraph(doc, 'held when the shutdown began'))
+    await editor.waitForAcknowledged()
+    // Someone who types every few milliseconds, through the whole shutdown: the document is never free of changes.
+    const typing = setInterval(() => editor.edit((doc) => appendParagraph(doc, 'typed during the shutdown')), 5)
+
+    const started = performance.now()
+    try {
+      await harness.close()
+    } finally {
+      clearInterval(typing)
+    }
+
+    // What it held at the start is stored at once; what came after is for `destroy()`. It does not wait out its 3 s.
+    expect(performance.now() - started).toBeLessThan(1_500)
+    expect((await storedParagraphs(db, documentId))[0]).toBe('held when the shutdown began')
+  })
+
   it('finishes within its wait and says which document it could not store, when the write never succeeds', async () => {
     const { store, harness, clients, documentId } = await start({ ...fastTiming, shutdownWaitMs: 300 })
     const editor = clients.open(documentId, { email: owner.email })

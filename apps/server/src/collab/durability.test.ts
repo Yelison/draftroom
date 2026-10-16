@@ -71,6 +71,37 @@ describe('whether memory holds something the database does not', () => {
   })
 })
 
+describe('the changes a document has stored', () => {
+  it('counts the changes, and says that a mark is stored once a write that captured it is committed', () => {
+    const doc = new Y.Doc()
+    const durable = new DocumentDurability(loaded)
+    durable.noteChange()
+    durable.noteChange()
+    const mark = durable.changeCount
+    expect(durable.hasStored(mark)).toBe(false)
+
+    const write = durable.capture(doc)
+    expect(durable.hasStored(mark)).toBe(false)
+    durable.commit(write)
+
+    expect(mark).toBe(2)
+    expect(durable.hasStored(mark)).toBe(true)
+  })
+
+  it('does not say that a change made after the mark was stored by a write that did not capture it', () => {
+    const doc = new Y.Doc()
+    const durable = new DocumentDurability(loaded)
+    durable.noteChange()
+    const mark = durable.changeCount
+    durable.commit(durable.capture(doc))
+    durable.noteChange()
+
+    // The mark of the start is stored although the document has changed since: that is what lets a shutdown stop waiting.
+    expect(durable.hasStored(mark)).toBe(true)
+    expect(durable.hasStored(durable.changeCount)).toBe(false)
+  })
+})
+
 describe('the registry of loaded documents', () => {
   it('counts the updates a document applies after it was loaded, and not the state it was loaded with', () => {
     const doc = new Y.Doc()

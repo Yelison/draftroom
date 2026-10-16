@@ -9,6 +9,8 @@ import { Waiter } from './waiter.ts'
 export class ObservedStore implements StateStore {
   /** Writes fail with an error while this is set. */
   failing = false
+  /** Every write takes this long before it reaches the database: a database that is slow, so that others type meanwhile. */
+  writeDelayMs = 0
   /** Writes never finish while this is set, as a database that stopped answering. */
   hanging = false
   failed = 0
@@ -67,6 +69,7 @@ export class ObservedStore implements StateStore {
       this.waiter.changed()
       throw new Error('The disk is full')
     }
+    if (this.writeDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.writeDelayMs))
     await this.inner.save(documentId, state)
     this.written.push(state)
     this.succeeded += 1

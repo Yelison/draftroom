@@ -37,8 +37,14 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
 /**
  * Tries every document whose write is not confirmed, at once and then again after each wait of the retry's back-off,
- * until all are confirmed or the signal says the time is up. A write that fails resolves quickly, so a single attempt
- * would give up on a database that comes back a moment later: the point of the wait is to keep trying within it.
+ * until what each one held when the shutdown began is stored or the signal says the time is up. A write that fails
+ * resolves quickly, so a single attempt would give up on a database that comes back a moment later: the point of the wait
+ * is to keep trying within it.
+ *
+ * "Stored" is measured against the number of changes each document had at the start, not against "nothing unconfirmed":
+ * the connections are still open and a person who is typing keeps the document unconfirmed for as long as they type, which
+ * would use the whole wait every time. What arrives after the start is stored by `destroy()`, which closes the connections
+ * and stores each document one last time.
  */
 async function storeUntilConfirmed({
   hocuspocus,
@@ -53,15 +59,23 @@ async function storeUntilConfirmed({
   readonly delays: readonly number[]
   readonly signal: AbortSignal
 }): Promise<void> {
-  const unconfirmed = () =>
-    [...hocuspocus.documents.values()].filter((document) => durability.get(document.name)?.unconfirmed)
+  const watermarks = new Map<string, number>()
+  for (const document of hocuspocus.documents.values()) {
+    const durable = durability.get(document.name)
+    if (durable?.unconfirmed) watermarks.set(document.name, durable.changeCount)
+  }
+  const waiting = () =>
+    [...hocuspocus.documents.values()].filter((document) => {
+      const mark = watermarks.get(document.name)
+      return mark !== undefined && durability.get(document.name)?.hasStored(mark) === false
+    })
   for (let round = 0; !signal.aborted; round += 1) {
-    const pending = unconfirmed()
+    const pending = waiting()
     if (pending.length === 0) return
     // The attempts below replace the retries that were waiting, which would otherwise store the same state a second time.
     retry.cancelAll()
     await Promise.all(pending.map((document) => storeNow(hocuspocus, document)))
-    if (unconfirmed().length === 0) return
+    if (waiting().length === 0) return
     await pause(delays[Math.min(round, delays.length - 1)] ?? 0, signal)
   }
 }
