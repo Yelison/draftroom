@@ -48,6 +48,11 @@ export class RevocationMarks {
     return this.counter
   }
 
+  /** How many connections are authenticating or loading: the tickets that keep the marks alive. */
+  get inFlight(): number {
+    return this.pending.size
+  }
+
   /** The connection is registered, or gone, or refused: it is no longer in flight. Settling twice is harmless. */
   settle(ticket: number): void {
     this.pending.delete(ticket)

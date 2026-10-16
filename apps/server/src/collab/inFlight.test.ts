@@ -151,6 +151,20 @@ describe('a connection that registers after a revocation', () => {
     connection,
   })
   type Before = NonNullable<Extension<ConnectionContext>['beforeHandleMessage']>
+  type Connected = NonNullable<Extension<ConnectionContext>['connected']>
+  type Disconnected = NonNullable<Extension<ConnectionContext>['onDisconnect']>
+  const connectedAs = (connection: Connection<ConnectionContext>) => ({
+    instance: new Hocuspocus(),
+    request: new Request('http://localhost'),
+    requestHeaders: new Headers(),
+    requestParameters: new URLSearchParams(),
+    socketId: 'socket',
+    connectionConfig: { readOnly: false, isAuthenticated: true },
+    providerVersion: null,
+    context: connection.context,
+    documentName,
+    connection,
+  })
 
   it('has its first message refused, and is closed with the plan, before the message is applied', async () => {
     const { marks, extension } = withExtension()
@@ -174,6 +188,46 @@ describe('a connection that registers after a revocation', () => {
 
     expect(connection.readOnly).toBe(false)
     expect(socket.close).not.toHaveBeenCalled()
+  })
+
+  it('is no longer in flight once it is registered, so the marks that only it needed are forgotten', async () => {
+    const { marks, extension } = withExtension()
+    const { connection } = registered(marks.ticket())
+    marks.leave({ userId: 'person-2' }, revoked)
+    expect(marks.inFlight).toBe(1)
+
+    await hook<Parameters<Connected>[0]>(extension.connected)(connectedAs(connection))
+
+    expect(marks.inFlight).toBe(0)
+  })
+
+  it('is no longer in flight once it disconnects', async () => {
+    const { marks, extension } = withExtension()
+    const { connection } = registered(marks.ticket())
+
+    await hook<Parameters<Disconnected>[0]>(extension.onDisconnect)({
+      instance: new Hocuspocus(),
+      clientsCount: 0,
+      context: connection.context,
+      document: connection.document,
+      documentName,
+      requestHeaders: new Headers(),
+      requestParameters: new URLSearchParams(),
+      socketId: 'socket',
+    })
+
+    expect(marks.inFlight).toBe(0)
+  })
+
+  it('closes a connection that a mark names as it connects, and settles it', async () => {
+    const { marks, extension } = withExtension()
+    const { socket, connection } = registered(marks.ticket())
+    marks.leave({ userId: 'person-1' }, revoked)
+
+    await hook<Parameters<Connected>[0]>(extension.connected)(connectedAs(connection))
+
+    expect(socket.close).toHaveBeenCalledWith(4403, 'access-revoked')
+    expect(marks.inFlight).toBe(0)
   })
 
   function withExtension() {
