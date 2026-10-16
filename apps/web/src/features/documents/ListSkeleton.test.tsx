@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { IntlProvider } from 'react-intl'
 import { describe, expect, it } from 'vitest'
 import { messages } from '../../i18n/messages.ts'
@@ -10,8 +10,6 @@ const renderSkeleton = (props: ListSkeletonProps = {}) =>
       <ListSkeleton {...props} />
     </IntlProvider>,
   )
-
-const busy = () => document.querySelector('[aria-busy="true"]')
 
 describe('the skeleton of a list', () => {
   it('draws the rows of the documents unless it is told otherwise', () => {
@@ -45,8 +43,7 @@ describe('the skeleton of a list', () => {
   it('is busy as a whole, with the rows and what it says inside', () => {
     renderSkeleton()
 
-    expect(busy()).not.toBeNull()
-    expect(within(busy() as HTMLElement).getAllByRole('listitem')).toHaveLength(6)
-    expect(within(busy() as HTMLElement).getByRole('status')).toBeInTheDocument()
+    const busy = screen.getByRole('list').closest('[aria-busy="true"]')
+    expect(busy).toContainElement(screen.getByRole('status'))
   })
 })

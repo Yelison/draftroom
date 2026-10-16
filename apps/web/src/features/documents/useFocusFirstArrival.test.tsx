@@ -46,13 +46,15 @@ describe('the focus when a page of a list arrives', () => {
     },
   )
 
-  it('stays where it is until the page is in', async () => {
+  it('stays where it is until the page is in, even if a row leaves meanwhile', async () => {
     const { rerender } = render(<List rows={3} selector="a" />)
     await loadMore()
 
-    rerender(<List rows={3} selector="a" />)
-
+    rerender(<List rows={2} selector="a" />)
     expect(screen.getByRole('button', { name: 'Load more' })).toHaveFocus()
+
+    rerender(<List rows={4} selector="a" />)
+    expect(screen.getByRole('link', { name: 'Open 3' })).toHaveFocus()
   })
 
   it('moves once for each time a page was asked for', async () => {
