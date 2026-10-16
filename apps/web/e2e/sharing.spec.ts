@@ -59,6 +59,8 @@ test.describe('the share dialog', () => {
     await page.keyboard.press('Enter')
     await expect(dialog.getByRole('combobox', { name: 'Role of Daniel Okafor' })).toHaveValue('editor')
     await expect(dialog.getByText('Daniel Okafor was given the role Editor.')).toBeAttached()
+    // Nobody is left to add, so the picker is gone with the button that was used: the focus lands in the list, once it is read again.
+    await expect(dialog.getByRole('combobox', { name: 'Role of Marta Ruiz' })).toBeFocused()
 
     // Change it.
     await dialog.getByRole('combobox', { name: 'Role of Daniel Okafor' }).selectOption('commenter')
@@ -69,6 +71,7 @@ test.describe('the share dialog', () => {
     await page.keyboard.press('Enter')
     await expect(dialog.getByRole('combobox', { name: 'Role of Daniel Okafor' })).toHaveCount(0)
     await expect(dialog.getByText('Daniel Okafor no longer has access.')).toBeAttached()
+    await expect(dialog.getByRole('combobox', { name: 'Role of Marta Ruiz' })).toBeFocused()
 
     await page.keyboard.press('Escape')
 
@@ -85,5 +88,18 @@ test.describe('the share dialog', () => {
     await expect(owner).toHaveAttribute('aria-disabled', 'true')
     await expect(dialog.getByRole('button', { name: 'Remove Marta Ruiz' })).toHaveAttribute('aria-disabled', 'true')
     await expect(dialog.getByText(/^Last owner\./)).toBeVisible()
+  })
+
+  test('does not come back when the person goes Back after closing it', async ({ page }) => {
+    await page.goto(`/documents/${interviews.id}`)
+    await page.getByRole('button', { name: 'Share' }).click()
+    await expect(page.getByRole('dialog', { name: /^Share “/ })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    await page.goBack()
+
+    await expect(page).not.toHaveURL(/\/share$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 })
