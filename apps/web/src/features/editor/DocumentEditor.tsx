@@ -174,6 +174,21 @@ function EditorWorkspace({
   // Counted, so a second refusal is a new message in the live region and is announced again.
   const [refusals, setRefusals] = useState(0)
 
+  // A dialog that is open when the text stops taking edits is closed for good, not hidden: what it would apply is not the person's
+  // to make, and a dialog that was only hidden would open again, empty, when the text takes edits again. The button that opened
+  // it goes with the toolbar, so the focus goes to the headline. Adjusted while rendering, from what the last render saw, so that
+  // no effect has to set state.
+  const [sawEditable, setSawEditable] = useState(editable)
+  const [droppedDialog, setDroppedDialog] = useState(false)
+  if (sawEditable !== editable) {
+    setSawEditable(editable)
+    setDroppedDialog(!editable && linkRequest !== null)
+    if (!editable) setLinkRequest(null)
+  }
+  useEffect(() => {
+    if (droppedDialog) focusHeadline()
+  }, [droppedDialog, focusHeadline])
+
   const requestLink = useCallback((href: string | null) => {
     setLinkChange(null)
     setLinkRequest({ href })
@@ -270,8 +285,7 @@ function EditorWorkspace({
         <EditorContent editor={editor} />
       </div>
       <LinkDialog
-        // A dialog that was open when the text stopped taking edits goes with them: what it would apply is not the person's to make.
-        request={editable ? linkRequest : null}
+        request={linkRequest}
         onSubmit={applyLink}
         onRemove={removeLink}
         onClose={() => setLinkRequest(null)}

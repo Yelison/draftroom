@@ -300,8 +300,8 @@ describe('a role that changes while the document is open', () => {
 })
 
 describe('a dialog that was open when the connection stopped', () => {
-  it('goes with the right to edit: the link it would apply is never made', async () => {
-    const { server, editor, user } = await openEditor()
+  it('goes with the right to edit for good: the link is never made, the focus is not lost, and it does not open again', async () => {
+    const { server, editor, text, user } = await openEditor()
     await screen.findByText('Sync status: Synced')
     act(() => editor.commands.insertContent('Some words'))
     act(() => editor.commands.selectAll())
@@ -313,6 +313,15 @@ describe('a dialog that was open when the connection stopped', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(JSON.stringify(editor.getJSON())).not.toContain('link')
+    // The button that opened it went with the toolbar: the focus is on the headline, not on the page.
+    expect(document.body).not.toHaveFocus()
+    expect(screen.getByRole('heading', { level: 1, name: 'Autumn launch plan' })).toHaveFocus()
+
+    await user.click(await screen.findByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(text).toHaveAttribute('contenteditable', 'true'), { timeout: 10_000 })
+    await screen.findByText('Sync status: Synced')
+    // Nobody asked for it: it is not there when the text takes edits again.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
 
