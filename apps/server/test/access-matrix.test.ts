@@ -2,7 +2,8 @@ import type { Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, type Api, type Call } from './support/api.ts'
-import { rolesOf } from './support/contract-roles.ts'
+import { anchor, createThread, quote } from './support/comments.ts'
+import { contractAllows, rolesOf } from './support/contract-roles.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
 import { personFor, scenarios } from './support/scenarios.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
@@ -89,6 +90,98 @@ describe.each(documentCases)('$operationId on a document', ({ operationId, call,
     // No role: the document does not exist for this person. A role the matrix refuses: it exists, and they may not.
     const expected = scenario.role === null ? 404 : mayDo ? allowed : 403
     expect(response.statusCode).toBe(expected)
+  })
+})
+
+interface ThreadCase {
+  readonly operationId: string
+  call(ids: { documentId: string; threadId: string }): Omit<Call, 'as'>
+  readonly allowed: number
+}
+
+// Rows of the matrix that need the role and nothing else: who may read comments, start a thread, reply, resolve, reopen.
+const threadCases: readonly ThreadCase[] = [
+  {
+    operationId: 'listThreads',
+    call: ({ documentId }) => ({ method: 'GET', url: `/api/documents/${documentId}/threads` }),
+    allowed: 200,
+  },
+  {
+    operationId: 'createThread',
+    call: ({ documentId }) => ({
+      method: 'POST',
+      url: `/api/documents/${documentId}/threads`,
+      body: { anchor, quote, body: 'Does the workshop fit before then?' },
+    }),
+    allowed: 201,
+  },
+  {
+    operationId: 'replyToThread',
+    call: ({ threadId }) => ({
+      method: 'POST',
+      url: `/api/threads/${threadId}/replies`,
+      body: { body: 'Yes, on the 4th.' },
+    }),
+    allowed: 201,
+  },
+  {
+    operationId: 'resolveThread',
+    call: ({ threadId }) => ({ method: 'POST', url: `/api/threads/${threadId}/resolve` }),
+    allowed: 200,
+  },
+  {
+    operationId: 'reopenThread',
+    call: ({ threadId }) => ({ method: 'POST', url: `/api/threads/${threadId}/reopen` }),
+    allowed: 200,
+  },
+]
+
+describe.each(threadCases)('$operationId on the threads of a document', ({ operationId, call, allowed }) => {
+  it.each(scenarios)('as a $name ($role)', async (scenario) => {
+    const { subject, documentId } = await arranged(scenario)
+    // Somebody else's thread: these rows do not depend on who wrote it.
+    const { threadId } = await createThread(db, { workspaceId: studio.workspaceId, documentId, author: studio.owner })
+
+    const response = await api({ as: subject, ...call({ documentId, threadId }) })
+
+    const mayDo = scenario.role !== null && rolesOf(operationId).roles.includes(scenario.role)
+    expect(response.statusCode).toBe(scenario.role === null ? 404 : mayDo ? allowed : 403)
+  })
+})
+
+interface CommentCase {
+  readonly operationId: string
+  call(commentId: string): Omit<Call, 'as'>
+  readonly allowed: number
+}
+
+// Rows that also depend on who wrote the comment: only the author edits, the author or an owner deletes. What each role
+// gets comes from the rows of the contract, and every case is tried on a comment of the person and on somebody else's.
+const commentCases: readonly CommentCase[] = [
+  {
+    operationId: 'updateComment',
+    call: (commentId) => ({ method: 'PATCH', url: `/api/comments/${commentId}`, body: { body: 'Yes, on the 5th.' } }),
+    allowed: 200,
+  },
+  {
+    operationId: 'deleteComment',
+    call: (commentId) => ({ method: 'DELETE', url: `/api/comments/${commentId}` }),
+    allowed: 204,
+  },
+]
+
+describe.each(commentCases)('$operationId on a comment', ({ operationId, call, allowed }) => {
+  describe.each([true, false])('written by the person: %s', (isAuthor) => {
+    it.each(scenarios)('as a $name ($role)', async (scenario) => {
+      const { subject, documentId } = await arranged(scenario)
+      const author = isAuthor ? subject : studio.owner
+      const { commentId } = await createThread(db, { workspaceId: studio.workspaceId, documentId, author })
+
+      const response = await api({ as: subject, ...call(commentId) })
+
+      const mayDo = scenario.role !== null && contractAllows(operationId, scenario.role, { isAuthor })
+      expect(response.statusCode).toBe(scenario.role === null ? 404 : mayDo ? allowed : 403)
+    })
   })
 })
 
