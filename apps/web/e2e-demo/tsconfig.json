@@ -1,7 +1,0 @@
-{
-  "extends": "../tsconfig.node.json",
-  "compilerOptions": { "tsBuildInfoFile": "${configDir}/../node_modules/.tmp/tsconfig.e2e-demo.tsbuildinfo" },
-  // The spec reads the fixtures for the ids of the documents it opens, as the specs of `e2e/` do.
-  "include": [".", "../src/data/mock/fixtures", "../src/data/mock/ids.ts"],
-  "references": [{ "path": "../../../packages/contract" }]
-}

@@ -10,7 +10,7 @@
     "tsBuildInfoFile": "${configDir}/node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
   // What this project covers, besides the build tooling and its tests (`vite.config.ts`, `scripts`) and the browser
-  // specs (`e2e`):
+  // specs (`e2e`, `e2e-demo`):
   //  - the few modules of `src` that the Vite configuration reads (`i18n/locale.ts`, `i18n/localeScript.ts`, the
   //    catalogues, `theme.ts`);
   //  - the fixtures that the bundle guard searches the production build for (`data/mock/fixtures`, `data/mock/ids.ts`);
@@ -19,6 +19,7 @@
     "vite.config.ts",
     "scripts",
     "e2e",
+    "e2e-demo",
     "src/i18n/locale.ts",
     "src/i18n/localeScript.ts",
     "src/i18n/*.json",

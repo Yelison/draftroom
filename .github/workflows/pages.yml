@@ -9,6 +9,11 @@ on:
   pull_request:
     paths:
       - 'apps/web/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - '.nvmrc'
       - '.github/workflows/pages.yml'
 
 permissions:
@@ -34,8 +39,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # The specs of the demo are not part of the project that `npm run typecheck` builds.
-      - run: npx tsc -b apps/web/e2e-demo
       - run: npx playwright install --with-deps chromium
       # Builds the demo itself (`build:demo`) before it serves it, so what is checked is what is kept below.
       - run: npm run test:e2e-demo -w @draftroom/web

@@ -35,7 +35,14 @@ const server = createServer(async (request, response) => {
     return
   }
 
-  const relative = decodeURIComponent(pathname.slice(basePath.length))
+  let relative: string
+  try {
+    relative = decodeURIComponent(pathname.slice(basePath.length))
+  } catch {
+    // An address that cannot be decoded is a bad request, not a reason for the server to stop.
+    response.writeHead(400).end()
+    return
+  }
   const path = resolve(root, relative === '' ? 'index.html' : relative)
   const file = path.startsWith(root + sep) ? await read(path) : undefined
   if (file !== undefined) {

@@ -1,6 +1,4 @@
 /* The static demo as GitHub Pages serves it: from `dist-demo/`, under `/draftroom/`, with no server behind it. */
-import { readdirSync } from 'node:fs'
-import { resolve } from 'node:path'
 import type { Page } from '@playwright/test'
 import { weeklyEnglish } from '../src/data/mock/fixtures/documents.ts'
 import { expect, test } from './fixtures.ts'
@@ -8,7 +6,6 @@ import { expect, test } from './fixtures.ts'
 test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
 
 const basePath = '/draftroom/'
-const buildDirectory = resolve(import.meta.dirname, '..', 'dist-demo')
 const main = (page: Page) => page.getByRole('main')
 
 /** The deep routes a person can reload, each with what proves its screen is there. */
@@ -27,46 +24,27 @@ const deepRoutes = [
 ]
 
 test.describe('the network', () => {
-  test('is never reached: the page asks only for files of the build and opens no WebSocket', async ({
+  // What it is never allowed to do is checked in every test, by the fixture; this one only proves it has something to see.
+  test('is watched on the screens that ask for the most: the lists, the editor and the Trash', async ({
     page,
-    baseURL,
+    networkWatch,
   }) => {
-    const files = new Set(
-      readdirSync(buildDirectory, { recursive: true, withFileTypes: true })
-        .filter((entry) => entry.isFile())
-        .map((entry) => `${basePath}${`${entry.parentPath}/${entry.name}`.slice(buildDirectory.length + 1)}`),
-    )
-    const origin = new URL(baseURL ?? '').origin
-    const seen: string[] = []
-    const notAllowed: string[] = []
-    const webSockets: string[] = []
-
-    // Whatever is not the build's own is aborted, so a request that should not happen cannot reach anything either.
-    await page.context().route('**/*', async (route) => {
-      const request = route.request()
-      const { origin: requestOrigin, pathname } = new URL(request.url())
-      seen.push(`${request.method()} ${request.url()}`)
-      const isTheBuild = requestOrigin === origin && (files.has(pathname) || request.isNavigationRequest())
-      if (isTheBuild && pathname.startsWith(basePath)) return route.continue()
-      notAllowed.push(`${request.method()} ${request.url()}`)
-      return route.abort()
-    })
-    page.on('websocket', (webSocket) => webSockets.push(webSocket.url()))
-
-    // The screens that ask for the most: the lists, the editor with its own chunk, and the Trash. The waits are soft so
-    // that a screen that never comes, because its request was refused, still ends in the list of what was refused.
     await page.goto('')
     await page.goto('documents')
-    await expect.soft(page.getByRole('heading', { level: 1, name: 'Documents' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Documents' })).toBeVisible()
     await page.goto(`documents/${weeklyEnglish.id}`)
-    await expect.soft(page.getByRole('textbox', { name: 'Document title' })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Document title' })).toBeVisible()
     await page.goto('trash')
-    await expect.soft(page.getByRole('heading', { level: 1, name: 'Trash' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Trash' })).toBeVisible()
 
-    await test.info().attach('requests.txt', { body: seen.join('\n') })
-    expect(seen.length, 'the page asked for nothing, so the check saw nothing').toBeGreaterThan(5)
-    expect(notAllowed, 'requests outside the build').toEqual([])
-    expect(webSockets, 'WebSockets').toEqual([])
+    expect(networkWatch.length, 'the page asked for nothing, so the watch saw nothing').toBeGreaterThan(5)
+  })
+})
+
+test.describe('the server of the demo', () => {
+  test('answers a malformed address with 400 and keeps serving', async ({ request }) => {
+    expect((await request.get('%E0%A4%A')).status()).toBe(400)
+    expect((await request.get('')).status()).toBe(200)
   })
 })
 
