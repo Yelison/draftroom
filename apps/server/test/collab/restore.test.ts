@@ -256,7 +256,8 @@ describe('restoring a version into a document that people have open', () => {
     expect(paragraphsOfDoc(live)).toEqual(['Edited Kept'])
   })
 
-  it('is not undone by a store that started before it: the old content is never written after the restore', async () => {
+  it('is not undone by a store that started before it: the old content is written before the restore begins to commit, never after', async () => {
+    const order: string[] = []
     let releaseWrite: () => void = () => undefined
     let writeStarted: () => void = () => undefined
     const started = new Promise<void>((resolve) => (writeStarted = resolve))
@@ -265,12 +266,19 @@ describe('restoring a version into a document that people have open', () => {
       store: (real) => ({
         load: (documentId) => real.load(documentId),
         async save(documentId, state) {
-          if (held) {
-            held = false
-            writeStarted()
-            await new Promise<void>((resolve) => (releaseWrite = resolve))
-          }
+          if (!held) return real.save(documentId, state)
+          held = false
+          writeStarted()
+          await new Promise<void>((resolve) => (releaseWrite = resolve))
           await real.save(documentId, state)
+          order.push('the store that was in flight wrote the old content')
+        },
+      }),
+      versions: (real) => ({
+        ...real,
+        commit(restored) {
+          order.push('the restore began to commit')
+          return real.commit(restored)
         },
       }),
     })
@@ -288,6 +296,7 @@ describe('restoring a version into a document that people have open', () => {
     const response = await restoring
 
     expect(response.statusCode).toBe(200)
+    expect(order).toEqual(['the store that was in flight wrote the old content', 'the restore began to commit'])
     expect(
       await eventually(async () => {
         const stored = await storedParagraphs(db, documentId)

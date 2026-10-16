@@ -253,17 +253,23 @@ describe('a document that people have open', () => {
 })
 
 describe('the sweep', () => {
-  it('runs by itself on the interval the server was given, and stops when the server shuts down', async () => {
+  it('runs by itself on the interval the server was given', async () => {
     await startServer({ autoVersionSweepMs: 25 })
     const documentId = await storedDocument(0, stateOf('Draft'))
     clock.at(11)
 
     await eventually(async () => ((await versionsOf(db, documentId)).length === 1 ? true : undefined))
-    await collab.close()
+  })
 
-    const before = await versionsOf(db, documentId)
-    await new Promise((resolve) => setTimeout(resolve, 80))
-    expect(await versionsOf(db, documentId)).toEqual(before)
+  it('stops when the server shuts down: a document that becomes due afterwards is left alone', async () => {
+    await startServer({ autoVersionSweepMs: 25 })
+    await collab.close()
+    const documentId = await storedDocument(0, stateOf('Draft'))
+    clock.at(11)
+
+    await new Promise((resolve) => setTimeout(resolve, 120))
+
+    expect(await versionsOf(db, documentId)).toEqual([])
   })
 })
 
