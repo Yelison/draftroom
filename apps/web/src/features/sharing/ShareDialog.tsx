@@ -31,8 +31,7 @@ export function ShareDialog() {
   const lostOwnership = useRef(false)
   const done = useRef<HTMLButtonElement>(null)
   const announce = (text: string) => {
-    // Once the person is no longer an owner this is the only thing to say: the change that caused it is old news.
-    if (!lostOwnership.current) setAnnouncement(({ count }) => ({ count: count + 1, text }))
+    setAnnouncement(({ count }) => ({ count: count + 1, text }))
   }
 
   // The role comes with the document, and a change of access made in this dialog can take it from the person. What had the

@@ -144,14 +144,19 @@ describe('the count of the shared table', () => {
     })
     const count = () => within(main()).getByText('2 documents')
 
-    await user.click(within(filters()).getByRole('button', { name: 'Can edit' }))
+    const press = (name: string) => user.click(within(filters()).getByRole('button', { name }))
+    // Both lists are in the cache after the first visit, so going back to one of them has no loading in between.
+    await press('Can edit')
     await waitFor(() => expect(count()).toBeInTheDocument())
+    await press('Can view')
+    await waitFor(() => expect(count()).toBeInTheDocument())
+    await press('Can edit')
     const first = count()
-    await user.click(within(filters()).getByRole('button', { name: 'Can view' }))
-    await waitFor(() => expect(count()).not.toBe(first))
+
+    await press('Can view')
 
     // Two filters, two answers: the screen reader says the number after each press, though the number did not change.
-    expect(count()).toBeInTheDocument()
+    expect(count()).not.toBe(first)
   })
 })
 
