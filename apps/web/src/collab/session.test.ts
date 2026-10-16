@@ -351,6 +351,29 @@ describe('when the server ends the connection', () => {
     expect(textOf(world.server.document(wireName))).toBe(' and then morestored text')
   })
 
+  it('does nothing when asked to retry a document that is too large, and keeps what was not stored', async () => {
+    world = createWorld()
+    const opening = await opened()
+    world.network.set(false)
+    await advance(50)
+    typeInto(opening.doc, 'z'.repeat(MAX_MESSAGE_BYTES + 1000), 0)
+    world.network.set(true)
+    await advance(100)
+    expect(opening.session.getSnapshot()).toMatchObject({ state: 'error', cause: 'document-too-large' })
+
+    const closes = world.server.closes.length
+    opening.session.retry()
+    await advance(RECONNECT_STABLE_MS)
+
+    expect(opening.session.getSnapshot()).toMatchObject({ state: 'error', cause: 'document-too-large' })
+    // It did not send the same message again, which the server would have refused again.
+    expect(world.server.closes).toHaveLength(closes)
+    // Still offered, and still the only way out: discarding is what drops what was not stored.
+    opening.session.discardAndReload()
+    await advance(1100)
+    expect(opening.session.getSnapshot().state).toBe('synced')
+  })
+
   it('does nothing when asked to discard and reload from an error that is not about size', async () => {
     world = createWorld()
     const opening = await opened(stranger)

@@ -147,6 +147,9 @@ class ProviderSession implements CollabSession {
   // These are handed to screens as callbacks, so they keep their `this`.
 
   retry = (): void => {
+    // A document that is too large is opened again only by discarding what was not stored: a retry would send the same
+    // message again, and the machine takes the `open` after that discard to mean that it happened.
+    if (this.model.state === 'error' && this.model.cause === 'document-too-large') return
     this.dispatch({ type: 'open' })
   }
 
