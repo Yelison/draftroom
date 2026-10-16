@@ -1,4 +1,5 @@
 import type { Schema } from '@draftroom/contract'
+import { MAX_ANCHOR_POSITION_LENGTH } from '@draftroom/contract/collab'
 import type { Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
@@ -467,7 +468,7 @@ describe('the limits of a text', () => {
     },
   )
 
-  it('allows an end of the anchor up to 128 characters, the limit of the protocol, and refuses 129 with 413', async () => {
+  it('allows an end of the anchor up to the limit of the protocol, and refuses one character more with 413', async () => {
     const documentId = await freshDocument()
     const start = (end: string) =>
       api({
@@ -477,8 +478,8 @@ describe('the limits of a text', () => {
         body: { anchor: { start: anchor.start, end }, quote, body: 'A comment' },
       })
 
-    expect((await start('A'.repeat(128))).statusCode).toBe(201)
-    expect(await start('A'.repeat(129))).toMatchObject({
+    expect((await start('A'.repeat(MAX_ANCHOR_POSITION_LENGTH))).statusCode).toBe(201)
+    expect(await start('A'.repeat(MAX_ANCHOR_POSITION_LENGTH + 1))).toMatchObject({
       statusCode: 413,
       body: { code: 'too-large', errors: [{ pointer: '/anchor/end', code: 'too-long' }] },
     })
