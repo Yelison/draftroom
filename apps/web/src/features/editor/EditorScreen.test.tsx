@@ -4,7 +4,13 @@ import { ApiError, TransportError } from '../../data/errors.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { budget, launchPlan, openEditor, people, renderEditor, ydocOf } from './testing/renderEditor.tsx'
 
-const textArea = () => screen.findByRole('textbox', { name: /Document content|Contenido del documento/ })
+const textArea = (waitFor?: { timeout: number }) =>
+  screen.findByRole('textbox', { name: /Document content|Contenido del documento/ }, waitFor)
+
+// The screen is a lazy route and the editor mounts Tiptap in StrictMode: on a runner that is busy, the five seconds a wait
+// has by default (see `renderEditor`) ran out in this test (5.16 s in CI) though nothing in it was wrong. Both of its waits
+// take as long as half of the test's own limit of twenty, so the test still fails if the screen never arrives.
+const slowRunner = { timeout: 10_000 }
 
 describe('the document screen', () => {
   it('opens a document for its owner with the title, the toolbar and a text area that can be edited', async () => {
@@ -53,14 +59,14 @@ describe('the document screen', () => {
         getDocument: (request) => new Promise((resolve) => (arrive = () => resolve(dataSource.getDocument(request)))),
       }),
     })
-    await screen.findByRole('heading', { level: 1, name: 'Document' })
+    await screen.findByRole('heading', { level: 1, name: 'Document' }, slowRunner)
     // The classes of the column's first two children, which carry its measures (the CSS is not loaded in these tests).
     const layoutOf = () =>
       [...(container.querySelector('.column')?.children ?? [])].slice(0, 2).map((child) => child.className)
 
     const whileLoading = layoutOf()
     await act(async () => arrive?.())
-    await textArea()
+    await textArea(slowRunner)
 
     expect(whileLoading).toEqual(['toolbarBand', 'sheet'])
     expect(layoutOf()).toEqual(whileLoading)
