@@ -1,6 +1,6 @@
 import type { Kysely, Transaction } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { deleteComment, insertReply, setResolved, updateCommentBody, type Change } from '../src/db/comments/commands.ts'
+import { deleteComment, insertReply, setResolved, updateCommentBody } from '../src/db/comments/commands.ts'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, notFound, type Api } from './support/api.ts'
 import { addComment, createThread } from './support/comments.ts'
