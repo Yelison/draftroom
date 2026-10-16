@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { documentName, type StatelessEvent } from '@draftroom/contract/collab'
 import { keysAfterEvent } from '../../data/queryKeys.ts'
 import { daniel } from '../../data/mock/fixtures/index.ts'
-import { launchPlan, openEditor } from './testing/renderEditor.tsx'
+import { budget, launchPlan, openEditor, people } from './testing/renderEditor.tsx'
 import { joinAsPeer } from './testing/peer.ts'
 
 afterEach(() => vi.restoreAllMocks())
@@ -117,5 +117,28 @@ describe('undo', () => {
     })
     expect(editor.getText()).toBe('Remote. ')
     peer.leave()
+  })
+})
+
+describe('the sync status of the open editor', () => {
+  it('announces synchronising once however many keys are pressed, and synced once when the server stored them', async () => {
+    const { editor } = await openEditor()
+    const region = await screen.findByText('Sync status: Synced')
+    const announced: (string | null)[] = []
+    const observer = new MutationObserver(() => announced.push(region.textContent))
+    observer.observe(region, { childList: true, characterData: true, subtree: true })
+
+    for (let key = 0; key < 30; key += 1) act(() => editor.commands.insertContent('x'))
+    await waitFor(() => expect(region).toHaveTextContent('Sync status: Synced'), { timeout: 5000 })
+    observer.disconnect()
+
+    expect(announced).toEqual(['Sync status: Synchronising', 'Sync status: Synced'])
+  })
+
+  it('says read-only to a reader and never synchronising, whatever the provider counts', async () => {
+    const { server } = await openEditor({ signedInAs: people.daniel, documentId: budget.id })
+
+    await screen.findByText('Sync status: Read-only')
+    expect(server.collaboration.document(documentName(budget.id)).getXmlFragment('default').length).toBe(0)
   })
 })

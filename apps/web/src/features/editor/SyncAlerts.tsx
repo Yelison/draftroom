@@ -4,7 +4,7 @@ import type { CollabSnapshot } from '../../collab/session.ts'
 import styles from './SyncAlerts.module.css'
 
 export interface SyncAlertsProps {
-  snapshot: CollabSnapshot
+  snapshot: Pick<CollabSnapshot, 'cause' | 'action' | 'notice'>
   onRetry: () => void
   onDiscard: () => void
   onDismissNotice: () => void
