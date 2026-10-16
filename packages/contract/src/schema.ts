@@ -674,6 +674,8 @@ export interface paths {
          * Restore a version
          * @description Saves a `pre-restore` version of the current state, replaces the live content in one transaction and saves a `restore` version. Edits made meanwhile merge on top; none is dropped silently.
          *
+         *     A `409 conflict` means people kept editing the document while it was being restored, so the content that would have been replaced kept changing; nothing was restored and no `pre-restore` version was kept. The same request can be tried again.
+         *
          *     Required document role. Restore a version: owner.
          */
         post: operations["restoreVersion"];
@@ -2397,6 +2399,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             default: components["responses"]["Unexpected"];
         };
     };
