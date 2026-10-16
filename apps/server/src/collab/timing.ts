@@ -14,6 +14,8 @@ export interface CollabTiming {
   readonly shutdownGraceMs: number
   /** How long it waits for the sockets it asked to close to do so, before it destroys what is still open. */
   readonly socketCloseMs: number
+  /** How often the server looks for documents that are due an automatic version (protocol §11.2). */
+  readonly autoVersionSweepMs: number
 }
 
 export const productionTiming: CollabTiming = {
@@ -23,4 +25,5 @@ export const productionTiming: CollabTiming = {
   shutdownWaitMs: 30_000,
   shutdownGraceMs: 5_000,
   socketCloseMs: 1_000,
+  autoVersionSweepMs: 60_000,
 }

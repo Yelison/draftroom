@@ -6,6 +6,7 @@ import type { Database } from '../db/tables.ts'
 import type { AuthProvider } from '../http/auth/auth-provider.ts'
 import type { LiveDocuments } from '../http/live-documents.ts'
 import { authenticateExtension } from './authenticate.ts'
+import { createAutoVersions } from './autoVersions.ts'
 import { awarenessGuardExtension } from './awarenessGuard.ts'
 import { endConnections, tellConnections, type ClosePlan, type ConnectionSelector } from './closeConnections.ts'
 import type { ConnectionContext } from './context.ts'
@@ -13,6 +14,7 @@ import { inFlightExtension, RevocationMarks } from './inFlight.ts'
 import { DurabilityRegistry } from './durability.ts'
 import { durableAckExtension } from './durableAck.ts'
 import { limitsExtension } from './limits.ts'
+import { broadcastToDocument } from './broadcastToDocument.ts'
 import { createLiveDocuments } from './liveDocuments.ts'
 import type { CollabLog } from './log.ts'
 import { OpenSockets } from './openSockets.ts'
@@ -68,6 +70,8 @@ export interface CollabServer {
   tell(target: ConnectionTarget, event: StatelessEvent): number
   /** The work REST does on documents that people may have open: the state a version is saved from, and the restore. */
   readonly documents: LiveDocuments
+  /** Looks for documents that are due an automatic version now and makes them, and says how many it made. It also runs on its own, on an interval. */
+  sweepAutoVersions(): Promise<number>
   /** Stores what can be stored, within the wait of protocol §7.2, and stops. */
   shutDown(): Promise<void>
   readonly hocuspocus: Hocuspocus<ConnectionContext>
@@ -88,7 +92,7 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
   const store = options.store ?? createPostgresStateStore(database)
   const now = options.now ?? Date.now
 
-  const durability = new DurabilityRegistry()
+  const durability = new DurabilityRegistry(now)
   const retry = new StoreRetry(timing.retryDelaysMs, log)
   const sockets = new OpenSockets()
   const marks = new RevocationMarks(stuckConnectionMs, now)
@@ -131,12 +135,23 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
     log,
   })
 
+  const autoVersions = createAutoVersions({
+    database,
+    documents,
+    durability,
+    broadcast: (documentId, event) => broadcastToDocument(server.hocuspocus, documentId, event),
+    log,
+    now,
+  })
+
   return {
     hocuspocus: server.hocuspocus,
     documents,
+    sweepAutoVersions: autoVersions.sweep,
 
     async listen() {
       await server.listen()
+      autoVersions.start(timing.autoVersionSweepMs)
       return server.address.port
     },
 
@@ -155,6 +170,9 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
       return tellConnections(server.hocuspocus, selector, event)
     },
 
-    shutDown: () => shutDownCollaboration({ server, durability, retry, sockets, timing, log }),
+    shutDown() {
+      autoVersions.stop()
+      return shutDownCollaboration({ server, durability, retry, sockets, timing, log })
+    },
   }
 }

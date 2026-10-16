@@ -6,6 +6,7 @@ import { apiOf, notFound, type Api, type Call } from './support/api.ts'
 import { anchor, createThread, quote } from './support/comments.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
+import { createVersion } from './support/versions.ts'
 import { createDocument, createFolder, createPerson, createWorkspace, join, type Person } from './support/world.ts'
 
 // The id of something in another workspace must answer exactly like an id that does not exist: the status, the body,
@@ -34,7 +35,7 @@ interface Setting {
   /** What belongs to the other workspace, where Alice is nobody. */
   readonly foreign: Ids
   /** A document of Alice's own workspace that she cannot read: private to Bruno, with a thread of his in it. */
-  readonly hidden: { documentId: string; threadId: string; commentId: string }
+  readonly hidden: { documentId: string; threadId: string; commentId: string; versionId: string }
 }
 
 let setting: Setting
@@ -61,11 +62,13 @@ beforeAll(async () => {
       documentId: foreignDocumentId,
       folderId: await createFolder(db, otherId),
       ...(await createThread(db, { workspaceId: otherId, documentId: foreignDocumentId, author: bruno })),
+      versionId: await createVersion(db, { workspaceId: otherId, documentId: foreignDocumentId, author: bruno }),
       userId: bruno.id,
     },
     hidden: {
       documentId: hiddenDocumentId,
       ...(await createThread(db, { workspaceId, documentId: hiddenDocumentId, author: bruno })),
+      versionId: await createVersion(db, { workspaceId, documentId: hiddenDocumentId, author: bruno }),
     },
   }
 })
@@ -76,6 +79,7 @@ interface Ids {
   readonly folderId: string
   readonly threadId: string
   readonly commentId: string
+  readonly versionId: string
   /** A person the calls name: who belongs to the workspace they are about, or nobody. */
   readonly userId: string
 }
@@ -171,6 +175,10 @@ const routes: readonly (readonly [string, (ids: Ids) => Omit<Call, 'as'>])[] = [
     'removeAccess',
     ({ documentId, userId }) => ({ method: 'DELETE', url: `/api/documents/${documentId}/access/${userId}` }),
   ],
+  ['listVersions', ({ documentId }) => ({ method: 'GET', url: `/api/documents/${documentId}/versions` })],
+  ['createVersion', ({ documentId }) => ({ method: 'POST', url: `/api/documents/${documentId}/versions` })],
+  ['getVersionContent', ({ versionId }) => ({ method: 'GET', url: `/api/versions/${versionId}/content` })],
+  ['restoreVersion', ({ versionId }) => ({ method: 'POST', url: `/api/versions/${versionId}/restore` })],
   [
     'setGeneralAccess',
     ({ documentId }) => ({
@@ -187,6 +195,7 @@ const missing = (): Ids => ({
   folderId: randomUUID(),
   threadId: randomUUID(),
   commentId: randomUUID(),
+  versionId: randomUUID(),
   userId: randomUUID(),
 })
 
@@ -224,6 +233,16 @@ describe('a document of her own workspace that Alice cannot read', () => {
   // Its threads and comments are hers to know about exactly when the document is: asking by their own ids changes nothing.
   it.each(routes.filter(([operationId]) => /Thread|Comment/.test(operationId)))(
     'answers %s, for its threads and comments, as an id that does not exist',
+    async (_operationId, call) => {
+      const asked = await api({ as: setting.alice, ...call({ ...setting.foreign, ...setting.hidden }) })
+
+      expect(asked).toMatchObject({ statusCode: 404, body: notFound })
+    },
+  )
+
+  // The same for its versions, by the id of the document and by their own.
+  it.each(routes.filter(([operationId]) => /Version/.test(operationId)))(
+    'answers %s, for its versions, as an id that does not exist',
     async (_operationId, call) => {
       const asked = await api({ as: setting.alice, ...call({ ...setting.foreign, ...setting.hidden }) })
 
