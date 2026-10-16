@@ -9,8 +9,8 @@ const explorer = (page: Page) => page.getByRole('complementary', { name: 'Explor
 const tree = (page: Page) => explorer(page).getByRole('tree', { name: 'Documents and folders' })
 const treeitem = (page: Page, name: string) => tree(page).getByRole('treeitem', { name, exact: true })
 
-/** Opens a document that is not the editor's (the share route has no Tiptap) and waits for the tree. */
-async function openExplorer(page: Page, path = `/documents/${weeklyEnglish.id}/share`) {
+/** Opens a document and waits for the explorer beside it to show its tree. */
+async function openExplorer(page: Page, path = `/documents/${weeklyEnglish.id}`) {
   await page.goto(path)
   await expect(tree(page)).toBeVisible()
 }
@@ -57,7 +57,7 @@ test('walks the tree with the keyboard and keeps the open document selected whil
 })
 
 test('creates, renames and archives a document from the explorer', async ({ page }) => {
-  await openExplorer(page, `/documents/${launchPlan.id}/share`)
+  await openExplorer(page, `/documents/${launchPlan.id}`)
 
   // Create: a blank document opens, and its row is the selected one.
   await explorer(page).getByRole('button', { name: 'New document' }).click()
@@ -107,7 +107,7 @@ test('lists and searches the Documents screen', async ({ page }) => {
 test('has no horizontal scroll at 1280 and 1440 px', async ({ page }) => {
   const screens = [
     { path: '/documents', ready: page.getByRole('main').getByRole('link', { name: 'Autumn launch plan' }) },
-    { path: `/documents/${weeklyEnglish.id}/share`, ready: tree(page) },
+    { path: `/documents/${weeklyEnglish.id}`, ready: tree(page) },
   ]
   for (const width of [1280, 1440]) {
     await page.setViewportSize({ width, height: 800 })
@@ -140,7 +140,7 @@ const shifts = (page: Page) =>
   )
 
 test('does not shift while the lists arrive', async ({ page }) => {
-  for (const path of ['/documents', `/documents/${weeklyEnglish.id}/share`]) {
+  for (const path of ['/documents', `/documents/${weeklyEnglish.id}`]) {
     await page.goto(path)
     await expect(page.getByRole('main').getByRole('link', { name: 'Autumn launch plan' }).or(tree(page))).toBeVisible()
     expect(await shifts(page), path).toBeLessThan(0.01)
