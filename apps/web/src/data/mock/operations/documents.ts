@@ -1,3 +1,5 @@
+// The mock plays the server here (a document made from a template is written by the server), so it may do what the server does.
+// oxlint-disable-next-line no-restricted-imports
 import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
 import type { DataSource } from '../../DataSource.ts'
 import type { DocumentRecord } from '../fixtures/documents.ts'
