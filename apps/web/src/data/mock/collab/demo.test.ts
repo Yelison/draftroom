@@ -131,6 +131,9 @@ describe('the world of the demo', () => {
       const plan = textOf(await api.getVersionContent(params(lastOfPlan)))
       const interviewsStored = textOf(await api.getVersionContent(params(lastOfInterviews)))
 
+      // The plan's last version is its two opening paragraphs, and the interviews' is the first.
+      expect(plan).toHaveLength(2)
+      expect(interviewsStored).toHaveLength(1)
       expect(liveText(server, launchPlan.id).slice(0, plan.length)).toEqual(plan)
       expect(liveText(server, interviews.id).slice(0, interviewsStored.length)).toEqual(interviewsStored)
       expect(plan.join(' ')).toContain(locale === 'en' ? 'second week of November' : 'segunda semana de noviembre')
