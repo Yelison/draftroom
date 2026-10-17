@@ -35,14 +35,23 @@ the same image runs on any host name.
 
 **Who sets which headers.** The server never sees `index.html`, so the headers of the document can only come from the proxy; the
 headers of `/api` and `/collab` can only come from the server, which is the one that knows its origins and what is personal. The
-proxy sends the static ones (`Strict-Transport-Security`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`,
-`Cross-Origin-Opener-Policy`, a Content-Security-Policy of `frame-ancestors 'none'` alone, and no `Server`) from
-`deploy/security-headers.caddy`, which the Caddyfile imports **inside the block that serves the web app**, so that they reach those
-files and never `/api` or `/collab`. T7.2 owns the server's headers and writes the full Content-Security-Policy, whose hash is that
-of the inline script of the built `index.html`: it generates the fragment in the `web-build` stage and the proxy stage of the
-`Dockerfile` copies it from there, at the place a comment marks. T7.2 therefore edits the fragment and that one line, and not
-the Caddyfile. HSTS is `max-age` of a year without `includeSubDomains` or `preload`: without it a browser can be sent back to plain
-HTTP, where the `Secure` cookies of ADR 0004 are never sent, and this site cannot speak for the other names under its domain.
+proxy sends the static ones from `deploy/security-headers.caddy`, which the Caddyfile imports **inside the block that serves the web
+app**, so that they reach those files and never `/api` or `/collab`. T7.2 owns the server's headers and writes the full
+Content-Security-Policy, whose hash is that of the inline script of the built `index.html`, so it can only exist after the web build:
+T7.2 generates the fragment in the `web-build` stage and the proxy stage of the `Dockerfile` copies it from there, at the place a
+comment marks. It edits the fragment and that one line, and not the Caddyfile.
+
+**The contract of the headers fragment.** One shape and one list of values, so that the two tasks never have to agree again:
+
+| | |
+| --- | --- |
+| **Format** | Exactly one `header { … }` block of the Caddyfile language, which the Caddyfile imports inside `handle`. No named snippets (`(name) { … }`): an `import` of a file that holds one fails with `unrecognized directive` and the proxy does not start. |
+| **Values T8.1 fixes and T7.2 keeps** | `Strict-Transport-Security: max-age=31536000` (no `includeSubDomains`, no `preload`: this site cannot speak for the other names under its domain, and a preload cannot be taken back); `X-Content-Type-Options: nosniff`; `Referrer-Policy: strict-origin-when-cross-origin`; `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`; `Cross-Origin-Opener-Policy: same-origin`; and `-Server`. |
+| **The one value T7.2 replaces** | `Content-Security-Policy`. T8.1 writes `frame-ancestors 'none'` alone (that directive works only as a header, never in a `<meta>` tag); T7.2 writes the full policy, with that directive in it. |
+| **Who writes the file** | T8.1 commits the file with the values above. T7.2 overwrites it in the image, from the `web-build` stage, with the same format and the same values and only the policy changed. The Caddyfile is T8.1's and T7.2 does not edit it. |
+| **How it is checked** | `apps/server/test/deploy/caddy-fragment.test.ts` runs `caddy adapt` with the image the `Dockerfile` pins on the Caddyfile and the fragment, and fails if Caddy does not accept them. It also asserts that every header of the fragment is on the files of the web app and nowhere else, and that a fragment written as a named snippet is refused. T7.2 can point the same check at the fragment it generates; the drill checks the result on the running proxy. |
+
+HSTS is a year because without it a browser can be sent back to plain HTTP, where the `Secure` cookies of ADR 0004 are never sent.
 
 **What the images hold.** The server image has the server's production dependencies and nothing else: `npm ci --omit=dev` with
 one workspace still installs what the web workspace needs in production, so a script in the dependency stage removes every package

@@ -2,6 +2,9 @@
 # inside the block that serves the web app, so they are sent with those files and with nothing else. `/api` and `/collab` are
 # answered by the server, which sets its own (T7.2): the proxy does not add these to them, so the two never contradict each other.
 #
+# The shape of this file is a contract (ADR 0016): exactly one `header { … }` block, never a named snippet, with these values; T7.2
+# keeps them all and replaces only the policy. `apps/server/test/deploy/caddy-fragment.test.ts` checks it with Caddy.
+#
 # T7.2 adds the Content-Security-Policy of the page. It needs the hash of the inline script of `index.html`, which exists only
 # after the web build, so it is generated in the `web-build` stage of the Dockerfile and written over this file in the image,
 # with `frame-ancestors 'none'` kept in it (that directive works only as a header, never in a <meta> tag).
