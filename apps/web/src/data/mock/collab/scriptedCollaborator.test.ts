@@ -1,6 +1,6 @@
 import { fragmentName } from '@draftroom/editor-schema'
 // oxlint-disable-next-line no-restricted-imports
-import { jsonToYUpdate, replaceFragmentContent } from '@draftroom/editor-schema/convert'
+import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
 import * as Y from 'yjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { demoContent } from '../fixtures/demoContent.ts'
@@ -179,6 +179,9 @@ describe('the collaborator of the demo', () => {
     cursors.push(Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(visitorsText, visitorsText.length)))
     live(4_000)
     cursors.length = 0
+    // She gives up the line she had begun, and does not go on writing after the visitor's words.
+    live(3_000)
+    expect(hers(ydoc)).toBe(`${label} VISITOR NOTE`)
     live(300_000)
     stop()
 
@@ -201,19 +204,18 @@ describe('the collaborator of the demo', () => {
     expect(shown).toHaveLength(1)
   })
 
-  it('goes on in the new last paragraph when hers is replaced, as when a version is restored', () => {
+  it('goes on in the new last paragraph when hers is deleted and another is added, as when a version is restored', () => {
     const { ydoc, seat } = scene()
     startCollaborator(seat, lines, lively)
     live(12_000)
+    const fragment = ydoc.getXmlFragment(fragmentName)
 
-    ydoc.transact(
-      () =>
-        replaceFragmentContent(ydoc.getXmlFragment(fragmentName), {
-          type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Restored notes:' }] }],
-        }),
-      'restore',
-    )
+    fragment.delete(fragment.length - 1, 1)
+    live(3_000)
+    // A document of the demo is only ever written from JSON; this is the one place a test makes a paragraph by hand.
+    const paragraph = new Y.XmlElement('paragraph')
+    paragraph.insert(0, [new Y.XmlText('Restored notes:')])
+    fragment.insert(fragment.length, [paragraph])
     live(60_000)
 
     expect(hers(ydoc).startsWith('Restored notes: ')).toBe(true)

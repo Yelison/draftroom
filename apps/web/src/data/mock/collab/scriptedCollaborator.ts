@@ -56,11 +56,11 @@ const pace = {
 /** How long she waits before trying again: when someone's cursor is in her paragraph, or the document has no paragraph yet. */
 const RETRY_MS = 500
 
-/** The paragraph she writes in: the last of the document, when it is plain text. `undefined` until the document has one. */
+/** The paragraph she writes in: the last block of the document, when it is a paragraph of plain text. `undefined` until the document has one. */
 function paragraphOf(ydoc: Y.Doc): Y.XmlText | undefined {
   const fragment = ydoc.getXmlFragment(fragmentName)
   const last = fragment.length === 0 ? undefined : fragment.get(fragment.length - 1)
-  const text = last instanceof Y.XmlElement ? last.get(0) : undefined
+  const text = last instanceof Y.XmlElement && last.nodeName === 'paragraph' ? last.get(0) : undefined
   return text instanceof Y.XmlText ? text : undefined
 }
 
