@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The backup and restore drill: starts the production stack under a throwaway Compose project, runs deploy/drill/drill.mjs
+# The backup and restore drill: starts the production stack under a throwaway Compose project, runs deploy/drill/drill.ts
 # against it and removes everything it started, whatever happens. CI runs it (`Backup and restore drill`); so can you:
 #
 #   deploy/drill/drill.sh
@@ -47,8 +47,16 @@ set +a
 
 "${compose[@]}" up --detach --build --wait
 
+# The proxy is healthy once its admin endpoint answers, which can be before it has issued its certificate and written the root
+# certificate it issues from: wait for the file, up to a minute.
 proxy="$("${compose[@]}" ps --quiet proxy)"
-docker cp "$proxy:/data/caddy/pki/authorities/local/root.crt" "$work/caddy-root.crt"
+root_certificate=/data/caddy/pki/authorities/local/root.crt
+for _ in $(seq 1 60); do
+  docker exec "$proxy" test -s "$root_certificate" && break
+  sleep 1
+done
+docker cp "$proxy:$root_certificate" "$work/caddy-root.crt" || { echo "the proxy never wrote $root_certificate" >&2; exit 1; }
 
-export DRILL_ORIGIN="https://localhost:${HTTPS_PORT}" NODE_EXTRA_CA_CERTS="$work/caddy-root.crt"
-node "$repository/deploy/drill/drill.mjs"
+export DRILL_ORIGIN="https://localhost:${HTTPS_PORT}" DRILL_HTTP_ORIGIN="http://localhost:${HTTP_PORT}"
+export NODE_EXTRA_CA_CERTS="$work/caddy-root.crt"
+node "$repository/deploy/drill/drill.ts"

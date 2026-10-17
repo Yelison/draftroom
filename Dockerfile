@@ -70,4 +70,8 @@ CMD ["sh", "-c", "node src/db/run-migrations.ts && exec node src/main.ts"]
 
 FROM ${CADDY_IMAGE} AS proxy
 COPY deploy/Caddyfile /etc/caddy/Caddyfile
+# The headers of the document, imported by the Caddyfile for the web app's files only. T7.2 adds the full Content-Security-Policy:
+# its hash is that of the inline script of index.html, so it is generated in the `web-build` stage from dist/index.html, and the
+# line below is where this stage takes the generated file from that stage instead of from the repository.
+COPY deploy/security-headers.caddy /etc/caddy/security-headers.caddy
 COPY --from=web-build /app/apps/web/dist /srv

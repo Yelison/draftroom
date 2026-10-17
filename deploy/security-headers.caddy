@@ -1,0 +1,21 @@
+# The headers of the document: what the browser is told about the page and the files it loads. The Caddyfile imports this file
+# inside the block that serves the web app, so they are sent with those files and with nothing else. `/api` and `/collab` are
+# answered by the server, which sets its own (T7.2): the proxy does not add these to them, so the two never contradict each other.
+#
+# T7.2 adds the Content-Security-Policy of the page. It needs the hash of the inline script of `index.html`, which exists only
+# after the web build, so it is generated in the `web-build` stage of the Dockerfile and written over this file in the image,
+# with `frame-ancestors 'none'` kept in it (that directive works only as a header, never in a <meta> tag).
+header {
+	# A browser that has seen the site over HTTPS keeps using HTTPS for a year, which is what makes the `Secure` session cookie
+	# reliable. No `includeSubDomains` and no `preload`: this site cannot speak for the other names under its domain, and a
+	# preload cannot be taken back.
+	Strict-Transport-Security "max-age=31536000"
+	X-Content-Type-Options "nosniff"
+	Referrer-Policy "strict-origin-when-cross-origin"
+	# The app needs none of the capabilities a page can ask for.
+	Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+	Cross-Origin-Opener-Policy "same-origin"
+	# The page is never shown in a frame of another site. The rest of the policy comes with T7.2.
+	Content-Security-Policy "frame-ancestors 'none'"
+	-Server
+}

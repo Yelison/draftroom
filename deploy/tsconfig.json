@@ -8,5 +8,5 @@
     "rootDir": ".",
     "types": ["node"]
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "../apps/server/test/support/ws.d.ts"]
 }

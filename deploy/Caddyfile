@@ -1,13 +1,18 @@
 # The only listener the outside world reaches. It terminates TLS, serves the built web app, and sends `/api` and `/collab`
 # to the server. `SITE_ADDRESS` is the public host name: Caddy gets a certificate for it by itself. For a name that is
 # not public (`draftroom.localhost`, an address on a private network) it issues one from its own certificate authority.
+{
+	# Caddy's own redirect from HTTP sends the browser to port 443, which is wrong when HTTPS is published on another port. The
+	# one below goes to `PUBLIC_ORIGIN`, the address people really use.
+	auto_https disable_redirects
+}
+
+http://{$SITE_ADDRESS} {
+	redir {$PUBLIC_ORIGIN}{uri} permanent
+}
+
 {$SITE_ADDRESS} {
 	encode zstd gzip
-
-	# A browser that has seen this site over HTTPS keeps using HTTPS for a year, which is what makes the `Secure` session cookie
-	# reliable. No `includeSubDomains` and no `preload`: this site cannot speak for the other names under its domain, and a
-	# preload cannot be taken back.
-	header Strict-Transport-Security "max-age=31536000"
 
 	handle /api/* {
 		reverse_proxy server:8380
@@ -21,6 +26,9 @@
 
 	handle {
 		root * /srv
+
+		# The headers of the document, for the web app's files only (see the file).
+		import /etc/caddy/security-headers.caddy
 
 		# Content-hashed files never change under their name; the page that names them always has to be fetched again.
 		@hashed path /assets/*

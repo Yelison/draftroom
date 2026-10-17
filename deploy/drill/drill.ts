@@ -1,11 +1,11 @@
-#!/usr/bin/env node
 // The checks of the backup and restore drill (deploy/drill/drill.sh starts the stack and calls this). It is a person's first
 // day on the production stack, then a disaster and a recovery, driven over HTTPS and WSS like a browser would:
 //
-//   1. sign up with a real account and read the session cookie's flags,
-//   2. create a document and write into it over the collaboration WebSocket, until the server says it stored the change,
-//   3. take a backup and restore it into a database that did not exist,
-//   4. start a second server on the restored database, sign in again with the same password and open the document.
+//   1. read what the proxy sends: the headers of the document on the web app's files and not on the API, and the redirect from HTTP,
+//   2. sign up with a real account and read the session cookies' flags,
+//   3. create a document and write into it over the collaboration WebSocket, until the server says it stored the change,
+//   4. take a backup and restore it into a database that did not exist,
+//   5. start a second server on the restored database, sign in again with the same password and open the document.
 //
 // It needs NODE_EXTRA_CA_CERTS to trust the proxy's certificate authority. Nothing here is a secret: the account is made up
 // for the run, and the password is generated for it.
@@ -18,14 +18,16 @@ import { yUpdateToJson } from '@draftroom/editor-schema/convert'
 import { HocuspocusProvider, HocuspocusProviderWebsocket } from '@hocuspocus/provider'
 import WebSocket from 'ws'
 import * as Y from 'yjs'
+import { z } from 'zod'
 
-const required = (name) => {
+const required = (name: string): string => {
   const value = process.env[name]
   if (!value) throw new Error(`${name} is not set; run this through deploy/drill/drill.sh`)
   return value
 }
 
 const origin = required('DRILL_ORIGIN')
+const plainHttpOrigin = required('DRILL_HTTP_ORIGIN')
 const restored = { api: required('DRILL_RESTORED_API'), collab: required('DRILL_RESTORED_COLLAB') }
 const scripts = new URL('../../scripts/', import.meta.url).pathname
 const drillDirectory = new URL('./', import.meta.url).pathname
@@ -38,8 +40,8 @@ const account = {
 const sentence = `The minutes were written before the disaster ${randomUUID()}`
 
 let steps = 0
-const step = (message) => console.log(`[${String(++steps).padStart(2, '0')}] ${message}`)
-function check(condition, message) {
+const step = (message: string): void => console.log(`[${String(++steps).padStart(2, '0')}] ${message}`)
+function check(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`drill failed: ${message}`)
 }
 
@@ -47,22 +49,38 @@ function check(condition, message) {
 
 const csrfHeader = 'x-csrf-token'
 
+interface Cookie {
+  readonly value: string
+  readonly flags: readonly string[]
+}
+
+/** What a JSON answer has to hold for the drill to go on: the rest of it is not the drill's business. */
+async function parse<Shape extends z.ZodType>(response: Response, shape: Shape): Promise<z.infer<Shape>> {
+  return shape.parse(await response.json())
+}
+const identified = z.object({ id: z.string() })
+const titled = z.object({ title: z.string() })
+const workspaceList = z.object({ items: z.array(identified) })
+
 class Session {
-  cookies = new Map()
-  constructor(base) {
+  readonly cookies = new Map<string, Cookie>()
+  readonly base: string
+
+  constructor(base: string) {
     this.base = base
   }
-  remember(response) {
+
+  private remember(response: Response): void {
     for (const line of response.headers.getSetCookie()) {
-      const [pair, ...flags] = line.split(';').map((part) => part.trim())
-      const [name, ...value] = pair.split('=')
+      const [pair = '', ...flags] = line.split(';').map((part) => part.trim())
+      const [name = '', ...value] = pair.split('=')
       this.cookies.set(name, { value: value.join('='), flags: flags.map((flag) => flag.toLowerCase()) })
     }
   }
-  get cookieHeader() {
+  get cookieHeader(): string {
     return [...this.cookies].map(([name, { value }]) => `${name}=${value}`).join('; ')
   }
-  async request(method, path, body) {
+  async request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<Response> {
     const csrf = this.cookies.get('dr_csrf')?.value
     const response = await fetch(`${this.base}${path}`, {
       method,
@@ -79,7 +97,7 @@ class Session {
   }
 }
 
-async function waitUntilReady(base) {
+async function waitUntilReady(base: string): Promise<void> {
   const deadline = Date.now() + 60_000
   for (;;) {
     try {
@@ -95,27 +113,40 @@ async function waitUntilReady(base) {
 // ---- The collaboration WebSocket ---------------------------------------------------------------------------------------
 
 /** Opens a document as the session's person, over a Node WebSocket that sends the cookie the browser would send. */
-function openDocument(collabUrl, session, documentId) {
+interface StoredEvent {
+  readonly snapshot: string
+}
+
+interface OpenDocument {
+  readonly doc: Y.Doc
+  readonly stored: StoredEvent[]
+  readonly synced: Promise<void>
+  close(): void
+}
+
+function openDocument(collabUrl: string, session: Session, documentId: string): OpenDocument {
   const doc = new Y.Doc()
-  const stored = []
+  const stored: StoredEvent[] = []
   const headers = { cookie: session.cookieHeader, origin: session.base }
   const socket = new HocuspocusProviderWebsocket({
     url: collabUrl,
     autoConnect: false,
     WebSocketPolyfill: class extends WebSocket {
-      constructor(address) {
+      constructor(address: string | URL) {
         super(address, { headers })
       }
     },
   })
-  const synced = new Promise((resolve, reject) => {
+  const synced = new Promise<void>((resolve, reject) => {
     const provider = new HocuspocusProvider({
       name: documentName(documentId),
       document: doc,
       websocketProvider: socket,
       token: null,
       sessionAwareness: false,
-      onSynced: ({ state }) => state && resolve(),
+      onSynced: ({ state }) => {
+        if (state) resolve()
+      },
       onAuthenticationFailed: ({ reason }) =>
         reject(new Error(`the collaboration server refused the connection: ${reason}`)),
       onStateless: ({ payload }) => {
@@ -131,16 +162,20 @@ function openDocument(collabUrl, session, documentId) {
 }
 
 /** The paragraphs of a document as the schema reads them. */
-const paragraphsOf = (doc) =>
+const paragraphsOf = (doc: Y.Doc): string[] =>
   (yUpdateToJson(Y.encodeStateAsUpdate(doc)).content ?? []).flatMap(({ content }) =>
     (content ?? []).map(({ text }) => text ?? ''),
   )
 
-async function until(description, produce, milliseconds = 20_000) {
+async function until<Value>(
+  description: string,
+  produce: () => Value | undefined,
+  milliseconds = 20_000,
+): Promise<Value> {
   const deadline = Date.now() + milliseconds
   for (;;) {
     const value = produce()
-    if (value) return value
+    if (value !== undefined) return value
     check(Date.now() < deadline, `timed out waiting for ${description}`)
     await new Promise((resolve) => setTimeout(resolve, 50))
   }
@@ -148,16 +183,37 @@ async function until(description, produce, milliseconds = 20_000) {
 
 // ---- The drill ---------------------------------------------------------------------------------------------------------
 
-const collabOf = (base) => `${base.replace(/^http/, 'ws')}/collab`
+const collabOf = (base: string): string => `${base.replace(/^http/, 'ws')}/collab`
 
 step(`the stack answers on ${origin}`)
 await waitUntilReady(origin)
 
-step('the proxy tells browsers to keep using HTTPS')
+step('the proxy sends the headers of the document with the web app, and none of them with the API')
+const documentHeaders = {
+  'strict-transport-security': 'max-age=31536000',
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'cross-origin-opener-policy': 'same-origin',
+  'content-security-policy': "frame-ancestors 'none'",
+}
 const page = await fetch(origin)
+for (const [name, value] of Object.entries(documentHeaders)) {
+  check(page.headers.get(name) === value, `the page has ${name}: ${page.headers.get(name) ?? 'nothing'}, not ${value}`)
+}
+check(page.headers.has('permissions-policy'), 'the page has no Permissions-Policy')
+check(!page.headers.has('server'), `the page names its server: ${page.headers.get('server') ?? ''}`)
+const api = await fetch(`${origin}/api/health/live`)
+check(api.ok, `the API's liveness answered ${api.status}`)
+for (const name of [...Object.keys(documentHeaders), 'permissions-policy']) {
+  check(!api.headers.has(name), `the API answer carries ${name}, which belongs to the server's own headers`)
+}
+
+step('plain HTTP is sent to the address people use, port included')
+const redirect = await fetch(`${plainHttpOrigin}/documents/abc?tab=1`, { redirect: 'manual' })
+check(redirect.status === 301, `plain HTTP answered ${redirect.status}`)
 check(
-  page.headers.get('strict-transport-security') === 'max-age=31536000',
-  'the proxy sends no Strict-Transport-Security',
+  redirect.headers.get('location') === `${origin}/documents/abc?tab=1`,
+  `plain HTTP was sent to ${redirect.headers.get('location') ?? 'nowhere'}, not to ${origin}`,
 )
 
 step('the person signs up, and the session cookie is HttpOnly and Secure')
@@ -173,15 +229,17 @@ check(csrfCookie !== undefined, 'sign-up set no dr_csrf cookie')
 check(csrfCookie.flags.includes('secure'), 'the CSRF cookie is not Secure')
 
 step('the person creates a document and writes into it over WSS, until the server says it stored it')
-const { items: workspaces } = await (await session.request('GET', '/api/workspaces')).json()
+const { items: workspaces } = await parse(await session.request('GET', '/api/workspaces'), workspaceList)
 check(workspaces.length === 1, `the person belongs to ${workspaces.length} workspaces`)
-const created = await session.request('POST', `/api/workspaces/${workspaces[0].id}/documents`, { title: 'Minutes' })
+const [workspace] = workspaces
+check(workspace !== undefined, 'the person has no workspace')
+const created = await session.request('POST', `/api/workspaces/${workspace.id}/documents`, { title: 'Minutes' })
 check(created.status === 201, `creating the document answered ${created.status}`)
-const documentId = (await created.json()).id
+const { id: documentId } = await parse(created, identified)
 const writer = openDocument(collabOf(origin), session, documentId)
 await writer.synced
-const updates = []
-writer.doc.on('update', (update) => updates.push(update))
+const updates: Uint8Array[] = []
+writer.doc.on('update', (update: Uint8Array) => updates.push(update))
 writer.doc.transact(() => {
   const paragraph = new Y.XmlElement('paragraph')
   paragraph.insert(0, [new Y.XmlText(sentence)])
@@ -214,7 +272,7 @@ const signIn = await returning.request('POST', '/api/auth/sign-in', {
   password: account.password,
 })
 check(signIn.status === 200, `signing in on the restored database answered ${signIn.status}`)
-const title = (await (await returning.request('GET', `/api/documents/${documentId}`)).json()).title
+const { title } = await parse(await returning.request('GET', `/api/documents/${documentId}`), titled)
 check(title === 'Minutes', `the restored document is titled "${title}"`)
 const reader = openDocument(collabOf(`http://127.0.0.1:${restored.collab}`), returning, documentId)
 await reader.synced
