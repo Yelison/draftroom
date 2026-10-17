@@ -9,7 +9,7 @@ export type PasswordProblem = 'required' | 'tooShort' | 'tooLong'
 export const passwordLimits = { min: 12, max: 128 } as const
 
 /** The longest email the contract takes (`Email`), in code points. */
-const maxEmailLength = 254
+export const maxEmailLength = 254
 
 const codePoints = (value: string): number => [...value].length
 
