@@ -137,3 +137,21 @@ jobs:
           retention-days: 7
       - run: docker compose -p "$COMPOSE_PROJECT_NAME" down --volumes
         if: always()
+
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # Optional: it is not one of the required checks of the ruleset, because a new advisory in a dependency must not stop an
+      # unrelated pull request. It reads the lockfile and installs nothing; it fails for a vulnerability of high severity or worse.
+      - run: npm audit --audit-level=high
