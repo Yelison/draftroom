@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { daniel, demoPassword, marta } from '../../data/mock/fixtures/index.ts'
-import { rememberAccount, rememberedAccount } from './lastAccount.ts'
+import { lastAccountKey, rememberAccount, rememberedAccount } from './lastAccount.ts'
 import { renderSignedOut } from './testing/renderSignedOut.tsx'
 
 // Signing in as somebody else on a browser that held another account leaves that account (protocol §12.2): its copies are
@@ -9,6 +9,10 @@ import { renderSignedOut } from './testing/renderSignedOut.tsx'
 
 const leaving = vi.hoisted(() => ({ leaveAccount: vi.fn() }))
 vi.mock('../../collab/leaveAccount.ts', () => ({ leaveAccount: leaving.leaveAccount, UNSTORED_WAIT_MS: 5_000 }))
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 beforeEach(() => {
   leaving.leaveAccount.mockReset()
@@ -93,6 +97,55 @@ describe('signing in on a browser that held another account', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Keep them' }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  })
+
+  it('tells the other tabs that the account changed as soon as the session did, not when the person has answered the question', async () => {
+    const written: string[] = []
+    const setItem = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation((key, value) => void written.push(`${key}=${value}`))
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => (key === lastAccountKey ? marta.id : null))
+    let answer: (keep: boolean) => void = () => undefined
+    leaving.leaveAccount.mockImplementation(async ({ confirm }: { confirm: (count: number) => Promise<boolean> }) => {
+      await new Promise<void>((resolve) => (answer = () => resolve()))
+      void confirm
+      return { purged: true }
+    })
+    const view = renderSignedOut('/sign-in')
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+    view.queryClient.setQueryData(['workspaces', 'list'], { items: [{ name: 'Harbor & Pine' }] })
+    await view.user.type(screen.getByRole('textbox', { name: 'Email' }), daniel.email)
+    await view.user.type(screen.getByLabelText('Password'), demoPassword)
+
+    await view.user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    // The question about the old account is still unanswered: the new one is already written down, for the other tabs to hear, and
+    // what this tab read for the old one is already gone.
+    await waitFor(() => expect(leaving.leaveAccount).toHaveBeenCalled())
+    expect(written).toContain(`${lastAccountKey}=${daniel.id}`)
+    expect(view.queryClient.getQueryData(['workspaces', 'list'])).toBeUndefined()
+    expect(leaving.leaveAccount).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: marta.id }))
+    setItem.mockRestore()
+    answer(true)
+  })
+
+  it.each([
+    ['Keep them', false],
+    ['Discard them', true],
+  ])('still leaves what the old account kept as the person says: %s', async (button, discards) => {
+    let said: boolean | undefined
+    leaving.leaveAccount.mockImplementation(async ({ confirm }: { confirm: (count: number) => Promise<boolean> }) => {
+      said = await confirm(1)
+      return { purged: said }
+    })
+    rememberAccount(marta.id)
+    const { router, user } = await signInAs(daniel)
+
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: button }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(said).toBe(discards)
+    expect(leaving.leaveAccount).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: marta.id }))
   })
 
   it('writes down that the copies could not be cleared and signs in all the same', async () => {

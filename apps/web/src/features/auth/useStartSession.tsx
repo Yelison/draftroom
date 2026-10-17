@@ -27,9 +27,14 @@ export function useStartSession(): StartingSession {
   const start = useCallback(
     async (user: Schema<'User'>) => {
       const previous = rememberedAccount()
-      if (previous !== null && previous !== user.id) await leave(previous)
+      // The session of the browser is the new person's from the moment the server answered, in every tab. The other tabs hear
+      // of it through the account that is written down, so it is written **now** and not when the person has answered the
+      // question below, which can wait for ever: a tab that is not told keeps believing it is the old account, and what it
+      // asks next is answered as somebody else and taken for the loss of a document of the old one. What this tab read is
+      // dropped with it.
       rememberAccount(user.id)
       queryClient.clear()
+      if (previous !== null && previous !== user.id) await leave(previous)
       void navigate(destinationAfterSignIn(location.state), { replace: true })
     },
     [leave, location.state, navigate, queryClient],
