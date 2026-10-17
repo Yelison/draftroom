@@ -562,3 +562,30 @@ describe('the operations that need a session and nothing else', () => {
     expect(response.statusCode).toBe(200)
   })
 })
+
+describe('signOut', () => {
+  it('answers anyone who is signed in, and nobody else', async () => {
+    const subject = await createPerson(db, 'Someone with no workspace')
+    expect(rolesOf('signOut').scope).toBe('session')
+
+    const signedIn = await api({ as: subject, method: 'POST', url: '/api/auth/sign-out' })
+    const nobody = await api({ method: 'POST', url: '/api/auth/sign-out' })
+
+    expect([signedIn.statusCode, nobody.statusCode]).toEqual([204, 401])
+  })
+})
+
+describe('the operations that need no one', () => {
+  // A request that is wrong in its shape and nothing else: asked of a caller with no session, it gets the answer to its
+  // shape (400) and never a 401, which is how an operation that needs no session shows that it does not ask for one.
+  it.each([
+    ['signUp', '/api/auth/sign-up', { email: 'not-an-email', password: 'x', name: '' }],
+    ['signIn', '/api/auth/sign-in', { email: 'not-an-email', password: '' }],
+  ] as const)('%s answers a caller with no session', async (operationId, url, body) => {
+    expect(rolesOf(operationId).scope).toBe('public')
+
+    const response = await api({ method: 'POST', url, body })
+
+    expect(response.statusCode).toBe(400)
+  })
+})

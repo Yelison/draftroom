@@ -4,7 +4,8 @@ import { createCollabServer } from './collab/server.ts'
 import { ConfigError, loadConfig } from './config.ts'
 import { createDatabase } from './db/database.ts'
 import { buildApp } from './http/app.ts'
-import { authProviderFor } from './http/auth/select.ts'
+import { createSessions } from './http/auth/sessions.ts'
+import { authProviderFor, sessionCookiesFor } from './http/auth/select.ts'
 import type { DocumentBroadcaster } from './http/document-broadcaster.ts'
 
 // The entry point of the server: `npm start`, or `npm run dev` with a watcher. Run by Node itself, with no build step.
@@ -22,7 +23,8 @@ function readConfig() {
 
 const config = readConfig()
 const database = createDatabase(config.databaseUrl)
-const authProvider = authProviderFor(config, database)
+const sessions = createSessions({ database })
+const authProvider = authProviderFor(config, database, sessions)
 // The collaboration server logs through the app, and the app tells the connections of a document about a change through
 // the collaboration server. The app is built first and the broadcaster reaches the server when a request is served,
 // which is always after both exist.
@@ -32,6 +34,8 @@ const broadcaster: DocumentBroadcaster = {
 const app = buildApp({
   database,
   authProvider,
+  sessions,
+  sessionCookies: sessionCookiesFor(config),
   logger: { level: 'info' },
   broadcaster,
   liveDocuments: {

@@ -6,9 +6,15 @@ import { createDatabase } from '../db/database.ts'
 import type { Database } from '../db/tables.ts'
 import { buildApp, type ContractViolation } from './app.ts'
 import type { AuthProvider } from './auth/auth-provider.ts'
+import { sessionStackFor } from '../../test/support/auth.ts'
 import { noLiveDocuments, silentBroadcaster, silentLiveAccess } from '../../test/support/broadcasters.ts'
-import { loadContract, type Contract } from './contract.ts'
-import { operationRoute } from './operation-route.ts'
+import {
+  contractWithSyntheticOperation,
+  syntheticPath,
+  syntheticRoute,
+  syntheticOperationId,
+} from '../../test/support/synthetic-contract.ts'
+import type { Contract } from './contract.ts'
 
 // The application without a database behind it: what the server does before any handler runs, and when a handler
 // goes wrong. Checks that need a real PostgreSQL are in test/.
@@ -22,15 +28,15 @@ const marta = { id: '5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11', name: 'Marta Ruiz' }
 const person = { id: marta.id, email: 'marta@harborpine.example', name: marta.name }
 
 // What a handler has to do for the checks of the app to be seen (answer, fail, break the contract) is tested with a
-// handler of the test on an operation nobody has a route for yet: a route cannot be declared twice, and the real
-// ones need a database. The tests of the real routes are in test/. A task that brings a route for `signIn` moves
-// these tests to another operation that is still free. The checks that run before any handler (the session, the
-// shape of the request) are tested on a real route, which they never let the request reach.
+// handler of the test on an operation nobody has a route for: a route cannot be declared twice, and the real ones need
+// a database. Every operation of the contract has its route now, so the tests add an operation of their own to a copy of
+// the contract in memory (`test/support/synthetic-contract.ts`). The tests of the real routes are in test/. The checks
+// that run before any handler (the session, the shape of the request) are tested on a real route, which they never let
+// the request reach.
 const workspaceUrl = `/api/workspaces/${workspaceId}`
-const signInUrl = '/api/auth/sign-in'
 const credentials = { email: person.email, password: 'a long enough password' }
-const signIn = (application: FastifyInstance) =>
-  application.inject({ method: 'POST', url: signInUrl, payload: credentials })
+const probe = (application: FastifyInstance) =>
+  application.inject({ method: 'POST', url: syntheticPath, payload: credentials })
 
 /** Everyone is Marta, and the provider records what it was asked: the app's checks, not an identity, are under test. */
 const signedInAsMarta: AuthProvider = {
@@ -39,7 +45,7 @@ const signedInAsMarta: AuthProvider = {
 
 let contract: Contract
 beforeAll(() => {
-  contract = loadContract()
+  contract = contractWithSyntheticOperation()
 })
 
 let database: Kysely<Database> | undefined
@@ -54,9 +60,12 @@ function appWithoutDatabase(
   authProvider: AuthProvider = signedInAsMarta,
 ): FastifyInstance {
   database = createDatabase(unreachableDatabaseUrl)
+  const { sessions, sessionCookies } = sessionStackFor(database)
   app = buildApp({
     database,
     authProvider,
+    sessions,
+    sessionCookies,
     broadcaster: silentBroadcaster,
     liveAccess: silentLiveAccess,
     liveDocuments: noLiveDocuments,
@@ -94,6 +103,9 @@ const implementedOperations = [
   'getReadiness',
   'getMe',
   'updateMe',
+  'signUp',
+  'signIn',
+  'signOut',
   'listWorkspaces',
   'getWorkspace',
   'updateWorkspace',
@@ -215,9 +227,9 @@ describe('a request that breaks the contract', () => {
 
   it('reaches the handler once it follows the contract', async () => {
     const application = appWithoutDatabase()
-    application.route(operationRoute(contract, 'signIn', (_request, reply) => reply.send(person)))
+    application.route(syntheticRoute(contract, (_request, reply) => reply.send(person)))
 
-    expect((await signIn(application)).statusCode).toBe(200)
+    expect((await probe(application)).statusCode).toBe(200)
   })
 
   it('is refused for a path parameter that is not an id', async () => {
@@ -277,11 +289,11 @@ describe('a handler that fails', () => {
   const failWith = (error: Error) => {
     const application = appWithoutDatabase()
     application.route(
-      operationRoute(contract, 'signIn', () => {
+      syntheticRoute(contract, () => {
         throw error
       }),
     )
-    return signIn(application)
+    return probe(application)
   }
 
   it('answers the internal-error problem and keeps the cause to itself', async () => {
@@ -311,13 +323,13 @@ describe('a handler that fails', () => {
   it("does not carry the handler's headers into the 500, a session cookie included", async () => {
     const application = appWithoutDatabase()
     application.route(
-      operationRoute(contract, 'signIn', (_request, reply) => {
+      syntheticRoute(contract, (_request, reply) => {
         reply.header('set-cookie', 'dr_session=abc; HttpOnly').header('etag', '"v1"')
         throw new Error('failed after the session was started')
       }),
     )
 
-    const response = await signIn(application)
+    const response = await probe(application)
 
     expect(response.statusCode).toBe(500)
     expect(response.headers).not.toHaveProperty('set-cookie')
@@ -339,22 +351,22 @@ describe('a response that breaks the contract', () => {
   it('never leaves the server: it becomes a 500, and the violation is reported with its reason', async () => {
     const violations: ContractViolation[] = []
     const application = appWithoutDatabase(violations)
-    application.route(operationRoute(contract, 'signIn', () => ({ id: eventId, name: marta.name })))
+    application.route(syntheticRoute(contract, () => ({ id: eventId, name: marta.name })))
 
-    const response = await signIn(application)
+    const response = await probe(application)
 
     expect(response.statusCode).toBe(500)
     expect(response.json()).toMatchObject({ code: 'internal-error' })
     expect(response.body).not.toContain(eventId)
     expect(violations).toHaveLength(1)
-    expect(violations[0]).toMatchObject({ operationId: 'signIn', status: 200 })
+    expect(violations[0]).toMatchObject({ operationId: syntheticOperationId, status: 200 })
     expect(violations[0]?.reason).toContain('email')
   })
 
   it("does not carry the handler's headers, a session cookie included", async () => {
     const application = appWithoutDatabase()
     application.route(
-      operationRoute(contract, 'signIn', (_request, reply) =>
+      syntheticRoute(contract, (_request, reply) =>
         reply
           .header('set-cookie', 'dr_session=abc; HttpOnly')
           .header('etag', '"v1"')
@@ -365,7 +377,7 @@ describe('a response that breaks the contract', () => {
       ),
     )
 
-    const response = await signIn(application)
+    const response = await probe(application)
 
     expect(response.statusCode).toBe(500)
     expect(response.headers).not.toHaveProperty('set-cookie')
@@ -379,9 +391,9 @@ describe('a response that breaks the contract', () => {
   it('is let through when the contract accepts it', async () => {
     const violations: ContractViolation[] = []
     const application = appWithoutDatabase(violations)
-    application.route(operationRoute(contract, 'signIn', (_request, reply) => reply.send(person)))
+    application.route(syntheticRoute(contract, (_request, reply) => reply.send(person)))
 
-    expect((await signIn(application)).statusCode).toBe(200)
+    expect((await probe(application)).statusCode).toBe(200)
     expect(violations).toEqual([])
   })
 })

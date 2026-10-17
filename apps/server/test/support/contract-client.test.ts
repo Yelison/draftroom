@@ -1,18 +1,25 @@
 import Fastify, { type FastifyInstance } from 'fastify'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { buildApp, type ContractViolation } from '../../src/http/app.ts'
-import { loadContract, type Contract } from '../../src/http/contract.ts'
+import type { Contract } from '../../src/http/contract.ts'
 import { operationRoute } from '../../src/http/operation-route.ts'
 import { createContractClient, findOperation, ContractError } from './contract-client.ts'
 import { ContractCoverage } from './contract-coverage.ts'
 import { createDatabase } from '../../src/db/database.ts'
 import type { AuthProvider } from '../../src/http/auth/auth-provider.ts'
+import { sessionStackFor } from './auth.ts'
 import { noLiveDocuments, silentBroadcaster, silentLiveAccess } from './broadcasters.ts'
+import {
+  contractWithSyntheticOperation,
+  syntheticOperationId,
+  syntheticPath,
+  syntheticRoute,
+} from './synthetic-contract.ts'
 import { unreachableDatabaseUrl } from './unreachable-database.ts'
 
 let contract: Contract
 beforeAll(() => {
-  contract = loadContract()
+  contract = contractWithSyntheticOperation()
 })
 
 let app: FastifyInstance | undefined
@@ -46,9 +53,12 @@ describe('the contract client', () => {
   it('returns a response that follows the contract and records the operation as exercised', async () => {
     const coverage = new ContractCoverage()
     const database = unusedDatabase()
+    const { sessions, sessionCookies } = sessionStackFor(database)
     app = buildApp({
       database,
       authProvider,
+      sessions,
+      sessionCookies,
       broadcaster: silentBroadcaster,
       liveAccess: silentLiveAccess,
       liveDocuments: noLiveDocuments,
@@ -77,26 +87,29 @@ describe('the contract client', () => {
   it('fails the test when the server replaced a response, whose 500 would pass the contract by itself', async () => {
     const violations: ContractViolation[] = []
     const database = unusedDatabase()
+    const { sessions, sessionCookies } = sessionStackFor(database)
     app = buildApp({
       database,
       authProvider,
+      sessions,
+      sessionCookies,
       broadcaster: silentBroadcaster,
       liveAccess: silentLiveAccess,
       liveDocuments: noLiveDocuments,
       contract,
       onContractViolation: (violation) => violations.push(violation),
     })
-    // `signIn` has no route of its own yet, so the test brings one that answers against the contract.
-    app.route(operationRoute(contract, 'signIn', () => ({ id: 'not-a-uuid' })))
+    // An operation that exists only in the contract of these tests has no route, so the test brings one that breaks it.
+    app.route(syntheticRoute(contract, () => ({ id: 'not-a-uuid' })))
     const client = createContractClient(app, contract, new ContractCoverage(), violations)
 
     await expect(
       client.request({
         method: 'POST',
-        url: '/api/auth/sign-in',
+        url: syntheticPath,
         payload: { email: 'marta@harborpine.example', password: 'a long enough password' },
       }),
-    ).rejects.toThrow(/answered signIn against the contract/)
+    ).rejects.toThrow(new RegExp(`answered ${syntheticOperationId} against the contract`))
     await database.destroy()
   })
 

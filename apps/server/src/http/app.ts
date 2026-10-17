@@ -1,8 +1,14 @@
+import fastifyCookie from '@fastify/cookie'
+import fastifyRateLimit from '@fastify/rate-limit'
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify'
 import type { Kysely } from 'kysely'
 import type { Database } from '../db/tables.ts'
 import type { AuthProvider } from './auth/auth-provider.ts'
 import { requireAuthentication } from './auth/authenticate.ts'
+import type { SessionCookies } from './auth/cookies.ts'
+import type { Passwords } from './auth/passwords.ts'
+import type { RateLimits } from './auth/rateLimit.ts'
+import type { Sessions } from './auth/sessions.ts'
 import { loadContract, type Contract } from './contract.ts'
 import type { DocumentBroadcaster } from './document-broadcaster.ts'
 import type { LiveAccess } from './live-access.ts'
@@ -18,6 +24,7 @@ import {
 } from './problem.ts'
 import { accessRoutes } from './routes/access.ts'
 import { activityRoutes } from './routes/activity.ts'
+import { authRoutes } from './routes/auth.ts'
 import { commentRoutes } from './routes/comments.ts'
 import { documentRoutes } from './routes/documents.ts'
 import { folderRoutes } from './routes/folders.ts'
@@ -49,6 +56,13 @@ export interface AppDependencies {
   readonly authProvider: AuthProvider
   /** Who hears about a change to a document that people have open. Required, so that an app cannot forget to tell them. */
   readonly broadcaster: DocumentBroadcaster
+  /** The sessions people sign in with, and the cookies that carry them. Required: an app that cannot sign anyone in is a mistake, not a mode. */
+  readonly sessions: Sessions
+  readonly sessionCookies: SessionCookies
+  /** How passwords are hashed and checked; the real ones unless a test watches them. */
+  readonly passwords?: Passwords
+  /** The limits on sign-in and sign-up attempts; the decided ones unless a test needs a smaller window. */
+  readonly rateLimits?: RateLimits
   /** Who holds open connections to account for a change of access. Required for the same reason: forgetting it leaves a revoked person connected. */
   readonly liveAccess: LiveAccess
   /** Who works on documents that people have open: the state a version is saved from, and the restore. Required, since a version taken from stored state alone could miss what is being typed. */
@@ -67,6 +81,10 @@ export function buildApp({
   broadcaster,
   liveAccess,
   liveDocuments,
+  sessions,
+  sessionCookies,
+  passwords,
+  rateLimits,
   contract = loadContract(),
   logger = false,
   onContractViolation,
@@ -119,7 +137,19 @@ export function buildApp({
     return JSON.stringify(problemBody('internal-error'))
   })
 
+  // The plugins the authentication routes stand on. `global: false`: no route is limited unless it asks, and the limits
+  // of sign-in are asked for by the routes, because they count failures and not requests.
+  void app.register(fastifyCookie)
+  void app.register(fastifyRateLimit, { global: false })
+
   const dependencies = { contract, database, broadcaster, liveAccess, liveDocuments }
+  void app.register(authRoutes, {
+    ...dependencies,
+    sessions,
+    sessionCookies,
+    ...(passwords === undefined ? {} : { passwords }),
+    ...(rateLimits === undefined ? {} : { rateLimits }),
+  })
   for (const routes of [
     healthRoutes,
     profileRoutes,
