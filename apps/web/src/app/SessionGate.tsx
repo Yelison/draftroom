@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { isApiError } from '../data/errors.ts'
+import { queryKeys } from '../data/queryKeys.ts'
 import { useDataSource } from '../data/useDataSource.ts'
 import { redirectState } from '../features/auth/redirect.ts'
 import { useIdentityChanges } from '../features/auth/useIdentityChanges.ts'
@@ -24,10 +25,17 @@ export function SessionGate() {
   // again for whoever it is now. Dropping the data while the page is still there would have its queries ask for it again at
   // once. `heldAt` is when, and the answer to `getMe` that comes after it is what lets the page go.
   const [heldAt, setHeldAt] = useState<number | null>(null)
-  const identityChanged = useCallback(() => setHeldAt(Date.now()), [])
-  useIdentityChanges(identityChanged)
+  const accountChanged = useCallback(() => setHeldAt(Date.now()), [])
+  // The connection is the first to know that the session ended, and the page stays as it is (the editor says what happened):
+  // who is signed in is asked first, so that what the page asks next is not answered as somebody else and taken for the loss
+  // of the document.
+  const sessionEnded = useCallback(
+    () => void queryClient.invalidateQueries({ queryKey: queryKeys.me() }),
+    [queryClient],
+  )
+  useIdentityChanges({ accountChanged, sessionEnded })
   useEffect(() => {
-    // Resets, not removes: the question of this gate is the only active query, and it is asked again by the reset.
+    // Resets, not removes: the question of this gate is the only active query, and the reset asks it again.
     if (heldAt !== null) void queryClient.resetQueries()
   }, [heldAt, queryClient])
 

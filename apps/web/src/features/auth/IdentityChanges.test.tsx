@@ -1,10 +1,11 @@
+import { focusManager } from '@tanstack/react-query'
 import { act, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { copiesOf } from '../../collab/offlineCache.ts'
 import type { DataSource } from '../../data/DataSource.ts'
 import { ApiError } from '../../data/errors.ts'
 import { marta } from '../../data/mock/fixtures/index.ts'
-import { launchPlan, openEditor } from '../editor/testing/renderEditor.tsx'
+import { openEditor } from '../editor/testing/renderEditor.tsx'
 import { renderScreen } from '../documents/testing/renderScreen.tsx'
 import { lastAccountKey } from './lastAccount.ts'
 
@@ -60,6 +61,9 @@ describe('when another tab of the browser signs in as somebody else', () => {
     const session = switchableSession()
     const { queryClient } = renderScreen('/documents', { wrap: session.wrap })
     await screen.findByRole('heading', { level: 1, name: 'Documents' })
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0))
+    // The screen reads a few lists one after another: let it finish before the account is changed under it.
+    await new Promise((resolve) => setTimeout(resolve, 300))
     await waitFor(() => expect(queryClient.isFetching()).toBe(0))
     session.calls.length = 0
 
@@ -125,22 +129,36 @@ describe('when another tab of the browser signs in as somebody else', () => {
 })
 
 describe('when the connection of the open document is closed because the session ended', () => {
-  it('does not purge the copy of the account that was signed in when the next answer is a not found of the new one', async () => {
+  it('asks who is signed in first, and a not found of the new account does not purge the copy of the old one', async () => {
     const session = switchableSession()
     const { server } = await openEditor({ wrap: session.wrap })
     await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument())
     expect(await copiesOf(marta.id)).toHaveLength(1)
 
-    // Another tab signed in as Lucía, who has no access to the document: the server ends this tab's socket, and the next
-    // thing the page asks of the API is answered as Lucía, with a not found.
+    // Another tab signed in as Lucía, who has no access to the document: the server ends this tab's socket, and everything
+    // the page asks of the API from then on is answered as Lucía, the document with a not found.
     session.switchTo()
     act(() => server.collaboration.closeConnections(4401, 'unauthenticated'))
 
-    // The page is asked who it is first, and only then asks for the document again; the copy of the account that was left stays.
+    // The first thing asked is who is signed in. Only then does the page read the document again, and it is not Marta's.
     await waitFor(() => expect(session.calls).toContain('getMe as lucia'))
-    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Document content' })).not.toBeInTheDocument())
-    expect(screen.queryByRole('heading', { name: 'Your access to this document was removed' })).not.toBeInTheDocument()
+    act(() => {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+    })
+    await waitFor(() => expect(session.calls).toContain('getDocument as lucia'))
+    expect(session.calls.indexOf('getMe as lucia')).toBeLessThan(session.calls.indexOf('getDocument as lucia'))
+    await waitFor(async () => expect(await copiesOf(lucia.id)).toEqual([]))
     expect(await copiesOf(marta.id)).toHaveLength(1)
-    expect(launchPlan.id).toBeDefined()
+  })
+
+  it('leaves the page as it is, for the editor to say that the session ended', async () => {
+    const { server } = await openEditor()
+    await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument())
+
+    act(() => server.collaboration.closeConnections(4401, 'unauthenticated'))
+
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Document content' })).toBeInTheDocument()
   })
 })

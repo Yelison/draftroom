@@ -3,22 +3,27 @@ import { onSessionEnded } from '../../collab/sessionEnded.ts'
 import { lastAccountKey } from './lastAccount.ts'
 
 /**
- * Calls back when this tab finds out that who the browser is has changed without it: another tab signed in as somebody else
- * or out (the account the browser holds is written to the storage they share, which every other tab is told of), or the
- * server closed the connection of the open document because the session ended. A session belongs to the browser, so it is
- * the same one in every tab, and what a tab has read was read for the account it had.
+ * What this tab does when it finds out that who the browser is has changed without it. A session belongs to the browser, so
+ * it is the same one in every tab, and what a tab has read was read for the account it had.
  */
-export function useIdentityChanges(onChange: () => void): void {
+export interface IdentityChanges {
+  /** Another tab signed in as somebody else or out: the account the browser holds is written to the storage the tabs share. */
+  accountChanged(): void
+  /** The server closed the connection of the open document because the session ended (`4401`): the first to know. */
+  sessionEnded(): void
+}
+
+export function useIdentityChanges({ accountChanged, sessionEnded }: IdentityChanges): void {
   useEffect(() => {
     const fromAnotherTab = (event: StorageEvent) => {
       // `null` is the storage being cleared altogether.
-      if (event.key === lastAccountKey || event.key === null) onChange()
+      if (event.key === lastAccountKey || event.key === null) accountChanged()
     }
     window.addEventListener('storage', fromAnotherTab)
-    const stopListening = onSessionEnded(onChange)
+    const stopListening = onSessionEnded(sessionEnded)
     return () => {
       window.removeEventListener('storage', fromAnotherTab)
       stopListening()
     }
-  }, [onChange])
+  }, [accountChanged, sessionEnded])
 }
