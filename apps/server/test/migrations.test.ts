@@ -179,8 +179,6 @@ describe('the seventh migration, on a database that already holds events and ver
   }
 
   it('swaps the indexes of the history for the ones of the millisecond order, keeps the one the versions still need, and leaves the rows', async () => {
-describe('the migration of the session activity, on a database that already holds a session', () => {
-  it('gives the session the time of the migration as its last activity and leaves the rest of it', async () => {
     const populated = await provisionDatabase({ migrated: false })
     try {
       const { error } = await new Migrator({ db: populated.db, provider: migrationProvider }).migrateTo(
@@ -205,7 +203,11 @@ describe('the migration of the session activity, on a database that already hold
       expect(eventsBefore).toHaveLength(1)
       const before = await indexesOf(populated.db)
 
-      expect(await migrateToLatest(populated.db)).toEqual(['0006_user_preferences', '0007_millisecond_order_indexes'])
+      expect(await migrateToLatest(populated.db)).toEqual([
+        '0006_user_preferences',
+        '0007_millisecond_order_indexes',
+        '0008_session_activity',
+      ])
 
       const after = await indexesOf(populated.db)
       expect(Object.keys(after).filter((name) => !(name in before))).toEqual([
@@ -230,6 +232,21 @@ describe('the migration of the session activity, on a database that already hold
         populated.db,
       )
       expect(await indexesOf(populated.db)).toEqual({ ...after, ...before })
+    } finally {
+      await populated.drop()
+    }
+  })
+})
+
+describe('the migration of the session activity, on a database that already holds a session', () => {
+  it('gives the session the time of the migration as its last activity and leaves the rest of it', async () => {
+    const populated = await provisionDatabase({ migrated: false })
+    try {
+      const { error } = await new Migrator({ db: populated.db, provider: migrationProvider }).migrateTo(
+        '0005_activity_events_workspace_idx',
+      )
+      expect(error).toBeUndefined()
+      const workspace = await createPopulatedWorkspace(populated.db)
       const expiresAt = new Date(Date.now() + 60_000)
       await sql`insert into sessions (user_id, token_hash, expires_at) values (${workspace.userId}, ${Uint8Array.of(1, 2, 3)}, ${expiresAt})`.execute(
         populated.db,
