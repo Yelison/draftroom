@@ -1,3 +1,4 @@
+import { announceSessionEnded } from './sessionEnded.ts'
 import {
   MAX_UNSENT_BYTES,
   STORED_ACK_TIMEOUT_MS,
@@ -548,7 +549,9 @@ class ProviderSession implements CollabSession {
     if (this.link === null) return
     const next = this.build()
     if (sameSnapshot(this.current, next)) return
+    const sessionEnded = next.cause === 'unauthenticated' && this.current.cause !== 'unauthenticated'
     this.current = next
     for (const listener of this.listeners) listener()
+    if (sessionEnded) announceSessionEnded()
   }
 }

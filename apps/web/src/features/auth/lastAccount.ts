@@ -3,11 +3,12 @@
  * are named for an account, and the ones of the account that was left have to be cleared (protocol §12.2). It is only a
  * hint kept in the browser, so a storage that is not there, or is full, just means that no switch is noticed.
  */
-const key = 'draftroom-last-account'
+/** Also what other tabs watch: a change to it is another tab signing in or out. */
+export const lastAccountKey = 'draftroom-last-account'
 
 export function rememberedAccount(): string | null {
   try {
-    return localStorage.getItem(key)
+    return localStorage.getItem(lastAccountKey)
   } catch {
     return null
   }
@@ -15,7 +16,7 @@ export function rememberedAccount(): string | null {
 
 export function rememberAccount(userId: string): void {
   try {
-    localStorage.setItem(key, userId)
+    localStorage.setItem(lastAccountKey, userId)
   } catch {
     // Nothing to do: a sign-in that cannot be remembered is still a sign-in.
   }
@@ -23,7 +24,7 @@ export function rememberAccount(userId: string): void {
 
 export function forgetAccount(): void {
   try {
-    localStorage.removeItem(key)
+    localStorage.removeItem(lastAccountKey)
   } catch {
     // As above.
   }
