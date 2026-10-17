@@ -67,8 +67,11 @@ it when `import.meta.env.MODE` is `production`.
   argument is the same as ever, and `production-bundle.spec.ts` searches the real build for the texts of both demo languages.
 - **Content.** Each document opens with the text in `fixtures/demoContent.ts`, in that language, and does not repeat its title
   as a first heading: the title is shown above the text. The text is written into the document when it is first opened, not
-  when the world starts, with `jsonToYUpdate` as the server would. The last stored version of a document is the beginning of
-  its text.
+  when the world starts, as the server would (`collab/seededContent.ts`). It is written as one fixed Yjs client, so every tab
+  and every build hold the same items, and the threads of the demo are anchored on the sentences they quote in that text, in
+  the language of the demo (`collab/demoDocuments.ts`, `fixtures/demoThreads.ts`): the comments panel shows them on their
+  text. One thread, which only the demo has, is on a sentence that was taken out after it was written, so the panel also shows
+  an orphaned thread. The last stored version of a document is the beginning of its text.
 - **Tabs.** `collab/tabLink.ts` carries the Yjs updates and the awareness of a document between the tabs of one browser over a
   `BroadcastChannel`. A tab that opens joins the oldest world there is. A tab that is **reloaded starts a world of its own**
   (the demo starts again on reload): the other tabs keep the one they had and the two share nothing from then on, because every
