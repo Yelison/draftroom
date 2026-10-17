@@ -76,7 +76,10 @@ async function startServer(environment: NodeJS.ProcessEnv): Promise<Running> {
   throw new Error(`The server never answered:\n${written}`)
 }
 
-describe('the development identity', () => {
+// Each test starts a process, which takes seconds when the machine is busy.
+const startTimeout = 30_000
+
+describe('the development identity', { timeout: startTimeout }, () => {
   it('serves in a server that is told it is development, which shows the header below is what is being refused', async () => {
     const { api } = await startServer({ NODE_ENV: 'development' })
 
@@ -100,7 +103,7 @@ describe('the development identity', () => {
   )
 })
 
-describe('a server in production', () => {
+describe('a server in production', { timeout: startTimeout }, () => {
   const production = { NODE_ENV: 'production', ALLOWED_ORIGINS: 'https://draftroom.example' }
 
   it('says it must be reached over HTTPS, and sets only __Host- cookies', async () => {
