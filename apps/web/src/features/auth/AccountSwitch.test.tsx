@@ -51,6 +51,20 @@ describe('signing in on a browser that held another account', () => {
     expect(rememberedAccount()).toBe(marta.id)
   })
 
+  it('drops what was read for the account that was there, which is not for this one', async () => {
+    rememberAccount(marta.id)
+    const view = renderSignedOut('/sign-in')
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+    view.queryClient.setQueryData(['workspaces', 'list'], { items: [{ name: 'Harbor & Pine' }] })
+    await view.user.type(screen.getByRole('textbox', { name: 'Email' }), daniel.email)
+    await view.user.type(screen.getByLabelText('Password'), demoPassword)
+
+    await view.user.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(view.router.state.location.pathname).toBe('/'))
+
+    expect(view.queryClient.getQueryData(['workspaces', 'list'])).not.toEqual({ items: [{ name: 'Harbor & Pine' }] })
+  })
+
   it('does not leave anything when the sign-in is refused: the account that was there is still the one', async () => {
     rememberAccount(marta.id)
     const view = renderSignedOut('/sign-in')
