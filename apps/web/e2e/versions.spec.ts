@@ -116,11 +116,18 @@ test.describe('the layout', () => {
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
       })
 
-      test('does not shift while the document and the versions arrive', async ({ page }) => {
+      test('does not shift while the screen, the document and the versions arrive', async ({ page }) => {
+        // The mock answers at once, so the placeholder would never be on screen to be measured: the code of the screen is
+        // held back for a moment, which is what a slow connection does to it.
+        await page.route('**/assets/VersionsScreen-*.js', async (route) => {
+          await new Promise((resolve) => setTimeout(resolve, 400))
+          await route.continue()
+        })
         await page.goto(`/documents/${launchPlan.id}/versions`)
         await expect(list(page).getByRole('listitem')).toHaveCount(3)
 
-        expect(await shifts(page)).toBeLessThan(0.01)
+        // The screen is small, so a block that jumps scores little: what is measured is none at all, not the editor's one in a hundred.
+        expect(await shifts(page)).toBeLessThan(0.001)
       })
     })
   }
