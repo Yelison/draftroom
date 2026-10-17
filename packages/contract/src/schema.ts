@@ -38,7 +38,7 @@ export interface paths {
         put?: never;
         /**
          * Create an account and sign in
-         * @description Starts a session: the response sets the `dr_session` cookie and the `dr_csrf` cookie. The account **claims** the pending membership row of this email, if there is one: it keeps the same `userId`, becomes an active member and inherits the document grants given to it. Only an email that already has a signed-up account is a `409 conflict`.
+         * @description Starts a session: the response sets the session cookie and the CSRF cookie (`dr_session` and `dr_csrf`; `__Host-dr_session` and `__Host-dr_csrf` in production). The account **claims** the pending membership row of this email, if there is one: it keeps the same `userId`, becomes an active member and inherits the document grants given to it. Only an email that already has a signed-up account is a `409 conflict`.
          *
          *     An account that claims no invitation gets a workspace of its own, created in the same transaction: its `name` is the person's name (their own content, never translated, and they can rename it in Settings) and the person is its `owner`. One that claims an invitation gets none.
          *
@@ -1372,7 +1372,7 @@ export interface operations {
             /** @description The account was created and the session started. */
             201: {
                 headers: {
-                    /** @description Sets `dr_session` (HttpOnly) and `dr_csrf` (readable by the client, echoed in `X-CSRF-Token`). */
+                    /** @description Sets `dr_session` (HttpOnly) and `dr_csrf` (readable by the client, echoed in `X-CSRF-Token`); `__Host-dr_session` and `__Host-dr_csrf` in production. */
                     "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
@@ -1403,7 +1403,7 @@ export interface operations {
             /** @description The session started. */
             200: {
                 headers: {
-                    /** @description Sets `dr_session` (HttpOnly) and `dr_csrf` (readable by the client, echoed in `X-CSRF-Token`). */
+                    /** @description Sets `dr_session` (HttpOnly) and `dr_csrf` (readable by the client, echoed in `X-CSRF-Token`); `__Host-dr_session` and `__Host-dr_csrf` in production. */
                     "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };

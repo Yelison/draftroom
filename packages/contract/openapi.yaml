@@ -6,7 +6,7 @@ info:
   description: |-
     Metadata, permissions, comments, versions and history. Document content is a Yjs document: it travels over the collaboration connection and never over REST.
 
-    Every request after sign-in carries the `dr_session` cookie; requests that change state also carry the `X-CSRF-Token` header. Every error is `application/problem+json` with a stable `code`. Text lengths count Unicode code points.
+    Every request after sign-in carries the session cookie (`dr_session`, `__Host-dr_session` in production); requests that change state also carry the `X-CSRF-Token` header. Every error is `application/problem+json` with a stable `code`. Text lengths count Unicode code points.
   license:
     name: MIT
     identifier: MIT
@@ -117,7 +117,7 @@ paths:
         - Session
       summary: Create an account and sign in
       description: |-
-        Starts a session: the response sets the `dr_session` cookie and the `dr_csrf` cookie. The account **claims** the pending membership row of this email, if there is one: it keeps the same `userId`, becomes an active member and inherits the document grants given to it. Only an email that already has a signed-up account is a `409 conflict`.
+        Starts a session: the response sets the session cookie and the CSRF cookie (`dr_session` and `dr_csrf`; `__Host-dr_session` and `__Host-dr_csrf` in production). The account **claims** the pending membership row of this email, if there is one: it keeps the same `userId`, becomes an active member and inherits the document grants given to it. Only an email that already has a signed-up account is a `409 conflict`.
 
         An account that claims no invitation gets a workspace of its own, created in the same transaction: its `name` is the person's name (their own content, never translated, and they can rename it in Settings) and the person is its `owner`. One that claims an invitation gets none.
 
@@ -139,7 +139,7 @@ paths:
           description: The account was created and the session started.
           headers:
             Set-Cookie:
-              description: Sets `dr_session` (HttpOnly) and `dr_csrf` (readable by the client, echoed in `X-CSRF-Token`).
+              description: Sets `dr_session` (HttpOnly) and `dr_csrf` (readable by the client, echoed in `X-CSRF-Token`); `__Host-dr_session` and `__Host-dr_csrf` in production.
               schema:
                 type: string
           content:
@@ -188,7 +188,7 @@ paths:
           description: The session started.
           headers:
             Set-Cookie:
-              description: Sets `dr_session` (HttpOnly) and `dr_csrf` (readable by the client, echoed in `X-CSRF-Token`).
+              description: Sets `dr_session` (HttpOnly) and `dr_csrf` (readable by the client, echoed in `X-CSRF-Token`); `__Host-dr_session` and `__Host-dr_csrf` in production.
               schema:
                 type: string
           content:
@@ -2296,12 +2296,12 @@ components:
       type: apiKey
       in: cookie
       name: dr_session
-      description: The server-side session, set at sign-in or sign-up. HttpOnly.
+      description: The server-side session, set at sign-in or sign-up. HttpOnly. Behind HTTPS (production) the cookies are named `__Host-dr_session` and `__Host-dr_csrf` (ADR 0004); `name` is the one without the prefix, used in development.
     csrf:
       type: apiKey
       in: header
       name: X-CSRF-Token
-      description: Echo of the `dr_csrf` cookie (double submit). Required on every method that changes state.
+      description: Echo of the `dr_csrf` cookie, `__Host-dr_csrf` in production (double submit). Required on every method that changes state.
   parameters:
     WorkspaceId:
       name: workspaceId
