@@ -415,7 +415,8 @@ describe('restoring while two connected editors keep typing', () => {
     )
     expect(await storedParagraphs(db, documentId)).toEqual(expected)
     expect(world.collab.log.entries.filter((entry) => entry.level === 'error')).toEqual([])
-  })
+    // Its own waits run to eight seconds, so the default of five would end it under load before they could.
+  }, 20_000)
 })
 
 describe('the sequence of a restore, when the document changes under it or the database fails', () => {

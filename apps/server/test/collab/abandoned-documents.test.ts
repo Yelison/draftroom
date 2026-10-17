@@ -17,6 +17,16 @@ import { createStudio, type Studio } from '../support/world.ts'
 
 const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
+/** Whether the condition holds within the time given: it is looked at again until it does, so a slow machine is waited for. */
+async function within(ms: number, holds: () => boolean): Promise<boolean> {
+  const deadline = Date.now() + ms
+  while (!holds()) {
+    if (Date.now() > deadline) return false
+    await pause(10)
+  }
+  return true
+}
+
 let database: TestDatabase
 let db: Kysely<Database>
 let studio: Studio
@@ -49,20 +59,14 @@ describe('a document whose last person leaves while a version is being saved', (
         method: 'POST',
         url: `/api/documents/${studio.documentId}/versions`,
       })
-      await pause(150)
+      // The person leaves once the version really holds the mutex, however long the request takes to get there.
       const live = collab.server.hocuspocus.documents.get(documentName(studio.documentId))
-      expect(live?.saveMutex.isLocked()).toBe(true)
+      expect(await within(2_000, () => live?.saveMutex.isLocked() === true)).toBe(true)
       clients.destroyAll()
       expect((await saving).statusCode).toBe(201)
 
-      const unloaded = async (): Promise<boolean> => {
-        const deadline = Date.now() + 3_000
-        while (collab.server.hocuspocus.documents.has(documentName(studio.documentId))) {
-          if (Date.now() > deadline) return false
-          await pause(25)
-        }
-        return true
-      }
+      const unloaded = () =>
+        within(3_000, () => !collab.server.hocuspocus.documents.has(documentName(studio.documentId)))
       expect(await unloaded()).toBe(true)
     } finally {
       clients.destroyAll()
