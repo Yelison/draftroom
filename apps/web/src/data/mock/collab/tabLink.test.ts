@@ -57,7 +57,13 @@ async function openTab(bus: ReturnType<typeof createBus>, peer: string, fresh = 
     storeDelayMs: 20,
     initialContent: (document) => (link?.mayStartContent(document) === true ? startingContent() : undefined),
   })
-  link = await joinTabs(server, bus.connect(), { peer, now: () => (clock += 1), discoveryMs: 5, fresh })
+  link = await joinTabs(server, bus.connect(), {
+    peer,
+    now: () => (clock += 1),
+    discoveryMs: 5,
+    fresh,
+    startingContent,
+  })
   return { server, link }
 }
 
@@ -207,5 +213,23 @@ describe('the tabs of the demo', () => {
     await vi.waitFor(() => expect(paragraphs(inSecond)).toEqual(['The plan']))
     expect(second.link.mayStartContent(name)).toBe(false)
     expect(paragraphs(inThird)).toEqual(['The plan'])
+  })
+
+  it('write a document that was opened once the tabs that had it are gone, and never leave it empty', async () => {
+    const bus = createBus()
+    const first = await openTab(bus, 'tab-1')
+    const second = await openTab(bus, 'tab-2')
+    const third = await openTab(bus, 'tab-3')
+    await vi.waitFor(() => expect(paragraphs(third.server.document(name))).toEqual(['The plan']))
+    third.link.close()
+    first.link.close()
+    await vi.waitFor(() => expect(second.link.mayStartContent('another-document')).toBe(true))
+
+    const inSecond = second.server.document(name)
+
+    await vi.waitFor(() => expect(paragraphs(inSecond)).toEqual(['The plan']))
+    // Long enough for a second writing to have happened, if there were one.
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    expect(paragraphs(inSecond)).toEqual(['The plan'])
   })
 })

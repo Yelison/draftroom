@@ -42,13 +42,16 @@ export function createDemo({
   discoveryMs = 150,
 }: DemoOptions): Demo {
   let link: TabLink | undefined
+  const startingContent = (documentName: string) => {
+    const documentId = parseDocumentName(documentName)
+    const content = documentId === null ? undefined : demoContent[locale][documentId]
+    return content === undefined ? undefined : jsonToYUpdate({ type: 'doc', content: [...content] })
+  }
   return {
     initialContent(documentName) {
       // Written once, by one tab, when the document is opened: two tabs that each wrote it would leave it twice.
-      const documentId = parseDocumentName(documentName)
-      const content = documentId === null ? undefined : demoContent[locale][documentId]
       const mayStart = link === undefined ? transport === null : link.mayStartContent(documentName)
-      return content === undefined || !mayStart ? undefined : jsonToYUpdate({ type: 'doc', content: [...content] })
+      return mayStart ? startingContent(documentName) : undefined
     },
     start(server) {
       const stopCollaborators = seatCollaborators(server, scripts, locale, page)
@@ -60,6 +63,7 @@ export function createDemo({
           now: () => Date.now(),
           discoveryMs,
           fresh: page.isReload(),
+          startingContent,
         }).then((joined) => {
           link = joined
           server.releaseAuthentication()

@@ -128,6 +128,8 @@ export interface JoinOptions {
   discoveryMs: number
   /** Start a world of one's own instead of joining one: what a reloaded tab does. */
   fresh: boolean
+  /** The Yjs update a document starts with, for a tab that has to write it after all (see `mayStartContent`). */
+  startingContent(documentName: string): Uint8Array | undefined
 }
 
 export interface TabLink {
@@ -147,7 +149,7 @@ export interface TabLink {
 export async function joinTabs(
   server: SimulatedCollabServer,
   transport: TabTransport,
-  { peer, now, discoveryMs, fresh }: JoinOptions,
+  { peer, now, discoveryMs, fresh, startingContent }: JoinOptions,
 ): Promise<TabLink> {
   const world = fresh
     ? { id: peer, startedAt: now(), peers: [] }
@@ -164,8 +166,23 @@ export async function joinTabs(
   const opened = new Set<string>()
   const post = (message: TabMessage) => transport.post(message)
 
+  const timers = new Set<ReturnType<typeof setTimeout>>()
+  function writeIfNobodyAnswers(document: string): void {
+    const timer = setTimeout(() => {
+      timers.delete(timer)
+      const room = server.document(document)
+      const update = startingContent(document)
+      // Structs in the document mean that a tab answered with its content.
+      if (room.store.clients.size === 0 && update !== undefined) Y.applyUpdate(room, update)
+    }, discoveryMs)
+    timers.add(timer)
+  }
+
   const observer: RoomObserver = {
     created: (document) => {
+      // A document that was opened and is asked for from the tabs that have it: when none of them is left to answer, this tab
+      // writes it, so that a document is never opened empty, and it cannot be written twice while a tab still has it.
+      if (opened.has(document)) writeIfNobodyAnswers(document)
       opened.add(document)
       post({
         kind: 'open',
@@ -229,6 +246,7 @@ export async function joinTabs(
     world: world.id,
     mayStartContent: (document) => founder === peer && !opened.has(document),
     close() {
+      timers.forEach((timer) => clearTimeout(timer))
       stopListening()
       stopObserving()
       post({ kind: 'bye', world: world.id, peer })
