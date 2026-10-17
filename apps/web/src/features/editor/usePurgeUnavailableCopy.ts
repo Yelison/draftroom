@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
 import { purgeCopiesOfDocument, type PurgedDocument } from '../../collab/offlineCache.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { meQuery } from './meQuery.ts'
@@ -12,6 +13,10 @@ const nothingKept: PurgedDocument = { hadCopy: false, hadUnstoredChanges: false 
  * is deleted by the module that owns the copies, once it is known whose they are, and what it held is returned so that the
  * screen says the same as for a document that was open: access was removed, and what was never stored was not sent.
  *
+ * A deletion is not a query: it is done once, and what it found is what it is. Asking again (a refocus, a reconnection) would
+ * find nothing, because the first call deleted it, and the screen would change its mind about what the person lost. So it is
+ * a single shot, started once the account is known, and its result lasts while the screen is shown for this document.
+ *
  * It is `undefined` until that is known. Where it cannot be known (nobody signed in, or the copies cannot be listed) the
  * person is told what is true of the API's answer alone: nothing is claimed of a copy.
  */
@@ -19,14 +24,23 @@ export function usePurgeUnavailableCopy(documentId: string, unavailable: boolean
   const dataSource = useDataSource()
   const me = useQuery(meQuery(dataSource))
   const userId = me.data?.id
-  const purge = useQuery({
-    queryKey: ['unavailable-document-copy', userId, documentId],
-    // A copy that cannot be deleted now is deleted by the next purge of the account's copies (sign-out, account switch).
-    queryFn: () => purgeCopiesOfDocument(userId ?? '', documentId).catch(() => nothingKept),
-    enabled: unavailable && userId !== undefined,
-    retry: false,
-    gcTime: 0,
+  const purge = useMutation({
+    mutationFn: ({ userId, documentId }: { userId: string; documentId: string }) =>
+      // A copy that cannot be deleted now is deleted by the next purge of the account's copies (sign-out, account switch).
+      purgeCopiesOfDocument(userId, documentId).catch(() => nothingKept),
   })
+  const { mutate } = purge
+  // StrictMode runs the effect twice before the mutation has had a render to say it started: the reference is what stops
+  // the second run from deleting nothing and replacing what the first one found.
+  const started = useRef<string | null>(null)
+  useEffect(() => {
+    if (!unavailable || userId === undefined || started.current === `${userId}:${documentId}`) return
+    started.current = `${userId}:${documentId}`
+    mutate({ userId, documentId })
+  }, [unavailable, userId, documentId, mutate])
+
   if (!unavailable) return undefined
-  return me.isError ? nothingKept : purge.data
+  if (me.isError) return nothingKept
+  // What a previous document found is not this one's.
+  return purge.variables?.documentId === documentId ? purge.data : undefined
 }
