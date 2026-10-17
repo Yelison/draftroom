@@ -9,13 +9,13 @@ export function EditorStatePanel({
 }: {
   /** What happened, when the screen's own heading is not already saying it. */
   title?: string
-  description: string
+  description?: string
   children: ReactNode
 }) {
   return (
     <div className={styles.panel}>
       {title !== undefined && <h2 className={styles.title}>{title}</h2>}
-      <p className={styles.description}>{description}</p>
+      {description !== undefined && <p className={styles.description}>{description}</p>}
       {children}
     </div>
   )
