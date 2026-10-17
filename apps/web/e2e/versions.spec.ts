@@ -1,43 +1,49 @@
 /* The version history in the production build, with a real browser: from the editor, to a version, to a restore, and back, by keyboard. */
 import type { Page } from '@playwright/test'
+import { versions } from '../src/data/mock/fixtures/collaboration.ts'
 import { launchPlan } from '../src/data/mock/fixtures/documents.ts'
 import { expect, test } from './fixtures.ts'
 
 test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
 
-const versions = (page: Page) => page.getByRole('region', { name: 'Versions' })
+// The name a version has for a screen reader carries the moment it was made, in the browser's time zone, which is this machine's.
+const named = versions.find((version) => version.documentId === launchPlan.id && version.label !== null)
+const namedWhen = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(
+  new Date(named?.createdAt ?? 0),
+)
+const namedName = `Before the pricing review, ${namedWhen}`
+
+const list = (page: Page) => page.getByRole('region', { name: 'Versions' })
 
 test.describe('the version history', () => {
   test('is opened from the editor, a version is read, restored and the way back to the document is the keyboard', async ({
     page,
   }) => {
     await page.goto(`/documents/${launchPlan.id}`)
-    const history = page.getByRole('link', { name: 'Version history' })
-    await expect(history).toBeVisible()
-    await history.focus()
+    const link = page.getByRole('link', { name: 'Version history' })
+    await expect(link).toBeVisible()
+    await link.focus()
     await page.keyboard.press('Enter')
 
     await expect(page).toHaveURL(new RegExp(`/documents/${launchPlan.id}/versions$`))
     await expect(page.getByRole('heading', { level: 1, name: 'Version history' })).toBeFocused()
-    await expect(versions(page).getByRole('listitem')).toHaveCount(3)
+    await expect(list(page).getByRole('listitem')).toHaveCount(3)
 
     // Read the version that has a name of its own.
-    const named = versions(page).getByRole('button', { name: /^Before the pricing review/ })
-    await named.focus()
+    const row = list(page).getByRole('button', { name: /^Before the pricing review/ })
+    await row.focus()
     await page.keyboard.press('Enter')
-    await expect(named).toHaveAttribute('aria-current', 'true')
-    const text = page.getByRole('document', { name: 'Text of “Before the pricing review”' })
+    await expect(row).toHaveAttribute('aria-current', 'true')
+    const text = page.locator('[role="document"][contenteditable="false"]')
+    await expect(text).toHaveAccessibleName(`Text of “${namedName}”`)
     await expect(text).toContainText('The launch moves to the second week of November.')
     await expect(text).toHaveAttribute('contenteditable', 'false')
 
     // Restore it: the dialog opens on the way out, and the focus comes back to the button that asked.
-    const restore = versions(page)
-      .getByRole('listitem')
-      .filter({ hasText: 'Saved version' })
-      .getByRole('button', { name: 'Restore “Before the pricing review”' })
+    const restore = list(page).getByRole('button', { name: `Restore “${namedName}”` })
     await restore.focus()
     await page.keyboard.press('Enter')
-    const dialog = page.getByRole('dialog', { name: 'Restore “Before the pricing review”?' })
+    const dialog = page.getByRole('dialog', { name: `Restore “${namedName}”?` })
     await expect(dialog).toContainText('How it is now is saved first as a version')
     await expect(dialog.getByRole('button', { name: 'Close' })).toBeFocused()
     await page.keyboard.press('Tab')
@@ -46,10 +52,10 @@ test.describe('the version history', () => {
 
     await expect(dialog).toBeHidden()
     await expect(restore).toBeFocused()
-    await expect(page.getByText(/The document went back to “Before the pricing review”/)).toBeAttached()
-    await expect(versions(page).getByRole('listitem')).toHaveCount(5)
-    await expect(versions(page).getByRole('listitem').first()).toContainText('Restored version')
-    await expect(versions(page).getByRole('listitem').nth(1)).toContainText('Version before a restore')
+    await expect(page.getByText(/The document went back to “Before the pricing review, /)).toBeAttached()
+    await expect(list(page).getByRole('listitem')).toHaveCount(5)
+    await expect(list(page).getByRole('listitem').first()).toContainText('Restored version')
+    await expect(list(page).getByRole('listitem').nth(1)).toContainText('Version before a restore')
 
     // Back to the document.
     const back = page.getByRole('link', { name: 'Back to “Autumn launch plan”' })
@@ -61,7 +67,7 @@ test.describe('the version history', () => {
 
   test('saves a version with a name, with the keyboard, and the focus comes back to the button', async ({ page }) => {
     await page.goto(`/documents/${launchPlan.id}/versions`)
-    await expect(versions(page).getByRole('listitem')).toHaveCount(3)
+    await expect(list(page).getByRole('listitem')).toHaveCount(3)
     const save = page.getByRole('button', { name: 'Save a version' })
     await save.focus()
     await page.keyboard.press('Enter')
@@ -72,6 +78,50 @@ test.describe('the version history', () => {
 
     await expect(dialog).toBeHidden()
     await expect(save).toBeFocused()
-    await expect(versions(page).getByRole('listitem').first()).toContainText('Ready for review')
+    await expect(list(page).getByRole('listitem').first()).toContainText('Ready for review')
   })
+})
+
+/** The sum of the layout shifts the page has had since it loaded, which the browser measures. */
+const shifts = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        let total = 0
+        const observer = new PerformanceObserver((entries) => {
+          for (const entry of entries.getEntries()) {
+            const shift = entry as PerformanceEntry & { value: number; hadRecentInput: boolean }
+            if (!shift.hadRecentInput) total += shift.value
+          }
+        })
+        observer.observe({ type: 'layout-shift', buffered: true })
+        setTimeout(() => resolve(total), 500)
+      }),
+  )
+
+test.describe('the layout', () => {
+  for (const width of [1440, 1280]) {
+    test.describe(`at ${width} px`, () => {
+      test.use({ viewport: { width, height: 900 } })
+
+      test('has no horizontal scroll with a version open', async ({ page }) => {
+        await page.goto(`/documents/${launchPlan.id}/versions`)
+        await list(page)
+          .getByRole('button', { name: /^Before the pricing review/ })
+          .click()
+        await expect(page.locator('[role="document"][contenteditable="false"]')).toContainText(
+          'second week of November',
+        )
+
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+      })
+
+      test('does not shift while the document and the versions arrive', async ({ page }) => {
+        await page.goto(`/documents/${launchPlan.id}/versions`)
+        await expect(list(page).getByRole('listitem')).toHaveCount(3)
+
+        expect(await shifts(page)).toBeLessThan(0.01)
+      })
+    })
+  }
 })
