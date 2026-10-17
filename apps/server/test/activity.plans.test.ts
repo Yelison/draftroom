@@ -82,12 +82,13 @@ describe('the plan of the history of a workspace, with a filter by instant that 
   it.each([
     ['until an instant', () => ({ to: '2026-08-01T00:00:00Z' })],
     ['for one person until an instant', () => ({ actorId: owner.id, to: '2026-08-01T00:00:00Z' })],
-    ['until an instant, after a cursor', () => ({ to: '2026-08-20T00:00:00Z', after: cursor })],
+    ['until an instant that is before the cursor', () => ({ to: '2026-08-01T00:00:00Z', after: cursor })],
   ])('has the range in the condition of the index and sorts nothing, %s', async (_name, filters) => {
     const plan = await planOf(filters())
 
     expect(plan).toContain('activity_events_workspace_ms_idx')
-    expect(plan).toMatch(/Index Cond: .*date_trunc/)
+    const condition = plan.split('\n').find((line) => line.includes('Index Cond')) ?? ''
+    expect(condition).toMatch(/date_trunc.*<=/)
     expect(plan).not.toMatch(/Sort/)
   })
 
