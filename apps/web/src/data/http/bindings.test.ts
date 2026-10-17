@@ -30,21 +30,16 @@ const pathPattern = (template: string) => new RegExp(`^${template.replace(/\{[^}
 describe('the HTTP bindings', () => {
   it.each(Object.entries(calls))('%s sends the method and path the contract gives it', async (id, call) => {
     const operation = contract.operations.find((row) => row.id === id)
-    const { source, requests } = recordingSource(contract.successStatus(id))
+    // The version download is the one answer that is bytes, not JSON.
+    const { source, requests } = recordingSource(
+      contract.successStatus(id),
+      id === 'getVersionContent' ? 'application/octet-stream' : 'application/json',
+    )
 
     await call(source)
 
     expect(requests).toHaveLength(1)
     expect(requests[0]?.method).toBe(operation?.method.toUpperCase())
     expect(new URL(requests[0]?.url ?? '').pathname).toMatch(pathPattern(operation?.path ?? ''))
-  })
-
-  it('downloads a version as bytes from its content path', async () => {
-    const { source, requests } = recordingSource(200, 'application/octet-stream')
-
-    await source.getVersionContent({ params: { path: { versionId: 'v-1' } } })
-
-    expect(requests[0]?.method).toBe('GET')
-    expect(new URL(requests[0]?.url ?? '').pathname).toBe('/api/versions/v-1/content')
   })
 })

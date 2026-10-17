@@ -14,7 +14,6 @@ import { threadOperations } from './operations/threads.ts'
 import { versionOperations } from './operations/versions.ts'
 import { workspaceOperations } from './operations/workspaces.ts'
 import { atLeast, documentRole } from './roles.ts'
-import { unhandled } from './unhandled.ts'
 import { createWorld, type World } from './world.ts'
 import { documentName, parseDocumentName } from '@draftroom/contract/collab'
 import * as Y from 'yjs'
@@ -57,7 +56,6 @@ function operationsOf(ctx: Context, collaboration: SimulatedCollabServer, identi
     ...versionOperations(ctx),
     ...activityOperations(ctx),
     ...templateOperations(ctx),
-    getVersionContent: unhandled('getVersionContent'),
   }
   return {
     ...rest,

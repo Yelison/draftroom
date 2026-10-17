@@ -34,6 +34,7 @@ authorization is the server's and is tested there (plan, section 9.2).
 - No connection that closes when access is revoked or a member is removed: the collaboration server below decides access when a document is opened, and nothing ends a connection afterwards.
 - No email verification: whoever signs up with an invited email claims it.
 - Made-up values: the `sizeBytes` of a version, and the label a restored version copies from the one it restores.
+- Version content: the stored versions of the fixtures hold text of their own, and a version made later holds what the latest one held (the mock keeps no live state to snapshot). A restore adds versions but does not change what an open editor shows.
 
 ## Collaboration
 
@@ -54,7 +55,6 @@ Documents start empty, and two tabs do not share one (each page has its own worl
 | Operation                     | Why                                                                                                    |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `getLiveness`, `getReadiness` | Probes for the orchestrator; the data source does not carry them.                                      |
-| `getVersionContent`           | The bytes are a Yjs update, which needs a document with content and the versions of the server (T5.1). It fails loudly. |
 
 An operation without a handler never answers with a made-up value: it rejects with `UnhandledOperationError` and logs
 the reason on the console, which fails the end-to-end test that reached it.
