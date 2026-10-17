@@ -5,9 +5,9 @@ import { useIntl } from 'react-intl'
 import { isApiError } from '../../data/errors.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
 import type { MessageId } from '../../i18n/messages.ts'
+import { membersQuery } from '../documents/queries.ts'
 import { WorkspaceGate } from '../documents/WorkspaceGate.tsx'
 import { meQuery } from '../editor/meQuery.ts'
-import { peopleOptionsQuery } from '../history/queries.ts'
 import { FormStatus } from './FormStatus.tsx'
 import { InviteMember } from './InviteMember.tsx'
 import { MemberRow } from './MemberRow.tsx'
@@ -16,6 +16,7 @@ import { SettingsFailure } from './SettingsFailure.tsx'
 import { SettingsSkeleton } from './SettingsSkeleton.tsx'
 import { useMemberChanges, type MemberChange } from './useMemberChanges.ts'
 import { isLastOwner } from './workspaceRoles.ts'
+import frame from './Settings.module.css'
 import styles from './Members.module.css'
 
 /** What a refusal says here in this screen's own words; the rest is what every screen says about a refusal. */
@@ -32,7 +33,7 @@ export function MembersTab() {
 
 function Members({ workspaceId }: { workspaceId: string }) {
   const dataSource = useDataSource()
-  const members = useQuery(peopleOptionsQuery(dataSource, workspaceId))
+  const members = useQuery(membersQuery(dataSource, workspaceId))
   const me = useQuery(meQuery(dataSource))
 
   if (members.isError || me.isError) {
@@ -69,8 +70,10 @@ function MemberList({ workspaceId, members, meId }: MemberListProps) {
     workspaceId,
     onDone: (change: MemberChange) => {
       setFailure(null)
-      const role = change.kind === 'removed' ? '' : intl.formatMessage({ id: `settings.members.role.${change.role}` })
-      setAnnouncement({ id: `settings.members.announce.${change.kind}`, values: { name: change.name, role } })
+      setAnnouncement({
+        id: `settings.members.announce.${change.kind}`,
+        values: change.kind === 'removed' ? { name: change.name } : { name: change.name, role: change.role },
+      })
       if (change.kind === 'removed') {
         focusHeading.current = true
         setRemoval(null)
@@ -103,12 +106,12 @@ function MemberList({ workspaceId, members, meId }: MemberListProps) {
   }, [canManage])
 
   return (
-    <section className={styles.panel} aria-labelledby="settings-members-heading">
+    <section className={frame.panel} aria-labelledby="settings-members-heading">
       <div>
-        <h2 id="settings-members-heading" ref={heading} tabIndex={-1} className={styles.heading}>
+        <h2 id="settings-members-heading" ref={heading} tabIndex={-1} className={frame.heading}>
           {intl.formatMessage({ id: 'settings.members.title' })}
         </h2>
-        <p className={styles.description}>
+        <p className={frame.description}>
           {intl.formatMessage({ id: canManage ? 'settings.members.description' : 'settings.members.readOnly' })}
         </p>
       </div>

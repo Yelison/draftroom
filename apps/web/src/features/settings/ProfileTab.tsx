@@ -30,13 +30,13 @@ function ProfileForm({ me }: { me: Schema<'Me'> }) {
   const intl = useIntl()
   const { locale: appLocale } = useLocale()
   const update = useUpdateMe()
-  // A person who has not chosen a language reads the one the browser gave them: that is the one to show as chosen.
-  const savedLocale = me.locale ?? appLocale
+  // A person who has not chosen a language reads the one the browser gave them, and that is the one the group shows. It
+  // is not saved until they say so: the account stays without a language, and saving writes the one in use.
   const [name, setName] = useState(me.name)
-  const [locale, setLocale] = useState<Locale>(savedLocale)
+  const [locale, setLocale] = useState<Locale>(me.locale ?? appLocale)
   const [problem, setProblem] = useState<TextProblem | null>(null)
   const nameChanged = name.trim() !== me.name
-  const changed = nameChanged || locale !== savedLocale
+  const changed = nameChanged || locale !== me.locale
 
   function save(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -44,7 +44,7 @@ function ProfileForm({ me }: { me: Schema<'Me'> }) {
     const found = textProblem(name, contractLimits.personName)
     setProblem(found)
     if (found !== null) return
-    update.mutate({ ...(nameChanged ? { name: name.trim() } : {}), ...(locale === savedLocale ? {} : { locale }) })
+    update.mutate({ ...(nameChanged ? { name: name.trim() } : {}), ...(locale === me.locale ? {} : { locale }) })
   }
 
   return (

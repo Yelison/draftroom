@@ -116,6 +116,19 @@ export function describeDataSourceContract(name: string, harness: Harness) {
         await expectRefusal(owner.updateMe({ body: { name: emoji(81) } }), 'too-large', '/name')
       })
 
+      it('keeps the only owner who can act in place, even with another owner who has not signed up yet', async () => {
+        const { owner, ownerId, workspaceId } = await harness.scenario()
+        await owner.addMember({
+          ...inWorkspace(workspaceId),
+          body: { email: `pending-${unique()}@contract.example`, role: 'owner' },
+        })
+
+        await expectRefusal(
+          owner.updateMember({ params: { path: { workspaceId, userId: ownerId } }, body: { role: 'member' } }),
+          'last-owner',
+        )
+      })
+
       it('lets an owner rename the workspace and leaves a member out with 403', async () => {
         const { owner, member, workspaceId } = await harness.scenario()
 

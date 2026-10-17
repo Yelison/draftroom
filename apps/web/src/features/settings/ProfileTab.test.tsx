@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { main, openTab, refusal, renderScreen } from './testing/openSettings.tsx'
@@ -102,6 +102,18 @@ describe('the Profile tab', () => {
     expect(localStorage.getItem(localeStorageKey)).toBe('es')
   })
 
+  it('saves the language already in use when the account has none, and says so', async () => {
+    localStorage.setItem(localeStorageKey, 'es')
+    const { user, server } = renderScreen('/settings/profile')
+    await within(main()).findByRole('heading', { level: 2, name: 'Perfil' })
+    expect(within(main()).getByRole('radio', { name: 'Español' })).toBeChecked()
+
+    await user.click(within(main()).getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await within(main()).findByText('Cambios guardados')).toBeInTheDocument()
+    expect((await server.connect({ signedInAs: 'marta@harborpine.example' }).getMe()).locale).toBe('es')
+  })
+
   it('shows a skeleton with a spoken status while the account is on its way', async () => {
     renderScreen('/settings/profile', {
       wrap: (dataSource) => ({ ...dataSource, getMe: () => new Promise(() => undefined) }),
@@ -124,6 +136,6 @@ describe('the Profile tab', () => {
     await user.click(within(main()).getByRole('button', { name: 'Try again' }))
 
     expect(await within(main()).findByRole('heading', { level: 2, name: 'Profile' })).toBeInTheDocument()
-    await waitFor(() => expect(within(main()).queryByRole('alert')).not.toBeInTheDocument())
+    expect(within(main()).queryByRole('alert')).not.toBeInTheDocument()
   })
 })

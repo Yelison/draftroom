@@ -51,7 +51,7 @@ describe('the Settings screen', () => {
     localStorage.setItem(localeStorageKey, 'es')
     renderScreen('/settings/profile')
 
-    expect(await screen.findByRole('tablist', { name: 'Secciones de ajustes' })).toBeInTheDocument()
+    expect(await screen.findByRole('tablist', { name: 'Secciones de la configuración' })).toBeInTheDocument()
     expect(tab('Perfil')).toBeInTheDocument()
     expect(tab('Espacio')).toBeInTheDocument()
     expect(tab('Miembros')).toBeInTheDocument()

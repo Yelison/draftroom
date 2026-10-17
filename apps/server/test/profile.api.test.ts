@@ -1,11 +1,12 @@
 import type { Schema } from '@draftroom/contract'
 import type { Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { findProfile, updateProfile } from '../src/db/profile.ts'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, bodyAs, type Api } from './support/api.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
-import { createPendingPerson, createPerson, createWorkspace, join, type Person } from './support/world.ts'
+import { createPendingPerson, createPerson, type Person } from './support/world.ts'
 
 let database: TestDatabase
 let db: Kysely<Database>
@@ -117,13 +118,13 @@ describe('nobody changes the account of somebody else', () => {
     },
   )
 
-  it('does not take a member who has not signed up for a person who can change a profile', async () => {
+  it('writes nothing for a member who has not signed up, and finds no account to answer with', async () => {
     const pending = await createPendingPerson(db)
-    await join(db, await createWorkspace(db), pending)
 
-    const response = await api({ as: pending, method: 'PATCH', url: '/api/me', body: { name: 'Somebody' } })
+    const answer = await updateProfile(db, pending.id, { editorTextSize: 'large' })
 
-    expect(response.statusCode).toBe(401)
+    expect(answer).toBeUndefined()
+    expect(await findProfile(db, pending.id)).toMatchObject({ editorTextSize: 'medium' })
   })
 })
 

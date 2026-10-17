@@ -1,10 +1,14 @@
 import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { ana, daniel, harborPine, marta, sofia } from '../../data/mock/fixtures/index.ts'
+import { ana, daniel, marta, sofia } from '../../data/mock/fixtures/index.ts'
 import { main, openTab, refusal, renderScreen } from './testing/openSettings.tsx'
 
 const row = (name: string) => within(main()).getByText(name).closest('li')
-const roleOf = (name: string) => within(row(name) as HTMLElement).getByRole('combobox')
+const roleOf = (name: string) => {
+  const member = row(name)
+  if (member === null) throw new Error(`There is no row for ${name}`)
+  return within(member).getByRole('combobox')
+}
 
 describe('the Members tab', () => {
   it('lists everyone in the workspace, with the person who has not signed up marked as pending', async () => {
@@ -92,6 +96,17 @@ describe('the Members tab', () => {
       await user.selectOptions(roleOf('Marta Ruiz (you)'), 'Member')
 
       expect(calls).toBe(0)
+    })
+
+    it('stays protected while the other owner is still pending: only an owner who has signed up can act', async () => {
+      const { user } = await openTab('members', 'Members')
+      await user.type(within(main()).getByRole('textbox', { name: 'Email' }), 'idris@harborpine.example')
+      await user.selectOptions(within(main()).getByRole('combobox', { name: 'Role' }), 'Owner')
+      await user.click(within(main()).getByRole('button', { name: 'Invite' }))
+      await within(main()).findByText('idris@harborpine.example was invited as Owner.')
+
+      expect(roleOf('Marta Ruiz (you)')).toHaveAttribute('aria-disabled', 'true')
+      expect(within(main()).getByText(/Only owner\. Make someone else an owner/)).toBeInTheDocument()
     })
 
     it('is free to step down once somebody else is an owner too', async () => {
@@ -212,6 +227,6 @@ describe('the Members tab', () => {
     await user.click(within(main()).getByRole('button', { name: 'Try again' }))
 
     expect(await within(main()).findByRole('heading', { level: 2, name: 'Members' })).toBeInTheDocument()
-    expect(harborPine.name).toBe('Harbor Pine')
+    expect(within(main()).queryByRole('alert')).not.toBeInTheDocument()
   })
 })
