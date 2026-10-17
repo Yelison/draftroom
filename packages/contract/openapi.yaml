@@ -45,23 +45,69 @@ paths:
       tags:
         - Session
       summary: Get the signed-in person
-      description: Any signed-in person.
+      description: Any signed-in person. Besides who they are, the answer carries the preferences saved on the account.
       responses:
         '200':
-          description: The person behind the session.
+          description: The person behind the session, with their preferences.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/Me'
               examples:
                 default:
-                  $ref: '#/components/examples/User'
+                  $ref: '#/components/examples/Me'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         default:
           $ref: '#/components/responses/Unexpected'
       security:
         - session: []
+      x-draftroom-roles:
+        scope: session
+    patch:
+      operationId: updateMe
+      tags:
+        - Session
+      summary: Change the signed-in person's profile and preferences
+      description: |-
+        Changes only the caller's own account: the person is always the one of the session, never named in the request. Send the fields to change; a field that is left out keeps its value, and an empty body is a `400 validation-failed`. `locale` saves the language the app opens in on any browser and takes precedence over the browser's language; `null` clears it, so the browser's language applies again. There is no `revision`: the fields are independent and belong to one person, so the last write wins, as it does for `updateWorkspace`.
+
+        Any signed-in person.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMeRequest'
+            examples:
+              default:
+                value:
+                  name: Marta Ruiz
+                  locale: es
+                  editorTextSize: large
+      responses:
+        '200':
+          description: The person with the changes applied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+              examples:
+                default:
+                  $ref: '#/components/examples/Me'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
       x-draftroom-roles:
         scope: session
   /api/auth/sign-up:
@@ -2277,6 +2323,19 @@ components:
       type: string
       minLength: 1
       maxLength: 80
+    Locale:
+      type: string
+      description: A language of the product.
+      enum:
+        - en
+        - es
+    EditorTextSize:
+      type: string
+      description: The size of the text in the editor; `medium` until the person chooses.
+      enum:
+        - small
+        - medium
+        - large
     Password:
       type: string
       minLength: 12
@@ -2506,6 +2565,30 @@ components:
           $ref: '#/components/schemas/Email'
         name:
           $ref: '#/components/schemas/PersonName'
+    Me:
+      type: object
+      description: The signed-in person with the preferences saved on their account.
+      additionalProperties: false
+      required:
+        - id
+        - email
+        - name
+        - locale
+        - editorTextSize
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        email:
+          $ref: '#/components/schemas/Email'
+        name:
+          $ref: '#/components/schemas/PersonName'
+        locale:
+          oneOf:
+            - $ref: '#/components/schemas/Locale'
+            - type: 'null'
+          description: The language the person chose, or `null` while they have not chosen one and the browser's applies.
+        editorTextSize:
+          $ref: '#/components/schemas/EditorTextSize'
     UserRef:
       type: object
       description: Enough of a person to label them.
@@ -2933,6 +3016,19 @@ components:
       properties:
         name:
           $ref: '#/components/schemas/WorkspaceName'
+    UpdateMeRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          $ref: '#/components/schemas/PersonName'
+        locale:
+          oneOf:
+            - $ref: '#/components/schemas/Locale'
+            - type: 'null'
+        editorTextSize:
+          $ref: '#/components/schemas/EditorTextSize'
     AddMemberRequest:
       type: object
       additionalProperties: false
@@ -2985,10 +3081,7 @@ components:
           type: string
           pattern: ^[a-z0-9-]{1,64}$
         locale:
-          type: string
-          enum:
-            - en
-            - es
+          $ref: '#/components/schemas/Locale'
           description: The language of the template's content; `en` when omitted. Only valid together with `templateId`.
       dependentRequired:
         locale:
@@ -3355,6 +3448,14 @@ components:
         id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
         email: marta@harborpine.example
         name: Marta Ruiz
+    Me:
+      summary: The signed-in person with their preferences
+      value:
+        id: 5b8f7a3e-2d4c-4e1b-8a6f-1c9d3e7b0a11
+        email: marta@harborpine.example
+        name: Marta Ruiz
+        locale: es
+        editorTextSize: medium
     Workspace:
       summary: A workspace the caller owns
       value:

@@ -23,6 +23,7 @@ const limitedFields = [
   ['CreateFolderRequest', 'name', 'FolderName'],
   ['UpdateFolderRequest', 'name', 'FolderName'],
   ['UpdateWorkspaceRequest', 'name', 'WorkspaceName'],
+  ['UpdateMeRequest', 'name', 'PersonName'],
   ['CreateThreadRequest', 'body', 'CommentBody'],
   ['CreateThreadRequest', 'quote', 'Quote'],
   ['CreateCommentRequest', 'body', 'CommentBody'],
@@ -78,6 +79,7 @@ describe('length limits', () => {
         'updateComment',
         'updateDocument',
         'updateFolder',
+        'updateMe',
         'updateWorkspace',
       ],
       without: [],
@@ -88,6 +90,7 @@ describe('length limits', () => {
   // listed, and the other way round.
   it.each([
     ['User', 'name', ['PersonName']],
+    ['Me', 'name', ['PersonName']],
     ['UserRef', 'name', ['PersonName']],
     ['SignUpRequest', 'name', ['PersonName']],
     ['Member', 'name', ['PersonName', 'null']],
