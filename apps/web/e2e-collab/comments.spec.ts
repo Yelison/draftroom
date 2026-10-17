@@ -31,13 +31,20 @@ async function typeAt(person: Participant, offset: number, text: string): Promis
   await person.page.keyboard.type(text)
 }
 
-/** Selects `length` characters from `offset`, with the keyboard. */
-async function select(person: Participant, offset: number, length: number): Promise<void> {
-  await person.editor.focus()
-  await person.page.keyboard.press('Control+Home')
-  for (let moved = 0; moved < offset; moved++) await person.page.keyboard.press('ArrowRight')
-  for (let selected = 0; selected < length; selected++) await person.page.keyboard.press('Shift+ArrowRight')
-  await settled(person.page, (typed) => typed.length === length)
+/**
+ * Selects `expected`, which starts after `offset` characters, with the keyboard. The keys can arrive while the editor is
+ * redrawing what the other person typed, and then the selection is not the one asked for: it is read back, and made again.
+ */
+async function select(person: Participant, offset: number, expected: string): Promise<void> {
+  const selected = () => person.page.evaluate(() => window.getSelection()?.toString() ?? '')
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await person.editor.focus()
+    await person.page.keyboard.press('Control+Home')
+    for (let moved = 0; moved < offset; moved++) await person.page.keyboard.press('ArrowRight')
+    for (let count = 0; count < expected.length; count++) await person.page.keyboard.press('Shift+ArrowRight')
+    if ((await selected()) === expected) break
+  }
+  await settled(person.page, (text) => text === expected)
 }
 
 /**
@@ -65,7 +72,7 @@ test.describe('a comment while the other person writes around it', () => {
     await expect.poll(() => priya.text()).toBe(base)
 
     // Priya comments on "launch plan", with the keyboard; Daniel sees the thread without reloading.
-    await select(priya, 4, commented.length)
+    await select(priya, 4, commented)
     await priya.page.keyboard.press('Control+Alt+m')
     await priya.page.keyboard.type('Is this still the name?')
     await priya.page.keyboard.press('Control+Enter')
@@ -93,7 +100,7 @@ test.describe('a comment while the other person writes around it', () => {
     for (const person of [daniel, priya]) await expect(person.syncStatus).toHaveText('Sync status: Synced')
 
     // Daniel deletes the whole range: the thread keeps its quote, has no highlight and can still be answered.
-    await select(daniel, 6, 'launchC plan'.length)
+    await select(daniel, 6, 'launchC plan')
     await daniel.page.keyboard.press('Delete')
     for (const person of [daniel, priya]) {
       await expect(card(person)).toHaveAttribute('data-state', 'orphaned')
