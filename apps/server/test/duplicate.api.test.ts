@@ -9,7 +9,13 @@ import type { Database } from '../src/db/tables.ts'
 import { apiOf, bodyAs, type Api } from './support/api.ts'
 import { recordEvent } from './support/activity.ts'
 import { createThread } from './support/comments.ts'
-import { appendParagraph, storedState, storeState } from './support/collab/content.ts'
+import {
+  addPositionMigrations,
+  appendParagraph,
+  positionMigrationsName,
+  storedState,
+  storeState,
+} from './support/collab/content.ts'
 import { withAttribute } from './support/collab/forbidden-content.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
@@ -44,9 +50,6 @@ afterAll(async () => {
   await database.drop()
 })
 
-// The map that `@tiptap/y-tiptap` writes on structural edits and never prunes (ADR 0011, decision 2).
-const migrationsMap = '__tiptap_position_migrations:root:default'
-
 /** A state with a heading, formatted text and plain paragraphs, and `migrations` entries of about a kilobyte each. */
 function stateWith(migrations: number): Uint8Array {
   const doc = new Y.Doc()
@@ -61,12 +64,7 @@ function stateWith(migrations: number): Uint8Array {
   bold.insert(0, [text])
   fragment.insert(1, [bold])
   appendParagraph(doc, 'The harbour lights came on one by one.')
-  const map = doc.getMap(migrationsMap)
-  doc.transact(() => {
-    for (let entry = 0; entry < migrations; entry += 1) {
-      map.set(`${entry + 1}:${entry}`, { seen: { 1: entry }, transfers: ['x'.repeat(1000)] })
-    }
-  })
+  addPositionMigrations(doc, migrations)
   return Y.encodeStateAsUpdate(doc)
 }
 
@@ -134,7 +132,7 @@ describe('duplicating a document', () => {
     const copied = await storedState(db, copy.id)
     const doc = new Y.Doc()
     Y.applyUpdate(doc, copied)
-    expect(doc.getMap(migrationsMap).size).toBe(0)
+    expect(doc.getMap(positionMigrationsName).size).toBe(0)
     expect(copied.byteLength).toBeLessThan((await storedState(db, original)).byteLength / 50)
   })
 
