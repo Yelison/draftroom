@@ -31,8 +31,6 @@ export type TabMessage =
       readonly startedAt: number
       readonly joinedAt: number
     }
-  /** A tab that has found its world says so to the tabs in it. */
-  | { readonly kind: 'joined'; readonly peer: string; readonly world: string; readonly joinedAt: number }
   /** A tab opened a document and asks for what the others have of it. */
   | {
       readonly kind: 'open'
@@ -94,10 +92,6 @@ export function readMessage(data: unknown): TabMessage | null {
         ? { kind, peer, world, startedAt, joinedAt }
         : null
     }
-    case 'joined': {
-      const joinedAt = data['joinedAt']
-      return isText(world) && typeof joinedAt === 'number' ? { kind, peer, world, joinedAt } : null
-    }
     case 'bye':
       return isText(world) ? { kind, peer, world } : null
     case 'open': {
@@ -158,7 +152,8 @@ export async function joinTabs(
     ? { id: peer, startedAt: now(), peers: [] }
     : await discoverWorld(transport, peer, now, discoveryMs)
   const joinedAt = world.id === peer ? world.startedAt : now()
-  // Who is in the world and since when: the same for every tab once they have heard each other.
+  // The tabs this one found in its world, and since when. A tab that opens later is younger than all of them, so it never
+  // changes which is the oldest, and there is no need to tell the others about it.
   const roster = new Map([
     [peer, joinedAt],
     ...world.peers.map(({ peer: other, joinedAt: since }) => [other, since] as const),
@@ -215,9 +210,6 @@ export async function joinTabs(
       case 'awareness':
         server.receiveAwareness(message.document, message.peer, message.changes)
         break
-      case 'joined':
-        roster.set(message.peer, message.joinedAt)
-        break
       case 'bye':
         server.dropPeer(message.peer)
         roster.delete(message.peer)
@@ -225,8 +217,6 @@ export async function joinTabs(
         break
     }
   })
-
-  if (world.id !== peer) post({ kind: 'joined', peer, world: world.id, joinedAt })
 
   return {
     world: world.id,
