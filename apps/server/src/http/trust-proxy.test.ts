@@ -23,6 +23,9 @@ describe('who may say what the address of the caller is', () => {
     ['a word that is not an address', 'caddy'],
     ['a range with a prefix longer than the address', '10.0.0.0/33'],
     ['a range with something after the prefix', '10.0.0.0/8/8'],
+    ['every IPv4 address', '0.0.0.0/0'],
+    ['every IPv6 address', '::/0'],
+    ['an address with a prefix of nothing', '10.0.0.1/0'],
     ['a number in a list with an address', '1,10.0.0.5'],
     ['a list with one entry that is wrong', '10.0.0.5,everyone'],
   ])('is refused when it is %s', (_name, value) => {

@@ -51,6 +51,7 @@ const testConfig: CollabConfig = {
   host: '127.0.0.1',
   allowedOrigins: ['https://app.harborpine.example'],
   devIdentity: true,
+  nodeEnv: 'test',
   sessionSecret: 'a-secret-that-is-long-enough-for-a-hash',
 }
 

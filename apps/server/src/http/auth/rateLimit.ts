@@ -1,5 +1,6 @@
 import type {} from '@fastify/rate-limit'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
+import { addressKey } from '../../rate-limit/addressKey.ts'
 import type { Devices } from './devices.ts'
 import { keyOfEmail } from './emailKey.ts'
 
@@ -88,11 +89,11 @@ export function createAttemptLimits(app: FastifyInstance, limits: RateLimits, de
   })
   const perAddress = app.createRateLimit({
     ...rule(limits.signInFailuresPerAddress),
-    keyGenerator: (request) => `address:${request.ip}`,
+    keyGenerator: (request) => `address:${addressKey(request.ip)}`,
   })
   const signUps = app.createRateLimit({
     ...rule(limits.signUpsPerAddress),
-    keyGenerator: (request) => `sign-up:${request.ip}`,
+    keyGenerator: (request) => `sign-up:${addressKey(request.ip)}`,
   })
 
   // `Retry-After` is whole seconds and at least one, whatever is left of the window.
@@ -118,7 +119,7 @@ export function createAttemptLimits(app: FastifyInstance, limits: RateLimits, de
       const perAccount = device === null ? perEmail : perDevice
       const keys = [
         device === null ? `email:${keyOfEmail(emailOf(request.body))}` : `device:${device}`,
-        `address:${request.ip}`,
+        `address:${addressKey(request.ip)}`,
       ]
       const before = keys.map(reserve)
       const releaseAll = () => keys.forEach(release)

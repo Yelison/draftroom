@@ -86,6 +86,21 @@ describe('the limit by address', () => {
   })
 })
 
+describe('the limit by address, for IPv6', () => {
+  it('counts the addresses of one /64 together, so a household cannot spend a bucket per address', async () => {
+    app = appWithoutDatabase({ requestLimits: limits(3, 1000) })
+    const from = (remoteAddress: string) => app!.inject({ method: 'GET', url: '/api/nothing', remoteAddress })
+
+    const answers = await Promise.all(
+      ['2001:db8:1:2::1', '2001:db8:1:2::2', '2001:db8:1:2:ffff::3', '2001:db8:1:2::4'].map(from),
+    )
+    const nextNetwork = await from('2001:db8:1:3::1')
+
+    expect(tally(answers.map(({ statusCode }) => statusCode))).toEqual({ served: 3, limited: 1 })
+    expect(nextNetwork.statusCode).not.toBe(429)
+  })
+})
+
 describe('the limit by session', () => {
   const as = (session: string): InjectOptions => ({
     method: 'GET',

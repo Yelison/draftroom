@@ -29,7 +29,10 @@ import { productionTiming, type CollabTiming } from './timing.ts'
 import { upgradeGuardExtension } from './upgradeGuard.ts'
 
 /** What the collaboration server takes of the configuration of the process. */
-export type CollabConfig = Pick<Config, 'collabPort' | 'allowedOrigins' | 'devIdentity' | 'sessionSecret'> & {
+export type CollabConfig = Pick<
+  Config,
+  'collabPort' | 'allowedOrigins' | 'devIdentity' | 'sessionSecret' | 'nodeEnv'
+> & {
   readonly host: string
 }
 
@@ -118,7 +121,14 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
     // Versions are full updates because the documents are garbage collected (protocol §11).
     yDocOptions: { gc: true, gcFilter: () => true },
     extensions: [
-      upgradeGuardExtension({ allowedOrigins: config.allowedOrigins, development: config.devIdentity }, sockets),
+      upgradeGuardExtension(
+        {
+          allowedOrigins: config.allowedOrigins,
+          development: config.devIdentity,
+          production: config.nodeEnv === 'production',
+        },
+        sockets,
+      ),
       authenticateExtension({ database, authProvider, sessionSecret: config.sessionSecret, log, marks }),
       persistenceExtension({ store, durability, retry, marks, excerpts, log }),
       // Before the acknowledgement: a connection that a revocation names is closed before it is told anything is stored.

@@ -26,7 +26,7 @@ describe('the security headers of the API', () => {
   })
 
   it('add HSTS in production and only there', () => {
-    expect(securityHeaders({ production: true })[strictTransportSecurity]).toBe('max-age=31536000; includeSubDomains')
+    expect(securityHeaders({ production: true })[strictTransportSecurity]).toBe('max-age=31536000')
     expect(securityHeaders({ production: false })).not.toHaveProperty(strictTransportSecurity)
   })
 })

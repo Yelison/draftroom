@@ -219,14 +219,15 @@ test.describe('pasting', () => {
   ] as const
 
   for (const { name, html, text: expected } of cases) {
-    // The page of this suite fails a test for any console error. Here the browser may report one thing: that the content
-    // security policy refused a handler of the hostile markup while it was being read, which is the policy doing its part
-    // beside the sanitiser. Any other error still fails the test.
+    // The page of this suite fails a test for any console error. Here the browser may report one thing: Chromium's
+    // `script-src-attr` violation ("Executing inline event handler violates..."), which it raises when it creates the
+    // handler in the inert document ProseMirror reads the pasted HTML into. Nothing runs (`pwned` stays false below). Any
+    // other report still fails the test, a refused inline script among them: that would mean markup reached the live page.
     unwatched(`keeps only the text of ${name}, with nothing that runs and no link`, async ({ page }) => {
       const problems: string[] = []
       page.on('pageerror', (error) => problems.push(`uncaught: ${error.message}`))
       page.on('console', (message) => {
-        if (message.type() === 'error' && !/violates the following Content Security Policy/.test(message.text()))
+        if (message.type() === 'error' && !/Executing inline event handler violates/.test(message.text()))
           problems.push(`console.error: ${message.text()}`)
       })
       const text = await open(page)

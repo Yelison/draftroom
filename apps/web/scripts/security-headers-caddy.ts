@@ -18,7 +18,7 @@ export function securityHeadersCaddy(html: string): string {
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "no-referrer"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()"
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Strict-Transport-Security "max-age=31536000"
 	}
 }
 `

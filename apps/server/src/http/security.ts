@@ -20,11 +20,11 @@ const apiSecurityHeaders = {
 } as const
 
 /**
- * A year, which browsers cap anyway; and the subdomains, because the `__Host-` cookies already refuse to be set by one and a
- * subdomain that is served over plain HTTP would be the way round the protection. Not `preload`: that is a list nobody
- * leaves, and the owner of the domain has to choose it.
+ * A year, which is what browsers cap it at anyway. Not `includeSubDomains` (as in ADR 0016 and the headers of the proxy,
+ * which must say the same thing: a browser keeps the last policy it saw): this site cannot speak for the other names under
+ * its domain. Not `preload`: that is a list nobody leaves, and the owner of the domain has to choose it.
  */
-const strictTransportSecurity = 'max-age=31536000; includeSubDomains'
+export const strictTransportSecurity = 'max-age=31536000'
 
 export interface SecurityOptions {
   /** HSTS only in production: a development server is plain HTTP, and a browser that has learned a host is HTTPS-only will not go back. */

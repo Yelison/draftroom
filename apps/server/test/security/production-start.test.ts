@@ -117,7 +117,7 @@ describe('a server in production', { timeout: startTimeout }, () => {
     })
 
     expect(response.status).toBe(201)
-    expect(response.headers.get('strict-transport-security')).toBe('max-age=31536000; includeSubDomains')
+    expect(response.headers.get('strict-transport-security')).toBe('max-age=31536000')
     const cookies = response.headers.getSetCookie().map((line) => line.split('=')[0])
     expect(cookies.sort()).toEqual(['__Host-dr_csrf', '__Host-dr_device', '__Host-dr_session'])
   })

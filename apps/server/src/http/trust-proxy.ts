@@ -12,7 +12,8 @@ function isAddressOrRange(entry: string): boolean {
   const family = isIP(address)
   if (family === 0 || rest.length > 0) return false
   if (prefix === undefined) return true
-  return /^\d{1,3}$/.test(prefix) && Number(prefix) <= (family === 4 ? 32 : 128)
+  // `/0` is every address: it would trust anybody, and `proxy-addr` refuses it with a stack trace at start-up.
+  return /^\d{1,3}$/.test(prefix) && Number(prefix) >= 1 && Number(prefix) <= (family === 4 ? 32 : 128)
 }
 
 const message =

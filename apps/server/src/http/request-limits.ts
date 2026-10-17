@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
+import { addressKey } from '../rate-limit/addressKey.ts'
 import { createKeyedBuckets, type BucketRule } from '../rate-limit/keyedBuckets.ts'
 import { principalOf } from './auth/authenticate.ts'
 import { sendProblem } from './problem.ts'
@@ -44,7 +45,7 @@ export function limitByAddress(app: FastifyInstance, { perAddress }: RequestLimi
   const buckets = createKeyedBuckets({ ...perAddress, now: Date.now, maxKeys: rememberedKeys })
   app.addHook('onRequest', async (request, reply) => {
     if (unlimitedOperations.has(request.routeOptions.config.operationId ?? '')) return
-    const wait = buckets.take(`address:${request.ip}`)
+    const wait = buckets.take(`address:${addressKey(request.ip)}`)
     if (wait !== null) return refuse(reply, wait)
   })
 }
