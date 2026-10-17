@@ -215,7 +215,7 @@ describe('restore.sh', { timeout: 30_000 }, () => {
     expect(await query('already_in_use', `select to_regclass('written_later') as found`)).toEqual([{ found: null }])
   })
 
-  it('does not drop a database somebody is connected to', async () => {
+  it('does not replace a database somebody is connected to, and leaves it as it was', async () => {
     const connected = new pg.Client({ connectionString: urlOfDatabase(container.getConnectionUri(), 'already_in_use') })
     await connected.connect()
     try {
@@ -223,11 +223,13 @@ describe('restore.sh', { timeout: 30_000 }, () => {
 
       expect(outcome.code).not.toBe(0)
       expect(outcome.stderr).toContain('is in use')
+      expect((await notes('already_in_use')).map((note) => note.body)).toEqual(['the minutes of the board'])
     } finally {
       await connected.end()
     }
-    // PostgreSQL waits five seconds for the other connections to go before it refuses to drop the database.
-  }, 20_000)
+    // PostgreSQL waits five seconds for the other connections to go before it refuses to rename the database; the limit is the
+    // one of the whole group.
+  })
 
   describe('with an archive that a cut transfer left without the end of its data', () => {
     let truncated: string

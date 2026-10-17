@@ -17,6 +17,8 @@ const placeholder = /^(?:|CHANGE_ME\w*|<[^>]*>|\$\{\w+(?::?\?[^}]*)?\}|\$\(.*\)|
 
 /** A reference that carries a value of its own (`${NAME:-value}`, `${NAME-value}`, `${NAME:=value}`, `${NAME:+value}`). */
 const referenceWithValue = /^\$\{\w+:?[-=+]([^}]*)\}$/
+/** The same, found anywhere in a line, whatever the name: the value is what is read, never the `-` or `=` before it. */
+const valuesOfReferences = /\$\{\w+:?[-=+]([^}]*)\}/g
 
 /**
  * In source code only, and only unquoted (a quoted value is a literal, whatever it looks like): a keyword, a variable of the
@@ -92,6 +94,10 @@ export function findSecrets(text: string, { code = false }: ScanOptions = {}): F
         ([, quote = '', value = '']) => !isPlaceholder(value, quote !== ''),
       )
     if (leaked) return found('secret assigned a value')
-    return longRandomRun.test(line) ? found('long random-looking string') : []
+    // The `-`, `=` and `+` of a default are in the lookbehind of the run, so a long value after one is read on its own.
+    const defaults = [...line.matchAll(valuesOfReferences)].map(([, value = '']) => value)
+    return longRandomRun.test(line) || defaults.some((value) => longRandomRun.test(value))
+      ? found('long random-looking string')
+      : []
   })
 }

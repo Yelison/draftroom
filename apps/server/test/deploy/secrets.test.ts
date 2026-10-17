@@ -45,6 +45,7 @@ describe('what counts as a secret in a file meant to be published', () => {
     // The two lines a reviewer put in the Compose file, and the other ways to give a reference a value of its own.
     ['a password as the default of a Compose reference', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-draftroom2026}'],
     ['a long secret as the default of a Compose reference', `SESSION_SECRET: \${SESSION_SECRET:-${fake.hex64}}`],
+    ['a long default of a reference whose name says nothing', `SALT: \${SALT:-${fake.hex64}}`],
     ['a password after a dash with no colon', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD-draftroom2026}'],
     ['a password assigned by a reference', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:=draftroom2026}'],
     [
