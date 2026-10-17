@@ -150,7 +150,7 @@ Query keys live in one module, `apps/web/src/data/queryKeys.ts`. Each mutation l
 | `updateDocument` | the document, the document lists, pinned, shared, workspace activity, that document's activity |
 | `archiveDocument`, `restoreDocument`, `deleteDocument` | the document, the document lists, pinned, shared, workspace activity |
 | `pinDocument`, `unpinDocument` | the document, pinned, the document lists, shared |
-| `createDocument` | the document lists, workspace activity |
+| `createDocument`, `duplicateDocument` | the document lists, workspace activity |
 | `createFolder`, `updateFolder`, `deleteFolder` | the folders, the document lists |
 | `setAccess`, `removeAccess`, `setGeneralAccess` | the access list, the document, shared, workspace activity, that document's activity |
 | `createThread`, `replyToThread`, `resolveThread`, `reopenThread`, `updateComment`, `deleteComment` | the document's threads, workspace activity, that document's activity |

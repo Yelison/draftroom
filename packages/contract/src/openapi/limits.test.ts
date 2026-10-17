@@ -74,6 +74,7 @@ describe('length limits', () => {
         'createFolder',
         'createThread',
         'createVersion',
+        'duplicateDocument',
         'replyToThread',
         'signIn',
         'signUp',
