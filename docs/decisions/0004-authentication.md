@@ -60,7 +60,7 @@ Why these figures: ten wrong passwords for one account in a quarter of an hour i
 
 ### Sign-up and invitations
 
-`signUp` creates the account and the session, and answers `201` with the person. If the address already has a signed-up account it is `409 conflict` and nothing changes. If it had been added to workspaces by email, the row that invitation made **is claimed**: same `userId`, so the memberships and document grants given to the address are the person's from that moment (ADR 0005). A concurrent pair of sign-ups for one address is one `201` and one `409` (the second finds the unique index taken). A person with no invitation belongs to **no workspace**: the contract has no operation that creates one, and the app already shows that state.
+`signUp` creates the account and the session, and answers `201` with the person. If the address already has a signed-up account it is `409 conflict` and nothing changes. If it had been added to workspaces by email, the row that invitation made **is claimed**: same `userId`, so the memberships and document grants given to the address are the person's from that moment (ADR 0005). A concurrent pair of sign-ups for one address is one `201` and one `409` (the second finds the unique index taken). A person who claims no invitation gets **a workspace of their own**, written in the same transaction as the account (both or neither): it is named as the person is called, which is their own content, so the server translates nothing and they can rename it in Settings, and the person is its owner. One who claims an invitation gets none. A person can still end with no workspace (removed from the only one they had), which the app shows as its own state.
 
 ### Collaboration
 
@@ -74,7 +74,7 @@ The upgrade of the WebSocket resolves the session from the **`Cookie` header of 
 
 1. **`409` on sign-up reveals which emails have an account: accepted.** The contract fixes the answer, and the alternative (always `201` and a message to the inbox) needs email delivery, which the MVP does not have. What limits it is the sign-up limit above (ten attempts an hour from an address). Sign-in, where guessing is the point, never says. Revisit with email verification.
 2. **Password normalisation: NFKC**, above.
-3. **Email verification: none, and that is a known gap.** Without it, whoever signs up first with an address that has a pending invitation inherits its grants, and anyone can sign up as an address they do not own. The invitation is made by a member, so the exposure is bounded to the documents shared with that address, but it is real. It needs email delivery and is **a pending decision for the owner** before the app is public.
+3. **Email verification: none, and that is a known gap.** Without it, whoever signs up first with an address that has a pending invitation inherits its grants, and anyone can sign up as an address they do not own. The invitation is made by a member, so the exposure is bounded to the documents shared with that address, but it is real. It needs email delivery. The owner has decided to ship it as a **known risk**, written below.
 4. **The CSRF exemption of sign-in (login CSRF): kept, and made safe by the content type.** A cross-site form can post to the address, but it can only send `application/x-www-form-urlencoded`, `multipart/form-data` or `text/plain`, none of which the server reads as JSON (a test sends the first and the last and gets `400`); sending JSON needs a preflight the server never grants (T7.2 sets CORS by `ALLOWED_ORIGINS` and **must not** allow credentials from any other). `SameSite=Lax` does not help here, since the attack sends no cookie of its own.
 
 ## Threats covered
@@ -95,6 +95,21 @@ The upgrade of the WebSocket resolves the session from the **`Cookie` header of 
 | Secrets in logs | Nothing logs a body or a token; a test searches the output | `auth/logs.test.ts` |
 | Development identity in production | The cookie provider alone in `production` and when `NODE_ENV` is not set | `session.test.ts`, `select.test.ts` |
 | The whole thing in a browser, against the real server | Sign-in, gate, sign-up and sign-out with a live socket in another tab | `e2e-collab/auth.spec.ts`, `identity.spec.ts` |
+
+## Known risk: no email verification
+
+The owner accepted this on 2026-10-17. Nothing proves that a person owns the address they sign up with, and two things follow:
+
+- **Whoever signs up first with an address that has a pending invitation inherits what was shared with it**: its memberships and document grants (ADR 0005). Someone who knows or guesses an invited address, and gets to it before its owner, reads and edits those documents. The exposure is bounded by what members shared with that address, which is why the invitation is the thing to protect.
+- **`409` on sign-up reveals which addresses have an account.** The contract fixes that answer, and the sign-up limit (ten attempts an hour from one address) only slows the probing down.
+
+What production needs to close it, none of which exists yet:
+
+1. **A verification link before an invitation is claimed.** Signing up creates the account but not the seat: the memberships and grants are attached when the person follows a link sent to the address, so only whoever can read that mailbox gets them. A sign-up for an address that has an account would then answer the same whether or not it does (always "check your email"), which also closes the enumeration.
+2. **Email delivery**, with a transactional provider and **templates in both languages** (the person's language is not known before sign-up, so the language of the browser that asked), plain-text alternatives, and no content that depends on the person's data beyond their name.
+3. **A link that expires**, single-use, long enough to be unguessable (the 256 bits of a session token will do), stored hashed like a session, with a short lifetime (a day) and a way to ask for another that is itself rate-limited.
+
+Until then the README lists it among the known limitations, and the owner decides when it has to be done (before the product is public).
 
 ## The real-stack end-to-end suite
 

@@ -8,6 +8,10 @@ The static demo needs no server: its collaboration, including the second person 
 
 The project is at its planning stage. Everything lands through pull requests; see [CONTRIBUTING](CONTRIBUTING.md).
 
+## Known limitations
+
+- **Email addresses are not verified at sign-up.** Whoever signs up first with an address that has a pending invitation inherits what was shared with it, and the sign-up answer tells which addresses have an account. Closing it needs a verification link and email delivery in both languages; see [ADR 0004](docs/decisions/0004-authentication.md#known-risk-no-email-verification).
+
 ## License
 
 [MIT](LICENSE)
