@@ -1,4 +1,12 @@
-import { test as base, expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
+import {
+  test as base,
+  expect,
+  type Browser,
+  type BrowserContext,
+  type Locator,
+  type Page,
+  type WebSocketRoute,
+} from '@playwright/test'
 import { environment } from './environment.ts'
 import { people, type DemoPerson } from './people.ts'
 import { ServerProcess } from './serverProcess.ts'
@@ -58,6 +66,47 @@ export class Participant {
       for (const caret of copy.querySelectorAll('[class*="_caret"]')) caret.remove()
       return Array.from(copy.querySelectorAll('p'), (paragraph) => paragraph.textContent).join('\n')
     })
+  }
+
+  /**
+   * Puts the collaboration connections of this page under the control of the test, without changing them: each one is made to
+   * the real server, with the page's own `Origin` and cookie (the proxy needs both, so a connection that opens at all proves
+   * it), and everything the page says is passed on. While `hold()` is in effect a new connection waits to be made, and
+   * `release()` lets it go: the order of two answers that the network leaves open is then the test's.
+   *
+   * The connections are made from Node, not by the browser, so `context.setOffline` does not reach them. The test says when
+   * the server cannot be reached (`setReachable`), and a connection made then fails as it does for a browser that is offline.
+   */
+  async controlCollaboration(): Promise<{ hold(): void; release(): void; setReachable(reachable: boolean): void }> {
+    let reachable = true
+    const connected = new Set<WebSocketRoute>()
+    let gate: Promise<void> = Promise.resolve()
+    let open = () => {}
+    await this.page.routeWebSocket(/\/collab$/, async (client) => {
+      const said: (string | Buffer)[] = []
+      let closed = false
+      client.onMessage((message) => said.push(message))
+      client.onClose(() => (closed = true))
+      await gate
+      if (closed) return
+      if (!reachable) return client.close()
+      const server = client.connectToServer()
+      connected.add(client)
+      client.onClose(() => connected.delete(client))
+      for (const message of said) server.send(message)
+      client.onMessage((message) => server.send(message))
+    })
+    return {
+      hold: () => {
+        gate = new Promise((resolve) => (open = resolve))
+      },
+      release: () => open(),
+      setReachable: (value) => {
+        reachable = value
+        // What is connected goes with the network, as it does for a browser that is offline.
+        if (!value) for (const client of connected) void client.close()
+      },
+    }
   }
 
   /** The offline copies this browser keeps for the signed-in accounts, by database name (`draftroom:<user>:<workspace>:<document>`). */

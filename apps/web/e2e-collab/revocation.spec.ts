@@ -17,33 +17,51 @@ type FirstAnswer = 'collaboration-server' | 'api'
  *
  * When she is back the screen asks the API for the document again and the connection asks the collaboration server to let
  * her in, and both are refused. Which refusal arrives first depends on the network, and the screen has to be right either
- * way; the tests below hold back the API's answer to see the connection's refusal alone, and let it through to see its own.
+ * way, so the test decides it: it holds back the API's answer to see the connection's refusal alone, or holds back the
+ * connection until the API has answered.
  */
 async function accessRemovedDuringTheOutage(join: (person: DemoPerson) => Promise<Participant>, first: FirstAnswer) {
   const documentId = await createDocument('daniel', ['priya'])
   const daniel = await join('daniel')
   const priya = await join('priya')
   priya.toleratesConnectionErrors()
+  // Only where the order is the test's: the connections are then made by the test's control and not by the browser.
+  const collaboration = first === 'api' ? await priya.controlCollaboration() : undefined
   await daniel.open(documentId)
   await priya.open(documentId)
   await daniel.typeAtEnd(shared)
   await expect.poll(() => priya.text()).toBe(shared)
 
   await priya.context.setOffline(true)
+  collaboration?.setReachable(false)
   await expect(priya.syncStatus).toHaveText('Sync status: Offline with local copy')
   await priya.typeAtEnd(offlineText)
   await expect(priya.syncStatus).toHaveText('Sync status: Offline with local copy')
   expect(await priya.localCopies(), 'her device keeps what she wrote').toHaveLength(1)
 
   await revokeAccess('daniel', documentId, 'priya')
+  const isTheDocument = (url: URL) => url.pathname === `/api/documents/${documentId}`
   if (first === 'collaboration-server') {
     // A request that is never answered: the document the screen already has stays on it until the connection says more.
-    await priya.page.route(
-      (url) => url.pathname === `/api/documents/${documentId}`,
-      () => new Promise<void>(() => {}),
+    await priya.page.route(isTheDocument, () => new Promise<void>(() => {}))
+    await priya.context.setOffline(false)
+  } else {
+    // The connection is not made until the API has refused: the 404 is what the screen sees first, every time.
+    const refusedByTheApi = priya.page.waitForResponse(
+      (response) => isTheDocument(new URL(response.url())) && response.status() === 404,
     )
+    collaboration?.hold()
+    collaboration?.setReachable(true)
+    await priya.context.setOffline(false)
+    await refusedByTheApi
+    // The answer has reached the page; the screen still has to take it in. Where it replaces the editor with its own message
+    // that happens at once and is waited for here. Where it keeps the editor there is nothing to wait for, and the wait ends.
+    await priya.page
+      .getByRole('heading', { name: "This document isn't available" })
+      .waitFor({ timeout: 2_000 })
+      .catch(() => undefined)
+    collaboration?.release()
   }
-  await priya.context.setOffline(false)
   return { documentId, daniel, priya }
 }
 
@@ -76,11 +94,11 @@ test.describe('access removed while the person was offline, when the collaborati
   })
 })
 
-// FINDING (see the delivery of t24): when the API's 404 arrives first, which is what happens without a held-back answer,
-// the editor is taken out of the page, with its session, before the collaboration server has told the session that the
-// access is gone. It is the session that deletes the copy, so the copy stays on the device, and the screen says that the
-// document is not available. Remove `test.fail` when the product handles this order: the test will then fail on the
-// annotation itself.
+// FINDING (see the delivery of t24): when the API's 404 reaches the screen before the collaboration server's refusal reaches
+// the session, the editor is taken out of the page, with its session, and the session is the one that deletes the copy: the
+// copy stays on the device and the screen says that the document is not available. The order is the test's, not the
+// network's (the connection is held until the screen has taken the 404 in), so these two tests give the same result on every
+// run. Remove `test.fail` when the product handles this order: the tests will then fail on the annotation itself.
 test.describe('access removed while the person was offline, when the API refuses her first', () => {
   test('their offline copy is purged from the device', async ({ join }) => {
     test.fail(true, 'the offline copy outlives the removal of access when the document query answers 404 first')
