@@ -12,6 +12,7 @@ const fake = {
   awsKey: `AKIA${'Q7'.repeat(8)}`,
   jwt: `eyJ${'a'.repeat(12)}.eyJ${'b'.repeat(12)}.${'c'.repeat(12)}`,
   hex32: 'c0ffee'.repeat(11),
+  hex64: '9f86d081'.repeat(8),
   // 22 characters of salt and 31 of hash, with the `.` of their alphabet where it keeps every run of letters and digits short.
   bcrypt: `$2a$14$${'N9qo8uLOick.x2ZMRZoMye'}${'IjVHCm/XwZ1GV.mdq/9OdUgnwS8iVbi'}`,
 }
@@ -41,6 +42,19 @@ describe('what counts as a secret in a file meant to be published', () => {
     ['a password in a variable named PASS', 'export DB_PASS=hunter2hunter2'],
     ['a secret in a commented-out line of an ignore file', '# SESSION_SECRET=my-own-secret-value'],
     ['a key in a variable named KEY', 'export SSH_KEY=hunter2hunter2'],
+    // The two lines a reviewer put in the Compose file, and the other ways to give a reference a value of its own.
+    ['a password as the default of a Compose reference', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-draftroom2026}'],
+    ['a long secret as the default of a Compose reference', `SESSION_SECRET: \${SESSION_SECRET:-${fake.hex64}}`],
+    ['a password after a dash with no colon', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD-draftroom2026}'],
+    ['a password assigned by a reference', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:=draftroom2026}'],
+    [
+      'a reference that edits a value, which says nothing of where it comes from',
+      'POSTGRES_PASSWORD: ${DB_PASSWORD#hunter2}',
+    ],
+    ['a password in a camelCase variable', "const dbPass = 'Summer2026'"],
+    ['a key in a camelCase variable', "const sshKey = 'hunter2hunter2'"],
+    ['a password given as a flag with a space', 'docker login --password hunter2hunter2'],
+    ['a password given as a flag with an equals sign', 'mysql --password=hunter2hunter2'],
   ]
   it.each(secrets)('finds %s', (_what, line) => {
     expect(findSecrets(line)).toHaveLength(1)
@@ -80,6 +94,14 @@ describe('what counts as a secret in a file meant to be published', () => {
     ['a switch named like a secret', '          persist-credentials: false'],
     ['a commented-out setting that is not a secret', '# HTTP_PORT=80'],
     ['a word that only contains PASS', 'COMPASS=north'],
+    ['a lowercase word that ends in pass', 'const bypass = true'],
+    [
+      'a default that is not a secret, in a reference to a name that is not one',
+      'POSTGRES_USER: ${POSTGRES_USER:-draftroom}',
+    ],
+    ['a reference with an empty default', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}'],
+    ['a flag that says where the password is read from', 'docker login --password-stdin < /run/secrets/registry'],
+    ['a flag that takes a reference', 'docker login --password "$REGISTRY_PASSWORD"'],
     ['a name that only starts with KEY', 'MY_KEYBOARD=azerty'],
   ]
   it.each(harmless)('lets through %s', (_what, line) => {

@@ -9,10 +9,14 @@ export interface ScanOptions {
 }
 
 /**
- * What stands where a secret goes in an example, a template or a script: nothing, a marker, a reference to the environment or
- * a command that makes one. Strict on purpose: `hunter2.prod`, `Summer.2026` and `pa(ss` are passwords, not references.
+ * What stands where a secret goes in an example, a template or a script: nothing, a marker, a reference to the environment
+ * (`${NAME}`, or `${NAME:?message}`, which refuses to go on without it) or a command that makes one. Strict on purpose:
+ * `hunter2.prod`, `Summer.2026` and `pa(ss` are passwords, not references.
  */
-const placeholder = /^(?:|CHANGE_ME\w*|<[^>]*>|\$\{[^}]*\}|\$\(.*\)|\$\$?\w+|["']{2}|true|false)$/
+const placeholder = /^(?:|CHANGE_ME\w*|<[^>]*>|\$\{\w+(?::?\?[^}]*)?\}|\$\(.*\)|\$\$?\w+|["']{2}|true|false)$/
+
+/** A reference that carries a value of its own (`${NAME:-value}`, `${NAME-value}`, `${NAME:=value}`, `${NAME:+value}`). */
+const referenceWithValue = /^\$\{\w+:?[-=+]([^}]*)\}$/
 
 /**
  * In source code only, and only unquoted (a quoted value is a literal, whatever it looks like): a keyword, a variable of the
@@ -30,16 +34,19 @@ const tokenShapes: ReadonlyArray<readonly [rule: string, shape: RegExp]> = [
   ['password hash', /\$(?:2[abxy]\$\d{2}\$[./A-Za-z0-9]{53}|argon2(?:id|i|d)\$)/],
 ]
 
-// A name that says what it holds. `PASS` and `KEY` count only as a whole word or the end of a name (`DB_PASS`, `SSH_KEY`):
-// `COMPASS` and `MY_KEYBOARD` are not secrets.
+// A name that says what it holds. `PASS` and `KEY` count only as a whole word, the end of a name (`DB_PASS`, `SSH_KEY`) or
+// the capitalised end of a camelCase one (`dbPass`, `sshKey`): `COMPASS`, `MY_KEYBOARD` and `bypass` are not secrets.
 const secretName =
-  '\\w*(?:PASSWORD|PASSWD|PGPASS|SECRET|TOKEN|API_?KEY|PRIVATE_?KEY|CREDENTIALS?|(?<![A-Z])PASS(?![A-Z])|_KEY(?![A-Z]))\\w*'
+  '\\w*(?:PASSWORD|PASSWD|PGPASS|SECRET|TOKEN|API_?KEY|PRIVATE_?KEY|CREDENTIALS?|(?<![A-Z])PASS(?![A-Z])|_KEY(?![A-Z])|(?-i:(?<=[a-z])(?:Pass|Key)(?![a-z])))\\w*'
 // The name, then a value. The value is a reference to the environment or a command (which may hold spaces), or runs to a
 // quote, a space, a comma or a semicolon. Group 1 is the quote the value opens with, group 2 the value.
 const secretAssignment = new RegExp(
   `(?<![\\w\${])${secretName}["']?\\s*[=:]\\s*(["']?)(\\$\\{[^}]*\\}|\\$\\([^)]*\\)|[^\\s"',;]*)`,
   'gi',
 )
+// The same name given as a command-line flag with a space or an equals sign: `docker login --password value`.
+const secretFlag =
+  /--[\w-]*(?:password|passwd|pass|token|secret|api-?key)[\w-]*[= ]\s*(["']?)(\$\{[^}]*\}|\$\([^)]*\)|[^\s"',;|<>&]*)/gi
 const urlPassword = /\b[a-z][a-z0-9+.-]*:\/\/(?:\$\{[^}]*\}|[^\s:/@$]+):(\$\{[^}]*\}|[^\s@/]+)@/i
 // A long run of the characters of hexadecimal and base64: a key or a hash of one.
 const longRandomRun = /(?<![\w/+-])(?:[A-Za-z0-9+/_]-?){32,}={0,2}(?![\w/+=-])/
@@ -60,8 +67,12 @@ const instructionWithoutEquals = /^(\s*(?:ENV|ARG))\s+(\w+)\s+(?!=)(\S.*)$/i
 
 /** The lines of `text` that look like they hold a secret, and the rule each one broke. */
 export function findSecrets(text: string, { code = false }: ScanOptions = {}): Finding[] {
-  const isPlaceholder = (value: string, quoted: boolean): boolean =>
-    placeholder.test(value) || (code && !quoted && codePlaceholder.test(value))
+  const isPlaceholder = (value: string, quoted: boolean): boolean => {
+    // A default is a value somebody typed: it is held to the rules of any other value.
+    const defaultValue = referenceWithValue.exec(value)?.[1]
+    if (defaultValue !== undefined) return isPlaceholder(defaultValue, quoted)
+    return placeholder.test(value) || (code && !quoted && codePlaceholder.test(value))
+  }
   return text.split('\n').flatMap((rawLine, index) => {
     const line = rawLine
       .replace(imageDigest, 'sha256:DIGEST')
@@ -77,7 +88,9 @@ export function findSecrets(text: string, { code = false }: ScanOptions = {}): F
     const readsAssignments = !isComment(line) || commentedSetting.test(line)
     const leaked =
       readsAssignments &&
-      [...line.matchAll(secretAssignment)].some(([, quote = '', value = '']) => !isPlaceholder(value, quote !== ''))
+      [...line.matchAll(secretAssignment), ...line.matchAll(secretFlag)].some(
+        ([, quote = '', value = '']) => !isPlaceholder(value, quote !== ''),
+      )
     if (leaked) return found('secret assigned a value')
     return longRandomRun.test(line) ? found('long random-looking string') : []
   })
