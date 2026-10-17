@@ -9,6 +9,7 @@ import { DocumentEditor } from './DocumentEditor.tsx'
 import { EditorSkeleton } from './EditorSkeleton.tsx'
 import { EditorStatePanel } from './EditorStatePanel.tsx'
 import { documentQuery } from './documentQuery.ts'
+import { usePurgeUnavailableCopy } from './usePurgeUnavailableCopy.ts'
 import styles from './EditorScreen.module.css'
 
 /**
@@ -34,6 +35,7 @@ export function EditorScreen() {
   // Taking the editor out for a message here would end the session before it could.
   const accessRemoved = notFoundAnswer && query.data !== undefined
   const notFound = notFoundAnswer && query.data === undefined
+  usePurgeUnavailableCopy(documentId, notFound)
   // A retry puts the query back to pending: the screen stays on its message until the answer comes, so the button that was
   // pressed is still there, with the focus on it, instead of giving way to the skeleton.
   const retrying = query.isPending && query.isFetching && query.errorUpdateCount > 0

@@ -224,6 +224,18 @@ export async function copiesOf(userId: string): Promise<string[]> {
   return databases.flatMap(({ name }) => (name?.startsWith(prefix) ? [name] : []))
 }
 
+/**
+ * Deletes what this device keeps of one document for one account, whichever workspace the copy was made in. It is for a
+ * document the API says is not there when no session was ever made to purge it: the person opened it with the page
+ * closed, so there is no answer to tell which workspace it was in, and the name of the copy has to be searched for.
+ * It never touches the copy of another account, nor of another document: the name is matched whole, not by its ending.
+ */
+export async function purgeCopiesOfDocument(userId: string, documentId: string): Promise<void> {
+  const prefix = accountPrefix(userId)
+  const names = (await copiesOf(userId)).filter((name) => name.slice(prefix.length).split(':')[1] === documentId)
+  await purgeCopies(names)
+}
+
 /** Whether a copy holds changes that were never stored, read without loading its content. */
 export function hasUnstoredChanges(name: string): Promise<boolean> {
   return new Promise((resolve) => {
