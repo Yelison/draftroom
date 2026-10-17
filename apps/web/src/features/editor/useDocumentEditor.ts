@@ -6,6 +6,8 @@ import type { EditorProps, EditorView } from '@tiptap/pm/view'
 import { redo, undo } from '@tiptap/y-tiptap'
 import { useEffect, useMemo, useRef } from 'react'
 import type * as Y from 'yjs'
+import type { CommentRequests } from '../comments/commentRequests.ts'
+import { commentHighlights } from '../comments/highlightPlugin.ts'
 import { collaborationExtensions, type CollaboratingPerson } from './CollaborationExtensions.ts'
 import { LinkShortcut } from './LinkShortcut.ts'
 import { updateBytesOf } from './pasteBudget.ts'
@@ -27,6 +29,8 @@ export interface DocumentEditorOptions {
   contentLabel: string
   /** Called with the address of the link the cursor is in (or `null`) when the person asks for the link dialog. */
   onLinkRequest: (currentHref: string | null) => void
+  /** Where the text sends what the person does to a comment highlight: a click on it, or the key that opens its thread. */
+  commentRequests: CommentRequests
 }
 
 /**
@@ -42,14 +46,16 @@ export function useDocumentEditor({
   onTooLarge,
   contentLabel,
   onLinkRequest,
+  commentRequests,
 }: DocumentEditorOptions) {
   const extensions = useMemo(
     () => [
       ...editorExtensions(),
       ...collaborationExtensions({ ydoc, provider, person }),
       LinkShortcut.configure({ onRequest: onLinkRequest }),
+      commentHighlights.configure({ requests: commentRequests }),
     ],
-    [ydoc, provider, person, onLinkRequest],
+    [ydoc, provider, person, onLinkRequest, commentRequests],
   )
 
   // The handlers are made once with the editor and read what is current through this, as the editor's props do below.
@@ -70,6 +76,9 @@ export function useDocumentEditor({
         'aria-label': contentLabel,
         'aria-multiline': 'true',
         'aria-readonly': String(!editable),
+        // A text that takes no edits is not a field, so nothing would put the focus in it: a reader or a commenter has to
+        // be able to come back to it from a comment, and to move through it with the keyboard.
+        ...(editable ? {} : { tabindex: '0' }),
       },
       transformPastedHTML: sanitizePastedHtml,
       handleDOMEvents: { beforeinput: takeOverHistory },

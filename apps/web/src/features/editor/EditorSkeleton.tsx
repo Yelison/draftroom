@@ -11,19 +11,23 @@ export function EditorSkeleton() {
   const intl = useIntl()
 
   return (
-    <div className={sheet.column} aria-busy="true">
-      <div className={sheet.toolbarBand} />
-      <div className={sheet.sheet}>
-        <div className={styles.title} />
-        <div className={styles.text}>
-          <div className={styles.line} />
-          <div className={styles.line} />
-          <div className={styles.shortLine} />
+    <div className={sheet.workspace} aria-busy="true">
+      <div className={sheet.column}>
+        <div className={sheet.toolbarBand} />
+        <div className={sheet.sheet}>
+          <div className={styles.title} />
+          <div className={styles.text}>
+            <div className={styles.line} />
+            <div className={styles.line} />
+            <div className={styles.shortLine} />
+          </div>
         </div>
+        <p role="status" className="forma-visually-hidden">
+          {intl.formatMessage({ id: 'editor.loading' })}
+        </p>
       </div>
-      <p role="status" className="forma-visually-hidden">
-        {intl.formatMessage({ id: 'editor.loading' })}
-      </p>
+      {/* The place of the panel, so the sheet does not move when the document arrives. */}
+      <div className={styles.panel} />
     </div>
   )
 }
