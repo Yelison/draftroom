@@ -81,7 +81,9 @@ describe('the states of a card', () => {
     const card = screen.getByRole('article', { name: 'Comment thread by Sofía Marín' })
     expect(card).toHaveAttribute('data-state', state)
     expect(within(card).getByText('once the pricing review is signed off')).toBeInTheDocument()
-    if (marker === null) expect(within(card).queryByText(/^(Resolved|Text removed)$/)).not.toBeInTheDocument()
+    // An open thread has no marker at all: what comes first in the card is the text it quotes.
+    if (marker === null)
+      expect(card.firstElementChild).toBe(within(card).getByText('once the pricing review is signed off'))
     else expect(within(card).getByText(marker)).toBeInTheDocument()
   })
 
