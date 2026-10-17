@@ -22,6 +22,7 @@ describe('MockDataSource', () => {
         memberId: daniel.id,
         outsider: connect(wei.email),
         anonymous: connect(),
+        connectAs: connect,
       }
     },
   })

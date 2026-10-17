@@ -185,5 +185,6 @@ The plan did not fix these; the contract does, and a change to any of them goes 
 - **Activity** events are the document-scoped actions only; `actor` is `null` when the server acted.
 - **Text limits** beyond the plan's: workspace name 1–80, version label 1–100, person name 1–80, password 12–128 (the authentication task may tighten it).
 - **Sign-up** with an email that already has a signed-up account is `409 conflict`; sign-in never says which accounts exist.
+- **A new account has a workspace of its own** unless it claims an invitation: `signUp` creates it in the same transaction, named as the person is called, with the person as its owner. The account and the workspace are written together or not at all. A person can still end with no workspace (removed from the only one they had), which the client shows as its own state.
 - **Decided in ADR 0004:** `409` on sign-up is kept and limited by a sign-up limit per network address; passwords are normalised to NFKC before they are hashed and checked (the limits above count them as sent); emails are not verified, which is a known gap (whoever signs up first with a pending email inherits its grants); sign-in stays exempt from CSRF because a body that is not JSON is refused.
 - **The version download** is typed as `string` by the generator; read the response body as bytes.

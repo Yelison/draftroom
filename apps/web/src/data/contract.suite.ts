@@ -33,6 +33,8 @@ export interface Scenario {
   outsider: DataSource
   /** Nobody is signed in. */
   anonymous: DataSource
+  /** The same server as somebody who has signed up (the suite's connections keep no cookies, so it cannot sign itself in). */
+  connectAs(email: string): DataSource
 }
 
 export interface Harness {
@@ -137,6 +139,29 @@ export function describeDataSourceContract(name: string, harness: Harness) {
         })
 
         expect(decomposed.email).toBe(account.email)
+      })
+
+      it('gives an account nobody invited a workspace of its own, named as the person is, in which it is the owner', async () => {
+        const { anonymous, connectAs } = await harness.scenario()
+        const account = { ...newAccount(), name: 'Lucía Fernández 🌿' }
+        await anonymous.signUp({ body: account })
+
+        const { items } = await connectAs(account.email).listWorkspaces()
+
+        expect(items).toEqual([
+          { id: expect.any(String), name: account.name, role: 'owner', createdAt: expect.any(String) },
+        ])
+      })
+
+      it('gives no workspace of its own to an account that claims an invitation, which already has a seat', async () => {
+        const { owner, workspaceId, anonymous, connectAs } = await harness.scenario()
+        const account = newAccount()
+        await owner.addMember({ ...inWorkspace(workspaceId), body: { email: account.email, role: 'member' } })
+        await anonymous.signUp({ body: account })
+
+        const { items } = await connectAs(account.email).listWorkspaces()
+
+        expect(items.map((workspace) => workspace.id)).toEqual([workspaceId])
       })
 
       it('claims what an invitation made: the same person, now with a name, and a member of the workspace', async () => {

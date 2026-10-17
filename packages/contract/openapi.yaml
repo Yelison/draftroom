@@ -119,6 +119,8 @@ paths:
       description: |-
         Starts a session: the response sets the `dr_session` cookie and the `dr_csrf` cookie. The account **claims** the pending membership row of this email, if there is one: it keeps the same `userId`, becomes an active member and inherits the document grants given to it. Only an email that already has a signed-up account is a `409 conflict`.
 
+        An account that claims no invitation gets a workspace of its own, created in the same transaction: its `name` is the person's name (their own content, never translated, and they can rename it in Settings) and the person is its `owner`. One that claims an invitation gets none.
+
         No sign-in needed.
       requestBody:
         required: true

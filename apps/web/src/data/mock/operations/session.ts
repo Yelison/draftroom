@@ -49,6 +49,17 @@ export function sessionOperations(ctx: Context): SessionOperations {
       const account = existing ?? addPendingPerson(world, body.email)
       account.name = body.name
       account.password = normalised(body.password)
+      // Somebody nobody invited starts in a workspace of their own, named as they are; claiming an invitation gives a seat already.
+      if (!world.memberships.some((membership) => membership.userId === account.id)) {
+        const workspace = { id: world.newId(), name: body.name, createdAt: world.now() }
+        world.workspaces.push(workspace)
+        world.memberships.push({
+          workspaceId: workspace.id,
+          userId: account.id,
+          role: 'owner',
+          createdAt: workspace.createdAt,
+        })
+      }
       session.userId = account.id
       return { id: account.id, email: account.email, name: body.name }
     },
