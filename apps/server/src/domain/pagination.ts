@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
-import { isStorableInstant } from './activity.ts'
+import { isStorableInstant } from './instants.ts'
 
 // The cursor of a list ordered by a timestamp and then by id: a position in that order, bound to the request that
 // produced it. It is opaque to clients and carries nothing but a place in a list, so it needs no signature: a made-up

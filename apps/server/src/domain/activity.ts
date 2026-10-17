@@ -11,9 +11,3 @@ export const sharingActivity = [
   'access.revoked',
   'general-access.changed',
 ] as const satisfies readonly Schema<'ActivityType'>[]
-
-/**
- * Whether PostgreSQL can hold the instant of a filter. The contract's format accepts a year 0000, which the calendar
- * does not have and the database refuses, so it has to be told apart before the query is made.
- */
-export const isStorableInstant = (timestamp: string): boolean => !timestamp.startsWith('0000-')
