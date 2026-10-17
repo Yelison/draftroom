@@ -126,6 +126,33 @@ describe('moving between the text and its threads with the keyboard', () => {
     await waitFor(() => expect(field).toHaveFocus())
   })
 
+  it('brings the comments back when the text asks for a thread or for a comment from the activity tab', async () => {
+    const user = userEvent.setup()
+    renderCommentedDocument({ paragraphs, started: [week], fixtureThreads: false })
+    const editor = await editorOf()
+    const panel = await findPanel()
+    const text = await screen.findByRole('textbox', { name: 'Document content' })
+    await waitFor(() => expect(marks()).toHaveLength(1))
+
+    await user.click(within(panel).getByRole('tab', { name: 'Activity' }))
+    text.focus()
+    act(() => void editor.commands.setTextSelection(rangeOf(editor, 'second week').from + 2))
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+    await waitFor(() =>
+      expect(within(panel).getByRole('tab', { name: 'Comments' })).toHaveAttribute('aria-selected', 'true'),
+    )
+    await waitFor(() => expect(cardOf(panel, week.body)).toHaveFocus())
+
+    await user.click(within(panel).getByRole('tab', { name: 'Activity' }))
+    text.focus()
+    act(() => void editor.commands.setTextSelection(rangeOf(editor, 'the announcement')))
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+    await waitFor(() =>
+      expect(within(panel).getByRole('tab', { name: 'Comments' })).toHaveAttribute('aria-selected', 'true'),
+    )
+    expect(await within(panel).findByRole('region', { name: 'New comment' })).toBeInTheDocument()
+  })
+
   it('also works for a commenter, whose text takes no edits', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({

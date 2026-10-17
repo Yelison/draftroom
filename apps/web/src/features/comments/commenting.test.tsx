@@ -54,6 +54,17 @@ describe('commenting on a selection', () => {
     },
   )
 
+  it('is not offered for a selection of nothing but blanks, which has no text to quote', async () => {
+    renderCommentedDocument({ paragraphs: ['Before    after'] })
+    const editor = await editorOf()
+    const panel = await findPanel()
+
+    await select(editor, '    ')
+
+    expect(within(panel).getByText('Select some text to comment on it.')).toBeInTheDocument()
+    expect(within(panel).queryByRole('button', { name: 'Comment on the selected text' })).not.toBeInTheDocument()
+  })
+
   it('creates the thread with an anchor on the selection, the quote and the text, and takes the person to its card', async () => {
     const user = userEvent.setup()
     const createThread = vi.fn<DataSource['createThread']>()
