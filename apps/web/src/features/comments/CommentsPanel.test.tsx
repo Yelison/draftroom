@@ -185,3 +185,49 @@ describe('open and resolved threads, with a filter', () => {
     expect(within(panel).queryByRole('article')).not.toBeInTheDocument()
   })
 })
+
+describe('what the panel says when an action on a thread is refused', () => {
+  const refused = (code: 'unavailable' | 'forbidden') =>
+    new ApiError({ type: 'about:blank', title: 'x', status: code === 'forbidden' ? 403 : 503, code })
+
+  const actions = [
+    {
+      action: 'a reply',
+      fails: 'replyToThread' as const,
+      then: 'Draftroom is unavailable right now.',
+      code: 'unavailable' as const,
+    },
+    {
+      action: 'resolving',
+      fails: 'resolveThread' as const,
+      then: "You don't have permission to do that.",
+      code: 'forbidden' as const,
+    },
+  ]
+
+  it.each(actions)(
+    "tells $action in the language of the person, not in the server's",
+    async ({ fails, then, code }) => {
+      const user = userEvent.setup()
+      renderCommentedDocument({
+        wrap: (dataSource) => ({
+          ...dataSource,
+          [fails]: async () => {
+            throw refused(code)
+          },
+        }),
+      })
+      const panel = await findPanel()
+      const card = await within(panel).findByRole('article')
+
+      if (fails === 'replyToThread') {
+        await user.type(within(card).getByRole('textbox', { name: 'Reply to this thread' }), 'Noted')
+        await user.click(within(card).getByRole('button', { name: 'Reply' }))
+      } else {
+        await user.click(within(card).getByRole('button', { name: 'Resolve' }))
+      }
+
+      expect(await within(card).findByRole('alert')).toHaveTextContent(then)
+    },
+  )
+})

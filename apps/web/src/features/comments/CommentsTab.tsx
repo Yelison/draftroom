@@ -8,7 +8,6 @@ import { CommentCard, type CommentCardState } from '../../components/CommentCard
 import { succeeded, type Outcome } from '../../components/CommentCard/outcome.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { ListSkeleton } from '../documents/ListSkeleton.tsx'
-import { problemMessageId } from '../documents/problemMessage.ts'
 import { StateMessage } from '../documents/StateMessage.tsx'
 import { shortcutLabel } from '../editor/shortcuts.ts'
 import { commentShortcut, type Placement } from './highlightPlugin.ts'
@@ -17,7 +16,7 @@ import { threadsQuery } from './queries.ts'
 import { canComment, canDeleteComment, canEditComment } from './roles.ts'
 import { SelectionAction } from './SelectionAction.tsx'
 import { ThreadFilter, type ThreadFilterValue } from './ThreadFilter.tsx'
-import { useCardActions, type Announcement } from './useCardActions.ts'
+import { failedOutcome, useCardActions, type Announcement } from './useCardActions.ts'
 import { useFocusPlan } from './useFocusPlan.ts'
 import { useSelectionToComment } from './useSelectionToComment.ts'
 import { useThreadActions } from './useThreadActions.ts'
@@ -116,7 +115,7 @@ export function CommentsTab({
       onAnnounce('created')
       return succeeded
     } catch (error) {
-      return { ok: false, message: intl.formatMessage({ id: problemMessageId(error) }) }
+      return failedOutcome(intl, error)
     }
   }
 
