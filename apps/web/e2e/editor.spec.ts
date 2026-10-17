@@ -569,9 +569,11 @@ test.describe('the keyboard and the focus', () => {
     await textArea(page).waitFor()
     await page.getByRole('textbox', { name: 'Document title' }).focus()
 
-    // The Share button of an owner sits between the toolbar and the title.
+    // The link to the history and the Share button of an owner sit between the toolbar and the title.
     await page.keyboard.press('Shift+Tab')
     await expect(page.getByRole('button', { name: 'Share' })).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(page.getByRole('link', { name: 'Version history' })).toBeFocused()
     await page.keyboard.press('Shift+Tab')
     await expect(toolbarButton(page, 'Bold')).toBeFocused()
     await expect(toolbarButton(page, 'Bold')).toHaveCSS('outline-style', 'solid')
@@ -579,6 +581,8 @@ test.describe('the keyboard and the focus', () => {
     await expect(toolbarButton(page, 'Italic')).toBeFocused()
     await page.keyboard.press('End')
     await expect(toolbarButton(page, 'Link')).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('link', { name: 'Version history' })).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Share' })).toBeFocused()
     await page.keyboard.press('Tab')
@@ -590,6 +594,7 @@ test.describe('the keyboard and the focus', () => {
     await textArea(page).waitFor()
     await page.getByRole('textbox', { name: 'Document title' }).focus()
 
+    await page.keyboard.press('Shift+Tab')
     await page.keyboard.press('Shift+Tab')
     await page.keyboard.press('Shift+Tab')
 
@@ -605,7 +610,7 @@ test.describe('the keyboard and the focus', () => {
     await page.getByRole('tree').waitFor()
 
     const stops: (string | null)[] = []
-    for (let press = 0; press < 14; press++) {
+    for (let press = 0; press < 15; press++) {
       await page.keyboard.press('Tab')
       stops.push(
         await page.evaluate(() => {
@@ -634,6 +639,7 @@ test.describe('the keyboard and the focus', () => {
       'New folder',
       'Autumn launch plan',
       'Bold',
+      'Version history',
       'Share',
       'Document title',
       'Document content',
