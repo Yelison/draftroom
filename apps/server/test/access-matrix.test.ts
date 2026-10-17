@@ -66,6 +66,15 @@ const documentCases: readonly DocumentCase[] = [
     allowed: 200,
   },
   {
+    operationId: 'duplicateDocument',
+    call: (id) => ({
+      method: 'POST',
+      url: `/api/documents/${id}/duplicate`,
+      body: { title: 'Copy of Autumn launch plan' },
+    }),
+    allowed: 201,
+  },
+  {
     operationId: 'archiveDocument',
     call: (id) => ({ method: 'POST', url: `/api/documents/${id}/archive` }),
     allowed: 200,

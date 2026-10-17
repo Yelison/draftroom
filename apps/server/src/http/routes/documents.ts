@@ -1,10 +1,13 @@
 import type { Schema } from '@draftroom/contract'
 import { contractLimits } from '@draftroom/contract'
+import { InvalidDocumentError } from '@draftroom/editor-schema/convert'
 import type { FastifyPluginCallback } from 'fastify'
 import { listDocuments } from '../../db/documents/caller-documents.ts'
 import { createDocumentRows, deleteArchivedDocument, setArchived, updateMetadata } from '../../db/documents/commands.ts'
+import { readDocumentState } from '../../db/documents/state.ts'
 import { folderBelongsTo, isForeignKeyViolation } from '../../db/folders.ts'
 import { metadataChanges } from '../../domain/documents.ts'
+import { copyOfContent, type ContentCopy } from '../../domain/duplicate.ts'
 import { decodeCursor, encodeCursor, type CursorFilters } from '../../domain/pagination.ts'
 import { builtInTemplates } from '../../domain/templates/built-in.ts'
 import { principalOf } from '../auth/authenticate.ts'
@@ -26,6 +29,15 @@ const folderWentAway = (error: unknown): unknown =>
   isForeignKeyViolation(error, 'documents_folder_fkey')
     ? new ProblemError('validation-failed', { errors: [invalidValue('/folderId')] })
     : error
+
+/** The stored state is one the schema cannot read: nothing to copy, and not something the caller can fix. */
+function copyOrConflict(state: Uint8Array): ContentCopy {
+  try {
+    return copyOfContent(state)
+  } catch (error) {
+    throw error instanceof InvalidDocumentError ? new ProblemError('conflict') : error
+  }
+}
 
 export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { contract, database }, done) => {
   const present = ({ record, role }: AuthorisedDocument): Schema<'Document'> => presentDocument(record, role)
@@ -111,6 +123,48 @@ export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { 
         }),
       ),
     ),
+  )
+
+  app.route(
+    operationRoute(contract, 'duplicateDocument', async (request, reply) => {
+      const { userId } = principalOf(request)
+      const { documentId } = request.params
+      const { title, folderId } = request.body
+      const { record } = await authoriseDocument(database, documentId, userId, 'read', { onArchived: false })
+      // Whoever can read a document belongs to its workspace, which lets every member create; the check stays here so
+      // that a role the workspace matrix does not allow to create could never copy what it reads.
+      await authoriseWorkspace(database, record.workspace_id, userId, 'create-content')
+
+      if (
+        folderId !== undefined &&
+        folderId !== null &&
+        !(await folderBelongsTo(database, record.workspace_id, folderId))
+      ) {
+        throw new ProblemError('validation-failed', { errors: [invalidValue('/folderId')] })
+      }
+
+      // The stored state, read in the transaction that writes the copy: a connection's unstored changes are not part
+      // of it, and nothing here writes to the original.
+      const copyId = await database
+        .transaction()
+        .execute(async (trx) => {
+          const state = await readDocumentState(trx, documentId)
+          // Deleted for good since it was checked: the answer is the one for an id that was never there.
+          if (state === undefined) throw new ProblemError('not-found')
+          const copy = copyOrConflict(state)
+          return createDocumentRows(trx, {
+            workspaceId: record.workspace_id,
+            title,
+            folderId: folderId === undefined ? record.folder_id : folderId,
+            createdBy: userId,
+            ...copy,
+          })
+        })
+        .catch((error: unknown) => {
+          throw folderWentAway(error)
+        })
+      return reply.code(201).send(present(await reload(copyId, userId)))
+    }),
   )
 
   app.route(
