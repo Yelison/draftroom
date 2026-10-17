@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { collaboratorScripts } from '../src/data/mock/fixtures/collaboratorScripts.ts'
 import { demoContent } from '../src/data/mock/fixtures/demoContent.ts'
+import { demoFixtures } from '../src/data/mock/fixtures/demoSeed.ts'
+import { demoVersionContent } from '../src/data/mock/fixtures/demoVersionContent.ts'
 import { seed } from '../src/data/mock/fixtures/index.ts'
 import { expect, test } from './fixtures.ts'
 
@@ -33,7 +35,7 @@ function readableTexts(node: unknown, key?: string): string[] {
   return []
 }
 
-/** The words of the documents of the demo and of what its collaborators write: text nodes, which `readableTexts` does not read. */
+/** The words of the documents of the demo, of its versions and of what its collaborators write: text nodes, which `readableTexts` does not read. */
 function writtenTexts(node: unknown): string[] {
   if (Array.isArray(node)) return node.flatMap(writtenTexts)
   if (typeof node !== 'object' || node === null) return []
@@ -44,6 +46,9 @@ function writtenTexts(node: unknown): string[] {
 
 const demoTexts = [
   ...writtenTexts(demoContent),
+  ...writtenTexts(demoVersionContent),
+  // The titles, excerpts, folders, comments and version labels that the demo has in each language.
+  ...(['en', 'es'] as const).flatMap((locale) => readableTexts(demoFixtures(locale).seed)),
   ...collaboratorScripts.flatMap(({ lines }) =>
     Object.values(lines).flatMap((script) => script.flatMap(({ draft, final }) => [draft, final])),
   ),

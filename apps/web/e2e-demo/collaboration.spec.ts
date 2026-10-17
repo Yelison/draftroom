@@ -1,14 +1,25 @@
 /* The simulated collaboration of the static demo: documents that open with their text, tabs that share them and a person who writes. */
 import type { Page } from '@playwright/test'
+import { demoFixtures } from '../src/data/mock/fixtures/demoSeed.ts'
 import { launchPlan, weeklyEnglish } from '../src/data/mock/fixtures/documents.ts'
 import { expect, test } from './fixtures.ts'
 
 test.use({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' })
 
+/** The text as whole words, so that «Product» is not found in «Producto». */
+const asWords = (text: string) =>
+  new RegExp(`(?<![\\p{L}])${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}])`, 'u')
+const main = (page: Page) => page.getByRole('main')
 const editor = (page: Page) => page.getByRole('textbox', { name: /Document content|Contenido del documento/ })
 const people = (page: Page) => page.getByRole('list', { name: /People in this document|Personas en este documento/ })
 /** The avatar of a person in the document, which says their name and that they are online. */
 const person = (page: Page, name: string) => people(page).getByLabel(new RegExp(`^${name},`))
+
+/** What the demo shows of its world in a language: the documents, their excerpts and the folders. */
+function worldTexts(locale: 'en' | 'es') {
+  const { documents, folders } = demoFixtures(locale).seed
+  return [...documents.flatMap(({ title, excerpt }) => [title, excerpt ?? '']), ...folders.map(({ name }) => name)]
+}
 
 const languages = [
   {
@@ -17,6 +28,9 @@ const languages = [
     highlights: 'Highlights',
     openPoints: 'Still open after the pricing review:',
     collaborator: 'Daniel Okafor',
+    language: 'en' as const,
+    otherLanguage: 'es' as const,
+    folder: 'Product',
   },
   {
     name: 'Spanish',
@@ -24,10 +38,13 @@ const languages = [
     highlights: 'Lo más destacado',
     openPoints: 'Sigue abierto tras la revisión de precios:',
     collaborator: 'Daniel Okafor',
+    language: 'es' as const,
+    otherLanguage: 'en' as const,
+    folder: 'Producto',
   },
 ]
 
-for (const { name, locale, highlights, openPoints, collaborator } of languages) {
+for (const { name, locale, highlights, openPoints, collaborator, language, otherLanguage, folder } of languages) {
   test.describe(`in ${name}`, () => {
     test.use({ locale })
 
@@ -35,6 +52,26 @@ for (const { name, locale, highlights, openPoints, collaborator } of languages) 
       await page.goto(`documents/${weeklyEnglish.id}`)
 
       await expect(editor(page).getByRole('heading', { level: 2, name: highlights })).toBeVisible()
+    })
+
+    test('the lists, the home screen and a document are all in the language of the demo', async ({ page }) => {
+      const own = worldTexts(language)
+      const foreign = worldTexts(otherLanguage).filter((text) => text !== '' && !own.includes(text))
+      const { title } = demoFixtures(language).seed.documents.find(({ id }) => id === launchPlan.id) ?? { title: '' }
+      const screens = [
+        { path: 'documents', shows: main(page) },
+        { path: '', shows: main(page) },
+        { path: `documents/${launchPlan.id}`, shows: page.getByRole('complementary') },
+      ]
+
+      for (const { path, shows } of screens) {
+        await page.goto(path)
+        await expect(shows).toContainText(path === '' || path === 'documents' ? title : folder)
+        for (const text of foreign)
+          await expect(page.locator('body'), `${path}: ${text}`).not.toContainText(asWords(text))
+      }
+      await expect(page.getByRole('textbox', { name: /Document title|Título del documento/ })).toHaveValue(title)
+      await expect(editor(page)).toContainText(openPoints)
     })
 
     test('two tabs of the browser share a document and converge', async ({ page, context }) => {

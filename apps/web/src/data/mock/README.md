@@ -57,23 +57,34 @@ that the mock of the tests and of the mocked end-to-end suite do not have, so th
 them. All three live in `collab/` and `fixtures/` and are asked for by `createMockServer({ demo })`; `createMockDataSource` does
 it when `import.meta.env.MODE` is `production`.
 
-- **Content.** Each document opens with the text in `fixtures/demoContent.ts`, in the language the demo started in (the stored
-  choice, then the browser's, as the app picks it), which does not change if the person switches language afterwards. The text
-  is written into the document when it is first opened, not when the world starts, with `jsonToYUpdate` as the server would.
+- **A world in one language.** The fixtures of the tests have a document in English next to its twin in Spanish, and folders
+  in both, which suits tests that look for either. The demo does not: `createMockServer({ demo })` starts the world from
+  `fixtures/demoSeed.ts` (`demoFixtures(locale)`), which has one set of documents, with the title, the excerpt, the folders,
+  the comments and the version labels written in the language the demo started in (the stored choice, then the browser's, as
+  the app picks it; it does not change if the person switches language afterwards). Names of people and workspaces are the
+  same. The stored versions come with their text in that language too (`fixtures/demoVersionContent.ts`), so the history and a
+  restore stay in it. The world of the tests, `e2e/` and the suites of the mock is not touched: `createWorld()` without an
+  argument is the same as ever, and `production-bundle.spec.ts` searches the real build for the texts of both demo languages.
+- **Content.** Each document opens with the text in `fixtures/demoContent.ts`, in that language, and does not repeat its title
+  as a first heading: the title is shown above the text. The text is written into the document when it is first opened, not
+  when the world starts, with `jsonToYUpdate` as the server would. The last stored version of a document is the beginning of
+  its text.
 - **Tabs.** `collab/tabLink.ts` carries the Yjs updates and the awareness of a document between the tabs of one browser over a
   `BroadcastChannel`. A tab that opens joins the oldest world there is. A tab that is **reloaded starts a world of its own**
   (the demo starts again on reload): the other tabs keep the one they had and the two share nothing from then on, because every
-  message names its world and a tab ignores the rest. Only the tab that started a world writes the starting text of a document
-  (two tabs that each wrote it would leave every paragraph twice); when it has gone, the first tab to open a document does.
+  message names its world and a tab ignores the rest. Only one tab writes the starting text of a document (two tabs that each wrote it would leave every paragraph twice): the one
+  that started the world and, when it has gone, the oldest of those that are left, which every tab works out the same.
   Only the collaboration is shared: the lists, the comments and the rest of the contract are each tab's. Where there is no
   `BroadcastChannel` the demo is one tab and works the same. A tab that closes without `pagehide` (a crash) leaves its people
   in the other tabs until they reload.
 - **A person who writes.** `collab/scriptedCollaborator.ts` plays a person of the fixtures (`fixtures/collaboratorScripts.ts`:
   Daniel in the launch plan, Sofía in the brand voice guide) with a connection of her own. She is in the document while someone
   else has it open and the tab is visible, moves her cursor, and types, rewrites and erases a line at the pace of a person, in
-  the last paragraph of the document and never while someone else's cursor is in it. She stays present and writes nothing when
-  the person prefers reduced motion, and leaves when the tab is hidden. With several tabs, `navigator.locks` picks the one that
-  plays her.
+  the last paragraph of the document, adding and removing only her own letters, and never while someone else's cursor is in it
+  (when someone writes in or after her line, she gives it up and erases what is hers). She stays present and writes nothing
+  when the person prefers reduced motion, and leaves when the tab is hidden or the person goes: she takes her letters out
+  first, so the paragraph is as she found it. With several tabs, one plays her and the others wait their turn in a
+  `navigator.locks` queue, so that the one that stays takes over when that tab goes.
 
 What it proves is the screen, as everything above does: the simulated collaboration is **not** evidence that real browsers
 converge. That is the real stack's (`e2e-collab/`), and nothing in the interface says otherwise or says that it is simulated.
