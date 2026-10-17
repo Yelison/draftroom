@@ -228,8 +228,8 @@ describe('opening a thread from the text', () => {
   const clickAt = (editor: Editor, position: number) =>
     editor.view.someProp('handleClick', (handler) => handler(editor.view, position, new MouseEvent('click')))
   const pressComment = (editor: Editor) =>
-    editor.view.someProp('handleKeyDown', (handler) =>
-      handler(editor.view, new KeyboardEvent('keydown', { key: 'm', ctrlKey: true, altKey: true })),
+    editor.view.dom.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'm', ctrlKey: true, altKey: true, bubbles: true, cancelable: true }),
     )
 
   function withRequests(...texts: string[]) {
@@ -287,5 +287,16 @@ describe('opening a thread from the text', () => {
     clickAt(editor, rangeOf(editor, 'cd').from)
 
     expect(sent).toEqual([{ type: 'thread', threadId: 'narrow', focus: false }])
+  })
+
+  it("takes a commenter, whose text takes no edits, to the thread too: the key is not one of the editor's", () => {
+    const { editor, sent } = withRequests('abcdef')
+    showHighlights(editor, [threadOn(editor, 'a', 'cd')], { handshaken: true })
+    editor.setEditable(false)
+
+    editor.commands.setTextSelection(rangeOf(editor, 'cd').from + 1)
+    pressComment(editor)
+
+    expect(sent).toEqual([{ type: 'thread', threadId: 'a', focus: true }])
   })
 })

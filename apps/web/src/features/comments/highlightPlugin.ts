@@ -1,5 +1,6 @@
 import type { Schema } from '@draftroom/contract'
 import { Extension, type Editor } from '@tiptap/core'
+import { keydownHandler } from '@tiptap/pm/keymap'
 import type { Mapping } from '@tiptap/pm/transform'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
@@ -111,6 +112,19 @@ function highlightPlugin(requests: CommentRequests | null): Plugin<HighlightStat
         if (threadId !== null) requests?.send({ type: 'thread', threadId, focus: false })
         return false
       },
+      // A DOM handler, not `handleKeyDown`: ProseMirror runs that one only while the text is editable, and a commenter's
+      // is not. This one runs for every role.
+      handleDOMEvents: {
+        keydown: keydownHandler({
+          [commentShortcut]: (state) => {
+            const { selection } = state
+            // Text that is selected is for a new comment; a caret in a highlight is for its thread.
+            const threadId = selection.empty ? threadAt(state, selection.from, { caret: true }) : null
+            requests?.send(threadId === null ? { type: 'comment' } : { type: 'thread', threadId, focus: true })
+            return true
+          },
+        }),
+      },
     },
   })
 }
@@ -211,22 +225,11 @@ export interface CommentHighlightsOptions {
   requests: CommentRequests | null
 }
 
-/** The extension that puts the plugin, and the key that opens a thread from the text, in the editor. */
+/** The extension that puts the plugin in the editor: its highlights, its clicks and the key that opens a thread. */
 export const commentHighlights = Extension.create<CommentHighlightsOptions>({
   name: 'commentHighlights',
   addOptions: () => ({ requests: null }),
   addProseMirrorPlugins() {
     return [highlightPlugin(this.options.requests)]
-  },
-  addKeyboardShortcuts() {
-    return {
-      [commentShortcut]: ({ editor }) => {
-        const { selection } = editor.state
-        // Text that is selected is for a new comment; a caret in a highlight is for its thread.
-        const threadId = selection.empty ? threadAt(editor.state, selection.from, { caret: true }) : null
-        this.options.requests?.send(threadId === null ? { type: 'comment' } : { type: 'thread', threadId, focus: true })
-        return true
-      },
-    }
   },
 })
