@@ -16,6 +16,7 @@ const words = {
   en: {
     locale: 'en-US',
     comment: 'Comment on the selected text',
+    hint: 'Select some text to comment on it.',
     yourComment: 'Your comment',
     replyField: 'Reply to this thread',
     resolve: 'Resolve',
@@ -35,6 +36,7 @@ const words = {
   es: {
     locale: 'es-ES',
     comment: 'Comentar el texto seleccionado',
+    hint: 'Selecciona un texto para comentarlo.',
     yourComment: 'Tu comentario',
     replyField: 'Responder a este hilo',
     resolve: 'Resolver',
@@ -151,6 +153,8 @@ for (const [language, said] of Object.entries(words)) {
 
       // From the text to the card: the caret in the highlight is enough.
       await page.keyboard.press('ArrowLeft')
+      // The panel says there is no selection once the editor has taken the caret in: only then is the key for the thread.
+      await expect(panel.getByText(said.hint)).toBeVisible()
       await page.keyboard.press('ControlOrMeta+Alt+m')
       await expect(panel.getByRole('article')).toBeFocused()
       await expect(panel.getByRole('article')).toHaveAttribute('aria-current', 'true')
