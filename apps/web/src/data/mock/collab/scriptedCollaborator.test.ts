@@ -85,15 +85,21 @@ describe('the collaborator of the demo', () => {
     expect(blocks(ydoc).slice(0, -1).map(String)).toEqual(before)
   })
 
-  it('moves her cursor as she goes, and shows it where she writes', () => {
+  it('moves her cursor with every letter she types or erases', () => {
     const { ydoc, seat, shown } = scene()
     startCollaborator(seat, lines, lively)
+    let length = hers(ydoc).length
+    const withoutCursor: number[] = []
 
-    live(30_000)
+    for (let step = 0; step < 600; step += 1) {
+      const shownBefore = shown.length
+      live(100)
+      const now = hers(ydoc).length
+      if (now !== length && shown.length === shownBefore) withoutCursor.push(step)
+      length = now
+    }
 
-    const last = shown.at(-1)
-    const position = last === undefined ? null : Y.createAbsolutePositionFromRelativePosition(last, ydoc)
-    expect(position?.index).toBe(hers(ydoc).length)
+    expect(withoutCursor).toEqual([])
     expect(shown.length).toBeGreaterThan(20)
   })
 
