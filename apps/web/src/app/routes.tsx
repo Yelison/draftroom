@@ -4,6 +4,7 @@ import { DocumentsScreen } from '../features/documents/DocumentsScreen.tsx'
 import { FolderScreen } from '../features/documents/FolderScreen.tsx'
 import { EditorSkeleton } from '../features/editor/EditorSkeleton.tsx'
 import { HistoryScreen } from '../features/history/HistoryScreen.tsx'
+import { HomeScreen } from '../features/home/HomeScreen.tsx'
 import { SearchScreen } from '../features/search/SearchScreen.tsx'
 import { SharedScreen } from '../features/shared/SharedScreen.tsx'
 import { TemplateScreen } from '../features/templates/TemplateScreen.tsx'
@@ -31,7 +32,7 @@ export const routes: RouteObject[] = [
       {
         Component: OverviewLayout,
         children: [
-          { index: true, ...screen('nav.home', 'home') },
+          { index: true, Component: HomeScreen, handle: { section: 'home' } satisfies RouteHandle },
           { path: 'documents', Component: DocumentsScreen, handle: { section: 'documents' } satisfies RouteHandle },
           {
             path: 'folders/:folderId',
