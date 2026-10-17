@@ -154,6 +154,9 @@ const collabOf = (base) => `${base.replace(/^http/, 'ws')}/collab`
 step(`the stack answers on ${origin}`)
 await waitUntilReady(origin)
 
+// TEMPORARY. Until the authentication task (T7.1) is on this branch, sign-up gives a person no workspace, so a pending
+// member is inserted by hand to be claimed at sign-up. Once it lands, signing up without an invitation creates the person's
+// own workspace in the same transaction: this step and the SQL below are deleted, and the drill signs up through the API alone.
 step('an operator invites the first owner of a workspace (a pending member, as the API does it)')
 const postgres = execFileSync('docker', [
   'ps',

@@ -70,6 +70,13 @@ tested.
 The server checks the `Origin` of every WebSocket upgrade against `ALLOWED_ORIGINS`, so `PUBLIC_ORIGIN` has to be exactly what the
 browser shows in its address bar, port included.
 
+## The first account
+
+There is no setup step and no default account. Open the address and sign up: a person who signs up without an invitation gets a
+workspace of their own, of which they are the owner, in the same transaction, so on a new installation the first person to sign up
+has somewhere to create documents. Everybody else is invited by email from the workspace's settings and claims the invitation
+when they sign up.
+
 ## Variables
 
 The server reads these and nothing else from its environment; it refuses to start, naming every problem, when one is wrong.
