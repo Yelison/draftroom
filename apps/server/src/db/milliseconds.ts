@@ -23,3 +23,16 @@ export const millisecondKey = (column: string): RawBuilder<string> =>
 /** The rows that come after a position in a list that is newest first: those before it, by the instant and then by `id`. */
 export const isBefore = (column: string, idColumn: string, { timestamp, id }: CursorPosition): RawBuilder<boolean> =>
   sql<boolean>`(${inMilliseconds(column)}, ${sql.ref(idColumn)}) < (${timestamp}::timestamptz at time zone 'UTC', ${id}::uuid)`
+
+// A filter by an instant on the column (`created_at < $to`) cannot be an index condition on the cut instant: the planner
+// walks the index from the newest row and throws away every row after `to` one by one. So each filter is accompanied by a
+// bound on the same expression, which can. The bound is implied by the filter, so it never removes a row the filter keeps,
+// whatever the precision of the instant it is given; the filter stays and decides the exact result.
+
+/** `created_at < to` implies the cut instant is at or before `to`: the cut never moves an instant forward. */
+export const atOrBefore = (column: string, instant: string): RawBuilder<boolean> =>
+  sql<boolean>`${inMilliseconds(column)} <= (${instant}::timestamptz at time zone 'UTC')`
+
+/** `created_at >= from` implies the cut instant is at or after `from` cut too: cutting never reverses the order of two instants. */
+export const atOrAfter = (column: string, instant: string): RawBuilder<boolean> =>
+  sql<boolean>`${inMilliseconds(column)} >= date_trunc('milliseconds', ${instant}::timestamptz at time zone 'UTC')`

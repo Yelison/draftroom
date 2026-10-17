@@ -7,8 +7,10 @@ import { sql, type Kysely } from 'kysely'
 // it can, and that is the expression the queries use.
 //
 // Measured on 125,000 events and 3,000 versions (EXPLAIN ANALYZE): with these indexes the pages come from the index in
-// order with no sort (0.1 to 0.8 ms), where ordering by the cut instant over the old ones read the table and sorted it
-// (5 to 330 ms).
+// order with no sort (0.1 to 3 ms), where ordering by the cut instant over the old ones read the table and sorted it
+// (5 to 330 ms). The history's filters by instant carry a bound on the same expression (`atOrBefore`, `atOrAfter`), or the
+// index would be walked from the newest event and every event after `to` thrown away one by one (31 ms on 120,000 events,
+// against 0.6 ms with the bound).
 //
 // Two old indexes are dropped because nothing reads them any more: every query that used them (the history of the
 // workspace with any filter, the history of a document, and the deletion of a document's events, which only needs the

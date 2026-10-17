@@ -1,10 +1,12 @@
 import { documentName } from '@draftroom/contract/collab'
-import { focusManager, onlineManager } from '@tanstack/react-query'
+import { focusManager, onlineManager, useQuery } from '@tanstack/react-query'
 import { act, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { copiesOf } from '../../collab/offlineCache.ts'
 import type { DataSource } from '../../data/DataSource.ts'
 import { ApiError } from '../../data/errors.ts'
+import { queryKeys } from '../../data/queryKeys.ts'
+import { SimulatedSocket } from '../../data/mock/collab/SimulatedCollabServer.ts'
 import { marta } from '../../data/mock/fixtures/index.ts'
 import { launchPlan, openEditor } from './testing/renderEditor.tsx'
 
@@ -65,45 +67,62 @@ function readAgain() {
 
 const copiesOnDevice = () => copiesOf(marta.id)
 
+/** The sockets of the simulated server that the session has used, whether they are open or not. */
+function usedSockets() {
+  const listening = vi.spyOn(SimulatedSocket.prototype, 'addEventListener')
+  return () => [...new Set(listening.mock.contexts)]
+}
+const CLOSED = 3
+
+/**
+ * What the document's query says it is, in the page: it is told in the same turn as the screen is, so that a test that
+ * waits for `error` here has the screen's answer to it and not only the cache's.
+ */
+function DocumentQueryStatus() {
+  const { status } = useQuery({ queryKey: queryKeys.document(launchPlan.id), enabled: false })
+  return <output aria-label="Document query">{status}</output>
+}
+
 describe('access removed while the person was offline, when the API answers before the connection', () => {
+  it('purges the copy, says so, and sends nothing of what was written, after a not found', async () => {
+    const api = documentApi()
+    const sockets = usedSockets()
+    const { editor, server } = await openEditor({ wrap: api.wrap })
+    await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument())
+    const comeBack = goOffline()
+    act(() => editor.commands.insertContent('Written offline'))
+    await waitFor(() => expect(screen.getByText('Sync status: Offline with local copy')).toBeInTheDocument())
+    expect(await copiesOnDevice()).toHaveLength(1)
+
+    // The connection is not answered until the API has: the refusal of the document is what the screen sees first.
+    server.collaboration.holdAuthentication()
+    api.refuse(404)
+    comeBack()
+
+    expect(await screen.findByRole('heading', { name: removedHeading })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to Documents' })).toHaveAttribute('href', '/documents')
+    // The text that may have had the focus is gone: the focus goes to the headline and not to the page.
+    expect(screen.getByRole('heading', { level: 1 })).toHaveFocus()
+    expect(screen.queryByRole('heading', { name: "This document isn't available" })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Document content' })).not.toBeInTheDocument()
+    await waitFor(async () => expect(await copiesOnDevice()).toEqual([]))
+
+    // The connection is let through now, and what the person wrote does not go with it.
+    // The session has closed the connection that was waiting to be answered: that is what is waited for, not a time.
+    await waitFor(() =>
+      expect(sockets().every((socket) => socket instanceof SimulatedSocket && socket.readyState === CLOSED)).toBe(true),
+    )
+    await act(async () => server.collaboration.releaseAuthentication())
+    expect(server.collaboration.document(wireName).getXmlFragment('default').toString()).not.toContain(
+      'Written offline',
+    )
+    expect(server.collaboration.connectionsTo(wireName)).toBe(0)
+  })
+
   it.each([
-    { status: 404, answer: 'not found' },
-    { status: 403, answer: 'forbidden' },
-  ] as const)(
-    'purges the copy, says so, and sends nothing of what was written, after a $answer',
-    async ({ status }) => {
-      const api = documentApi()
-      const { editor, server } = await openEditor({ wrap: api.wrap })
-      await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument())
-      const comeBack = goOffline()
-      act(() => editor.commands.insertContent('Written offline'))
-      await waitFor(() => expect(screen.getByText('Sync status: Offline with local copy')).toBeInTheDocument())
-      expect(await copiesOnDevice()).toHaveLength(1)
-
-      // The connection is not answered until the API has: the refusal of the document is what the screen sees first.
-      server.collaboration.holdAuthentication()
-      api.refuse(status)
-      comeBack()
-
-      expect(await screen.findByRole('heading', { name: removedHeading })).toBeInTheDocument()
-      expect(screen.getByRole('link', { name: 'Go to Documents' })).toHaveAttribute('href', '/documents')
-      // The text that may have had the focus is gone: the focus goes to the headline and not to the page.
-      expect(screen.getByRole('heading', { level: 1 })).toHaveFocus()
-      expect(screen.queryByRole('heading', { name: "This document isn't available" })).not.toBeInTheDocument()
-      expect(screen.queryByRole('textbox', { name: 'Document content' })).not.toBeInTheDocument()
-      await waitFor(async () => expect(await copiesOnDevice()).toEqual([]))
-
-      // The connection is let through now, and what the person wrote does not go with it.
-      await act(async () => server.collaboration.releaseAuthentication())
-      await act(async () => new Promise((resolve) => setTimeout(resolve, 200)))
-      expect(server.collaboration.document(wireName).getXmlFragment('default').toString()).not.toContain(
-        'Written offline',
-      )
-      expect(server.collaboration.connectionsTo(wireName)).toBe(0)
-    },
-  )
-
-  it('keeps the copy when the API fails for a reason that is not about access', async () => {
+    { status: 503, answer: 'is unavailable' },
+    { status: 403, answer: 'forbids something, which is not that the person lost the document' },
+  ] as const)('keeps the copy when the API $answer', async ({ status }) => {
     const api = documentApi()
     const { editor } = await openEditor({ wrap: api.wrap })
     await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument())
@@ -111,7 +130,7 @@ describe('access removed while the person was offline, when the API answers befo
     act(() => editor.commands.insertContent('Written offline'))
     await waitFor(() => expect(screen.getByText('Sync status: Offline with local copy')).toBeInTheDocument())
 
-    api.refuse(503)
+    api.refuse(status)
     comeBack()
 
     expect(await screen.findByRole('heading', { name: "We couldn't open this document" })).toBeInTheDocument()
@@ -123,7 +142,7 @@ describe('access removed while the person was offline, when the API answers befo
 describe('access removed while the document is open, when the connection answers before the API', () => {
   it('keeps saying that the access was removed when the API refuses the document afterwards', async () => {
     const api = documentApi()
-    const { server } = await openEditor({ wrap: api.wrap })
+    const { server } = await openEditor({ wrap: api.wrap, extra: <DocumentQueryStatus /> })
     await waitFor(() => expect(server.collaboration.connectionsTo(wireName)).toBe(1))
     api.refuse(404, { held: true })
     readAgain()
@@ -132,9 +151,8 @@ describe('access removed while the document is open, when the connection answers
     act(() => server.collaboration.closeConnections(4403, 'access-revoked'))
     expect(await screen.findByRole('heading', { name: removedHeading })).toBeInTheDocument()
     await api.answer()
-    await waitFor(() => expect(api.refusals()).toBe(1))
-    // The answer has been taken in by the screen once the query has had a turn to report it.
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 50)))
+    // The query has failed with the answer, and the screen has been told in the same turn.
+    await waitFor(() => expect(screen.getByLabelText('Document query')).toHaveTextContent('error'))
 
     expect(screen.getByRole('heading', { name: removedHeading })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: "This document isn't available" })).not.toBeInTheDocument()

@@ -217,10 +217,14 @@ describe('the seventh migration, on a database that already holds events and ver
       expect(await populated.db.selectFrom('activity_events').select('id').execute()).toEqual(eventsBefore)
       expect(await populated.db.selectFrom('document_versions').select('id').execute()).toHaveLength(1)
 
-      // Going back is a new migration: creating the two indexes again from what they were gives exactly what there was.
-      for (const name of ['activity_events_document_idx', 'activity_events_workspace_idx']) {
-        await sql.raw(before[name] ?? '').execute(populated.db)
-      }
+      // Going back is a new migration, and it creates the two indexes again as `0002` and `0005` wrote them: from those
+      // statements the result is what the migrations had made.
+      await sql`create index activity_events_workspace_idx on activity_events (workspace_id, created_at desc, id desc)`.execute(
+        populated.db,
+      )
+      await sql`create index activity_events_document_idx on activity_events (workspace_id, document_id, created_at, id)`.execute(
+        populated.db,
+      )
       expect(await indexesOf(populated.db)).toEqual({ ...after, ...before })
     } finally {
       await populated.drop()

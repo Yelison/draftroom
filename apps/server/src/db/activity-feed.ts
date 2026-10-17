@@ -2,7 +2,7 @@ import { sql, type Kysely } from 'kysely'
 import { sharingActivity } from '../domain/activity.ts'
 import type { CursorPosition } from '../domain/pagination.ts'
 import { memberDocuments, ownsDocument, readableDocument } from './documents/caller-documents.ts'
-import { inMilliseconds, isBefore, millisecondKey } from './milliseconds.ts'
+import { atOrAfter, atOrBefore, inMilliseconds, isBefore, millisecondKey } from './milliseconds.ts'
 import type { ActivityType, Database } from './tables.ts'
 
 // The history as a person is told it: the events of the documents they can read, at the moment they ask. The right to
@@ -81,8 +81,12 @@ export function activityPageQuery(db: Kysely<Database>, search: ActivitySearch) 
     .where((eb) => eb.or([eb('e.type', 'not in', [...sharingActivity]), ownsDocument(eb)]))
   if (search.documentId !== undefined) query = query.where('d.id', '=', search.documentId)
   if (search.actorId !== undefined) query = query.where('e.actor_id', '=', search.actorId)
-  if (search.from !== undefined) query = query.where('e.created_at', '>=', instant(search.from))
-  if (search.to !== undefined) query = query.where('e.created_at', '<', instant(search.to))
+  if (search.from !== undefined) {
+    query = query.where('e.created_at', '>=', instant(search.from)).where(atOrAfter('e.created_at', search.from))
+  }
+  if (search.to !== undefined) {
+    query = query.where('e.created_at', '<', instant(search.to)).where(atOrBefore('e.created_at', search.to))
+  }
   if (search.after !== undefined) {
     query = query.where(isBefore('e.created_at', 'e.id', search.after))
   }

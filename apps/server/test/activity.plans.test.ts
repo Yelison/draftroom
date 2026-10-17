@@ -75,6 +75,33 @@ describe('the plan of the history of a workspace', () => {
   })
 })
 
+// A filter by an instant on the column is not a condition of the index on the cut instant: without a bound on that
+// expression, the index is walked from the newest event and every event after `to` is read and thrown away.
+describe('the plan of the history of a workspace, with a filter by instant that cuts the range', () => {
+  const cursor = { timestamp: '2026-08-10T10:00:00.000000Z', id: '00000000-0000-4000-8000-000000000001' }
+  it.each([
+    ['until an instant', () => ({ to: '2026-08-01T00:00:00Z' })],
+    ['for one person until an instant', () => ({ actorId: owner.id, to: '2026-08-01T00:00:00Z' })],
+    ['until an instant, after a cursor', () => ({ to: '2026-08-20T00:00:00Z', after: cursor })],
+  ])('has the range in the condition of the index and sorts nothing, %s', async (_name, filters) => {
+    const plan = await planOf(filters())
+
+    expect(plan).toContain('activity_events_workspace_ms_idx')
+    expect(plan).toMatch(/Index Cond: .*date_trunc/)
+    expect(plan).not.toMatch(/Sort/)
+  })
+
+  it('has both ends of a window in the condition of the index', async () => {
+    const plan = await planOf({ from: '2026-07-20T00:00:00Z', to: '2026-08-01T00:00:00Z' })
+
+    const condition = plan.split('\n').find((line) => line.includes('Index Cond')) ?? ''
+    expect(plan).toContain('activity_events_workspace_ms_idx')
+    expect(condition).toMatch(/date_trunc.*>=/)
+    expect(condition).toMatch(/date_trunc.*<=/)
+    expect(plan).not.toMatch(/Sort/)
+  })
+})
+
 describe('the plan of the history of a document', () => {
   it.each([
     ['without filters', () => ({})],
