@@ -70,11 +70,24 @@ The protocol's rule stands for T2.1: the server never filters the map, clears it
 - It is correct only if `endConnections` is called after the change is committed: a connection that takes its ticket after the mark is taken to have read the database after the change.
 - **Known residue.** Hocuspocus sends the current presence of the others to a connection when it registers, before any hook of ours runs, and no hook runs between the end of a load and that registration for the connections that wait on the same load. A connection revoked while it is being established can therefore be sent the presence of the other people (their name, colour and cursor) before the close. Checking the mark earlier would need a hook at that point, or a second look at the database, and closing from `onAuthenticate` is not possible because the hook cannot choose the close code (it answers with a refusal, and a refusal `not-found` would make a client with only a change of role purge its copy). The connection is told nothing stored (the check runs before the acknowledgement), it applies nothing, and the person had access an instant earlier, so the residue is accepted.
 
+### 4. The limit stands, and the way out is a copy of the content (owner's decision, 2026-10-17)
+
+The owner accepts `MAX_DOCUMENT_STATE_BYTES` as it is and chooses not to prune the position-migration map: it stays exactly as clients write it, so comment anchors remain exact and §2 of the protocol does not change. Nobody is left stuck, though. For a document that is too large to keep editing, the client offers **Duplicate as a new document** (`duplicateDocument`, `POST /api/documents/{documentId}/duplicate`):
+
+- It copies the **content** into a **new** document, built from the content the way a template is: the server reads the stored state with `yUpdateToJson`, which refuses what the schema refuses (ADR 0011, decision 1), and writes the result with `jsonToYUpdate`. A state the reader refuses is a `409 conflict` and nothing is created.
+- It copies **no** comments, versions, access or activity, and the map is left behind, which is why the copy is far smaller than an original with many structural edits. The caller owns the copy and gets one `document.created` event; the original gets nothing.
+- It reads the state that is **stored**, not the live state of some connection, and the original is only read: its state, `revision` and `updated_at` do not change. It works on a document over the limit, which is the case it exists for.
+- The title is the caller's, written by the client in the person's language, because the server does not translate.
+
+**Why this does not break the rule "never rebuild a Yjs document from JSON".** The rule protects the *same* document: rebuilding it would give every node a new identity and orphan every comment anchor, offline copy and open connection. A duplicate is a different document that nobody anchors to, has copies of or is connected to yet, exactly as a document made from a template is. The row "A new document built from the content ('compact')" in the table of decision 2 was about replacing the document in place, which stays forbidden.
+
+What it costs: the people who have the original keep it, and the copy is a fork that starts without the discussion that was around the text.
+
 ## Consequences
 
 - A document with forbidden content is repaired, logged and stored; nothing forbidden is ever in `document_states`. Tests pin it with one case for each way in (a level 1 and a level 4 heading, an unknown node, an unknown mark, a `javascript:` link, text under the document, a paragraph in a paragraph, a list that starts at `1e20`), and compare every state the database was given.
 - The server's per-store cost is proportional to the size of the state. It is small for the documents of the MVP, and it grows with the map.
-- The size of a document is not the size of its text. The "too large" state of §5.2 is reachable through structural editing alone, and it is an open decision for the owner (above), not something T2.1 fixes.
+- The size of a document is not the size of its text. The "too large" state of §5.2 is reachable through structural editing alone, and it was an open decision for the owner (above), decided on 2026-10-17 (decision 4), and not something T2.1 fixes.
 
 ## Alternatives considered
 

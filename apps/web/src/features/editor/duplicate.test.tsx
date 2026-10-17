@@ -1,8 +1,10 @@
 import { documentName } from '@draftroom/contract/collab'
+import { QueryClient } from '@tanstack/react-query'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataSource } from '../../data/DataSource.ts'
 import { ApiError } from '../../data/errors.ts'
+import { keysAfterMutation } from '../../data/queryKeys.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { launchPlan, openEditor, people } from './testing/renderEditor.tsx'
 
@@ -61,6 +63,19 @@ describe('duplicating a document that is too large to keep editing', () => {
 
     await waitFor(() => expect(router.state.location.pathname).not.toBe(`/documents/${launchPlan.id}`))
     expect(await screen.findByRole('heading', { level: 1, name: 'Copia de «Autumn launch plan»' })).toBeInTheDocument()
+  })
+
+  it('marks stale exactly the queries the table of the API names for it', async () => {
+    const { user, router } = await openTooLarge()
+    const refreshed = vi.spyOn(QueryClient.prototype, 'invalidateQueries')
+    refreshed.mockClear()
+
+    await user.click(screen.getByRole('button', { name: 'Duplicate as a new document' }))
+
+    await waitFor(() => expect(router.state.location.pathname).not.toBe(`/documents/${launchPlan.id}`))
+    const copyId = router.state.location.pathname.split('/').at(-1) ?? ''
+    const expected = keysAfterMutation('duplicateDocument', { workspaceId: launchPlan.workspaceId, documentId: copyId })
+    expect(refreshed.mock.calls.map(([filters]) => filters?.queryKey)).toEqual(expected)
   })
 
   it('says it is working, and sends one request however many times it is pressed', async () => {
