@@ -1,5 +1,5 @@
 import type { Schema } from '@draftroom/contract'
-import type { Kysely } from 'kysely'
+import { sql, type Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../../src/db/tables.ts'
 import { Browser, goodPassword, newAccount, sessionStackFor, setCookiesOf } from '../support/auth.ts'
@@ -72,13 +72,28 @@ describe('signing up with an address nobody has used', () => {
     expect(row.signed_up_at).toBeInstanceOf(Date)
   })
 
-  it('puts the person in no workspace, because the contract gives an account nothing else to join', async () => {
+  it('gives the person a workspace of their own, named as they are, in which they are the owner', async () => {
     const browser = new Browser(server)
-    await signUp(browser)
+    const account = newAccount({ name: 'Lena Fischer' })
+    const created = bodyAs<Schema<'User'>>(await signUp(browser, account))
 
     const workspaces = await browser.request({ method: 'GET', url: '/api/workspaces' })
 
-    expect(workspaces.body).toEqual({ items: [] })
+    expect(workspaces.body).toEqual({
+      items: [{ id: expect.any(String), name: 'Lena Fischer', role: 'owner', createdAt: expect.any(String) }],
+    })
+    const members = await db.selectFrom('memberships').select(['user_id', 'role']).execute()
+    expect(members).toContainEqual({ user_id: created.id, role: 'owner' })
+  })
+
+  it('names the workspace as the person typed their name, whatever the language it is in', async () => {
+    const browser = new Browser(server)
+
+    await signUp(browser, newAccount({ name: 'Lucía Fernández 🌿' }))
+
+    expect((await browser.request({ method: 'GET', url: '/api/workspaces' })).body).toMatchObject({
+      items: [{ name: 'Lucía Fernández 🌿' }],
+    })
   })
 
   it('takes twelve emoji as a password of twelve, because the limit counts code points', async () => {
@@ -197,7 +212,57 @@ describe('signing up with an address that was invited', () => {
 
     await signUp(browser, newAccount({ email: `x${invited.email}` }))
 
-    expect((await browser.request({ method: 'GET', url: '/api/workspaces' })).body).toEqual({ items: [] })
+    // Nothing was claimed, so the person has the workspace of their own and not the one of the look-alike.
+    const { items } = bodyAs<Schema<'WorkspaceList'>>(await browser.request({ method: 'GET', url: '/api/workspaces' }))
+    expect(items.map((workspace) => workspace.id)).not.toContain(workspaceId)
+    expect(items).toHaveLength(1)
+  })
+
+  it('creates no workspace for a person who claims an invitation', async () => {
+    const workspaceId = await createWorkspace(db)
+    const invited = await createPendingPerson(db)
+    await join(db, workspaceId, invited, 'member')
+    const before = (await db.selectFrom('workspaces').select('id').execute()).length
+
+    await signUp(new Browser(server), newAccount({ email: invited.email, name: 'Tom Weller' }))
+
+    expect(await db.selectFrom('workspaces').select('id').execute()).toHaveLength(before)
+    const memberships = await db
+      .selectFrom('memberships')
+      .select('workspace_id')
+      .where('user_id', '=', invited.id)
+      .execute()
+    expect(memberships).toEqual([{ workspace_id: workspaceId }])
+  })
+})
+
+describe('a sign-up that fails halfway', () => {
+  it('leaves neither the account nor the workspace, because they are written together', async () => {
+    const broken = await provisionDatabase()
+    try {
+      // The membership is the third thing written, after the account and the workspace: a database that refuses it takes both back.
+      await sql`create function refuse_memberships() returns trigger language plpgsql as 'begin raise exception ''no memberships''; end'`.execute(
+        broken.db,
+      )
+      await sql`create trigger refuse_memberships before insert on memberships for each row execute function refuse_memberships()`.execute(
+        broken.db,
+      )
+      const stack = sessionStackFor(broken.db)
+      const app = createTestApp(broken.db, stack.provider, undefined, undefined, undefined, undefined, {
+        session: stack,
+      })
+      const account = newAccount()
+
+      const response = await new Browser(app).request({ method: 'POST', url: '/api/auth/sign-up', body: account })
+
+      expect(response.statusCode).toBe(500)
+      expect(await broken.db.selectFrom('users').select('id').where('email', '=', account.email).execute()).toEqual([])
+      expect(await broken.db.selectFrom('workspaces').select('id').execute()).toEqual([])
+      expect(await broken.db.selectFrom('sessions').select('id').execute()).toEqual([])
+      await app.app.close()
+    } finally {
+      await broken.drop()
+    }
   })
 })
 

@@ -1,4 +1,4 @@
-import type { Kysely } from 'kysely'
+import type { Kysely, Transaction } from 'kysely'
 import type { Database, WorkspaceRole } from './tables.ts'
 
 /** A workspace as the person who asks sees it: with their own role in it. */
@@ -38,4 +38,26 @@ export function workspaceOf(
   userId: string,
 ): Promise<WorkspaceOfMember | undefined> {
   return memberWorkspaces(db, userId).where('w.id', '=', workspaceId).executeTakeFirst()
+}
+
+/**
+ * The workspace a person starts with when nobody invited them: one of their own, named as they are (their own content, so
+ * nothing is translated and they can rename it in Settings), in which they are the owner. A person who has a seat
+ * somewhere already, which is what claiming an invitation gives, gets none. It runs in the transaction that writes the
+ * account, so a failure leaves neither.
+ */
+export async function giveOwnWorkspaceUnlessMember(
+  transaction: Transaction<Database>,
+  userId: string,
+  name: string,
+): Promise<void> {
+  const seat = await transaction
+    .selectFrom('memberships')
+    .select('workspace_id')
+    .where('user_id', '=', userId)
+    .limit(1)
+    .executeTakeFirst()
+  if (seat !== undefined) return
+  const { id } = await transaction.insertInto('workspaces').values({ name }).returning('id').executeTakeFirstOrThrow()
+  await transaction.insertInto('memberships').values({ workspace_id: id, user_id: userId, role: 'owner' }).execute()
 }

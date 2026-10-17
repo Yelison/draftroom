@@ -1,6 +1,7 @@
 import type { Schema } from '@draftroom/contract'
 import { sql } from 'kysely'
 import type { FastifyPluginCallback, FastifyReply } from 'fastify'
+import { giveOwnWorkspaceUnlessMember } from '../../db/workspaces.ts'
 import { principalOf } from '../auth/authenticate.ts'
 import { cookiesOf, sessionCookieName, type SessionCookies } from '../auth/cookies.ts'
 import { createPasswords, type Passwords } from '../auth/passwords.ts'
@@ -81,6 +82,7 @@ export const authRoutes: FastifyPluginCallback<AuthRouteDependencies> = (
               .set({ name, password_hash: passwordHash, signed_up_at: new Date() })
               .where('id', '=', existing.id)
               .execute()
+            await giveOwnWorkspaceUnlessMember(transaction, existing.id, name)
             return existing.id
           }
           const created = await transaction
@@ -88,6 +90,7 @@ export const authRoutes: FastifyPluginCallback<AuthRouteDependencies> = (
             .values({ email, name, password_hash: passwordHash, signed_up_at: new Date() })
             .returning('id')
             .executeTakeFirstOrThrow()
+          await giveOwnWorkspaceUnlessMember(transaction, created.id, name)
           return created.id
         })
       } catch (error) {
