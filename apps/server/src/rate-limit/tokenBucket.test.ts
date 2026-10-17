@@ -36,6 +36,16 @@ describe('the token bucket', () => {
     expect(taken.filter(Boolean)).toHaveLength(200)
   })
 
+  it('keeps its tokens when the clock steps back, instead of owing the time it went back', () => {
+    const clock = { now: 10_000 }
+    const bucket = bucketAt(clock)
+    clock.now = 0
+
+    expect(bucket.take()).toBe(true)
+    clock.now = 10
+    expect(Array.from({ length: 199 }, () => bucket.take()).every(Boolean)).toBe(true)
+  })
+
   it.each([
     ['a token a second', 1, 0, 1],
     ['two seconds for a token at half a token a second', 0.5, 0, 2],

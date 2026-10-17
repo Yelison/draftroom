@@ -20,7 +20,8 @@ export function createTokenBucket(options: {
   let last = options.now()
   const refill = () => {
     const now = options.now()
-    tokens = Math.min(options.burst, tokens + ((now - last) / 1000) * options.perSecond)
+    // A wall clock can step back (an NTP correction, a test that sets the time): that must not take tokens away.
+    tokens = Math.min(options.burst, tokens + (Math.max(0, now - last) / 1000) * options.perSecond)
     last = now
   }
   return {
