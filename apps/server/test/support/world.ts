@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { sql, type Kysely } from 'kysely'
+import type { Kysely } from 'kysely'
 import type { Database, DocumentRole, GeneralAccess, WorkspaceRole } from '../../src/db/tables.ts'
 
 // Rows for the tests of the API: people who can be named in the `X-Dev-User` header, workspaces they belong to, and
@@ -106,11 +106,6 @@ export async function grant(
       role: access.role,
     })
     .execute()
-}
-
-/** Sets a timestamp as PostgreSQL would hold it, microseconds included, which a `Date` cannot say. */
-export async function setUpdatedAt(db: Kysely<Database>, documentId: string, timestamp: string): Promise<void> {
-  await sql`update documents set updated_at = ${timestamp}::timestamptz where id = ${documentId}`.execute(db)
 }
 
 /** A workspace with an owner and a document they created: the common start of a test. */

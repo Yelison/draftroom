@@ -18,6 +18,13 @@ import type {
  */
 export type SyncPhase = SyncState | 'initial'
 
+/**
+ * The protocol's events and the one that does not come from the connection: the API answered that the document is no
+ * longer the person's. Its meaning is that of a `4403` (access removed), reached by the other road: the connection may be
+ * held back, slow or unreachable, and then the API is the only one that tells.
+ */
+export type SessionEvent = SyncEvent | { readonly type: 'access-removed' }
+
 /** The facts the machine tracks beyond its state (protocol section 8). */
 export interface SyncModel {
   readonly state: SyncPhase
@@ -199,7 +206,7 @@ function authenticate(model: SyncModel, scope: AuthorizedScope): SyncStep {
   }
 }
 
-function apply(model: SyncModel, event: SyncEvent): SyncStep {
+function apply(model: SyncModel, event: SessionEvent): SyncStep {
   if (model.state === 'revoked') return unchanged(model)
 
   switch (event.type) {
@@ -223,6 +230,11 @@ function apply(model: SyncModel, event: SyncEvent): SyncStep {
 
     case 'authentication-denied':
       return deny(model, event.reason)
+
+    case 'access-removed':
+      // In any state, also before the connection was ever authorised: the API served this document to the person, so what
+      // it says now is that they lost it, and the answer to that is the one for a `4403`.
+      return revoke(model)
 
     case 'document-too-large':
       return stop(model, 'document-too-large')
@@ -274,7 +286,7 @@ function apply(model: SyncModel, event: SyncEvent): SyncStep {
 const waitsForStored = (model: SyncModel): boolean =>
   model.state === 'synchronising' && model.handshakeDone && model.unsyncedChanges === 0 && model.hasPending
 
-function timerEffects(before: SyncModel, after: SyncModel, event: SyncEvent): SyncEffect[] {
+function timerEffects(before: SyncModel, after: SyncModel, event: SessionEvent): SyncEffect[] {
   const wasWaiting = waitsForStored(before)
   const waits = waitsForStored(after)
   // Each change of the person starts the wait over, so a document that is being typed in never times out.
@@ -283,7 +295,7 @@ function timerEffects(before: SyncModel, after: SyncModel, event: SyncEvent): Sy
 }
 
 /** The next facts and the effects for an event; the effects are in the order they must run. */
-export function transition(model: SyncModel, event: SyncEvent): SyncStep {
+export function transition(model: SyncModel, event: SessionEvent): SyncStep {
   const step = apply(model, event)
   return { model: step.model, effects: [...step.effects, ...timerEffects(model, step.model, event)] }
 }

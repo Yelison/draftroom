@@ -12,10 +12,16 @@ import { useDataSource } from '../../data/useDataSource.ts'
  *
  * It is made in an effect, not while rendering. Ending a session closes its connection, and StrictMode runs every effect,
  * its cleanup and the effect again: a session made while rendering would be ended by that cleanup and handed on dead.
+ * What the API says of the document is told to it as well: when it says the person lost the document, the session is the
+ * one that purges the copy, so it must still be there to be told.
  * What other people change in the document (its title, who may open it, comments, versions) arrives as events of the
  * connection, and each makes stale exactly the queries the protocol says it does.
  */
-export function useCollabSession(document: Schema<'Document'>, userId: string | undefined): CollabSession | null {
+export function useCollabSession(
+  document: Schema<'Document'>,
+  userId: string | undefined,
+  accessRemoved: boolean,
+): CollabSession | null {
   const dataSource = useDataSource()
   const queryClient = useQueryClient()
   const [session, setSession] = useState<CollabSession | null>(null)
@@ -43,6 +49,10 @@ export function useCollabSession(document: Schema<'Document'>, userId: string | 
       opened.destroy()
     }
   }, [dataSource, documentId, workspaceId, userId, queryClient])
+
+  useEffect(() => {
+    if (accessRemoved) session?.accessRemoved()
+  }, [accessRemoved, session])
 
   return session
 }

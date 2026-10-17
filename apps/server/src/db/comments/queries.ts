@@ -1,4 +1,5 @@
 import type { Kysely } from 'kysely'
+import { inMilliseconds } from '../milliseconds.ts'
 import type { Database } from '../tables.ts'
 
 // The reads of threads and comments. A thread comes with its comments and with the names of the people in it, which is
@@ -125,7 +126,7 @@ export function commentsOfThreads(db: Kysely<Database>, workspaceId: string, thr
   return commentsQuery(db)
     .where('c.workspace_id', '=', workspaceId)
     .where('c.thread_id', 'in', threadIds)
-    .orderBy('c.created_at', 'asc')
+    .orderBy(inMilliseconds('c.created_at'), 'asc')
     .orderBy('c.id', 'asc')
 }
 
@@ -170,7 +171,7 @@ export interface ThreadFilter {
 export function threadsOfDocument(db: Kysely<Database>, { workspaceId, documentId, status }: ThreadFilter) {
   const query = threadsQuery(db).where('t.workspace_id', '=', workspaceId).where('t.document_id', '=', documentId)
   return (status === undefined ? query : query.where('t.resolved_at', status === 'open' ? 'is' : 'is not', null))
-    .orderBy('t.created_at', 'asc')
+    .orderBy(inMilliseconds('t.created_at'), 'asc')
     .orderBy('t.id', 'asc')
 }
 

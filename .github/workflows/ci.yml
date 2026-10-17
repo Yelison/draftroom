@@ -117,6 +117,9 @@ jobs:
       # tests stop and start it) and serves the production build in `http` mode behind the identity proxy.
       - run: docker compose -p "$COMPOSE_PROJECT_NAME" up --detach --wait postgres
       - run: npm run test:e2e-collab -w @draftroom/web -- --workers=1
+      # The shared contract battery against the real server, over HTTP and checked against openapi.yaml. It starts the server
+      # itself on the same ports, after the suite above has stopped its own, and finds the database as the suite left it.
+      - run: npm run test:contract-real -w @draftroom/web
       # Only a failure leaves something to read: the traces Playwright keeps for the tests that failed, and what the server
       # and the database said while they ran.
       - run: |

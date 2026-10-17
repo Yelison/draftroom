@@ -280,6 +280,40 @@ describe('when access is removed during an outage', () => {
   })
 })
 
+describe('when the API says access was removed before the connection does', () => {
+  // The server still lets the person in (`setAccess` is not called): only the API's answer, handed to the session by the
+  // screen, can be the reason for everything below.
+  it('purges the copy, says so, and never sends what was written offline when the connection comes back', async () => {
+    world = createWorld()
+    const opening = await opened()
+    world.network.set(false)
+    typeInto(opening.doc, 'written offline, after access was gone')
+    await advance(100)
+    expect(await copiesOnDevice()).toHaveLength(1)
+
+    opening.session.accessRemoved()
+    world.network.set(true)
+    await advance(1100)
+
+    expect(state(opening)).toBe('revoked')
+    expect(await copiesOnDevice()).toEqual([])
+    expect(textOf(world.server.document(wireName))).toBe('')
+    expect(world.server.connectionsTo(wireName)).toBe(0)
+  })
+
+  it('purges the copy that was still being opened, and does not connect', async () => {
+    world = createWorld()
+    const opening = world.open(editor, { keepCopy: true })
+
+    opening.session.accessRemoved()
+    await advance(1100)
+
+    expect(state(opening)).toBe('revoked')
+    expect(await copiesOnDevice()).toEqual([])
+    expect(world.server.connectionsTo(wireName)).toBe(0)
+  })
+})
+
 describe('when the role becomes reader during an outage', () => {
   it('drops the copy with the changes that were not accepted, says so, and does not bring them back later', async () => {
     world = createWorld()

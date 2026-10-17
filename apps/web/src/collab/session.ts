@@ -7,7 +7,6 @@ import {
   type AuthorizedScope,
   type StatelessEvent,
   type SyncErrorCause,
-  type SyncEvent,
   type SyncState,
 } from '@draftroom/contract/collab'
 import { HocuspocusProvider, HocuspocusProviderWebsocket, WebSocketStatus } from '@hocuspocus/provider'
@@ -18,7 +17,15 @@ import { browserNetwork, type Network } from './network.ts'
 import { openLocalCopy, type LocalCopy } from './offlineCache.ts'
 import { PendingChanges } from './PendingChanges.ts'
 import { createReconnectBackoff, reconnectsOnItsOwn, type ReconnectBackoff } from './reconnection.ts'
-import { createSyncModel, errorAction, isEditable, transition, type SyncEffect, type SyncModel } from './syncState.ts'
+import {
+  createSyncModel,
+  errorAction,
+  isEditable,
+  transition,
+  type SessionEvent,
+  type SyncEffect,
+  type SyncModel,
+} from './syncState.ts'
 
 /** Said to the person once, after something they did while they were away could not be kept. */
 export type SessionNotice = 'offline-changes-discarded'
@@ -56,6 +63,12 @@ export interface CollabSession {
   /** The way out of a document that is too large: drops what was not stored, and opens the document again. */
   discardAndReload(): void
   dismissNotice(): void
+  /**
+   * The API answered that the document is no longer the person's. It is the same as the collaboration server closing the
+   * connection with `4403`: the copy this device keeps is purged and nothing is uploaded. It is for the screen to say it
+   * because the connection may not be there to say it first (held back, slow, unreachable), and the copy is the session's.
+   */
+  accessRemoved(): void
   /** Whether content that would add `bytes` to the Yjs update still fits what may be unsent (protocol section 12.5). */
   hasRoomFor(bytes: number): boolean
   destroy(): void
@@ -129,7 +142,7 @@ class ProviderSession implements CollabSession {
   private readonly stopListeningToNetwork: () => void
   private readonly listeners = new Set<() => void>()
   private readonly eventListeners = new Set<(event: StatelessEvent) => void>()
-  private readonly queue: SyncEvent[] = []
+  private readonly queue: SessionEvent[] = []
   private dispatching = false
   private current: CollabSnapshot
 
@@ -175,6 +188,8 @@ class ProviderSession implements CollabSession {
     this.publish()
   }
 
+  accessRemoved = (): void => this.dispatch({ type: 'access-removed' })
+
   hasRoomFor = (bytes: number): boolean => this.unsentBytes() + bytes <= MAX_UNSENT_BYTES
 
   destroy(): void {
@@ -186,7 +201,7 @@ class ProviderSession implements CollabSession {
 
   // --- The machine and its effects ----------------------------------------------------------------------------------
 
-  private dispatch(event: SyncEvent): void {
+  private dispatch(event: SessionEvent): void {
     this.queue.push(event)
     // An effect can cause an event of its own; it waits its turn so the machine never runs inside itself.
     if (this.dispatching) return
@@ -314,6 +329,11 @@ class ProviderSession implements CollabSession {
       return
     }
     link.copy = copy
+    // Access was removed while the copy was being opened: there was no copy to purge then, and there is no connection to make.
+    if (this.model.state === 'revoked') {
+      this.purgeCopy()
+      return
+    }
     link.ydoc.on('update', this.onDocumentUpdate)
     if (this.model.state === 'initial') {
       this.model = createSyncModel({ online: this.network.online(), hasLocalCopy: copy?.hadContent ?? false })

@@ -6,12 +6,13 @@ import {
   isEditable,
   isStopped,
   transition,
+  type SessionEvent,
   type SyncEffect,
   type SyncModel,
 } from './syncState.ts'
 
 /** The machine after the events, from a session that is online and has no local copy unless said. */
-function play(events: readonly SyncEvent[], start?: Partial<SyncModel>) {
+function play(events: readonly SessionEvent[], start?: Partial<SyncModel>) {
   let model: SyncModel = { ...createSyncModel({ online: true, hasLocalCopy: false }), ...start }
   const effects: SyncEffect[] = []
   for (const event of events) {
@@ -40,6 +41,7 @@ const notCovered: SyncEvent = { type: 'stored', coversLocalChanges: false }
 const timeout: SyncEvent = { type: 'stored-ack-timeout' }
 const closed = (code: number | null, online = true): SyncEvent => ({ type: 'connection-closed', code, online })
 const network = (online: boolean): SyncEvent => ({ type: 'network-changed', online })
+const accessRemoved: SessionEvent = { type: 'access-removed' }
 
 /** An editor whose changes are all stored and acknowledged. */
 const synced = [open, readWrite, handshake, unsynced(0)] as const
@@ -222,7 +224,7 @@ describe('the transitions of section 8.2', () => {
   const rows: {
     row: string
     from: Partial<SyncModel>
-    event: SyncEvent
+    event: SessionEvent
     to: string
     effects?: SyncEffect[]
     pending?: boolean
@@ -320,6 +322,28 @@ describe('the transitions of section 8.2', () => {
       event: { type: 'authentication-denied', reason: 'not-found' },
       to: 'error',
       effects: [disconnect],
+    },
+    {
+      row: 'access removed, said by the API, from a state that was never authorised',
+      from: { state: 'connecting' },
+      event: accessRemoved,
+      to: 'revoked',
+      effects: [purge, disconnect],
+    },
+    {
+      row: 'access removed, said by the API, while changes wait to be stored, drops them',
+      from: { state: 'offline-local', scope: 'read-write', hasBeenAuthorized: true, hasPending: true },
+      event: accessRemoved,
+      to: 'revoked',
+      effects: [purge, disconnect],
+      pending: false,
+    },
+    {
+      row: 'access removed, said by the API, before the first `open`',
+      from: { state: 'initial' },
+      event: accessRemoved,
+      to: 'revoked',
+      effects: [purge, disconnect],
     },
     {
       row: 'denied for a fault of the server is a reconnection that purges nothing and keeps what was pending',
@@ -609,7 +633,7 @@ describe('a refusal for a fault of the server', () => {
 })
 
 describe('what a state ignores', () => {
-  const everyEvent: SyncEvent[] = [
+  const everyEvent: SessionEvent[] = [
     open,
     readWrite,
     handshake,
@@ -622,6 +646,7 @@ describe('what a state ignores', () => {
     network(false),
     { type: 'authentication-denied', reason: 'unauthenticated' },
     { type: 'document-too-large' },
+    accessRemoved,
   ]
 
   it.each(everyEvent)('revoked stays revoked on $type', (event) => {
@@ -655,6 +680,7 @@ describe('what a state ignores', () => {
     { event: open, to: 'connecting' },
     { event: closed(4403), to: 'revoked' },
     { event: { type: 'authentication-denied', reason: 'not-found' } satisfies SyncEvent, to: 'revoked' },
+    { event: accessRemoved, to: 'revoked' },
   ])('a stopped error still answers $event.type with $to', ({ event, to }) => {
     const model = { ...createSyncModel({ online: true, hasLocalCopy: false }), ...stopped, hasBeenAuthorized: true }
 
