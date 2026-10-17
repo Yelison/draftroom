@@ -94,6 +94,13 @@ The upgrade of the WebSocket resolves the session from the **`Cookie` header of 
 | Cookie theft by a script, or sent in the clear | `HttpOnly`, `Secure` in production, `SameSite=Lax` | `auth/session.test.ts` |
 | Secrets in logs | Nothing logs a body or a token; a test searches the output | `auth/logs.test.ts` |
 | Development identity in production | The cookie provider alone in `production` and when `NODE_ENV` is not set | `session.test.ts`, `select.test.ts` |
+| The whole thing in a browser, against the real server | Sign-in, gate, sign-up and sign-out with a live socket in another tab | `e2e-collab/auth.spec.ts`, `identity.spec.ts` |
+
+## The real-stack end-to-end suite
+
+ADR 0015 identified a browser by a test cookie that a proxy turned into `X-Dev-User`, because there was no session. It is replaced: each browser context **signs in** as an account of the demo seed (which now has the demo password, the one the mock's accounts have) through the origin of the app, and is its session cookie from then on, for REST and for the collaboration socket. The suite has its own screens test (sign in and back to the page, sign-up, sign-out that ends the session and makes the **server** close a live socket held by another tab). Setting a scene up from Node still uses the development header against the API, since there is no browser there to hold a session.
+
+What stays of the proxy of the Vite servers is **routing and nothing else**: it serves `/api` and `/collab` from the origin of the app, as a reverse proxy does in production, and rewrites no request. It cannot go yet: the server has no CORS until T7.2, so a page on one port cannot read answers from another. When T7.2 adds it, the suite can talk to the API directly and the proxy can go.
 
 ## What is left, and for whom
 
