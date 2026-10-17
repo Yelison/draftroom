@@ -13,7 +13,7 @@ async function tabToExplorerSearch(page: Page) {
 }
 
 test('searches from the explorer, opens the results and opens a document, with the keyboard', async ({ page }) => {
-  await page.goto(`/documents/${launchPlan.id}/share`)
+  await page.goto(`/documents/${launchPlan.id}`)
   await expect(explorer(page).getByRole('tree', { name: 'Documents and folders' })).toBeVisible()
   await tabToExplorerSearch(page)
   const field = explorer(page).getByRole('searchbox', { name: 'Search documents' })

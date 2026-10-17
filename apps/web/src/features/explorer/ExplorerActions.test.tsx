@@ -5,7 +5,7 @@ import { localeStorageKey } from '../../i18n/locale.ts'
 import { fixtures, renderScreen } from '../documents/testing/renderScreen.tsx'
 
 const { launchPlan, weeklyEnglish, budget } = fixtures
-const pathOf = (id: string) => `/documents/${id}/share`
+const pathOf = (id: string) => `/documents/${id}`
 const explorer = () => screen.findByRole('complementary', { name: 'Explorer' })
 const row = (name: string, index = 0) => screen.getAllByRole('treeitem', { name })[index] as HTMLElement
 

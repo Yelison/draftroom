@@ -5,6 +5,7 @@ import { FolderScreen } from '../features/documents/FolderScreen.tsx'
 import { EditorSkeleton } from '../features/editor/EditorSkeleton.tsx'
 import { HistoryScreen } from '../features/history/HistoryScreen.tsx'
 import { SearchScreen } from '../features/search/SearchScreen.tsx'
+import { SharedScreen } from '../features/shared/SharedScreen.tsx'
 import { TemplateScreen } from '../features/templates/TemplateScreen.tsx'
 import { TrashScreen } from '../features/trash/TrashScreen.tsx'
 import type { MessageId } from '../i18n/messages.ts'
@@ -42,7 +43,7 @@ export const routes: RouteObject[] = [
             Component: TemplateScreen,
             handle: { section: 'documents' } satisfies RouteHandle,
           },
-          { path: 'shared', ...screen('nav.shared', 'shared') },
+          { path: 'shared', Component: SharedScreen, handle: { section: 'shared' } satisfies RouteHandle },
           { path: 'history', Component: HistoryScreen, handle: { section: 'history' } satisfies RouteHandle },
           {
             path: 'settings',
@@ -73,8 +74,15 @@ export const routes: RouteObject[] = [
             HydrateFallback: EditorSkeleton,
             lazy: async () => ({ Component: (await import('../features/editor/EditorScreen.tsx')).EditorScreen }),
             handle: { section: 'documents' } satisfies RouteHandle,
+            children: [
+              {
+                // A dialog over the editor, which the editor shows in its own place (an `Outlet`) once it has a document.
+                path: 'share',
+                lazy: async () => ({ Component: (await import('../features/sharing/ShareDialog.tsx')).ShareDialog }),
+                handle: { section: 'documents', dialog: true } satisfies RouteHandle,
+              },
+            ],
           },
-          { path: 'documents/:documentId/share', ...screen('screen.share', 'documents') },
           { path: 'documents/:documentId/versions', ...screen('screen.versions', 'documents') },
         ],
       },

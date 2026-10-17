@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { fixtures, renderScreen } from '../documents/testing/renderScreen.tsx'
 
 // The explorer is in the layout of a document; the share route of one has no editor, so it opens without Tiptap.
-const explorerPath = `/documents/${fixtures.launchPlan.id}/share`
+const explorerPath = `/documents/${fixtures.launchPlan.id}`
 const explorerSearch = () => screen.findByRole('searchbox', { name: 'Search documents' })
 const documentsSearch = async () => within(await screen.findByRole('main')).findByRole('searchbox')
 

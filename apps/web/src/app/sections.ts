@@ -7,6 +7,11 @@ export type Section = (typeof sections)[number]
 /** What a route declares about itself for the shell. A route without a section highlights no item of the rail. */
 export interface RouteHandle {
   section?: Section | undefined
+  /**
+   * The route is a dialog over its parent's screen, which stays on screen behind it. Opening or closing it is not a new
+   * page: the focus is the dialog's to take and to give back, not the headline's.
+   */
+  dialog?: boolean | undefined
 }
 
 const isSection = (value: unknown): value is Section => sections.some((section) => section === value)
