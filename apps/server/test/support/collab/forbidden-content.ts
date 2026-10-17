@@ -13,7 +13,7 @@ const fragmentOf = (doc: Y.Doc) => doc.getXmlFragment('default')
  * Yjs types an XML attribute as a string, and the wire carries any JSON value: an editor stores the level of a heading as
  * a number. A client that writes a number the schema does not allow is the case here, so the type has to be stepped over.
  */
-const withAttribute = (element: Y.XmlElement, name: string, value: number): Y.XmlElement => {
+export const withAttribute = (element: Y.XmlElement, name: string, value: number): Y.XmlElement => {
   element.setAttribute(name, value as unknown as string)
   return element
 }

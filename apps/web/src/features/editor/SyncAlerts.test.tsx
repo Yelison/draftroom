@@ -4,19 +4,24 @@ import { describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '../../app/AppProviders.tsx'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import type { CollabSnapshot } from '../../collab/session.ts'
-import { SyncAlerts } from './SyncAlerts.tsx'
+import { SyncAlerts, type DuplicateAction } from './SyncAlerts.tsx'
 
 type Shown = Pick<CollabSnapshot, 'cause' | 'action' | 'notice'>
 
-function show(snapshot: Shown) {
+const idle = { pending: false, problem: null }
+
+function show(snapshot: Shown, duplicate: Partial<DuplicateAction> = {}) {
+  const run = vi.fn()
   const handlers = { onRetry: vi.fn(), onDiscard: vi.fn(), onDismissNotice: vi.fn() }
   render(
     <AppProviders>
-      <SyncAlerts snapshot={snapshot} {...handlers} />
+      <SyncAlerts snapshot={snapshot} duplicate={{ ...idle, run, ...duplicate }} {...handlers} />
     </AppProviders>,
   )
-  return { ...handlers, user: userEvent.setup() }
+  return { ...handlers, run, user: userEvent.setup() }
 }
+
+const tooLarge: Shown = { cause: 'document-too-large', action: 'discard-and-reload', notice: null }
 
 const nothing: Shown = { cause: null, action: null, notice: null }
 
@@ -24,7 +29,13 @@ describe('what is said about the changes when the connection has a problem', () 
   it('says nothing when there is none', () => {
     const { container } = render(
       <AppProviders>
-        <SyncAlerts snapshot={nothing} onRetry={vi.fn()} onDiscard={vi.fn()} onDismissNotice={vi.fn()} />
+        <SyncAlerts
+          snapshot={nothing}
+          duplicate={{ ...idle, run: vi.fn() }}
+          onRetry={vi.fn()}
+          onDiscard={vi.fn()}
+          onDismissNotice={vi.fn()}
+        />
       </AppProviders>,
     )
 
@@ -60,6 +71,51 @@ describe('what is said about the changes when the connection has a problem', () 
     expect(onRetry).not.toHaveBeenCalled()
   })
 
+  describe('the way out of a document that is too large: duplicating it as a new one', () => {
+    it('is offered beside discarding, and runs once when pressed', async () => {
+      const { user, run, onDiscard } = show(tooLarge)
+
+      await user.click(screen.getByRole('button', { name: 'Duplicate as a new document' }))
+
+      expect(run).toHaveBeenCalledTimes(1)
+      expect(onDiscard).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: 'Discard my local changes and reload' })).toBeInTheDocument()
+    })
+
+    it.each([
+      { name: 'a store timeout', cause: 'store-timeout', action: 'retry', notice: null },
+      { name: 'an ended session', cause: 'unauthenticated', action: 'retry', notice: null },
+      { name: 'a document that is gone', cause: 'not-found', action: 'retry', notice: null },
+      {
+        name: 'the notice of discarded offline changes',
+        cause: null,
+        action: null,
+        notice: 'offline-changes-discarded',
+      },
+    ] as const)('is not offered for $name, which is not about size', ({ cause, action, notice }) => {
+      show({ cause, action, notice })
+
+      expect(screen.queryByRole('button', { name: /duplicate/i })).not.toBeInTheDocument()
+    })
+
+    it('says it is in progress, and ignores a second press', async () => {
+      const { user, run } = show(tooLarge, { pending: true })
+
+      const button = screen.getByRole('button', { name: 'Duplicating…' })
+      await user.click(button)
+
+      expect(button).toHaveAttribute('aria-busy', 'true')
+      expect(run).not.toHaveBeenCalled()
+    })
+
+    it('shows what the server refused, beside the buttons', () => {
+      show(tooLarge, { problem: 'Something went wrong. Try again.' })
+
+      expect(screen.getByText('Something went wrong. Try again.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Duplicate as a new document' })).toBeInTheDocument()
+    })
+  })
+
   it('tells the person that what they wrote offline was not kept, and lets them dismiss it', async () => {
     const { user, onDismissNotice } = show({ cause: null, action: null, notice: 'offline-changes-discarded' })
 
@@ -75,6 +131,7 @@ describe('what is said about the changes when the connection has a problem', () 
 
     expect(screen.getByText('Este documento es demasiado grande para seguir editándolo')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Descartar mis cambios locales y recargar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Duplicar como documento nuevo' })).toBeInTheDocument()
     expect(screen.getByText('Tus cambios sin conexión no se conservaron')).toBeInTheDocument()
   })
 })

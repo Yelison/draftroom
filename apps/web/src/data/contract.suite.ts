@@ -854,6 +854,85 @@ export function describeDataSourceContract(name: string, harness: Harness) {
         )
       })
 
+      describe('duplicating a document as a new one', () => {
+        const duplicateOf = (documentId: string, body: { title: string; folderId?: string | null }) => ({
+          ...document(documentId),
+          body,
+        })
+
+        it('makes a document of the caller, owned by them and shared with nobody, and leaves the original as it was', async () => {
+          const { owner, member, memberId, workspaceId } = await harness.scenario()
+          const original = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Autumn plan' } })
+          await owner.setGeneralAccess({ ...document(original.id), body: { generalAccess: 'viewer' } })
+          const before = await owner.getDocument(document(original.id))
+
+          const copy = await member.duplicateDocument(duplicateOf(original.id, { title: 'Copy of “Autumn plan”' }))
+
+          expect(copy).toMatchObject({
+            workspaceId,
+            title: 'Copy of “Autumn plan”',
+            role: 'owner',
+            revision: 1,
+            generalAccess: 'none',
+          })
+          expect(copy.id).not.toBe(original.id)
+          expect(await owner.getDocument(document(original.id))).toEqual(before)
+          const events = await member.listDocumentActivity(document(copy.id))
+          expect(events.items.map((event) => event.type)).toEqual(['document.created'])
+          expect(events.items[0]?.actor?.id).toBe(memberId)
+        })
+
+        it('puts the copy in the folder of the original unless the request names another place, or none', async () => {
+          const { owner, workspaceId } = await harness.scenario()
+          const [first, second] = await Promise.all(
+            ['First', 'Second'].map((name) => owner.createFolder({ ...inWorkspace(workspaceId), body: { name } })),
+          )
+          const original = await owner.createDocument({
+            ...inWorkspace(workspaceId),
+            body: { title: 'Filed', folderId: first?.id ?? '' },
+          })
+
+          const inherited = await owner.duplicateDocument(duplicateOf(original.id, { title: 'Copy' }))
+          const moved = await owner.duplicateDocument(
+            duplicateOf(original.id, { title: 'Copy', folderId: second?.id ?? '' }),
+          )
+          const loose = await owner.duplicateDocument(duplicateOf(original.id, { title: 'Copy', folderId: null }))
+
+          expect([inherited.folderId, moved.folderId, loose.folderId]).toEqual([first?.id, second?.id, null])
+        })
+
+        it('refuses a folder that does not exist, and a title past its limit', async () => {
+          const { owner, workspaceId } = await harness.scenario()
+          const original = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Plain' } })
+
+          await expectRefusal(
+            owner.duplicateDocument(duplicateOf(original.id, { title: 'Copy', folderId: crypto.randomUUID() })),
+            'validation-failed',
+            '/folderId',
+          )
+          await expectRefusal(
+            owner.duplicateDocument(duplicateOf(original.id, { title: emoji(201) })),
+            'too-large',
+            '/title',
+          )
+        })
+
+        it('answers a document the caller cannot read as one that does not exist', async () => {
+          const { owner, member, workspaceId } = await harness.scenario()
+          const original = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Private plan' } })
+
+          await expectRefusal(member.duplicateDocument(duplicateOf(original.id, { title: 'Copy' })), 'not-found')
+        })
+
+        it('answers an archived original as one that does not exist, to its owner too', async () => {
+          const { owner, workspaceId } = await harness.scenario()
+          const original = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Set aside' } })
+          await owner.archiveDocument(document(original.id))
+
+          await expectRefusal(owner.duplicateDocument(duplicateOf(original.id, { title: 'Copy' })), 'not-found')
+        })
+      })
+
       it('lists the templates in the language that was asked for', async () => {
         const { owner } = await harness.scenario()
 

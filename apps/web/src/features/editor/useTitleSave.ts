@@ -5,18 +5,13 @@ import { useState } from 'react'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { isApiError, type ApiError } from '../../data/errors.ts'
 import { keysAfterMutation } from '../../data/queryKeys.ts'
+import { clipToCodePoints } from './clipToCodePoints.ts'
 import { documentQuery } from './documentQuery.ts'
 
 type DocumentMeta = Schema<'Document'>
 
 /** What went wrong with the title, which the field says next to itself. */
 export type TitleProblem = 'required' | 'tooLong' | 'conflict' | 'failed'
-
-/** The text cut to a number of Unicode code points, which is how the contract counts: an emoji is one, though it is two UTF-16 units. */
-const clipToCodePoints = (text: string, max: number) => {
-  const points = [...text]
-  return points.length <= max ? text : points.slice(0, max).join('')
-}
 
 /** The document the server holds now, when the answer says the title was changed under us. */
 function currentFromConflict(error: ApiError): DocumentMeta | null {

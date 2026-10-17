@@ -1,7 +1,7 @@
 // The mock plays the server here (a document made from a template is written by the server), so it may do what
 // the server does.
 // oxlint-disable-next-line no-restricted-imports
-import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
+import { InvalidDocumentError, jsonToYUpdate, yUpdateToJson } from '@draftroom/editor-schema/convert'
 import type { DataSource } from '../../DataSource.ts'
 import type { DocumentRecord } from '../fixtures/documents.ts'
 import { templateContent } from '../fixtures/templateContent.ts'
@@ -18,6 +18,7 @@ type DocumentOperations = Pick<
   DataSource,
   | 'listDocuments'
   | 'createDocument'
+  | 'duplicateDocument'
   | 'getDocument'
   | 'updateDocument'
   | 'deleteDocument'
@@ -121,6 +122,42 @@ export function documentOperations(ctx: Context): DocumentOperations {
         ctx.startContent(document.id, jsonToYUpdate({ type: 'doc', content: [...content] }))
       }
       return documentView(world, document, user.id)
+    },
+
+    duplicateDocument: async ({ params: { path }, body }) => {
+      const user = caller(ctx)
+      checkTexts(['/title', body.title, textLimits.documentTitle])
+      const { document: original } = documentOf(ctx, path.documentId)
+      const { workspace } = workspaceOf(ctx, original.workspaceId)
+      checkFolder(workspace.id, body.folderId, '/folderId')
+
+      // As the server does: the content is read from what is stored and written again as a new document's own, so
+      // nothing but text and structure crosses over. Comments, versions, access and activity stay with the original.
+      let content: ReturnType<typeof yUpdateToJson>
+      try {
+        content = yUpdateToJson(ctx.live.state(original.id))
+      } catch (error) {
+        throw error instanceof InvalidDocumentError ? conflict() : error
+      }
+      const at = world.now()
+      const copy: DocumentRecord = {
+        id: world.newId(),
+        workspaceId: workspace.id,
+        folderId: body.folderId === undefined ? original.folderId : body.folderId,
+        title: body.title,
+        excerpt: original.excerpt,
+        revision: 1,
+        generalAccess: 'none',
+        createdBy: user.id,
+        createdAt: at,
+        updatedAt: at,
+        archivedAt: null,
+      }
+      world.documents.push(copy)
+      world.grants.push({ documentId: copy.id, userId: user.id, role: 'owner', createdAt: at })
+      record(world, 'document.created', user.id, copy.id)
+      ctx.startContent(copy.id, jsonToYUpdate(content))
+      return documentView(world, copy, user.id)
     },
 
     getDocument: async ({ params: { path } }) => {

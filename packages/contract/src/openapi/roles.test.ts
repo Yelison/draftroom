@@ -57,6 +57,7 @@ const operationAccess: [string, string, string[]][] = [
   ['listDocuments', 'workspace', ['workspace-read']],
   ['createDocument', 'workspace', ['create-content']],
   ['getDocument', 'document', ['read']],
+  ['duplicateDocument', 'document', ['read']],
   ['updateDocument', 'document', ['rename-move']],
   ['archiveDocument', 'document', ['archive-delete']],
   ['restoreDocument', 'document', ['archive-delete']],

@@ -313,6 +313,32 @@ export interface paths {
         patch: operations["updateDocument"];
         trace?: never;
     };
+    "/api/documents/{documentId}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Duplicate a document as a new one
+         * @description Copies the **content** of the document into a new document that the caller owns, built from the content the way a template is: the copy has the text and structure of the original and nothing else. Comments, versions, access and activity are not copied, and neither is the map of position migrations that editing leaves in the original, so the copy is far smaller than an original with many structural edits. It is the way out of a document that has grown past the size limit, where every write that adds content is refused. The original is not changed: not its content, its `revision` nor its `updatedAt`.
+         *
+         *     The content copied is the one the server has stored, not what a connection has open and has not been stored yet. The caller gets an explicit `owner` grant on the copy and `generalAccess` starts at `none`, as for any new document; one `document.created` event is recorded for it and none for the original. The `title` is the caller's: the server does not translate, so the client writes it in the person's language. A `folderId` that is unknown, or belongs to another workspace, is a `400 validation-failed` with `invalid-value` at `/folderId`. When it is omitted the copy goes to the folder of the original, and `null` puts it at the top level of the workspace. An archived original is a `404`, as for every operation but the ones that restore or delete it.
+         *
+         *     A stored state that the editor schema cannot read is a `409 conflict`: nothing is created. The server never stores such a state, so it points at damage to the stored data.
+         *
+         *     Required document role. Read metadata and content: viewer, commenter, editor, owner. Creating the copy also needs the workspace role that creates documents (member, owner), which everyone who can read a document has.
+         */
+        post: operations["duplicateDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{documentId}/archive": {
         parameters: {
             query?: never;
@@ -1090,6 +1116,10 @@ export interface components {
             templateId?: string;
             /** @description The language of the template's content; `en` when omitted. Only valid together with `templateId`. */
             locale?: components["schemas"]["Locale"];
+        };
+        DuplicateDocumentRequest: {
+            title: components["schemas"]["DocumentTitle"];
+            folderId?: components["schemas"]["NullableId"];
         };
         UpdateDocumentRequest: {
             title?: components["schemas"]["DocumentTitle"];
@@ -1871,6 +1901,39 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["DocumentStale"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Unexpected"];
+        };
+    };
+    duplicateDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateDocumentRequest"];
+            };
+        };
+        responses: {
+            /** @description The new document. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             413: components["responses"]["TooLarge"];
             default: components["responses"]["Unexpected"];
         };

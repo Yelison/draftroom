@@ -101,6 +101,7 @@ export const mutationInvalidations = {
   deleteFolder: ['folders', 'documentLists'],
 
   createDocument: ['documentLists', 'workspaceActivity'],
+  duplicateDocument: ['documentLists', 'workspaceActivity'],
   updateDocument: ['document', 'documentLists', 'pinned', 'shared', 'workspaceActivity', 'documentActivity'],
   archiveDocument: ['document', 'documentLists', 'pinned', 'shared', 'workspaceActivity'],
   restoreDocument: ['document', 'documentLists', 'pinned', 'shared', 'workspaceActivity'],

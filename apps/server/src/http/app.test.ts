@@ -116,6 +116,7 @@ const implementedOperations = [
   'listDocuments',
   'createDocument',
   'getDocument',
+  'duplicateDocument',
   'updateDocument',
   'archiveDocument',
   'restoreDocument',

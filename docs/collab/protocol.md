@@ -153,6 +153,7 @@ Every other message passes untouched. Consequences, which T2.1 tests (§15):
 
 - Every client answers the server's SyncStep1 with a SyncStep2 during the handshake, even when it has nothing to send. That one adds nothing, so it passes: **opening and reading a document over the limit works** for editors, commenters and viewers.
 - A message that only deletes passes. The way down from an oversized document is to delete content, or for an owner to restore a smaller version (§11.4, which this guard does not apply to). The size is measured again at the next store.
+- Deleting or restoring does not always bring a document down: the position-migration map is never pruned (§2), so the exit besides them is `duplicateDocument` (REST), which copies the content into a **new** document, without comments, versions, access or the map, and leaves the original untouched and readable (ADR 0011, decision 4).
 - A message that adds content is refused: the server (1) sends this connection the stateless event `document-too-large`; (2) closes its socket with `4413` (§6); (3) throws, so the message is not applied. Other connections are unaffected and keep reading.
 
 Closing, rather than silently dropping, is deliberate: a dropped update would be acknowledged with neither `SyncStatus(true)` nor an error and would leave the client "synchronising" forever.

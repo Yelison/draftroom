@@ -33,7 +33,7 @@ Every operation lists its rows under `x-draftroom-roles`, and a contract test pi
 
 | Matrix row | Roles | Operations |
 | --- | --- | --- |
-| Read metadata and content, open over WebSocket (read-only) | viewer, commenter, editor, owner | `getDocument`, `listDocumentActivity` (and the collaboration connection) |
+| Read metadata and content, open over WebSocket (read-only) | viewer, commenter, editor, owner | `getDocument`, `listDocumentActivity`, `duplicateDocument` (which also needs the workspace role that creates documents, and every reader has it) (and the collaboration connection) |
 | Write content over WebSocket | editor, owner | none: the collaboration connection only |
 | List and read comments | viewer, commenter, editor, owner | `listThreads` |
 | Create thread, reply, resolve, reopen | commenter, editor, owner | `createThread`, `replyToThread`, `resolveThread`, `reopenThread` |
@@ -79,7 +79,7 @@ Every 4xx and 5xx is `application/problem+json` (RFC 9457) with `type`, `title`,
 | `not-found` | 404 | The resource does not exist, or the caller cannot read it. |
 | `revision-conflict` | 409 | A stale `revision`; the body carries `current`. |
 | `last-owner` | 409 | The change would leave a workspace or a document without an owner. |
-| `conflict` | 409 | The request conflicts with the current state: the email is already registered or already a member, deleting a document that is not archived, deleting a folder that still holds documents, and restoring a version while people keep editing the document so that it cannot be replaced after three attempts (nothing is restored and no `pre-restore` version is kept: ask again). |
+| `conflict` | 409 | The request conflicts with the current state: the email is already registered or already a member, deleting a document that is not archived, deleting a folder that still holds documents, duplicating a document whose stored state the schema cannot read (nothing is created; trying again does not help), and restoring a version while people keep editing the document so that it cannot be replaced after three attempts (nothing is restored and no `pre-restore` version is kept: ask again). |
 | `too-large` | 413 | A text in the request body is longer than its limit, or the body is bigger than the server accepts. |
 | `rate-limited` | 429 | Too many attempts; `Retry-After` says when to retry. |
 | `internal-error` | 500 | An unhandled failure. |
@@ -150,7 +150,7 @@ Query keys live in one module, `apps/web/src/data/queryKeys.ts`. Each mutation l
 | `updateDocument` | the document, the document lists, pinned, shared, workspace activity, that document's activity |
 | `archiveDocument`, `restoreDocument`, `deleteDocument` | the document, the document lists, pinned, shared, workspace activity |
 | `pinDocument`, `unpinDocument` | the document, pinned, the document lists, shared |
-| `createDocument` | the document lists, workspace activity |
+| `createDocument`, `duplicateDocument` | the document lists, workspace activity |
 | `createFolder`, `updateFolder`, `deleteFolder` | the folders, the document lists |
 | `setAccess`, `removeAccess`, `setGeneralAccess` | the access list, the document, shared, workspace activity, that document's activity |
 | `createThread`, `replyToThread`, `resolveThread`, `reopenThread`, `updateComment`, `deleteComment` | the document's threads, workspace activity, that document's activity |

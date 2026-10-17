@@ -69,3 +69,28 @@ export function documentOfAtLeast(bytes: number): Y.Doc {
   }
   return doc
 }
+
+/** The map `@tiptap/y-tiptap` writes on structural edits and never prunes (ADR 0011, decision 2). */
+export const positionMigrationsName = '__tiptap_position_migrations:root:default'
+
+/**
+ * Adds entries to that map in the shape the binding writes and reads (`PositionMigration`), about a kilobyte each: a
+ * document that has had many structural edits, without the text that would make it long.
+ */
+export function addPositionMigrations(doc: Y.Doc, entries: number): void {
+  const map = doc.getMap(positionMigrationsName)
+  doc.transact(() => {
+    for (let entry = 0; entry < entries; entry += 1) {
+      map.set(`1:${entry}`, {
+        version: 1,
+        client: 1,
+        clock: entry,
+        seen: [[1, entry]],
+        transfers: Array.from({ length: 20 }, (_, index) => ({
+          source: { client: 1, clock: entry * 20 + index, length: 1 },
+          target: null,
+        })),
+      })
+    }
+  })
+}

@@ -996,6 +996,68 @@ paths:
           - row: archive-delete
             roles:
               - owner
+  /api/documents/{documentId}/duplicate:
+    post:
+      operationId: duplicateDocument
+      tags:
+        - Documents
+      summary: Duplicate a document as a new one
+      description: |-
+        Copies the **content** of the document into a new document that the caller owns, built from the content the way a template is: the copy has the text and structure of the original and nothing else. Comments, versions, access and activity are not copied, and neither is the map of position migrations that editing leaves in the original, so the copy is far smaller than an original with many structural edits. It is the way out of a document that has grown past the size limit, where every write that adds content is refused. The original is not changed: not its content, its `revision` nor its `updatedAt`.
+
+        The content copied is the one the server has stored, not what a connection has open and has not been stored yet. The caller gets an explicit `owner` grant on the copy and `generalAccess` starts at `none`, as for any new document; one `document.created` event is recorded for it and none for the original. The `title` is the caller's: the server does not translate, so the client writes it in the person's language. A `folderId` that is unknown, or belongs to another workspace, is a `400 validation-failed` with `invalid-value` at `/folderId`. When it is omitted the copy goes to the folder of the original, and `null` puts it at the top level of the workspace. An archived original is a `404`, as for every operation but the ones that restore or delete it.
+
+        A stored state that the editor schema cannot read is a `409 conflict`: nothing is created. The server never stores such a state, so it points at damage to the stored data.
+
+        Required document role. Read metadata and content: viewer, commenter, editor, owner. Creating the copy also needs the workspace role that creates documents (member, owner), which everyone who can read a document has.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DuplicateDocumentRequest'
+            examples:
+              default:
+                value:
+                  title: Copia de «Notas de la reunión de otoño»
+      responses:
+        '201':
+          description: The new document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+              examples:
+                default:
+                  $ref: '#/components/examples/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Unexpected'
+      security:
+        - session: []
+          csrf: []
+      x-draftroom-roles:
+        scope: document
+        rules:
+          - row: read
+            roles:
+              - viewer
+              - commenter
+              - editor
+              - owner
   /api/documents/{documentId}/archive:
     post:
       operationId: archiveDocument
@@ -3088,6 +3150,16 @@ components:
       dependentRequired:
         locale:
           - templateId
+    DuplicateDocumentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+      properties:
+        title:
+          $ref: '#/components/schemas/DocumentTitle'
+        folderId:
+          $ref: '#/components/schemas/NullableId'
     UpdateDocumentRequest:
       type: object
       additionalProperties: false

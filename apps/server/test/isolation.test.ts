@@ -118,6 +118,14 @@ const routes: readonly (readonly [string, (ids: Ids) => Omit<Call, 'as'>])[] = [
       body: { title: 'Budget', revision: 1 },
     }),
   ],
+  [
+    'duplicateDocument',
+    ({ documentId }) => ({
+      method: 'POST',
+      url: `/api/documents/${documentId}/duplicate`,
+      body: { title: 'Copy of Budget' },
+    }),
+  ],
   ['archiveDocument', ({ documentId }) => ({ method: 'POST', url: `/api/documents/${documentId}/archive` })],
   ['restoreDocument', ({ documentId }) => ({ method: 'POST', url: `/api/documents/${documentId}/restore` })],
   ['deleteDocument', ({ documentId }) => ({ method: 'DELETE', url: `/api/documents/${documentId}` })],

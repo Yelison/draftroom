@@ -1,5 +1,5 @@
 import type { Kysely } from 'kysely'
-import { writeDocumentState } from '../db/documents/state.ts'
+import { readDocumentState, writeDocumentState } from '../db/documents/state.ts'
 import type { Database } from '../db/tables.ts'
 
 /** Where the binary Yjs state of documents is kept. The collaboration server is its only writer (ADR 0005). */
@@ -12,14 +12,7 @@ export interface StateStore {
 
 export function createPostgresStateStore(database: Kysely<Database>): StateStore {
   return {
-    async load(documentId) {
-      const row = await database
-        .selectFrom('document_states')
-        .select('state')
-        .where('document_id', '=', documentId)
-        .executeTakeFirst()
-      return row?.state
-    },
+    load: (documentId) => readDocumentState(database, documentId),
 
     save: (documentId, state) => writeDocumentState(database, documentId, state),
   }

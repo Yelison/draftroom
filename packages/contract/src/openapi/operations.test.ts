@@ -26,6 +26,7 @@ const planOperations = [
   'POST /api/workspaces/{workspaceId}/documents',
   'GET /api/documents/{documentId}',
   'PATCH /api/documents/{documentId}',
+  'POST /api/documents/{documentId}/duplicate',
   'POST /api/documents/{documentId}/archive',
   'POST /api/documents/{documentId}/restore',
   'DELETE /api/documents/{documentId}',
