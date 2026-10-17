@@ -1,6 +1,6 @@
 import { hash as argon2Hash, verify as argon2Verify } from '@node-rs/argon2'
 import { describe, expect, it } from 'vitest'
-import { createPasswords, hashParameters, type Argon2 } from './passwords.ts'
+import { createPasswords, type Argon2 } from './passwords.ts'
 
 const passwords = createPasswords()
 
@@ -21,11 +21,8 @@ describe('a stored password', () => {
   it('is an Argon2id hash with the parameters the decision records', async () => {
     const stored = await passwords.hash('correct horse battery staple')
 
-    expect(stored).toMatch(
-      new RegExp(
-        `^\\$argon2id\\$v=19\\$m=${hashParameters.memoryCost},t=${hashParameters.timeCost},p=${hashParameters.parallelism}\\$`,
-      ),
-    )
+    // The figures of ADR 0004: a change to them is a change to the decision.
+    expect(stored.startsWith('$argon2id$v=19$m=19456,t=2,p=1$')).toBe(true)
   })
 
   it('does not hold the password', async () => {
@@ -90,8 +87,6 @@ describe('checking a password for an account that does not exist', () => {
     const argon2 = countingArgon2()
     await createPasswords(argon2).matches('x', null)
 
-    expect(argon2.verified[0]).toContain(
-      `m=${hashParameters.memoryCost},t=${hashParameters.timeCost},p=${hashParameters.parallelism}`,
-    )
+    expect(argon2.verified[0]).toContain('m=19456,t=2,p=1')
   })
 })
