@@ -1,6 +1,6 @@
-import { execFile } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
@@ -83,6 +83,31 @@ async function populate(name: string, body: string): Promise<void> {
 const notes = (name: string) =>
   query<{ id: number; body: string; state: Buffer }>(name, 'select * from notes order by id')
 
+/**
+ * A `docker` that logs its arguments and runs `hook` first, a shell snippet that can end the call or change what it does, and
+ * otherwise runs the real one: the way to see what the scripts ask Docker for and to make one step of them fail.
+ */
+function dockerShim(hook = ''): { readonly path: string; readonly log: string; readonly directory: string } {
+  const directory = mkdtempSync(join(workDirectory, 'shim-'))
+  const bin = join(directory, 'bin')
+  const log = join(directory, 'docker-arguments.log')
+  mkdirSync(bin)
+  const real = execFileSync('which', ['docker']).toString().trim()
+  writeFileSync(join(bin, 'docker'), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${log}'\n${hook}\nexec '${real}' "$@"\n`)
+  chmodSync(join(bin, 'docker'), 0o755)
+  return { path: `${bin}:${process.env['PATH'] ?? ''}`, log, directory }
+}
+
+/** A table big enough that the data is most of an archive of it, and the table of contents at the start a small part. */
+async function populateBig(name: string): Promise<void> {
+  await query('postgres', `create database "${name}"`)
+  await query(name, 'create table notes (id int primary key, body text not null)')
+  await query(
+    name,
+    `insert into notes select n, md5(random()::text) || md5(random()::text) from generate_series(1, 20000) as n`,
+  )
+}
+
 /** A backup of `draftroom` as it is now. */
 async function backUp(): Promise<string> {
   const outcome = await run('backup.sh', [workDirectory])
@@ -96,6 +121,7 @@ let archive: string
 beforeAll(async () => {
   await populate('draftroom', 'the minutes of the board')
   archive = await backUp()
+  await populateBig('big_source')
 })
 
 describe('backup.sh', () => {
@@ -130,26 +156,32 @@ describe('backup.sh', () => {
   })
 
   it('never puts a password on a command line, where `ps` would show it', async () => {
-    const shim = join(workDirectory, 'shim')
-    const log = join(workDirectory, 'docker-arguments.log')
-    const realDocker = (await import('node:child_process')).execFileSync('which', ['docker']).toString().trim()
-    rmSync(shim, { recursive: true, force: true })
-    mkdtempSync(join(workDirectory, 'unused-'))
-    const { mkdirSync } = await import('node:fs')
-    mkdirSync(shim)
-    writeFileSync(join(shim, 'docker'), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${log}'\nexec '${realDocker}' "$@"\n`)
-    chmodSync(join(shim, 'docker'), 0o755)
+    const shim = dockerShim()
     const secret = `s3cret-${randomUUID()}`
 
-    const outcome = await run('backup.sh', [workDirectory], {
-      PATH: `${shim}:${process.env['PATH'] ?? ''}`,
+    const outcome = await run('backup.sh', [join(shim.directory, 'out')], {
+      PATH: shim.path,
       POSTGRES_PASSWORD: secret,
       PGPASSWORD: secret,
     })
 
     expect(outcome.code, outcome.stderr).toBe(0)
-    expect(readFileSync(log, 'utf8')).toContain('pg_dump')
-    expect(readFileSync(log, 'utf8')).not.toContain(secret)
+    expect(readFileSync(shim.log, 'utf8')).toContain('pg_dump')
+    expect(readFileSync(shim.log, 'utf8')).not.toContain(secret)
+  })
+
+  it('does not keep a dump that is cut short on its way to the file, although its table of contents reads', async () => {
+    // `head -c` ends the dump half way, as a full disk or a dropped connection would.
+    const shim = dockerShim(
+      `case "$*" in *pg_dump*) '${execFileSync('which', ['docker']).toString().trim()}' "$@" | head -c 200000; exit 0 ;; esac`,
+    )
+    const output = join(shim.directory, 'out')
+
+    const outcome = await run('backup.sh', [output], { PATH: shim.path, POSTGRES_DB: 'big_source' })
+
+    expect(outcome.code).not.toBe(0)
+    expect(outcome.stderr).toContain('cannot be read back')
+    expect(readdirSync(output)).toEqual([])
   })
 })
 
@@ -195,11 +227,63 @@ describe('restore.sh', () => {
     // PostgreSQL waits five seconds for the other connections to go before it refuses to drop the database.
   }, 20_000)
 
+  describe('with an archive that a cut transfer left without the end of its data', () => {
+    let truncated: string
+    beforeAll(async () => {
+      const whole = await run('backup.sh', [workDirectory], { POSTGRES_DB: 'big_source' })
+      expect(whole.code, whole.stderr).toBe(0)
+      const bytes = readFileSync(whole.stdout.trim())
+      truncated = join(workDirectory, 'cut-short.dump')
+      writeFileSync(truncated, bytes.subarray(0, Math.floor(bytes.length / 2)))
+    })
+
+    it('leaves the database it was told to overwrite with its rows, even with --yes', async () => {
+      await populate('survivor', 'written before the transfer was cut')
+
+      const outcome = await run('restore.sh', ['--yes', truncated, 'survivor'])
+
+      expect(outcome.code).not.toBe(0)
+      expect(outcome.stderr).toContain('not a complete, readable backup')
+      expect((await notes('survivor')).map((note) => note.body)).toEqual(['written before the transfer was cut'])
+    })
+
+    it('refuses a backup that was cut short when it was written', async () => {
+      const outcome = await run('restore.sh', [truncated, 'never_created'])
+
+      expect(outcome.code).not.toBe(0)
+      expect(await databaseExists('never_created')).toBe(false)
+    })
+  })
+
+  it('keeps the database it was told to overwrite, and drops its scratch copy, when the restore itself fails', async () => {
+    await populate('survives_failure', 'written before the restore failed')
+    // The whole archive reads, so every check passes, and the restore into the scratch database is what fails.
+    const shim = dockerShim(
+      `case "$*" in *--single-transaction*) cat >/dev/null; echo 'injected failure' >&2; exit 1 ;; esac`,
+    )
+
+    const outcome = await run('restore.sh', ['--yes', archive, 'survives_failure'], { PATH: shim.path })
+
+    expect(outcome.code).not.toBe(0)
+    expect(outcome.stderr).toContain("'survives_failure' was not touched")
+    expect((await notes('survives_failure')).map((note) => note.body)).toEqual(['written before the restore failed'])
+    expect(await query('postgres', `select datname from pg_database where datname like 'restore\\_%'`)).toEqual([])
+  })
+
+  it('leaves no scratch or previous database behind after replacing one', async () => {
+    await populate('replaced_clean', 'about to be replaced')
+
+    const outcome = await run('restore.sh', ['--yes', archive, 'replaced_clean'])
+
+    expect(outcome.code, outcome.stderr).toBe(0)
+    expect(await query('postgres', `select datname from pg_database where datname like 'restore\\_%'`)).toEqual([])
+  })
+
   const refusals: ReadonlyArray<readonly [what: string, args: () => string[], message: string]> = [
     [
       'a file that is not a backup',
       () => [join(workDirectory, 'not-a-backup.dump'), 'refused_target'],
-      'not a readable backup',
+      'not a complete, readable backup',
     ],
     ['a file that is not there', () => [join(workDirectory, 'missing.dump'), 'refused_target'], 'is not a file'],
     [
@@ -208,6 +292,9 @@ describe('restore.sh', () => {
       'not a plain database name',
     ],
     ['no target at all', () => [archive], 'usage:'],
+    ['postgres as the target', () => [archive, 'postgres'], 'database of PostgreSQL itself'],
+    ['template0 as the target', () => [archive, 'template0'], 'database of PostgreSQL itself'],
+    ['template1 as the target', () => [archive, 'template1'], 'database of PostgreSQL itself'],
   ]
   it.each(refusals)('refuses %s and creates nothing', async (_what, args, message) => {
     writeFileSync(join(workDirectory, 'not-a-backup.dump'), 'just some text')

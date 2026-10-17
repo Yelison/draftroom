@@ -22,12 +22,12 @@ mkdir -p -- "$output_dir"
 archive="$output_dir/draftroom-$database-$(date -u +%Y%m%dT%H%M%SZ).dump"
 [[ ! -e "$archive" ]] || die "$archive already exists; a backup is never overwritten"
 
-# Written beside its final name and moved when it is complete and has been read back: a dump that failed halfway never
-# looks like a backup.
+# Written beside its final name and moved when it is complete and has been read to its end: a dump that failed halfway never
+# looks like a backup. `--list` would only read the table of contents at the start of the file.
 partial="$archive.partial"
 trap 'rm -f -- "$partial"' EXIT
 docker exec "$container" pg_dump --format=custom --username "$user" --dbname "$database" >"$partial"
-docker exec -i "$container" pg_restore --list <"$partial" >/dev/null || die 'the archive that was written cannot be read back'
+docker exec -i "$container" pg_restore --file=/dev/null <"$partial" >/dev/null || die 'the archive that was written cannot be read back'
 mv -- "$partial" "$archive"
 
 echo "backed up '$database' to $archive ($(wc -c <"$archive") bytes)" >&2
