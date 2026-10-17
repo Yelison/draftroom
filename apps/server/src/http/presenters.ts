@@ -3,6 +3,7 @@ import type { GrantRow } from '../db/access/queries.ts'
 import type { CommentRecord, PersonRef, ThreadRecord } from '../db/comments/queries.ts'
 import { roleOf, type DocumentRecord } from '../db/documents/caller-documents.ts'
 import type { FolderRow } from '../db/folders.ts'
+import type { ProfileRow } from '../db/profile.ts'
 import type { MemberRow } from '../db/members/queries.ts'
 import type { VersionRecord } from '../db/versions/queries.ts'
 import type { WorkspaceOfMember } from '../db/workspaces.ts'
@@ -15,6 +16,15 @@ export const presentWorkspace = (workspace: WorkspaceOfMember): Schema<'Workspac
   name: workspace.name,
   role: workspace.role,
   createdAt: workspace.createdAt.toISOString(),
+})
+
+/** The person of a session, who signed up and so has a name. */
+export const presentMe = (person: ProfileRow & { readonly name: string }): Schema<'Me'> => ({
+  id: person.id,
+  email: person.email,
+  name: person.name,
+  locale: person.locale,
+  editorTextSize: person.editorTextSize,
 })
 
 export const presentFolder = (folder: FolderRow): Schema<'Folder'> => ({

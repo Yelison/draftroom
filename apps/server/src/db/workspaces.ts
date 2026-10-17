@@ -20,6 +20,17 @@ export function workspacesOf(db: Kysely<Database>, userId: string): Promise<Work
   return memberWorkspaces(db, userId).orderBy('w.name').orderBy('w.id').execute()
 }
 
+/** Gives the workspace its new name and answers the name it has now. */
+export async function renameWorkspace(db: Kysely<Database>, workspaceId: string, name: string): Promise<string> {
+  const renamed = await db
+    .updateTable('workspaces')
+    .set({ name })
+    .where('id', '=', workspaceId)
+    .returning('name')
+    .executeTakeFirstOrThrow()
+  return renamed.name
+}
+
 /** The workspace, or nothing when it does not exist or the person is not in it: the two are the same to them. */
 export function workspaceOf(
   db: Kysely<Database>,

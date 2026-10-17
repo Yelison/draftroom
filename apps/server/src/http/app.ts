@@ -23,6 +23,7 @@ import { documentRoutes } from './routes/documents.ts'
 import { folderRoutes } from './routes/folders.ts'
 import { healthRoutes } from './routes/health.ts'
 import { memberRoutes } from './routes/members.ts'
+import { profileRoutes } from './routes/profile.ts'
 import { pinRoutes } from './routes/pins.ts'
 import { templateRoutes } from './routes/templates.ts'
 import { versionRoutes } from './routes/versions.ts'
@@ -121,6 +122,7 @@ export function buildApp({
   const dependencies = { contract, database, broadcaster, liveAccess, liveDocuments }
   for (const routes of [
     healthRoutes,
+    profileRoutes,
     workspaceRoutes,
     memberRoutes,
     folderRoutes,

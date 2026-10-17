@@ -10,8 +10,6 @@ import type { AuthProvider } from '../../src/http/auth/auth-provider.ts'
 import { noLiveDocuments, silentBroadcaster, silentLiveAccess } from './broadcasters.ts'
 import { unreachableDatabaseUrl } from './unreachable-database.ts'
 
-const workspaceId = '3d9b2c10-5e7a-4c4d-8f21-7a6b9c0d1e22'
-
 let contract: Contract
 beforeAll(() => {
   contract = loadContract()
@@ -88,13 +86,17 @@ describe('the contract client', () => {
       contract,
       onContractViolation: (violation) => violations.push(violation),
     })
-    // `updateWorkspace` has no route of its own yet, so the test brings one that answers against the contract.
-    app.route(operationRoute(contract, 'updateWorkspace', () => ({ id: 'not-a-uuid' })))
+    // `signIn` has no route of its own yet, so the test brings one that answers against the contract.
+    app.route(operationRoute(contract, 'signIn', () => ({ id: 'not-a-uuid' })))
     const client = createContractClient(app, contract, new ContractCoverage(), violations)
 
     await expect(
-      client.request({ method: 'PATCH', url: `/api/workspaces/${workspaceId}`, payload: { name: 'Almazara' } }),
-    ).rejects.toThrow(/answered updateWorkspace against the contract/)
+      client.request({
+        method: 'POST',
+        url: '/api/auth/sign-in',
+        payload: { email: 'marta@harborpine.example', password: 'a long enough password' },
+      }),
+    ).rejects.toThrow(/answered signIn against the contract/)
     await database.destroy()
   })
 

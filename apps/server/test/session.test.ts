@@ -69,7 +69,12 @@ describe('who is calling', () => {
 
   const sessionRoutes: readonly (readonly [string, Call])[] = [
     ['getMe', { method: 'GET', url: '/api/me' }],
+    ['updateMe, with a body that is wrong', { method: 'PATCH', url: '/api/me', body: { name: '' } }],
     ['listWorkspaces', { method: 'GET', url: '/api/workspaces' }],
+    [
+      'updateWorkspace, with a body that is wrong',
+      { method: 'PATCH', url: `/api/workspaces/${randomUUID()}`, body: { name: '' } },
+    ],
     ['getDocument', { method: 'GET', url: `/api/documents/${randomUUID()}` }],
     [
       'createDocument, with a body that is wrong',
