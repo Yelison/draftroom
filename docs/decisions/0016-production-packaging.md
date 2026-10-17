@@ -62,11 +62,16 @@ The tools are then always the server's version (a host with PostgreSQL 16 tools 
 runner has), and they connect over the container's local socket as the container's own user, so no credential is read, passed or
 written. A password cannot appear in `ps` if there is none.
 
-- A backup is a custom-format archive written beside its final name, read back with `pg_restore --list` and only then moved,
-  readable by its owner only, and never overwrites another.
-- A restore names its target database (a plain identifier, checked), verifies that the file is an archive before it touches
-  anything, creates a missing database, and drops and recreates one that holds data only when asked to by `--yes` or by typing the
-  name, and only if nobody is connected to it.
+- A backup is a custom-format archive written beside its final name, read back **to its end** (`pg_restore --file=/dev/null`; `--list`
+  would only read the table of contents at the start of the file, which a cut transfer still has) and only then moved, readable by
+  its owner only, and never overwrites another.
+- A restore names its target database (a plain identifier, checked; `postgres`, `template0` and `template1` are refused) and
+  reads the whole archive before it touches anything. It restores into a **scratch database** and replaces the target only when the
+  restore went all the way: it renames the target aside, renames the scratch database into place and drops what it replaced last.
+  A target that does not exist is created the same way. Replacing a database that holds data needs `--yes` or the typed name, and
+  a database nobody is connected to (PostgreSQL refuses the rename otherwise, which is the reminder to stop the server). If any step
+  fails the target is as it was and the scratch database is dropped, so a damaged or truncated archive can never cost the database
+  it was meant to recover.
 - A host that does not run the stack in Docker takes the same two commands by hand (`docs/deploy/README.md`); the scripts exist for
   the Compose stack, and that is what the tests and the CI drill exercise.
 
