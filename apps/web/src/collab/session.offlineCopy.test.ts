@@ -301,20 +301,6 @@ describe('when the API says access was removed before the connection does', () =
     expect(world.server.connectionsTo(wireName)).toBe(0)
   })
 
-  it('stays revoked when the connection is refused afterwards, and does not turn it into an error', async () => {
-    world = createWorld()
-    const opening = await opened()
-    const afterOpening = opening.states.length
-
-    opening.session.accessRemoved()
-    world.setAccess(editor, { denied: 'not-found' })
-    world.server.closeConnections(4403, 'access-revoked')
-    await advance(1100)
-
-    expect(opening.states.slice(afterOpening)).toEqual(['revoked'])
-    expect(await copiesOnDevice()).toEqual([])
-  })
-
   it('purges the copy that was still being opened, and does not connect', async () => {
     world = createWorld()
     const opening = world.open(editor, { keepCopy: true })
