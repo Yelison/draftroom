@@ -56,12 +56,11 @@ async function accessRemovedDuringTheOutage(join: (person: DemoPerson) => Promis
     collaboration?.setReachable(true)
     await priya.context.setOffline(false)
     await refusedByTheApi
-    // The answer has reached the page; the screen still has to take it in. Where it replaces the editor with its own message
-    // that happens at once and is waited for here. Where it keeps the editor there is nothing to wait for, and the wait ends.
+    // The answer has reached the page; the screen still has to take it in, and the connection is released only after it has:
+    // what the screen says of it (the removal of access, or that the document is not available) is the sign that it did.
     await priya.page
-      .getByRole('heading', { name: "This document isn't available" })
-      .waitFor({ timeout: 2_000 })
-      .catch(() => undefined)
+      .getByRole('heading', { name: /Your access to this document was removed|This document isn't available/ })
+      .waitFor()
     collaboration?.release()
   }
   return { documentId, daniel, priya }
@@ -96,23 +95,29 @@ test.describe('access removed while the person was offline, when the collaborati
   })
 })
 
-// FINDING (see the delivery of t24): when the API's 404 reaches the screen before the collaboration server's refusal reaches
-// the session, the editor is taken out of the page, with its session, and the session is the one that deletes the copy: the
-// copy stays on the device and the screen says that the document is not available. The order is the test's, not the
-// network's (the connection is held until the screen has taken the 404 in), so these two tests give the same result on every
-// run. Remove `test.fail` when the product handles this order: the tests will then fail on the annotation itself.
 test.describe('access removed while the person was offline, when the API refuses her first', () => {
+  test('what they wrote offline never reaches the server', async ({ join }) => {
+    const { documentId, daniel, priya } = await accessRemovedDuringTheOutage(join, 'api')
+
+    await expect(priya.page.getByRole('heading', { name: 'Your access to this document was removed' })).toBeVisible()
+    // The connection was let through after the API's refusal: it has had the time to send what she wrote, if it could.
+    await priya.page.waitForTimeout(3 * RECONNECT_INITIAL_DELAY_MS)
+    await daniel.typeAtEnd(' Daniel carries on.')
+    await expect(daniel.syncStatus).toHaveText('Sync status: Synced')
+    await expect.poll(() => storedText(documentId)).toBe(`${shared} Daniel carries on.`)
+    expect(await daniel.text()).toBe(`${shared} Daniel carries on.`)
+  })
+
   test('their offline copy is purged from the device', async ({ join }) => {
-    test.fail(true, 'the offline copy outlives the removal of access when the document query answers 404 first')
     const { priya } = await accessRemovedDuringTheOutage(join, 'api')
 
     await expect.poll(() => priya.localCopies(), { timeout: 15_000 }).toEqual([])
   })
 
   test('their screen says that the access was removed', async ({ join }) => {
-    test.fail(true, 'the screen shows the 404 of the document query instead of the removal of access')
     const { priya } = await accessRemovedDuringTheOutage(join, 'api')
 
     await expect(priya.page.getByRole('heading', { name: 'Your access to this document was removed' })).toBeVisible()
+    await expect(priya.page.getByRole('link', { name: 'Go to Documents' })).toBeVisible()
   })
 })
