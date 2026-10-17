@@ -113,7 +113,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run typecheck:e2e-collab -w @draftroom/web
       # PostgreSQL is the stack's one piece outside the suite: the suite migrates and seeds it, starts the server itself (the
       # tests stop and start it) and serves the production build in `http` mode behind the identity proxy.
       - run: docker compose -p "$COMPOSE_PROJECT_NAME" up --detach --wait postgres

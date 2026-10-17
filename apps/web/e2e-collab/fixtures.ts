@@ -74,12 +74,14 @@ export class Participant {
    * it), and everything the page says is passed on. While `hold()` is in effect a new connection waits to be made, and
    * `release()` lets it go: the order of two answers that the network leaves open is then the test's.
    *
-   * The connections are made from Node, not by the browser, so `context.setOffline` does not reach them. The test says when
-   * the server cannot be reached (`setReachable`), and a connection made then fails as it does for a browser that is offline.
+   * The connections are made from Node, not by the browser, so `context.setOffline` does not reach them: neither the page's
+   * half nor the server's. The test says when the server cannot be reached (`setReachable`): what is connected is closed on
+   * both sides, as a cut in the network does (the server stops seeing the person, and could not revoke a connection the
+   * page no longer has), and a connection made then fails as it does for a browser that is offline.
    */
   async controlCollaboration(): Promise<{ hold(): void; release(): void; setReachable(reachable: boolean): void }> {
     let reachable = true
-    const connected = new Set<WebSocketRoute>()
+    const connected = new Set<{ client: WebSocketRoute; server: WebSocketRoute }>()
     let gate: Promise<void> = Promise.resolve()
     let open = () => {}
     await this.page.routeWebSocket(/\/collab$/, async (client) => {
@@ -91,8 +93,12 @@ export class Participant {
       if (closed) return
       if (!reachable) return client.close()
       const server = client.connectToServer()
-      connected.add(client)
-      client.onClose(() => connected.delete(client))
+      const connection = { client, server }
+      connected.add(connection)
+      client.onClose(() => {
+        connected.delete(connection)
+        void server.close()
+      })
       for (const message of said) server.send(message)
       client.onMessage((message) => server.send(message))
     })
@@ -103,8 +109,13 @@ export class Participant {
       release: () => open(),
       setReachable: (value) => {
         reachable = value
-        // What is connected goes with the network, as it does for a browser that is offline.
-        if (!value) for (const client of connected) void client.close()
+        // What is connected goes with the network, on both sides.
+        if (!value) {
+          for (const { client, server } of connected) {
+            void client.close()
+            void server.close()
+          }
+        }
       },
     }
   }

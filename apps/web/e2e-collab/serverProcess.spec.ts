@@ -22,4 +22,16 @@ test.describe('the server process of the suite', () => {
 
     expect((await fetch(`${environment.apiOrigin}/api/health/ready`)).status).toBe(200)
   })
+
+  test('reports at once a server that dies before it answers, instead of waiting for its ports', async ({ server }) => {
+    await server.stop('SIGKILL')
+    // Both listeners on one port is a setting the server refuses to start with.
+    const broken = new ServerProcess({ COLLAB_PORT: String(environment.ports.api) })
+    const startedAt = Date.now()
+
+    await expect(broken.start()).rejects.toThrow(/exited with code 1 before it answered/)
+
+    expect(Date.now() - startedAt).toBeLessThan(20_000)
+    await server.start()
+  })
 })

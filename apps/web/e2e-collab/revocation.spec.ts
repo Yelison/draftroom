@@ -35,6 +35,8 @@ async function accessRemovedDuringTheOutage(join: (person: DemoPerson) => Promis
   await priya.context.setOffline(true)
   collaboration?.setReachable(false)
   await expect(priya.syncStatus).toHaveText('Sync status: Offline with local copy')
+  // The cut reaches the server's side too: it no longer sees her, so there is no live connection of hers for it to revoke.
+  await expect(daniel.presenceOf('Priya Raman')).toBeHidden()
   await priya.typeAtEnd(offlineText)
   await expect(priya.syncStatus).toHaveText('Sync status: Offline with local copy')
   expect(await priya.localCopies(), 'her device keeps what she wrote').toHaveLength(1)

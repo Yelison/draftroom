@@ -38,6 +38,9 @@ function acceptsConnections(port: number): Promise<boolean> {
 export class ServerProcess {
   private child: ChildProcess | undefined
 
+  /** `overrides` change the environment the server is started with, for a test that needs it to fail to start. */
+  constructor(private readonly overrides: NodeJS.ProcessEnv = {}) {}
+
   get running(): boolean {
     return this.child !== undefined
   }
@@ -57,7 +60,7 @@ export class ServerProcess {
     const log = openSync(serverLog, 'a')
     const child = spawn(process.execPath, ['src/main.ts'], {
       cwd: resolve(repositoryRoot, 'apps/server'),
-      env: serverEnvironment(),
+      env: { ...serverEnvironment(), ...this.overrides },
       stdio: ['ignore', log, log],
     })
     // The child holds its own descriptor of the file now.
@@ -66,11 +69,18 @@ export class ServerProcess {
     child.once('exit', () => {
       if (this.child === child) this.child = undefined
     })
-    await waitFor([`tcp://127.0.0.1:${ports.collaboration}`, `${apiOrigin}/api/health/ready`])
-    // What answered has to be this process: one that died while the ports were taken by another has answered for nothing.
-    if (child.exitCode !== null) {
-      throw new Error(`The server exited with code ${child.exitCode} while the stack answered; see ${serverLog}`)
-    }
+    // A server that dies before it answers (a wrong setting, a port taken between the check and the start) is reported at once
+    // and not after the whole wait. Once it has answered this promise is only left unused.
+    const diedBeforeAnswering = new Promise<never>((_, reject) => {
+      child.once('exit', (code) =>
+        reject(new Error(`The server exited with code ${code} before it answered; see ${serverLog}`)),
+      )
+    })
+    diedBeforeAnswering.catch(() => undefined)
+    await Promise.race([
+      waitFor([`tcp://127.0.0.1:${ports.collaboration}`, `${apiOrigin}/api/health/ready`]),
+      diedBeforeAnswering,
+    ])
   }
 
   /**
