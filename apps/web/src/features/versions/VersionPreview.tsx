@@ -16,8 +16,8 @@ export function VersionPreview({ documentId, version }: { documentId: string; ve
   const dateOf = useVersionDate()
 
   return (
-    <section className={styles.preview} aria-labelledby="versions-preview-title">
-      <h2 id="versions-preview-title" className={styles.previewTitle}>
+    <section className={styles.preview} aria-label={intl.formatMessage({ id: 'versions.preview.title' })}>
+      <h2 className={styles.previewTitle}>
         {version === null ? intl.formatMessage({ id: 'versions.preview.title' }) : (version.label ?? dateOf(version))}
       </h2>
       {version === null ? (
