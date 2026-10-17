@@ -215,9 +215,11 @@ describe('the collaborator of the demo', () => {
     // A document of the demo is only ever written from JSON; this is the one place a test makes a paragraph by hand.
     const paragraph = new Y.XmlElement('paragraph')
     paragraph.insert(0, [new Y.XmlText('Restored notes:')])
+    const seen = new Set<string>()
+    ydoc.on('update', () => seen.add(hers(ydoc)))
     fragment.insert(fragment.length, [paragraph])
     live(60_000)
 
-    expect(hers(ydoc).startsWith('Restored notes: ')).toBe(true)
+    expect([...seen].some((state) => state.startsWith('Restored notes: whether'))).toBe(true)
   })
 })
