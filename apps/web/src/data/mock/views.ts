@@ -1,6 +1,7 @@
 import type { Schema } from '@draftroom/contract'
 import type { ThreadRecord, VersionRecord, ActivityRecord } from './fixtures/collaboration.ts'
 import type { DocumentRecord, GrantRecord } from './fixtures/documents.ts'
+import type { PersonRecord } from './fixtures/people.ts'
 import type { FolderRecord, MembershipRecord, WorkspaceRecord } from './fixtures/workspaces.ts'
 import { documentRole } from './roles.ts'
 import type { World } from './world.ts'
@@ -12,6 +13,10 @@ export function userRef(world: World, userId: string): Schema<'UserRef'> {
   const person = world.people.find((row) => row.id === userId)
   if (person === undefined) throw new Error(`The mock has no person ${userId}`)
   return { id: person.id, name: person.name ?? person.email }
+}
+
+export function meView({ id, email, name, locale, editorTextSize }: PersonRecord): Schema<'Me'> {
+  return { id, email, name: name ?? email, locale, editorTextSize }
 }
 
 export function workspaceView(workspace: WorkspaceRecord, role: Schema<'WorkspaceRole'>): Schema<'Workspace'> {

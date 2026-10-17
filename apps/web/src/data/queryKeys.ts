@@ -89,6 +89,8 @@ export const mutationInvalidations = {
   signIn: ['everything'],
   signOut: ['everything'],
 
+  // The person's own query takes the answer as it is (`setQueryData`); what shows their name to others is what goes stale.
+  updateMe: ['members', 'documentLists', 'pinned', 'shared', 'workspaceActivity'],
   updateWorkspace: ['workspace', 'workspaces'],
   addMember: ['members', 'documentLists', 'pinned', 'shared', 'workspaceActivity'],
   updateMember: ['members', 'documentLists', 'pinned', 'shared', 'workspaceActivity'],

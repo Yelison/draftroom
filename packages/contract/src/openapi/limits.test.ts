@@ -12,6 +12,7 @@ const limited = [
   ['CommentBody', contractLimits.commentBody, 1, 5000],
   ['Quote', contractLimits.quote, 1, 500],
   ['FolderName', contractLimits.folderName, 1, 80],
+  ['PersonName', contractLimits.personName, 1, 80],
   ['WorkspaceName', contractLimits.workspaceName, 1, 80],
   ['VersionLabel', contractLimits.versionLabel, 1, 100],
 ] as const

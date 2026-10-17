@@ -156,6 +156,7 @@ Query keys live in one module, `apps/web/src/data/queryKeys.ts`. Each mutation l
 | `createThread`, `replyToThread`, `resolveThread`, `reopenThread`, `updateComment`, `deleteComment` | the document's threads, workspace activity, that document's activity |
 | `createVersion`, `restoreVersion` | the document's versions, workspace activity, that document's activity (a restore also changes the live content, which arrives over the collaboration connection) |
 | `addMember`, `updateMember`, `removeMember` | the members, and every list that depends on access |
+| `updateMe` | the members, the document lists, pinned, shared, workspace activity (they show the person's name); the person's own query takes the answer |
 | `updateWorkspace` | the workspace and the workspace list |
 
 | Stateless event (protocol, section 5.3) | Invalidates |

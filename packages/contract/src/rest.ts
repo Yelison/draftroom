@@ -26,6 +26,7 @@ export const contractLimits = {
   commentBody: { min: 1, max: 5000 },
   quote: { min: 1, max: 500 },
   folderName: { min: 1, max: 80 },
+  personName: { min: 1, max: 80 },
   workspaceName: { min: 1, max: 80 },
   versionLabel: { min: 1, max: 100 },
   page: { defaultSize: 25, maxSize: 100 },
