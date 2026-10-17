@@ -45,7 +45,7 @@ export function SignInScreen() {
     setProblems(found)
     if (found.email !== null) return emailInput.current?.focus()
     if (found.password !== null) return passwordInput.current?.focus()
-    signIn.mutate({ email: email.trim(), password })
+    signIn.mutate({ email, password })
   }
 
   return (

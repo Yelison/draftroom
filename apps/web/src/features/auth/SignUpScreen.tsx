@@ -48,7 +48,7 @@ export function SignUpScreen() {
     if (found.name !== null) return nameInput.current?.focus()
     if (found.email !== null) return emailInput.current?.focus()
     if (found.password !== null) return passwordInput.current?.focus()
-    signUp.mutate({ name: name.trim(), email: email.trim(), password })
+    signUp.mutate({ name: name.trim(), email, password })
   }
 
   return (

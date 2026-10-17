@@ -119,6 +119,8 @@ describe('creating an account', () => {
     await fill(user, { name: 'Lena Fischer', email: 'lena@harborpine.example', password })
 
     await user.click(submit())
+    // Enter in a field submits the form, which the button's own refusal of a click does not stop.
+    await user.click(passwordField())
     await user.keyboard('{Enter}')
 
     expect(sent).toBe(1)
