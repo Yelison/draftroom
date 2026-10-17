@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { purgeCopiesOfDocument, type PurgedDocument } from '../../collab/offlineCache.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
+import { retryTransportOnce } from '../documents/queries.ts'
 import { meQuery } from './meQuery.ts'
 
 const nothingKept: PurgedDocument = { hadCopy: false, hadUnstoredChanges: false }
@@ -22,7 +23,9 @@ const nothingKept: PurgedDocument = { hadCopy: false, hadUnstoredChanges: false 
  */
 export function usePurgeUnavailableCopy(documentId: string, unavailable: boolean): PurgedDocument | undefined {
   const dataSource = useDataSource()
-  const me = useQuery(meQuery(dataSource))
+  // The same question as the session gate asks, answered the same way: an unsigned person must reach sign-in without waiting
+  // for retries this observer would add.
+  const me = useQuery({ ...meQuery(dataSource), retry: retryTransportOnce })
   const userId = me.data?.id
   const purge = useMutation({
     mutationFn: ({ userId, documentId }: { userId: string; documentId: string }) =>
