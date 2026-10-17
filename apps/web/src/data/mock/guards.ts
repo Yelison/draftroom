@@ -16,6 +16,13 @@ export interface Context {
   session: Session
   /** Gives a new document the content it starts with, on the collaboration server that serves it: a template's text. */
   startContent: (documentId: string, update: Uint8Array) => void
+  /** The live text of a document, on the collaboration server that serves it, which is what a version keeps. */
+  live: {
+    /** The document as it is now, as the Yjs update a version stores. */
+    state: (documentId: string) => Uint8Array
+    /** Makes the live text what an update holds, for everyone who has the document open (the restore of a version). */
+    replace: (documentId: string, update: Uint8Array) => void
+  }
 }
 
 type DocumentRole = Schema<'DocumentRole'>

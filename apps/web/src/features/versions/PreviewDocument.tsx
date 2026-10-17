@@ -48,7 +48,7 @@ function PreviewEditor({ document, label }: { document: Y.Doc; label: string }) 
     {
       extensions,
       editable: false,
-      editorProps: { attributes: { class: prose.prose ?? '', role: 'document', 'aria-label': label } },
+      editorProps: { attributes: { class: prose.prose ?? '' } },
     },
     [extensions],
   )

@@ -5,7 +5,7 @@ import { documentName } from '@draftroom/contract/collab'
 import { launchPlan, rowButton, openVersions, rows, unavailable } from './testing/openVersions.tsx'
 
 const preview = () => screen.getByRole('region', { name: 'Preview' })
-const textOf = (name: RegExp) => screen.findByRole('document', { name })
+const textOf = (name: RegExp) => screen.findByRole('region', { name })
 
 describe('the preview of a version', () => {
   it('asks the person to choose one before anything is shown', async () => {
@@ -21,7 +21,10 @@ describe('the preview of a version', () => {
 
     const text = await textOf(/^Text of “Before the pricing review, /)
     expect(text).toHaveTextContent('The launch moves to the second week of November.')
-    expect(text).toHaveAttribute('contenteditable', 'false')
+    const editor = text.querySelector('.ProseMirror')
+    expect(editor).toHaveAttribute('contenteditable', 'false')
+    // The name is the region's alone: the text inside would be said twice with one of its own.
+    expect(editor).not.toHaveAttribute('aria-label')
     expect(within(preview()).getByText(/Nothing you do here changes the document/)).toBeInTheDocument()
   })
 
@@ -66,7 +69,7 @@ describe('the preview of a version', () => {
     })
 
     await user.click(within(rows()[0]!).getByRole('button', { name: rowButton.newest }))
-    await screen.findByRole('document')
+    await textOf(/^Text of /)
 
     expect(sockets).toEqual([])
     expect(server.collaboration.connectionsTo(documentName(launchPlan.id))).toBe(0)

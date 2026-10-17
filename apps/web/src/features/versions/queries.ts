@@ -21,11 +21,13 @@ export const versionsQuery = (dataSource: DataSource, documentId: string) =>
 
 /**
  * What a version held, as the Yjs update the server stored. A version never changes, so what was downloaded is never
- * stale; it is kept for a minute after the preview goes away, so coming back to a version does not download it again.
+ * stale, and its key is outside the list's: saving, restoring or an event that makes the list stale does not make a
+ * download be read again. It is kept for a minute after the preview goes away, so coming back to a version does not
+ * download it again.
  */
 export const versionContentQuery = (dataSource: DataSource, documentId: string, versionId: string) =>
   queryOptions({
-    queryKey: [...queryKeys.versions(documentId), 'content', versionId],
+    queryKey: ['versions', versionId, 'content'],
     queryFn: () => dataSource.getVersionContent({ params: { path: { versionId } } }),
     staleTime: Infinity,
     gcTime: 60_000,

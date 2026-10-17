@@ -1,6 +1,9 @@
 // A test may ask what the server would make of what the mock serves: the update must load as the server's own does.
 // oxlint-disable-next-line no-restricted-imports
-import { yUpdateToJson } from '@draftroom/editor-schema/convert'
+import { replaceFragmentContent, yUpdateToJson } from '@draftroom/editor-schema/convert'
+import { fragmentName } from '@draftroom/editor-schema'
+import { documentName } from '@draftroom/contract/collab'
+import * as Y from 'yjs'
 import { describe, expect, it } from 'vitest'
 import { isApiError } from '../errors.ts'
 import { createMockServer } from './createMockDataSource.ts'
@@ -10,6 +13,10 @@ import { versions } from './fixtures/collaboration.ts'
 
 const versionOf = (id: string) => ({ params: { path: { versionId: id } } })
 const documentOf = (id: string) => ({ params: { path: { documentId: id } } })
+const paragraph = (text: string) => ({
+  type: 'doc',
+  content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+})
 const textOf = (json: ReturnType<typeof yUpdateToJson>) => JSON.stringify(json)
 
 describe('the content of a version in the mock', () => {
@@ -31,19 +38,35 @@ describe('the content of a version in the mock', () => {
     expect(textOf(yUpdateToJson(first!))).not.toEqual(textOf(yUpdateToJson(second!)))
   })
 
-  it('holds, for a version saved later, what the latest one held, and a restore holds what it went back to', async () => {
-    const api = createMockServer().connect({ signedInAs: marta.email })
-    const target = versions[0]!
+  it('holds, for a version saved later, what was written in the document by then', async () => {
+    const server = createMockServer()
+    const api = server.connect({ signedInAs: marta.email })
+    const live = server.collaboration.document(documentName(launchPlan.id))
+    replaceFragmentContent(live.getXmlFragment(fragmentName), paragraph('Written just before saving'))
 
     const saved = await api.createVersion(documentOf(launchPlan.id))
-    const restored = await api.restoreVersion(versionOf(target.id))
 
-    expect(textOf(yUpdateToJson(await api.getVersionContent(versionOf(saved.id))))).toEqual(
-      textOf(yUpdateToJson(await api.getVersionContent(versionOf(versions[2]!.id)))),
+    expect(textOf(yUpdateToJson(await api.getVersionContent(versionOf(saved.id))))).toContain(
+      'Written just before saving',
     )
-    expect(textOf(yUpdateToJson(await api.getVersionContent(versionOf(restored.id))))).toEqual(
-      textOf(yUpdateToJson(await api.getVersionContent(versionOf(target.id)))),
+  })
+
+  it('keeps, in the version before a restore, what the document held, and puts the restored text in the document', async () => {
+    const server = createMockServer()
+    const api = server.connect({ signedInAs: marta.email })
+    const live = server.collaboration.document(documentName(launchPlan.id))
+    replaceFragmentContent(live.getXmlFragment(fragmentName), paragraph('Typed before the restore'))
+
+    const restored = await api.restoreVersion(versionOf(versions[0]!.id))
+
+    const [first, second] = (await api.listVersions(documentOf(launchPlan.id))).items
+    expect(first?.id).toBe(restored.id)
+    expect(second?.kind).toBe('pre-restore')
+    expect(textOf(yUpdateToJson(await api.getVersionContent(versionOf(second!.id))))).toContain(
+      'Typed before the restore',
     )
+    expect(textOf(yUpdateToJson(Y.encodeStateAsUpdate(live)))).toContain('first week of November')
+    expect(textOf(yUpdateToJson(Y.encodeStateAsUpdate(live)))).not.toContain('Typed before the restore')
   })
 
   it('is not there for a version that does not exist', async () => {

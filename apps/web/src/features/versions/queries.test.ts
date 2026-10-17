@@ -9,10 +9,10 @@ const scope = { workspaceId: harborPine.id, documentId: launchPlan.id }
 const dataSource = createMockDataSource()
 const listKey = versionsQuery(dataSource, launchPlan.id).queryKey
 
-// The list and what a preview downloaded are one prefix of the cache, which is the key the table of invalidation marks
-// stale: so a version saved or restored here, or by someone else (the event of the collaboration connection), is on the
-// list when the screen is next read. The screen opens no connection of its own to receive that event (see `VersionsScreen`),
-// so this is where the event's reach into the list is pinned.
+// The list is under the key the table of invalidation marks stale: so a version saved or restored here, or by someone
+// else (the event of the collaboration connection), is on the list when the screen is next read. The screen opens no
+// connection of its own to receive that event (see `VersionsScreen`), so this is where the event's reach into the list is
+// pinned. What a version held never changes, so none of those reaches it.
 describe('what makes the list of versions stale', () => {
   it.each([
     { cause: 'saving a version', keys: keysAfterMutation('createVersion', scope) },
@@ -22,9 +22,14 @@ describe('what makes the list of versions stale', () => {
     expect(keys.some((key) => key.every((part, index) => listKey[index] === part))).toBe(true)
   })
 
-  it('also reaches the download of a version, which a restore does not change', () => {
+  it('does not reach the download of a version, which never changes', () => {
     const contentKey = versionContentQuery(dataSource, launchPlan.id, 'v-1').queryKey
+    const stale = [
+      ...keysAfterMutation('createVersion', scope),
+      ...keysAfterMutation('restoreVersion', scope),
+      ...keysAfterEvent('versions-changed', scope),
+    ]
 
-    expect(contentKey.slice(0, listKey.length)).toEqual([...listKey])
+    expect(stale.filter((key) => key.every((part, index) => contentKey[index] === part))).toEqual([])
   })
 })

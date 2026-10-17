@@ -14,7 +14,7 @@ import { versionView } from '../views.ts'
 
 type VersionOperations = Pick<DataSource, 'listVersions' | 'createVersion' | 'getVersionContent' | 'restoreVersion'>
 
-/** The size of a version stands in for the size of the document's state, which the mock does not keep. */
+/** The size of a version stands in for the size of the document's state, which the mock does not measure. */
 const defaultSizeBytes = 2048
 
 /** An empty document: what a version holds when nothing before it did. */
@@ -59,12 +59,6 @@ export function versionOperations(ctx: Context): VersionOperations {
     const fixture = versionContent[versionId]
     return fixture === undefined ? emptyContent() : jsonToYUpdate(fixture)
   }
-  // The mock does not keep the live state of a document, so what a new version holds is what the latest one held.
-  const latestContent = (documentId: string) => {
-    const latest = latestOf(documentId)
-    return latest === undefined ? emptyContent() : contentOf(latest.id)
-  }
-
   return {
     listVersions: async ({ params: { path, query = {} } }) => {
       caller(ctx)
@@ -90,7 +84,7 @@ export function versionOperations(ctx: Context): VersionOperations {
         user.id,
         label,
         latestSize(document.id),
-        latestContent(document.id),
+        ctx.live.state(document.id),
       )
       record(world, 'version.created', user.id, document.id)
       return versionView(world, version)
@@ -113,8 +107,16 @@ export function versionOperations(ctx: Context): VersionOperations {
       requireRole(role, 'owner')
 
       // What the document held before the restore is kept, then the restored state is saved as the newest version.
-      addVersion(document.id, 'pre-restore', user.id, null, latestSize(document.id), latestContent(document.id))
-      const restored = addVersion(document.id, 'restore', user.id, target.label, target.sizeBytes, contentOf(target.id))
+      addVersion(document.id, 'pre-restore', user.id, null, latestSize(document.id), ctx.live.state(document.id))
+      ctx.live.replace(document.id, contentOf(target.id))
+      const restored = addVersion(
+        document.id,
+        'restore',
+        user.id,
+        target.label,
+        target.sizeBytes,
+        ctx.live.state(document.id),
+      )
       record(world, 'version.restored', user.id, document.id)
       return versionView(world, restored)
     },

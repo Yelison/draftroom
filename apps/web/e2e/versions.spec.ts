@@ -20,7 +20,7 @@ test.describe('the version history', () => {
     page,
   }) => {
     await page.goto(`/documents/${launchPlan.id}`)
-    const link = page.getByRole('link', { name: 'Versions' })
+    const link = page.getByRole('button', { name: 'Version history' })
     await expect(link).toBeVisible()
     await link.focus()
     await page.keyboard.press('Enter')
@@ -34,10 +34,9 @@ test.describe('the version history', () => {
     await row.focus()
     await page.keyboard.press('Enter')
     await expect(row).toHaveAttribute('aria-current', 'true')
-    const text = page.locator('[role="document"][contenteditable="false"]')
-    await expect(text).toHaveAccessibleName(`Text of “${namedName}”`)
+    const text = page.getByRole('region', { name: `Text of “${namedName}”` })
+    await expect(text.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'false')
     await expect(text).toContainText('The launch moves to the second week of November.')
-    await expect(text).toHaveAttribute('contenteditable', 'false')
 
     // Restore it: the dialog opens on the way out, and the focus comes back to the button that asked.
     const restore = list(page).getByRole('button', { name: `Restore “${namedName}”` })
@@ -109,9 +108,7 @@ test.describe('the layout', () => {
         await list(page)
           .getByRole('button', { name: /^Before the pricing review/ })
           .click()
-        await expect(page.locator('[role="document"][contenteditable="false"]')).toContainText(
-          'second week of November',
-        )
+        await expect(page.locator('.ProseMirror[contenteditable="false"]')).toContainText('second week of November')
 
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
       })
@@ -128,6 +125,38 @@ test.describe('the layout', () => {
 
         // The screen is small, so a block that jumps scores little: what is measured is none at all, not the editor's one in a hundred.
         expect(await shifts(page)).toBeLessThan(0.001)
+      })
+    })
+  }
+})
+
+test.describe('the header of the history with a title of 200 characters', () => {
+  for (const locale of ['en-US', 'es-ES'] as const) {
+    test.describe(`in ${locale} at 1280 px`, () => {
+      test.use({ locale, viewport: { width: 1280, height: 900 } })
+
+      test('keeps its buttons whole and inside the page, and names the document only in the accessible name', async ({
+        page,
+      }) => {
+        const title = 'Un título larguísimo '.repeat(10).slice(0, 200)
+        await page.goto(`/documents/${launchPlan.id}`)
+        const field = page.getByRole('textbox', { name: /Document title|Título del documento/ })
+        await field.fill(title)
+        await field.press('Enter')
+        await page.getByRole('button', { name: /Version history|Historial de versiones/ }).click()
+
+        const back = page.getByRole('link', {
+          name: new RegExp(`^(Back to the document|Volver al documento) .${title.slice(0, 20)}`),
+        })
+        await expect(back).toBeVisible()
+        await expect(back).toHaveText(/^(Back to the document|Volver al documento)$/)
+        const save = page.getByRole('button', { name: /Save a version|Guardar una versión/ })
+        for (const box of [await back.boundingBox(), await save.boundingBox()]) {
+          expect(box).not.toBeNull()
+          expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(1280)
+          expect(box?.height).toBeLessThanOrEqual(48)
+        }
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
       })
     })
   }

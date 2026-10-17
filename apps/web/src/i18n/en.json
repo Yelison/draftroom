@@ -329,7 +329,7 @@
   "sharing.forbidden.title": "Only owners can change who has access",
   "sharing.forbidden.description": "Ask an owner of this document to share it for you.",
   "sharing.announce.ownerLost": "You are no longer an owner of this document.",
-  "versions.link": "Versions",
+  "versions.link": "Version history",
   "versions.back": "Back to the document",
   "versions.backLabel": "Back to the document “{title}”",
   "versions.list.label": "Versions",
