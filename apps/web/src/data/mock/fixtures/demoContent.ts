@@ -6,20 +6,17 @@ import {
   budget,
   designReview,
   interviews,
-  interviewsSpanish,
   launchPlan,
   oldPricing,
-  oldPricingSpanish,
   onboardingChecklist,
-  onboardingGuide,
   weeklyEnglish,
-  weeklySpanish,
 } from './documents.ts'
 
-// What the documents of the demo hold when someone opens them, in the language the demo started in: the people of the
-// fixtures write in both, and the content of a document follows the visitor, not the title it was given.
+// What the documents of the demo hold when someone opens them, in the language the demo started in (`demoSeed.ts` gives
+// the world its titles in the same language). The title of a document is shown above its text, so the text does not
+// repeat it as a heading.
 //
-// The two documents a collaborator writes in (`scriptedCollaborators.ts`) end with a paragraph of plain text. It is the
+// The two documents a collaborator writes in (`collaboratorScripts.ts`) end with a paragraph of plain text. It is the
 // one she adds to and deletes from, so it reads as a line that is still being worked on.
 // A document with a stored version continues the last of them (`versionContent.ts`).
 
@@ -28,7 +25,6 @@ type Blocks = readonly JSONContent[]
 export const demoContent: Readonly<Record<Locale, Readonly<Record<string, Blocks>>>> = {
   en: {
     [launchPlan.id]: [
-      heading(2, 'Autumn launch plan'),
       paragraph('The launch moves to the second week of November, once the pricing review is signed off.'),
       paragraph('Marketing prepares the announcement and support gets the new tiers a week earlier.'),
       heading(2, 'Who does what'),
@@ -41,7 +37,6 @@ export const demoContent: Readonly<Record<Locale, Readonly<Record<string, Blocks
       paragraph('Still open after the pricing review:'),
     ],
     [designReview.id]: [
-      heading(2, 'Design review notes'),
       paragraph('We agreed to simplify the sidebar and keep the language selector in settings.'),
       heading(2, 'Decisions'),
       bulletList(
@@ -62,18 +57,7 @@ export const demoContent: Readonly<Record<Locale, Readonly<Record<string, Blocks
       heading(2, 'Next week'),
       orderedList('Close the billing decision.', 'Publish the pricing page.'),
     ],
-    [weeklySpanish.id]: [
-      heading(2, 'Highlights'),
-      bulletList('The welcome emails are active and the first replies are in.'),
-      heading(2, 'In progress'),
-      bulletList('Moving billing to the new provider.', 'A short guide for new teammates.'),
-      heading(2, 'Blocked'),
-      bulletList('Finance still has to choose the invoicing schedule.'),
-      heading(2, 'Next week'),
-      orderedList('Agree the invoicing schedule.', 'Send the guide to the team.'),
-    ],
     [interviews.id]: [
-      heading(2, 'Customer interview synthesis'),
       paragraph('Eight interviews, three themes: onboarding, sharing and the cost of switching.'),
       heading(2, 'What we heard'),
       bulletList(
@@ -84,19 +68,7 @@ export const demoContent: Readonly<Record<Locale, Readonly<Record<string, Blocks
       heading(2, 'What we do next'),
       orderedList('Bring the interview quotes to the launch plan.', 'Ask three more teams about sharing.'),
     ],
-    [interviewsSpanish.id]: [
-      heading(2, 'Interview synthesis, second round'),
-      paragraph('Five interviews with teams of fewer than ten people.'),
-      heading(2, 'What we heard'),
-      bulletList(
-        'Small teams share one folder and trust whoever created it.',
-        'Comments matter more than suggestions: a question beside the sentence it is about.',
-      ),
-      heading(2, 'What we do next'),
-      orderedList('Compare both rounds.', 'Share the synthesis with the whole team.'),
-    ],
     [brandVoice.id]: [
-      heading(2, 'Brand voice guide'),
       paragraph('We write the way we talk to a colleague: short sentences, no jargon, a little warmth.'),
       heading(2, 'How we sound'),
       bulletList(
@@ -108,7 +80,6 @@ export const demoContent: Readonly<Record<Locale, Readonly<Record<string, Blocks
       paragraph('Examples we still want to add:'),
     ],
     [budget.id]: [
-      heading(2, '2027 budget'),
       paragraph('Hiring, tools and travel assumptions for next year.'),
       heading(2, 'Hiring'),
       bulletList('One designer and one engineer, from March.', 'A part-time support role from September.'),
@@ -125,14 +96,7 @@ export const demoContent: Readonly<Record<Locale, Readonly<Record<string, Blocks
       orderedList('Meet your team lead.', 'Meet the person who will be your buddy.', 'Meet someone from support.'),
       paragraph('Ask your buddy anything: no question is too small.'),
     ],
-    [onboardingGuide.id]: [
-      heading(2, 'Welcome to Harbor Pine'),
-      paragraph('This guide has what you need for your first week: accounts, equipment and who to talk to.'),
-      heading(2, 'Your first week'),
-      orderedList('Sign in and check your accounts.', 'Pick up your equipment.', 'Meet the three people on your list.'),
-    ],
     [oldPricing.id]: [
-      heading(2, 'Old pricing draft'),
       paragraph('Three tiers, with a free plan that we dropped after the first review.'),
       bulletList(
         'Free: one workspace and five documents.',
@@ -140,15 +104,9 @@ export const demoContent: Readonly<Record<Locale, Readonly<Record<string, Blocks
         'Business: history and sharing controls.',
       ),
     ],
-    [oldPricingSpanish.id]: [
-      heading(2, 'Previous pricing draft'),
-      paragraph('The first idea for the tiers, kept for reference.'),
-      bulletList('A free plan, later removed.', 'A team plan with unlimited documents.'),
-    ],
   },
   es: {
     [launchPlan.id]: [
-      heading(2, 'Plan de lanzamiento de otoño'),
       paragraph('El lanzamiento pasa a la segunda semana de noviembre, cuando se apruebe la revisión de precios.'),
       paragraph('Marketing prepara el anuncio y soporte recibe las nuevas tarifas una semana antes.'),
       heading(2, 'Quién hace qué'),
@@ -161,7 +119,6 @@ export const demoContent: Readonly<Record<Locale, Readonly<Record<string, Blocks
       paragraph('Sigue abierto tras la revisión de precios:'),
     ],
     [designReview.id]: [
-      heading(2, 'Notas de la revisión de diseño'),
       paragraph('Acordamos simplificar la barra lateral y dejar el selector de idioma en los ajustes.'),
       heading(2, 'Decisiones'),
       bulletList(
@@ -188,18 +145,7 @@ export const demoContent: Readonly<Record<Locale, Readonly<Record<string, Blocks
       heading(2, 'La semana que viene'),
       orderedList('Cerrar la decisión de facturación.', 'Publicar la página de precios.'),
     ],
-    [weeklySpanish.id]: [
-      heading(2, 'Lo más destacado'),
-      bulletList('Los correos de bienvenida ya están activos y han llegado las primeras respuestas.'),
-      heading(2, 'En marcha'),
-      bulletList('El paso de la facturación al nuevo proveedor.', 'Una guía breve para quien se incorpora.'),
-      heading(2, 'Bloqueado'),
-      bulletList('Finanzas todavía tiene que elegir el calendario de facturación.'),
-      heading(2, 'La semana que viene'),
-      orderedList('Acordar el calendario de facturación.', 'Enviar la guía al equipo.'),
-    ],
     [interviews.id]: [
-      heading(2, 'Síntesis de entrevistas con clientes'),
       paragraph('Ocho entrevistas, tres temas: la primera vez, compartir y lo que cuesta cambiar de herramienta.'),
       heading(2, 'Lo que escuchamos'),
       bulletList(
@@ -213,19 +159,7 @@ export const demoContent: Readonly<Record<Locale, Readonly<Record<string, Blocks
         'Preguntar a tres equipos más sobre compartir.',
       ),
     ],
-    [interviewsSpanish.id]: [
-      heading(2, 'Síntesis de entrevistas con clientes'),
-      paragraph('Cinco entrevistas con equipos de menos de diez personas.'),
-      heading(2, 'Lo que escuchamos'),
-      bulletList(
-        'Los equipos pequeños comparten una carpeta y se fían de quien la creó.',
-        'Importan más los comentarios que las sugerencias: una pregunta junto a la frase de la que habla.',
-      ),
-      heading(2, 'Lo que haremos'),
-      orderedList('Comparar las dos rondas.', 'Compartir la síntesis con todo el equipo.'),
-    ],
     [brandVoice.id]: [
-      heading(2, 'Guía de voz de marca'),
       paragraph('Escribimos como hablamos con un compañero: frases cortas, sin jerga y con un poco de calidez.'),
       heading(2, 'Cómo sonamos'),
       bulletList(
@@ -237,7 +171,6 @@ export const demoContent: Readonly<Record<Locale, Readonly<Record<string, Blocks
       paragraph('Ejemplos que todavía queremos añadir:'),
     ],
     [budget.id]: [
-      heading(2, 'Presupuesto 2027'),
       paragraph('Hipótesis de contratación, herramientas y viajes para el próximo año.'),
       heading(2, 'Contratación'),
       bulletList(
@@ -261,25 +194,13 @@ export const demoContent: Readonly<Record<Locale, Readonly<Record<string, Blocks
       ),
       paragraph('Pregunta lo que necesites a quien te acompañe: ninguna duda es pequeña.'),
     ],
-    [onboardingGuide.id]: [
-      heading(2, 'Te damos la bienvenida a Harbor Pine'),
-      paragraph('Esta guía reúne lo que necesitas para tu primera semana: cuentas, equipo y con quién hablar.'),
-      heading(2, 'Tu primera semana'),
-      orderedList('Entra y comprueba tus cuentas.', 'Recoge tu equipo.', 'Conoce a las tres personas de tu lista.'),
-    ],
     [oldPricing.id]: [
-      heading(2, 'Borrador de precios anterior'),
       paragraph('Tres tarifas, con un plan gratuito que descartamos tras la primera revisión.'),
       bulletList(
         'Gratis: un espacio de trabajo y cinco documentos.',
         'Equipo: documentos ilimitados.',
         'Empresa: historial y control del uso compartido.',
       ),
-    ],
-    [oldPricingSpanish.id]: [
-      heading(2, 'Borrador de precios anterior'),
-      paragraph('La primera idea de las tarifas, guardada como referencia.'),
-      bulletList('Un plan gratuito, que se quitó después.', 'Un plan de equipo con documentos ilimitados.'),
     ],
   },
 }

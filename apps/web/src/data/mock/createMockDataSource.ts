@@ -2,6 +2,7 @@ import type { DataSource, RestSource } from '../DataSource.ts'
 import { createDemo, type DemoOptions } from './collab/demo.ts'
 import { replaceLiveContent } from './collab/liveContent.ts'
 import { SimulatedCollabServer, type Access, type Identity } from './collab/SimulatedCollabServer.ts'
+import { demoFixtures } from './fixtures/demoSeed.ts'
 import { marta } from './fixtures/index.ts'
 import type { Context, Session } from './guards.ts'
 import { activityOperations } from './operations/activity.ts'
@@ -74,7 +75,7 @@ export interface MockServerOptions {
 }
 
 export function createMockServer({ demo }: MockServerOptions = {}): MockServer {
-  const world: World = createWorld()
+  const world: World = createWorld(demo === undefined ? undefined : demoFixtures(demo.locale))
   const demonstration = demo === undefined ? undefined : createDemo(demo)
   const collaboration = new SimulatedCollabServer({
     authorize: (documentName, identity) => accessTo(world, documentName, identity),
