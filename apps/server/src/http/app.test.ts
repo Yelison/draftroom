@@ -61,13 +61,14 @@ function appWithoutDatabase(
   authProvider: AuthProvider = signedInAsMarta,
 ): FastifyInstance {
   database = createDatabase(unreachableDatabaseUrl)
-  const { sessions, sessionCookies } = sessionStackFor(database)
+  const { sessions, sessionCookies, devices } = sessionStackFor(database)
   app = buildApp({
     database,
     hardening: developmentHardening,
     authProvider,
     sessions,
     sessionCookies,
+    devices,
     broadcaster: silentBroadcaster,
     liveAccess: silentLiveAccess,
     liveDocuments: noLiveDocuments,

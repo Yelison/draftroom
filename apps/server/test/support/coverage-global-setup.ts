@@ -21,7 +21,7 @@ declare module 'vitest' {
 async function implementedOperations(): Promise<ReadonlySet<string>> {
   // Nothing connects: the pool opens its first connection on the first query, and building the app runs none.
   const database = createDatabase(unreachableDatabaseUrl)
-  const { sessions, sessionCookies } = sessionStackFor(database)
+  const { sessions, sessionCookies, devices } = sessionStackFor(database)
   const app = buildApp({
     database,
     hardening: developmentHardening,
@@ -32,6 +32,7 @@ async function implementedOperations(): Promise<ReadonlySet<string>> {
     liveDocuments: noLiveDocuments,
     sessions,
     sessionCookies,
+    devices,
   })
   try {
     await app.ready()

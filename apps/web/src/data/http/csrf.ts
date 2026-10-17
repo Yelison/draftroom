@@ -1,5 +1,9 @@
-/** The cookie the server sets with the session; its value is echoed in `X-CSRF-Token` (docs/api/README.md). */
-export const csrfCookieName = 'dr_csrf'
+/**
+ * The cookie the server sets with the session; its value is echoed in `X-CSRF-Token` (docs/api/README.md). Behind HTTPS
+ * the server names it with the `__Host-` prefix, which a sibling subdomain cannot plant, and without HTTPS (development)
+ * it has no prefix (docs/decisions/0004-authentication.md). The prefixed one is looked for first.
+ */
+export const csrfCookieNames = ['__Host-dr_csrf', 'dr_csrf'] as const
 export const csrfHeaderName = 'X-CSRF-Token'
 
 const methodsThatChangeState: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
@@ -30,5 +34,9 @@ export function cookieValue(cookies: string, name: string): string | undefined {
 
 /** The CSRF token the server set, read when each request is sent so a session started later is picked up. */
 export function csrfTokenFromCookie(): string | undefined {
-  return cookieValue(document.cookie, csrfCookieName)
+  for (const name of csrfCookieNames) {
+    const token = cookieValue(document.cookie, name)
+    if (token !== undefined) return token
+  }
+  return undefined
 }

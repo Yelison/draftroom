@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../../src/db/tables.ts'
 import type { AuthRequest } from '../../src/http/auth/auth-provider.ts'
 import { createCookieSessions, withDevelopmentIdentity } from '../../src/http/auth/cookie-session.ts'
+import { cookieNamesFor } from '../../src/http/auth/cookies.ts'
 import { createCsrf } from '../../src/http/auth/csrf.ts'
 import { createDevIdentity, devUserHeader } from '../../src/http/auth/devIdentity.ts'
 import { createSessions, type Sessions } from '../../src/http/auth/sessions.ts'
@@ -28,7 +29,7 @@ afterAll(async () => {
   await database.drop()
 })
 
-const provider = () => createCookieSessions({ sessions, csrf })
+const provider = () => createCookieSessions({ sessions, csrf, names: cookieNamesFor(false) })
 
 /** What a browser sends: its cookies, and the header the page adds to a request that changes something. */
 const requestOf = (cookies: Record<string, string>, extra: Record<string, string> = {}): AuthRequest => ({

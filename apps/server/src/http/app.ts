@@ -7,6 +7,7 @@ import type { Database } from '../db/tables.ts'
 import type { AuthProvider } from './auth/auth-provider.ts'
 import { requireAuthentication } from './auth/authenticate.ts'
 import type { SessionCookies } from './auth/cookies.ts'
+import type { Devices } from './auth/devices.ts'
 import type { Passwords } from './auth/passwords.ts'
 import type { RateLimits } from './auth/rateLimit.ts'
 import type { Sessions } from './auth/sessions.ts'
@@ -73,6 +74,8 @@ export interface AppDependencies {
   /** The sessions people sign in with, and the cookies that carry them. Required: an app that cannot sign anyone in is a mistake, not a mode. */
   readonly sessions: Sessions
   readonly sessionCookies: SessionCookies
+  /** The device cookie. Required with the cookies: it is what keeps the limit on attempts from locking an owner out of their own browser. */
+  readonly devices: Devices
   /** How passwords are hashed and checked; the real ones unless a test watches them. */
   readonly passwords?: Passwords
   /** The limits on sign-in and sign-up attempts; the decided ones unless a test needs a smaller window. */
@@ -99,6 +102,7 @@ export function buildApp({
   liveDocuments,
   sessions,
   sessionCookies,
+  devices,
   passwords,
   rateLimits,
   contract = loadContract(),
@@ -179,6 +183,7 @@ export function buildApp({
     ...dependencies,
     sessions,
     sessionCookies,
+    devices,
     ...(passwords === undefined ? {} : { passwords }),
     ...(rateLimits === undefined ? {} : { rateLimits }),
   })

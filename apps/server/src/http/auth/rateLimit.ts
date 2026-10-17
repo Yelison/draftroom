@@ -1,5 +1,7 @@
 import type {} from '@fastify/rate-limit'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
+import type { Devices } from './devices.ts'
+import { keyOfEmail } from './emailKey.ts'
 
 const minute = 60_000
 
@@ -34,6 +36,8 @@ export const defaultRateLimits: RateLimits = {
 
 /** A sign-in that is let to go on: the route says how it ended, and what it held is given back. */
 export interface SignInAttempt {
+  /** The identity of the browser if it is one that has signed in to this account before (`Devices`), else `null`. */
+  readonly device: string | null
   /** `failed` when the credentials were not right: only that counts against the limit. Call it exactly once. */
   finish(failed: boolean): Promise<void>
 }
@@ -55,9 +59,6 @@ export interface AttemptLimits {
   signUpBlockedFor(request: FastifyRequest): Promise<number | null>
 }
 
-/** The address of email as a key: one account whatever its case, and however its letters are written. */
-const keyOfEmail = (email: string): string => email.normalize('NFKC').trim().toLowerCase()
-
 /** The email of a request body, which has already been checked by the contract but arrives typed as nothing. */
 function emailOf(body: unknown): string {
   return typeof body === 'object' && body !== null && 'email' in body && typeof body.email === 'string'
@@ -70,11 +71,20 @@ function emailOf(body: unknown): string {
  * instance and not for several behind a balancer, each of which would count on its own (ADR 0004: a shared store is a
  * change of the plugin's `store` option, and nothing else here). The plugin must be registered on `app` before this runs.
  */
-export function createAttemptLimits(app: FastifyInstance, limits: RateLimits): AttemptLimits {
+export function createAttemptLimits(app: FastifyInstance, limits: RateLimits, devices: Devices): AttemptLimits {
   const rule = ({ max, windowMs }: RateRule) => ({ max, timeWindow: windowMs })
   const perEmail = app.createRateLimit({
     ...rule(limits.signInFailuresPerEmail),
     keyGenerator: (request) => `email:${keyOfEmail(emailOf(request.body))}`,
+  })
+  // A browser that has signed in to the account before is counted on its own and not with the address of email: whoever
+  // guesses at the account from elsewhere uses up the allowance of unknown browsers only. It has the same allowance as an
+  // address of email, so a stolen cookie is worth ten guesses in a quarter of an hour and no more (ADR 0004).
+  const deviceOf = (request: FastifyRequest): string | null =>
+    devices.recognise(request.headers.cookie, emailOf(request.body))
+  const perDevice = app.createRateLimit({
+    ...rule(limits.signInFailuresPerEmail),
+    keyGenerator: (request) => `device:${deviceOf(request) ?? ''}`,
   })
   const perAddress = app.createRateLimit({
     ...rule(limits.signInFailuresPerAddress),
@@ -104,7 +114,12 @@ export function createAttemptLimits(app: FastifyInstance, limits: RateLimits): A
 
   return {
     async beginSignIn(request) {
-      const keys = [`email:${keyOfEmail(emailOf(request.body))}`, `address:${request.ip}`]
+      const device = deviceOf(request)
+      const perAccount = device === null ? perEmail : perDevice
+      const keys = [
+        device === null ? `email:${keyOfEmail(emailOf(request.body))}` : `device:${device}`,
+        `address:${request.ip}`,
+      ]
       const before = keys.map(reserve)
       const releaseAll = () => keys.forEach(release)
       let blocked: number[]
@@ -112,7 +127,7 @@ export function createAttemptLimits(app: FastifyInstance, limits: RateLimits): A
         // Looked at without counting: a sign-in that succeeds is not an attempt against the limit. The ones in flight
         // ahead of this one are, as if they had failed.
         const looks = await Promise.all([
-          perEmail(request, { increment: false }),
+          perAccount(request, { increment: false }),
           perAddress(request, { increment: false }),
         ])
         blocked = looks.flatMap((look, index) =>
@@ -128,10 +143,11 @@ export function createAttemptLimits(app: FastifyInstance, limits: RateLimits): A
       }
       return {
         attempt: {
+          device,
           async finish(failed) {
             try {
               // Counted before it is given back, so the limit never sees less than there is.
-              if (failed) await Promise.all([perEmail(request), perAddress(request)])
+              if (failed) await Promise.all([perAccount(request), perAddress(request)])
             } finally {
               releaseAll()
             }

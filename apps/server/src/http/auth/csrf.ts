@@ -1,8 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
-/** The cookie that carries the token, which the page reads to put it in the header. */
-export const csrfCookieName = 'dr_csrf'
-/** The header it is echoed in, as Node names a header: lower case. */
+/** The header the token is echoed in, as Node names a header: lower case. */
 export const csrfHeaderName = 'x-csrf-token'
 
 export interface Csrf {

@@ -29,7 +29,7 @@ export interface TestAuthentication
     Pick<AppDependencies, 'rateLimits' | 'passwords' | 'requestLimits'>,
     Partial<Pick<AppDependencies, 'hardening'>> {
   /** The stack the app's routes use; the provider is passed apart, because most tests do not sign in. */
-  readonly session?: Pick<SessionStack, 'sessions' | 'sessionCookies'>
+  readonly session?: Pick<SessionStack, 'sessions' | 'sessionCookies' | 'devices'>
 }
 
 /** The real app on a given database, and a client that holds every response of the test to the contract. */
@@ -53,6 +53,7 @@ export function createTestApp(
     liveDocuments,
     sessions: session.sessions,
     sessionCookies: session.sessionCookies,
+    devices: session.devices,
     ...authentication,
     contract,
     ...(logger === undefined ? {} : { logger }),

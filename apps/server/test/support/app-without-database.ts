@@ -31,7 +31,7 @@ export function appWithoutDatabase({
   authProvider = sessionFromHeader,
 }: Overrides = {}): FastifyInstance {
   const database = createDatabase(unreachableDatabaseUrl)
-  const { sessions, sessionCookies } = sessionStackFor(database)
+  const { sessions, sessionCookies, devices } = sessionStackFor(database)
   const app = buildApp({
     database,
     hardening,
@@ -39,6 +39,7 @@ export function appWithoutDatabase({
     authProvider,
     sessions,
     sessionCookies,
+    devices,
     broadcaster: silentBroadcaster,
     liveAccess: silentLiveAccess,
     liveDocuments: noLiveDocuments,

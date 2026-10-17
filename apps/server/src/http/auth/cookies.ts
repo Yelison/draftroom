@@ -1,11 +1,27 @@
 // Brings the `setCookie` and `clearCookie` of the plugin into the type of a reply.
 import type {} from '@fastify/cookie'
 import type { FastifyReply } from 'fastify'
-import { csrfCookieName, type Csrf } from './csrf.ts'
+import type { Csrf } from './csrf.ts'
 import type { StartedSession } from './sessions.ts'
 
-/** The cookie that holds the session token. It is `HttpOnly`: nothing in the page can read it. */
-export const sessionCookieName = 'dr_session'
+/** The names of the cookies of a deployment: the session token (`HttpOnly`, nothing in the page can read it), the CSRF token and the device. */
+export interface CookieNames {
+  readonly session: string
+  readonly csrf: string
+  readonly device: string
+}
+
+/**
+ * Behind HTTPS the cookies are `__Host-` cookies: a browser accepts one only if it is `Secure`, has `Path=/` and has no
+ * `Domain`, so a page on a sibling subdomain (or a script that gets onto one) cannot plant a cookie of that name on the
+ * app (cookie tossing). Without HTTPS the prefix cannot be used, since the browser would refuse the cookie it requires
+ * `Secure` for, so development and the tests keep the plain names (ADR 0004). The prefix is part of the name, and the
+ * server reads only the name it set: a plain `dr_session` sent to a production server is not a session.
+ */
+export function cookieNamesFor(secure: boolean): CookieNames {
+  const prefix = secure ? '__Host-' : ''
+  return { session: `${prefix}dr_session`, csrf: `${prefix}dr_csrf`, device: `${prefix}dr_device` }
+}
 
 /** A value that is not valid percent-encoding is used as it came: a cookie another site set must not fail the request. */
 function decoded(value: string): string {
@@ -37,6 +53,9 @@ export function cookiesOf(header: string | string[] | undefined): Readonly<Recor
 }
 
 export interface SessionCookies {
+  readonly names: CookieNames
+  /** The session token the `Cookie` header carries under this deployment's name, if it carries one. */
+  sessionTokenOf(cookieHeader: string | string[] | undefined): string | undefined
   /** Sets the session cookie and the CSRF cookie, which end when the session's absolute lifetime does. */
   issue(reply: FastifyReply, session: Pick<StartedSession, 'token' | 'expiresAt'>): void
   /** Ends both in the browser. */
@@ -45,7 +64,7 @@ export interface SessionCookies {
 
 export interface SessionCookiesOptions {
   readonly csrf: Csrf
-  /** `Secure` in production, where the app is served over HTTPS; a development server is plain HTTP, which would never send it back. */
+  /** `Secure` and `__Host-` in production, where the app is served over HTTPS; a development server is plain HTTP, which would never send them back. */
   readonly secure: boolean
 }
 
@@ -56,16 +75,19 @@ export interface SessionCookiesOptions {
  */
 export function createSessionCookies({ csrf, secure }: SessionCookiesOptions): SessionCookies {
   const attributes = { path: '/', sameSite: 'lax', secure } as const
+  const names = cookieNamesFor(secure)
   return {
+    names,
+    sessionTokenOf: (cookieHeader) => cookiesOf(cookieHeader)[names.session],
     issue(reply, { token, expiresAt }) {
       reply
-        .setCookie(sessionCookieName, token, { ...attributes, httpOnly: true, expires: expiresAt })
-        .setCookie(csrfCookieName, csrf.tokenFor(token), { ...attributes, httpOnly: false, expires: expiresAt })
+        .setCookie(names.session, token, { ...attributes, httpOnly: true, expires: expiresAt })
+        .setCookie(names.csrf, csrf.tokenFor(token), { ...attributes, httpOnly: false, expires: expiresAt })
     },
     clear(reply) {
       reply
-        .clearCookie(sessionCookieName, { ...attributes, httpOnly: true })
-        .clearCookie(csrfCookieName, { ...attributes, httpOnly: false })
+        .clearCookie(names.session, { ...attributes, httpOnly: true })
+        .clearCookie(names.csrf, { ...attributes, httpOnly: false })
     },
   }
 }

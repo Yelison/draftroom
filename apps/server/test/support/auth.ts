@@ -2,8 +2,14 @@ import type { Kysely } from 'kysely'
 import type { Database } from '../../src/db/tables.ts'
 import type { AuthProvider } from '../../src/http/auth/auth-provider.ts'
 import { createCookieSessions, withDevelopmentIdentity } from '../../src/http/auth/cookie-session.ts'
-import { createSessionCookies, type SessionCookies } from '../../src/http/auth/cookies.ts'
-import { createCsrf, csrfCookieName, csrfHeaderName, type Csrf } from '../../src/http/auth/csrf.ts'
+import {
+  cookieNamesFor,
+  createSessionCookies,
+  type CookieNames,
+  type SessionCookies,
+} from '../../src/http/auth/cookies.ts'
+import { createCsrf, csrfHeaderName, type Csrf } from '../../src/http/auth/csrf.ts'
+import { createDevices, type Devices } from '../../src/http/auth/devices.ts'
 import { createDevIdentity } from '../../src/http/auth/devIdentity.ts'
 import { createSessions, type Sessions } from '../../src/http/auth/sessions.ts'
 import type { LiveAccess } from '../../src/http/live-access.ts'
@@ -17,6 +23,9 @@ export interface SessionStack {
   readonly sessions: Sessions
   readonly csrf: Csrf
   readonly sessionCookies: SessionCookies
+  readonly devices: Devices
+  /** The names the cookies of this stack have: `__Host-` ones only when it is `secure`. */
+  readonly names: CookieNames
   /** The cookie provider alone: what production runs. */
   readonly provider: AuthProvider
   /** The cookie provider with the development header behind it: what development and the tests run. */
@@ -35,11 +44,14 @@ export function sessionStackFor(
 ): SessionStack {
   const sessions = createSessions({ database, ...(now === undefined ? {} : { now }) })
   const csrf = createCsrf(testSessionSecret)
-  const provider = createCookieSessions({ sessions, csrf })
+  const names = cookieNamesFor(secure)
+  const provider = createCookieSessions({ sessions, csrf, names })
   return {
     sessions,
     csrf,
+    names,
     sessionCookies: createSessionCookies({ csrf, secure }),
+    devices: createDevices({ secret: testSessionSecret, cookieName: names.device, secure }),
     provider,
     withDevelopmentHeader: withDevelopmentIdentity(provider, createDevIdentity(database)),
   }
@@ -52,6 +64,7 @@ export interface SetCookie {
   readonly secure: boolean
   readonly sameSite: string | undefined
   readonly path: string | undefined
+  readonly domain: string | undefined
   readonly expires: Date | undefined
 }
 
@@ -70,6 +83,7 @@ function parseSetCookie(line: string): [string, SetCookie] {
       secure: flag('secure'),
       sameSite: attribute('samesite'),
       path: attribute('path'),
+      domain: attribute('domain'),
       expires: expires === undefined ? undefined : new Date(expires),
     },
   ]
@@ -88,6 +102,8 @@ export interface BrowserRequest {
   readonly body?: object
   /** Other headers of the request, such as the development one. */
   readonly headers?: Record<string, string>
+  /** The network address the request comes from, for a test that needs several. */
+  readonly remoteAddress?: string
   /** What a page does for a request that changes something: the `dr_csrf` cookie, in the header. Defaults to doing it. */
   readonly sendCsrf?: boolean
 }
@@ -99,14 +115,24 @@ export interface BrowserRequest {
 export class Browser {
   readonly cookies = new Map<string, string>()
   private readonly server: TestApp
+  private readonly csrfCookieName: string
 
-  constructor(server: TestApp) {
+  /** `names` are the ones the server's cookies have; a server that is `secure` uses the `__Host-` ones. */
+  constructor(server: TestApp, { csrf }: Pick<CookieNames, 'csrf'> = cookieNamesFor(false)) {
     this.server = server
+    this.csrfCookieName = csrf
   }
 
-  async request({ method, url, body, headers = {}, sendCsrf = true }: BrowserRequest): Promise<ContractResponse> {
+  async request({
+    method,
+    url,
+    body,
+    headers = {},
+    sendCsrf = true,
+    remoteAddress,
+  }: BrowserRequest): Promise<ContractResponse> {
     const cookie = [...this.cookies].map(([name, value]) => `${name}=${encodeURIComponent(value)}`).join('; ')
-    const csrf = this.cookies.get(csrfCookieName)
+    const csrf = this.cookies.get(this.csrfCookieName)
     const response = await this.server.request({
       method,
       url,
@@ -116,6 +142,7 @@ export class Browser {
         ...headers,
       },
       ...(body === undefined ? {} : { payload: body }),
+      ...(remoteAddress === undefined ? {} : { remoteAddress }),
     })
     for (const [name, set] of Object.entries(setCookiesOf(response))) {
       if (set.value === '' || (set.expires !== undefined && set.expires.getTime() <= Date.now()))

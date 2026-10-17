@@ -149,11 +149,12 @@ describe('the cookies a session sets', () => {
   it('are not Secure while the server is plain HTTP, which never sends back a Secure cookie', async () => {
     const response = await signIn(new Browser(server))
 
-    expect(Object.values(setCookiesOf(response)).map(({ secure }) => secure)).toEqual([false, false])
+    expect(Object.values(setCookiesOf(response)).map(({ secure }) => secure)).toEqual([false, false, false])
   })
 
   describe('in production', () => {
     let production: TestApp
+    const { names } = sessionStackFor(db, { secure: true })
     beforeAll(() => {
       const stack = sessionStackFor(db, { secure: true })
       production = createTestApp(db, stack.provider, undefined, undefined, undefined, undefined, {
@@ -164,19 +165,20 @@ describe('the cookies a session sets', () => {
     afterAll(() => production.app.close())
 
     it('are Secure, as well as HttpOnly and SameSite=Lax', async () => {
-      const response = await new Browser(production).request({
+      const response = await new Browser(production, names).request({
         method: 'POST',
         url: '/api/auth/sign-in',
         body: { email: account.email, password: account.password },
       })
 
-      const { dr_session: session, dr_csrf: csrf } = setCookiesOf(response)
-      expect(session).toMatchObject({ secure: true, httpOnly: true, sameSite: 'Lax' })
-      expect(csrf).toMatchObject({ secure: true, httpOnly: false, sameSite: 'Lax' })
+      const cookies = setCookiesOf(response)
+      expect(cookies['__Host-dr_session']).toMatchObject({ secure: true, httpOnly: true, sameSite: 'Lax' })
+      expect(cookies['__Host-dr_csrf']).toMatchObject({ secure: true, httpOnly: false, sameSite: 'Lax' })
+      expect(cookies['__Host-dr_device']).toMatchObject({ secure: true, httpOnly: true, sameSite: 'Strict' })
     })
 
     it('are cleared with the same attributes at sign-out, which a browser needs to remove them', async () => {
-      const browser = new Browser(production)
+      const browser = new Browser(production, names)
       await browser.request({
         method: 'POST',
         url: '/api/auth/sign-in',
@@ -185,9 +187,15 @@ describe('the cookies a session sets', () => {
 
       const response = await browser.request({ method: 'POST', url: '/api/auth/sign-out' })
 
-      const { dr_session: session, dr_csrf: csrf } = setCookiesOf(response)
-      expect(session).toMatchObject({ value: '', secure: true, httpOnly: true, sameSite: 'Lax', path: '/' })
-      expect(csrf).toMatchObject({ value: '', secure: true, sameSite: 'Lax', path: '/' })
+      const cookies = setCookiesOf(response)
+      expect(cookies['__Host-dr_session']).toMatchObject({
+        value: '',
+        secure: true,
+        httpOnly: true,
+        sameSite: 'Lax',
+        path: '/',
+      })
+      expect(cookies['__Host-dr_csrf']).toMatchObject({ value: '', secure: true, sameSite: 'Lax', path: '/' })
     })
   })
 })
@@ -201,7 +209,8 @@ describe('signing out', () => {
 
     expect(response.statusCode).toBe(204)
     expect(Object.keys(setCookiesOf(response)).sort()).toEqual(['dr_csrf', 'dr_session'])
-    expect(browser.cookies.size).toBe(0)
+    // The device cookie is not the session: it says this browser has signed in before, and outlives signing out (ADR 0004).
+    expect([...browser.cookies.keys()]).toEqual(['dr_device'])
     const kept = new Browser(server)
     kept.plant('dr_session', token)
     expect((await me(kept)).statusCode).toBe(401)
