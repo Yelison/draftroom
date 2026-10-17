@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { daniel, demoPassword, marta } from '../../data/mock/fixtures/index.ts'
-import { lastAccountKey, rememberAccount, rememberedAccount } from './lastAccount.ts'
+import { daniel, demoPassword, marta, sofia } from '../../data/mock/fixtures/index.ts'
+import { accountsBeingLeft, lastAccountKey, rememberAccount, rememberedAccount } from './lastAccount.ts'
 import { renderSignedOut } from './testing/renderSignedOut.tsx'
 
 // Signing in as somebody else on a browser that held another account leaves that account (protocol §12.2): its copies are
@@ -146,6 +146,44 @@ describe('signing in on a browser that held another account', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
     expect(said).toBe(discards)
     expect(leaving.leaveAccount).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: marta.id }))
+  })
+
+  it('asks again about an account whose question was never answered, in the next sign-in, whoever signs in', async () => {
+    // The person closes the tab with the question open: the page is gone and `leave` never came back.
+    leaving.leaveAccount.mockImplementationOnce(() => new Promise(() => undefined))
+    rememberAccount(marta.id)
+    const first = await signInAs(daniel)
+    await waitFor(() => expect(leaving.leaveAccount).toHaveBeenCalledTimes(1))
+    first.unmount()
+    leaving.leaveAccount.mockResolvedValue({ purged: true })
+
+    // Another tab, another sign-in, as a third person: nothing was answered about Marta, so it is asked again.
+    const second = renderSignedOut('/sign-in')
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+    await second.user.type(screen.getByRole('textbox', { name: 'Email' }), sofia.email)
+    await second.user.type(screen.getByLabelText('Password'), demoPassword)
+    await second.user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    await waitFor(() => expect(second.router.state.location.pathname).toBe('/'))
+    expect(leaving.leaveAccount.mock.calls.map(([options]) => options.userId)).toEqual([marta.id, marta.id, daniel.id])
+  })
+
+  it('stops asking about an account once it has been left, and about one the person has come back to', async () => {
+    rememberAccount(marta.id)
+    const first = await signInAs(daniel)
+    await waitFor(() => expect(first.router.state.location.pathname).toBe('/'))
+    first.unmount()
+    expect(accountsBeingLeft()).toEqual([])
+
+    // Left and answered: signing in as a third person only leaves the one the browser held.
+    const second = renderSignedOut('/sign-in')
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+    await second.user.type(screen.getByRole('textbox', { name: 'Email' }), sofia.email)
+    await second.user.type(screen.getByLabelText('Password'), demoPassword)
+    await second.user.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(second.router.state.location.pathname).toBe('/'))
+
+    expect(leaving.leaveAccount.mock.calls.map(([options]) => options.userId)).toEqual([marta.id, daniel.id])
   })
 
   it('writes down that the copies could not be cleared and signs in all the same', async () => {

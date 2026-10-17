@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { Schema } from '@draftroom/contract'
 import { useCallback, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { rememberAccount, rememberedAccount } from './lastAccount.ts'
+import { accountsBeingLeft, markAccountsBeingLeft, rememberAccount, rememberedAccount } from './lastAccount.ts'
 import { destinationAfterSignIn } from './redirect.ts'
 import { useLeaveAccount } from './useLeaveAccount.tsx'
 
@@ -26,15 +26,23 @@ export function useStartSession(): StartingSession {
 
   const start = useCallback(
     async (user: Schema<'User'>) => {
-      const previous = rememberedAccount()
+      // Whoever is left by this sign-in: the account the browser held, and any whose question a tab never answered. The new
+      // person is not left, whatever was written about them.
+      const toLeave = [...new Set([...accountsBeingLeft(), rememberedAccount()])].filter(
+        (userId): userId is string => userId !== null && userId !== user.id,
+      )
       // The session of the browser is the new person's from the moment the server answered, in every tab. The other tabs hear
       // of it through the account that is written down, so it is written **now** and not when the person has answered the
       // question below, which can wait for ever: a tab that is not told keeps believing it is the old account, and what it
       // asks next is answered as somebody else and taken for the loss of a document of the old one. What this tab read is
-      // dropped with it.
+      // dropped with it. What is being left is written down apart, so that a question that is never answered is asked again.
+      markAccountsBeingLeft(toLeave)
       rememberAccount(user.id)
       queryClient.clear()
-      if (previous !== null && previous !== user.id) await leave(previous)
+      for (const [index, userId] of toLeave.entries()) {
+        await leave(userId)
+        markAccountsBeingLeft(toLeave.slice(index + 1))
+      }
       void navigate(destinationAfterSignIn(location.state), { replace: true })
     },
     [leave, location.state, navigate, queryClient],

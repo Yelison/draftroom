@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { forgetAccount, rememberAccount, rememberedAccount } from './lastAccount.ts'
+import {
+  accountsBeingLeft,
+  forgetAccount,
+  markAccountsBeingLeft,
+  rememberAccount,
+  rememberedAccount,
+} from './lastAccount.ts'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -38,5 +44,39 @@ describe('the account this browser last signed in with', () => {
     expect(rememberedAccount()).toBeNull()
     expect(() => rememberAccount('user-1')).not.toThrow()
     expect(() => forgetAccount()).not.toThrow()
+    expect(accountsBeingLeft()).toEqual([])
+    expect(() => markAccountsBeingLeft(['user-1'])).not.toThrow()
   })
+})
+
+describe('the accounts that are being left', () => {
+  // A switch of account asks what to do with what the old one kept, and the question can be left unanswered for good (the tab
+  // is closed). What is being left is written down apart from the account the browser holds, so that it is asked again.
+  it('are none until a switch marks them, and are what it marked, in order, until it marks others', () => {
+    expect(accountsBeingLeft()).toEqual([])
+
+    markAccountsBeingLeft(['user-1', 'user-2'])
+    expect(accountsBeingLeft()).toEqual(['user-1', 'user-2'])
+
+    markAccountsBeingLeft(['user-2'])
+    expect(accountsBeingLeft()).toEqual(['user-2'])
+  })
+
+  it('are none again once the last is marked as left, and leave no key behind', () => {
+    markAccountsBeingLeft(['user-1'])
+
+    markAccountsBeingLeft([])
+
+    expect(accountsBeingLeft()).toEqual([])
+    expect(localStorage.getItem('draftroom-leaving-accounts')).toBeNull()
+  })
+
+  it.each([['not json'], ['{"a":1}'], ['[1,2]'], ['["ok", 2]']])(
+    'are none for what a page of another version wrote (%s)',
+    (written) => {
+      localStorage.setItem('draftroom-leaving-accounts', written)
+
+      expect(accountsBeingLeft()).toEqual([])
+    },
+  )
 })

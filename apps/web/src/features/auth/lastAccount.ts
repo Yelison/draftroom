@@ -29,3 +29,31 @@ export function forgetAccount(): void {
     // As above.
   }
 }
+
+const leavingKey = 'draftroom-leaving-accounts'
+
+/**
+ * The accounts whose copies a switch has yet to decide about. The account the browser holds changes as soon as the session
+ * does, which the other tabs need to hear at once, so it can no longer say that an account was left and its question never
+ * answered (the tab was closed with the dialog open). This does: it is written before the question and taken back when it has
+ * been answered, and the next sign-in asks again about whatever is still there (protocol section 12.2: leaving an account is
+ * decided, not forgotten). Not watched by the other tabs: it is no change of who the browser is.
+ */
+export function accountsBeingLeft(): string[] {
+  try {
+    const written: unknown = JSON.parse(localStorage.getItem(leavingKey) ?? '[]')
+    return Array.isArray(written) && written.every((id) => typeof id === 'string') ? written : []
+  } catch {
+    return []
+  }
+}
+
+/** Writes down which accounts are being left, in place of what was there; none removes the key. */
+export function markAccountsBeingLeft(userIds: readonly string[]): void {
+  try {
+    if (userIds.length === 0) localStorage.removeItem(leavingKey)
+    else localStorage.setItem(leavingKey, JSON.stringify(userIds))
+  } catch {
+    // As above: without storage nothing is remembered, and a question left open is not asked again.
+  }
+}
