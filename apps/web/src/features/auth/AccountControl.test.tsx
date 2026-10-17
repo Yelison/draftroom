@@ -63,6 +63,37 @@ describe('signing out from the app', () => {
     expect(leaving.leaveAccount).toHaveBeenCalledWith(expect.objectContaining({ userId: marta.id }))
   })
 
+  it('does not send the next person to the page this one was on: nobody is told where they were going', async () => {
+    const { user, router } = open()
+
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
+    // Let whatever the pages still on screen asked for come back before looking.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(router.state.location.pathname).toBe('/sign-in')
+    expect(router.state.location.state).toBeNull()
+  })
+
+  it('does not start a second sign-out for a second press while the first one waits', async () => {
+    let release: () => void = () => undefined
+    leaving.leaveAccount.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          order.push('leaveAccount')
+          release = () => resolve({ purged: true })
+        }),
+    )
+    const { user } = open()
+    const button = await screen.findByRole('button', { name: 'Sign out' })
+
+    await user.click(button)
+    await user.click(button)
+
+    expect(order).toEqual(['leaveAccount'])
+    release()
+  })
+
   it('leaves the person on the sign-in page, with the focus on its headline and not on a page that is gone', async () => {
     const { user, router } = open()
 
