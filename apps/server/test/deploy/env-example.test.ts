@@ -34,6 +34,22 @@ async function config(environmentFile: string): Promise<{ readonly code: number;
   }
 }
 
+const secrets = ['SESSION_SECRET', 'POSTGRES_PASSWORD'] as const
+
+/** The example with every secret filled in except those named: what somebody who edited only part of it has. */
+function editedExcept(name: string, left: readonly string[]): string {
+  const file = join(directory, name)
+  const filled = secrets.filter((secret) => !left.includes(secret))
+  const lines = readFileSync(join(deploy, 'env.example'), 'utf8')
+    .split('\n')
+    .map((line) => {
+      const secret = filled.find((candidate) => line === `${candidate}=`)
+      return secret === undefined ? line : `${secret}=${randomBytes(24).toString('hex')}`
+    })
+  writeFileSync(file, lines.join('\n'))
+  return file
+}
+
 describe('deploy/env.example, copied and not edited', () => {
   it('does not let the stack start, and names what is missing', async () => {
     const copy = join(directory, 'unedited.env')
@@ -45,16 +61,15 @@ describe('deploy/env.example, copied and not edited', () => {
     expect(outcome.stderr).toMatch(/SESSION_SECRET|POSTGRES_PASSWORD/)
   })
 
-  it('lets it start once both secrets have values, so that the refusal above is about them and nothing else', async () => {
-    const edited = join(directory, 'edited.env')
-    const secrets = `SESSION_SECRET=${randomBytes(32).toString('hex')}\nPOSTGRES_PASSWORD=${randomBytes(24).toString('hex')}\n`
-    writeFileSync(
-      edited,
-      readFileSync(join(deploy, 'env.example'), 'utf8').replace(/^(?:SESSION_SECRET|POSTGRES_PASSWORD)=$/gm, '') +
-        secrets,
-    )
+  it.each(secrets)('does not let it start with only %s left empty, and says which', async (empty) => {
+    const outcome = await config(editedExcept(`only-${empty}.env`, [empty]))
 
-    const outcome = await config(edited)
+    expect(outcome.code).not.toBe(0)
+    expect(outcome.stderr).toContain(empty)
+  })
+
+  it('lets it start once both secrets have values, so that the refusals above are about them and nothing else', async () => {
+    const outcome = await config(editedExcept('edited.env', []))
 
     expect(outcome.stderr).toBe('')
     expect(outcome.code).toBe(0)
