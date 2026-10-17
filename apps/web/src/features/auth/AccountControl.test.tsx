@@ -1,8 +1,15 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { createMemoryRouter } from 'react-router'
+import { RouterProvider } from 'react-router/dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, TransportError } from '../../data/errors.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { marta } from '../../data/mock/fixtures/index.ts'
+import { AppProviders } from '../../app/AppProviders.tsx'
+import { routes } from '../../app/routes.tsx'
+import { DataSourceContext } from '../../data/DataSourceContext.ts'
+import { createMockServer } from '../../data/mock/createMockDataSource.ts'
 import { renderScreen } from '../documents/testing/renderScreen.tsx'
 import { rememberAccount, rememberedAccount } from './lastAccount.ts'
 
@@ -247,5 +254,26 @@ describe('signing out when the server cannot be reached', () => {
     )
     expect(router.state.location.pathname).toBe('/')
     expect(signOutButton()).not.toHaveAttribute('aria-busy', 'true')
+  })
+})
+
+describe('signing out with the providers of the app', () => {
+  it('leaves no destination for the next person, whichever page asks again for its data on the way out', async () => {
+    const router = createMemoryRouter(routes, { initialEntries: ['/documents'] })
+    const user = userEvent.setup()
+    render(
+      <DataSourceContext value={createMockServer().connect({ signedInAs: marta.email })}>
+        <AppProviders>
+          <RouterProvider router={router} />
+        </AppProviders>
+      </DataSourceContext>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    expect(router.state.location.pathname).toBe('/sign-in')
+    expect(router.state.location.state).toBeNull()
   })
 })
