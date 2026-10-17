@@ -15,10 +15,11 @@ const production = { ...developmentHardening, production: true }
 const strictTransportSecurity = 'strict-transport-security'
 
 describe('the security headers of the API', () => {
-  it('say that an answer is data: nothing to load, no frame, no guessing of its type, no referrer', () => {
+  it('say that an answer is data about someone: nothing to load, no frame, no guessing of its type, no referrer, no cache', () => {
     expect(securityHeaders({ production: false })).toEqual({
       'content-security-policy': "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
       'x-content-type-options': 'nosniff',
+      'cache-control': 'no-store',
       'referrer-policy': 'no-referrer',
       'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()',
     })

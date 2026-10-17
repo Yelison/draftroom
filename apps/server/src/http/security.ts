@@ -11,6 +11,8 @@ import type { FastifyInstance } from 'fastify'
 const apiSecurityHeaders = {
   'content-security-policy': "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff',
+  // Every answer is about someone: a document, a name, a session. A shared cache or the back button must not keep it.
+  'cache-control': 'no-store',
   // An address in the Referer can hold a document id; the API has no use for where the caller came from.
   'referrer-policy': 'no-referrer',
   // The app uses none of these, so nothing that gets into the page can ask for them.

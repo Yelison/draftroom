@@ -388,7 +388,8 @@ describe('a response that breaks the contract', () => {
     expect(response.headers).not.toHaveProperty('etag')
     expect(response.headers).not.toHaveProperty('location')
     expect(response.headers).not.toHaveProperty('retry-after')
-    expect(response.headers).not.toHaveProperty('cache-control')
+    // The handler's `max-age=60` is gone; what is there is the server's own policy for every answer.
+    expect(response.headers['cache-control']).toBe('no-store')
     expect(response.headers['content-type']).toContain(problemType)
   })
 

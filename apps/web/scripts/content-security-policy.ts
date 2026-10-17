@@ -28,7 +28,7 @@ export const scriptSource = (source: string): string =>
  *   and `wss:`, because Safari has not always counted a WebSocket to the same host as `'self'`.
  * - **Images** include `data:` and `blob:` for what the editor builds from a pasted image; **workers** none.
  */
-export function contentSecurityPolicy(scriptSources: readonly string[]): string {
+export function contentSecurityPolicy(scriptSources: readonly string[], { asHeader = false } = {}): string {
   const directives: Record<string, readonly string[]> = {
     'default-src': ["'none'"],
     'script-src': ["'self'", ...scriptSources],
@@ -41,6 +41,8 @@ export function contentSecurityPolicy(scriptSources: readonly string[]): string 
     'form-action': ["'self'"],
     'object-src': ["'none'"],
     'frame-src': ["'none'"],
+    // Only a header can say it: a browser ignores it in a <meta> tag.
+    ...(asHeader ? { 'frame-ancestors': ["'none'"] } : {}),
   }
   return Object.entries(directives)
     .map(([name, sources]) => `${name} ${sources.join(' ')}`)
