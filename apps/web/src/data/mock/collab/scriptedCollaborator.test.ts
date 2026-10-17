@@ -1,6 +1,6 @@
 import { fragmentName } from '@draftroom/editor-schema'
 // oxlint-disable-next-line no-restricted-imports
-import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
+import { jsonToYUpdate, replaceFragmentContent } from '@draftroom/editor-schema/convert'
 import * as Y from 'yjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { demoContent } from '../fixtures/demoContent.ts'
@@ -130,15 +130,92 @@ describe('the collaborator of the demo', () => {
     expect(shown).toHaveLength(1)
   })
 
-  it('stops when she is told to', () => {
-    const { ydoc, seat } = scene()
+  it('writes nothing more once she is stopped', () => {
+    const { ydoc, seat, edits } = scene()
     const stop = startCollaborator(seat, lines, lively)
     live(20_000)
-    const written = hers(ydoc)
 
     stop()
+    const afterStopping = edits.length
     live(120_000)
 
-    expect(hers(ydoc)).toBe(written)
+    expect(edits).toHaveLength(afterStopping)
+  })
+
+  it('leaves the paragraph as she found it when she is stopped in the middle of a line, and starts clean again', () => {
+    const { ydoc, seat } = scene()
+    const stop = startCollaborator(seat, lines, lively)
+    live(12_000)
+    expect(hers(ydoc).length).toBeGreaterThan(label.length)
+
+    stop()
+    expect(hers(ydoc)).toBe(label)
+
+    startCollaborator(seat, lines, lively)
+    live(12_000)
+    expect(hers(ydoc).startsWith(`${label} whether`)).toBe(true)
+  })
+
+  it('writes and erases only her own letters: what a visitor wrote at the end of her paragraph stays', () => {
+    const { ydoc, seat, cursors } = scene()
+    const visitor = new Y.Doc()
+    Y.applyUpdate(visitor, Y.encodeStateAsUpdate(ydoc))
+    ydoc.on(
+      'update',
+      (update: Uint8Array, origin: unknown) => origin !== 'visitor' && Y.applyUpdate(visitor, update, 'her'),
+    )
+    visitor.on(
+      'update',
+      (update: Uint8Array, origin: unknown) => origin !== 'her' && Y.applyUpdate(ydoc, update, 'visitor'),
+    )
+    const stop = startCollaborator(seat, lines, lively)
+    live(12_000)
+
+    // The visitor writes after her letters, with their cursor there, and then goes to another paragraph.
+    const text = blocks(visitor).at(-1)
+    const visitorsText = text instanceof Y.XmlElement ? text.get(0) : undefined
+    if (!(visitorsText instanceof Y.XmlText)) throw new Error('The last paragraph has no text')
+    visitor.transact(() => visitorsText.insert(visitorsText.length, ' VISITOR NOTE'), 'visitor')
+    cursors.push(Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(visitorsText, visitorsText.length)))
+    live(4_000)
+    cursors.length = 0
+    live(300_000)
+    stop()
+
+    expect(hers(ydoc)).toBe(`${label} VISITOR NOTE`)
+  })
+
+  it('takes her place with reduced motion once the document has arrived', () => {
+    const ydoc = new Y.Doc()
+    const shown: Y.RelativePosition[] = []
+    startCollaborator({ ydoc, otherCursors: () => [], showCursor: (position) => shown.push(position) }, lines, {
+      ...lively,
+      reducedMotion: () => true,
+    })
+    live(5_000)
+    expect(shown).toHaveLength(0)
+
+    Y.applyUpdate(ydoc, jsonToYUpdate({ type: 'doc', content: [...(demoContent.en[launchPlan.id] ?? [])] }))
+    live(1_000)
+
+    expect(shown).toHaveLength(1)
+  })
+
+  it('goes on in the new last paragraph when hers is replaced, as when a version is restored', () => {
+    const { ydoc, seat } = scene()
+    startCollaborator(seat, lines, lively)
+    live(12_000)
+
+    ydoc.transact(
+      () =>
+        replaceFragmentContent(ydoc.getXmlFragment(fragmentName), {
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Restored notes:' }] }],
+        }),
+      'restore',
+    )
+    live(60_000)
+
+    expect(hers(ydoc).startsWith('Restored notes: ')).toBe(true)
   })
 })
