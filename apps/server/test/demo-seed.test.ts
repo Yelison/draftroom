@@ -1,6 +1,6 @@
 import type { Schema } from '@draftroom/contract'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { almazara, harborAndPine, people } from '../src/db/demo-seed/content.ts'
+import { almazara, demoPassword, harborAndPine, people } from '../src/db/demo-seed/content.ts'
 import { seedDemo } from '../src/db/demo-seed/seed.ts'
 import { apiOf, bodyAs, type Api } from './support/api.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
@@ -31,6 +31,29 @@ describe('the demo seed', () => {
 
     expect(await seedDemo(database.db)).toBe(false)
     expect(await count()).toBe(first)
+  })
+
+  it.each(Object.values(people))(
+    'lets $name sign in with the demo password, which is what the demo accounts are for',
+    async (person) => {
+      const response = await server.request({
+        method: 'POST',
+        url: '/api/auth/sign-in',
+        payload: { email: person.email, password: demoPassword },
+      })
+
+      expect(response).toMatchObject({ statusCode: 200, body: { email: person.email, name: person.name } })
+    },
+  )
+
+  it('refuses any other password, so the demo accounts are as protected as the rest', async () => {
+    const response = await server.request({
+      method: 'POST',
+      url: '/api/auth/sign-in',
+      payload: { email: people.marta.email, password: 'not the demo password' },
+    })
+
+    expect(response.statusCode).toBe(401)
   })
 
   it('has one workspace in English and one in Spanish, each served to its people', async () => {

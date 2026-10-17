@@ -54,6 +54,13 @@ export const people = {
 
 export const demoPeople: readonly DemoPerson[] = Object.values(people)
 
+/**
+ * The password of every demo account, which is what lets a browser sign in as one of them in development and in the
+ * end-to-end suite. It is the one the mock's demo accounts have, so the demo reads the same on either. The seed refuses to
+ * run outside development and test, so this never reaches a deployment.
+ */
+export const demoPassword = 'harbor pine rooftop'
+
 export const harborAndPine: DemoWorkspace = {
   id: '0b1f6d54-3c1a-4f55-9a43-6a7d2f5e8c01',
   name: 'Harbor & Pine',
