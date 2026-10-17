@@ -53,11 +53,22 @@ const spanish: Words = {
   invalidEmail: 'Escribe un correo como nombre@ejemplo.com.',
 }
 
-/** Signing out is the last stop of the page in the Tab order, at the foot of the rail on screen. */
-async function signOut(page: Page, words: Words) {
+/**
+ * Signing out is the last stop of the page in the Tab order, though it sits at the foot of the rail on screen: it is reached
+ * with the Tab key from wherever the focus is, which after opening a page is its headline.
+ */
+async function tabToSignOut(page: Page, words: Words) {
   const button = page.getByRole('button', { name: words.signOut })
   await expect(button).toBeVisible()
-  await button.focus()
+  for (let stop = 0; stop < 100; stop++) {
+    await page.keyboard.press('Tab')
+    if (await button.evaluate((element) => element === document.activeElement)) return
+  }
+  throw new Error(`The Tab key never reached "${words.signOut}"`)
+}
+
+async function signOut(page: Page, words: Words) {
+  await tabToSignOut(page, words)
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/sign-in$/)
   // The headline has the focus, which is what tells a screen reader that the page changed.
