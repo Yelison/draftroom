@@ -194,17 +194,21 @@ const documentHeaders = {
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'strict-origin-when-cross-origin',
   'cross-origin-opener-policy': 'same-origin',
-  'content-security-policy': "frame-ancestors 'none'",
 }
 const page = await fetch(origin)
 for (const [name, value] of Object.entries(documentHeaders)) {
   check(page.headers.get(name) === value, `the page has ${name}: ${page.headers.get(name) ?? 'nothing'}, not ${value}`)
 }
 check(page.headers.has('permissions-policy'), 'the page has no Permissions-Policy')
+// Contains, not equals: T7.2 writes the rest of the policy into the same header, and the page must stay out of other sites' frames.
+check(
+  page.headers.get('content-security-policy')?.includes("frame-ancestors 'none'") === true,
+  `the page's Content-Security-Policy does not forbid frames: ${page.headers.get('content-security-policy') ?? 'nothing'}`,
+)
 check(!page.headers.has('server'), `the page names its server: ${page.headers.get('server') ?? ''}`)
 const api = await fetch(`${origin}/api/health/live`)
 check(api.ok, `the API's liveness answered ${api.status}`)
-for (const name of [...Object.keys(documentHeaders), 'permissions-policy']) {
+for (const name of [...Object.keys(documentHeaders), 'permissions-policy', 'content-security-policy']) {
   check(!api.headers.has(name), `the API answer carries ${name}, which belongs to the server's own headers`)
 }
 

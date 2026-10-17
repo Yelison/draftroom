@@ -54,7 +54,7 @@ and its healthcheck is `GET /api/health/ready`, which answers `200` only when th
 migrations this version knows. Caddy obtains the certificate for `SITE_ADDRESS` by itself on first start and keeps it in the
 `caddy-data` volume.
 
-To try the stack on one machine, use a name Caddy does not treat as public, for example `SITE_ADDRESS=draftroom.localhost`. Caddy
+To try the stack on one machine, use a name Caddy does not treat as public, for example `SITE_ADDRESS=draftroom.localhost` (not `localhost`: the proxy tells browsers to use only HTTPS for the name for a year, and they would then refuse the plain `http://localhost` of any other project you run). Caddy
 then issues a certificate from its own authority; the browser will not trust it until you install the root certificate it keeps
 at `/data/caddy/pki/authorities/local/root.crt` in the proxy container (`docker compose cp` brings it out), or you accept the
 warning for that name. With `HTTPS_PORT` set to something other than 443, `PUBLIC_ORIGIN` carries the port.
@@ -177,6 +177,8 @@ container directly) and run `pg_dump` and `pg_restore` inside it, so they need D
   database you named: it asks you to type its name unless you pass `--yes`, and refuses while something is connected to it. If
   anything fails, your database is as it was. Start the stack again afterwards (the same command with `start`). `postgres`,
   `template0` and `template1` are never accepted as the target.
+- **A restore needs room for a second copy of the database** while it runs, because it restores into a scratch database before
+  replacing yours.
 - **Keep backups off the machine** that holds the database, and as private as the database itself: they contain everybody's documents.
   Retention and where they go are yours to decide; the scripts only make the archive.
 - **Without Docker,** the same thing by hand: `pg_dump --format=custom --file draftroom.dump "$DATABASE_URL"`, and

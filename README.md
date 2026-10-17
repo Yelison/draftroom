@@ -17,7 +17,7 @@ The project is at its planning stage. Everything lands through pull requests; se
 You need Docker with the Compose plugin and a host name that points at the machine (or `draftroom.localhost` to try it on one machine).
 
 ```sh
-cp deploy/env.example deploy/.env       # then fill in the values marked CHANGE_ME
+cp deploy/env.example deploy/.env       # then fill in the host name and the two secrets (empty until you do)
 docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom up -d --build --wait
 ```
 

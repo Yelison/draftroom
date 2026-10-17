@@ -1,6 +1,6 @@
 # Draftroom in production: Caddy in front, the server behind it, PostgreSQL 17 behind that.
 #
-#   cp deploy/env.example deploy/.env      # then fill in every value marked CHANGE_ME
+#   cp deploy/env.example deploy/.env      # then fill in the host name and the two secrets (they are empty until you do)
 #   docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom up -d --build --wait
 #
 # Only the proxy publishes ports. The server and the database are reachable on the Compose network and nowhere else, so

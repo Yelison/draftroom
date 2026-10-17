@@ -247,7 +247,7 @@ describe('restore.sh', () => {
       expect((await notes('survivor')).map((note) => note.body)).toEqual(['written before the transfer was cut'])
     })
 
-    it('refuses a backup that was cut short when it was written', async () => {
+    it('does not create a database for a cut-short backup', async () => {
       const outcome = await run('restore.sh', [truncated, 'never_created'])
 
       expect(outcome.code).not.toBe(0)
