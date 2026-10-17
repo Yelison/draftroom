@@ -12,7 +12,8 @@ const fake = {
   awsKey: `AKIA${'Q7'.repeat(8)}`,
   jwt: `eyJ${'a'.repeat(12)}.eyJ${'b'.repeat(12)}.${'c'.repeat(12)}`,
   hex32: 'c0ffee'.repeat(11),
-  bcrypt: `$2a$14$${'abcdefghij'.repeat(5)}abc`,
+  // 22 characters of salt and 31 of hash, with the `.` of their alphabet where it keeps every run of letters and digits short.
+  bcrypt: `$2a$14$${'N9qo8uLOick.x2ZMRZoMye'}${'IjVHCm/XwZ1GV.mdq/9OdUgnwS8iVbi'}`,
 }
 
 const isCode = (path: string): boolean => /\.(?:mjs|js|ts)$/.test(path)
