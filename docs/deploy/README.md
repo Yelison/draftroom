@@ -57,8 +57,10 @@ and sends `SIGTERM` to stop it; on that signal it stores the documents it holds 
 Any proxy works if it does these four things. [`deploy/Caddyfile`](../../deploy/Caddyfile) is the reference, and the only one that is
 tested.
 
-1. **Terminate TLS.** The server speaks plain HTTP and plain WebSocket; the browser must reach it over HTTPS and WSS (the
-   session cookie is `Secure`, and a page served over HTTPS cannot open an unencrypted WebSocket).
+1. **Terminate TLS.** The server speaks plain HTTP and plain WebSocket; the browser must reach it over HTTPS and WSS. In production
+   the server marks both cookies `Secure` ([ADR 0004](../decisions/0004-authentication.md)), and a browser never sends a `Secure`
+   cookie over plain HTTP, so nobody could stay signed in; a page served over HTTPS also cannot open an unencrypted WebSocket.
+   The proxy needs to add nothing about cookies: it passes `Set-Cookie` and `Cookie` as they are.
 2. **Send `/api/*` to `API_PORT`** (8380) and keep the path as it is.
 3. **Send `/collab` to `COLLAB_PORT`** (8480), keep the path, and forward the WebSocket handshake: the `Connection: Upgrade` and
    `Upgrade: websocket` headers have to reach the server, and an idle connection must not be closed by the proxy sooner than
@@ -70,12 +72,16 @@ tested.
 The server checks the `Origin` of every WebSocket upgrade against `ALLOWED_ORIGINS`, so `PUBLIC_ORIGIN` has to be exactly what the
 browser shows in its address bar, port included.
 
-## The first account
+## The first account and sessions
 
 There is no setup step and no default account. Open the address and sign up: a person who signs up without an invitation gets a
 workspace of their own, of which they are the owner, in the same transaction, so on a new installation the first person to sign up
 has somewhere to create documents. Everybody else is invited by email from the workspace's settings and claims the invitation
 when they sign up.
+
+Sessions are server-side: a session ends after 30 days, or after 7 without use, and signing out closes the person's open
+documents at once (ADR 0004). Passwords are hashed with Argon2id, which holds about 19 MiB of memory for the 70 ms it takes, so a
+burst of sign-ins needs memory in proportion; the container needs no more than a few hundred MiB for a team.
 
 ## Variables
 
@@ -85,7 +91,7 @@ The server reads these and nothing else from its environment; it refuses to star
 | ----------------- | --------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `NODE_ENV`        | yes, set to `production`    | Anything else may enable the development identity. Only an explicit `development` or `test` does.         |
 | `DATABASE_URL`    | yes                         | `postgres://user:password@host:5432/database`. The password must be URL-safe.                             |
-| `SESSION_SECRET`  | in production               | At least 32 characters, different per environment. Changing it signs everybody out.                       |
+| `SESSION_SECRET`  | in production               | At least 32 characters, different per environment. It keys the CSRF tokens. Changing it or restarting without it makes every CSRF cookie fail until the person signs in again; the sessions themselves live in the database and survive. |
 | `ALLOWED_ORIGINS` | in production               | Comma-separated origins (scheme, host, port; no path) the browser may use. The Compose file sets it from `PUBLIC_ORIGIN`. |
 | `API_PORT`        | no, 8380                    | The REST listener. Must differ from `COLLAB_PORT`.                                                        |
 | `COLLAB_PORT`     | no, 8480                    | The collaboration WebSocket listener.                                                                     |
@@ -135,9 +141,16 @@ and the broadcast of revocations across processes. That is deferred; this stack 
 
 ## What is not done yet
 
-- **Security headers, a content security policy, CORS and `trustProxy`** are T7.2. Until then the proxy adds none of them, and the
-  server does not trust the proxy's forwarded address.
-- **The sign-in rate limit** keeps its counters in the process, so it resets on restart and is not shared. A shared store belongs to
-  T7.2 together with the point above, and matters only once there is more than one process.
+- **Email addresses are not verified at sign-up.** Whoever signs up first with an address that has a pending invitation inherits
+  what was shared with it, and the sign-up answer tells which addresses have an account. This is a known risk the owner accepted
+  (ADR 0004, README); it needs email delivery in both languages before the product is public.
+- **Security headers, a content security policy, CORS, `trustProxy` and the production build guard against the development
+  identity** are T7.2. Until then the proxy adds none of the headers, and the server sees the proxy's address, not the visitor's:
+  **every visitor shares the network address of the proxy**, so the per-address limits on sign-in and sign-up (30 failed sign-ins
+  per 15 minutes, 10 sign-ups per hour) are counted for everybody together and one person's attempts can use them up. The
+  per-account limit (10 failed sign-ins per 15 minutes) is not affected.
+- **The limits on attempts live in the memory of the process.** They reset on restart and forget the oldest keys under pressure
+  (5000 keys), which is right for the one process this stack runs. A shared store is needed only if there is ever more than one
+  process (see Scaling), and is not built.
 - **No host, registry or account is created.** Images are built on the machine that runs them; publishing them to a registry and
   choosing where to run them is for the owner to decide.
