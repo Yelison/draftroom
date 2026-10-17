@@ -5,11 +5,13 @@ import {
   conflict,
   daniel,
   launchPlan,
+  launchPlanVersions,
   openVersions,
   rows,
   sofia,
   unavailable,
   versionRows,
+  when,
 } from './testing/openVersions.tsx'
 
 const restoreButtonOf = (row: HTMLElement) => within(row).getByRole('button', { name: /^Restore “/ })
@@ -59,7 +61,9 @@ describe('the confirmation to restore', () => {
   it('names the version and says what is kept and what may not be, without promising that nothing is lost', async () => {
     const { confirmation } = await askToRestore()
 
-    expect(within(confirmation).getByRole('heading', { name: 'Restore “Before the pricing review”?' })).toBeVisible()
+    expect(
+      within(confirmation).getByRole('heading', { name: /^Restore “Before the pricing review, .*”\?$/ }),
+    ).toBeVisible()
     expect(confirmation).toHaveTextContent('How it is now is saved first as a version')
     expect(confirmation).toHaveTextContent('may not be kept')
   })
@@ -116,7 +120,7 @@ describe('restoring a version', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(trigger).toHaveFocus()
     expect(trigger).toBeInTheDocument()
-    expect(await screen.findByText(/The document went back to “Before the pricing review”/)).toBeInTheDocument()
+    expect(await screen.findByText(/The document went back to “Before the pricing review, /)).toBeInTheDocument()
     // The restore saved how the document was, then the restored state: both are the newest rows.
     await waitFor(() => expect(rows()).toHaveLength(5))
     expect(rows()[0]).toHaveTextContent('Restored version')
@@ -165,6 +169,24 @@ describe('restoring a version', () => {
   it('names a version that has no name of its own by what it is and when it was made', async () => {
     await openVersions()
 
-    expect(restoreButtonOf(rows()[0]!)).toHaveAccessibleName(/^Restore “Automatic version from Oct 13, 2026/)
+    expect(restoreButtonOf(rows()[0]!)).toHaveAccessibleName(
+      `Restore “Automatic version from ${when(launchPlanVersions.newest.createdAt)}”`,
+    )
+  })
+})
+
+describe('the versions a restore leaves with the same name', () => {
+  it('are told apart by what names their restore button, so a screen reader hears which one it is', async () => {
+    const { confirmation, user } = await askToRestore()
+    await user.click(within(confirmation).getByRole('button', { name: 'Restore' }))
+    await waitFor(() => expect(rows()).toHaveLength(5))
+
+    const names = screen
+      .getAllByRole('button', { name: /^Restore “/ })
+      .map((button) => button.getAttribute('aria-label'))
+
+    // The restored version copies the name of the one it went back to.
+    expect(names.filter((name) => name?.startsWith('Restore “Before the pricing review, '))).toHaveLength(2)
+    expect(new Set(names).size).toBe(names.length)
   })
 })

@@ -344,6 +344,7 @@
   "versions.kind.preRestore": "Version before a restore",
   "versions.kind.restore": "Restored version",
   "versions.unnamed": "{kind} from {date}",
+  "versions.named": "{label}, {date}",
   "versions.row.byAuthor": "{date} by {author}",
   "versions.row.restore": "Restore",
   "versions.row.restoreLabel": "Restore “{name}”",

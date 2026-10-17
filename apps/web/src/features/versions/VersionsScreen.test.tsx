@@ -5,12 +5,14 @@ import { budget } from '../../data/mock/fixtures/documents.ts'
 import {
   launchPlan,
   launchPlanVersions,
+  rowButton,
   openVersions,
   renderScreen,
   rows,
   versionRows,
   unavailable,
   versionsPath,
+  when,
 } from './testing/openVersions.tsx'
 
 describe('the list of versions', () => {
@@ -18,14 +20,14 @@ describe('the list of versions', () => {
     await openVersions()
 
     const [newest, named, oldest] = rows()
-    expect(within(newest!).getByRole('button', { name: launchPlanVersions.newest })).toBeInTheDocument()
-    expect(newest).toHaveTextContent('Oct 13, 2026')
+    expect(within(newest!).getByRole('button', { name: rowButton.newest })).toBeInTheDocument()
+    expect(newest).toHaveTextContent(when(launchPlanVersions.newest.createdAt))
     // An automatic version has no author: only the date is said.
     expect(newest).not.toHaveTextContent(' by ')
     expect(named).toHaveTextContent('Before the pricing review')
     expect(named).toHaveTextContent('Saved version')
-    expect(named).toHaveTextContent(/Oct 11, 2026, .* by Marta Ruiz/)
-    expect(oldest).toHaveTextContent('Oct 9, 2026')
+    expect(named).toHaveTextContent(`${when(launchPlanVersions.named.createdAt)} by Marta Ruiz`)
+    expect(oldest).toHaveTextContent(when(launchPlanVersions.oldest.createdAt))
     expect(rows()).toHaveLength(3)
   })
 
@@ -99,7 +101,7 @@ describe('the list of versions', () => {
     await waitFor(() => expect(rows()).toHaveLength(3))
     expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
     // "Load more" went away with the last page: the focus is on the first row that arrived, not on the page.
-    expect(within(rows()[2]!).getByRole('button', { name: launchPlanVersions.oldest })).toHaveFocus()
+    expect(within(rows()[2]!).getByRole('button', { name: rowButton.oldest })).toHaveFocus()
   })
 })
 

@@ -2,10 +2,10 @@ import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { DataSource } from '../../data/DataSource.ts'
 import { documentName } from '@draftroom/contract/collab'
-import { launchPlan, launchPlanVersions, openVersions, rows, unavailable } from './testing/openVersions.tsx'
+import { launchPlan, rowButton, openVersions, rows, unavailable } from './testing/openVersions.tsx'
 
 const preview = () => screen.getByRole('region', { name: 'Preview' })
-const textOf = (name: string) => screen.findByRole('document', { name })
+const textOf = (name: RegExp) => screen.findByRole('document', { name })
 
 describe('the preview of a version', () => {
   it('asks the person to choose one before anything is shown', async () => {
@@ -17,9 +17,9 @@ describe('the preview of a version', () => {
   it('shows what the version held, as text that cannot be edited', async () => {
     const { user } = await openVersions()
 
-    await user.click(within(rows()[1]!).getByRole('button', { name: launchPlanVersions.named }))
+    await user.click(within(rows()[1]!).getByRole('button', { name: rowButton.named }))
 
-    const text = await textOf('Text of “Before the pricing review”')
+    const text = await textOf(/^Text of “Before the pricing review, /)
     expect(text).toHaveTextContent('The launch moves to the second week of November.')
     expect(text).toHaveAttribute('contenteditable', 'false')
     expect(within(preview()).getByText(/Nothing you do here changes the document/)).toBeInTheDocument()
@@ -27,8 +27,8 @@ describe('the preview of a version', () => {
 
   it('marks the version that is open in the list, and replaces the text when another one is chosen', async () => {
     const { user } = await openVersions()
-    const oldest = within(rows()[2]!).getByRole('button', { name: launchPlanVersions.oldest })
-    const newest = within(rows()[0]!).getByRole('button', { name: launchPlanVersions.newest })
+    const oldest = within(rows()[2]!).getByRole('button', { name: rowButton.oldest })
+    const newest = within(rows()[0]!).getByRole('button', { name: rowButton.newest })
 
     await user.click(oldest)
     expect(await screen.findByText(/The launch is planned for the first week of November/)).toBeInTheDocument()
@@ -65,7 +65,7 @@ describe('the preview of a version', () => {
       },
     })
 
-    await user.click(within(rows()[0]!).getByRole('button', { name: launchPlanVersions.newest }))
+    await user.click(within(rows()[0]!).getByRole('button', { name: rowButton.newest }))
     await screen.findByRole('document')
 
     expect(sockets).toEqual([])
@@ -83,7 +83,7 @@ describe('the preview of a version', () => {
         },
       }),
     })
-    await user.click(within(rows()[0]!).getByRole('button', { name: launchPlanVersions.newest }))
+    await user.click(within(rows()[0]!).getByRole('button', { name: rowButton.newest }))
 
     expect(await within(preview()).findByRole('alert')).toHaveTextContent("We couldn't open this version")
     failing = false
@@ -97,7 +97,7 @@ describe('the preview of a version', () => {
       wrap: (dataSource) => ({ ...dataSource, getVersionContent: async () => new Uint8Array([1, 2, 3, 4, 5]) }),
     })
 
-    await user.click(within(rows()[0]!).getByRole('button', { name: launchPlanVersions.newest }))
+    await user.click(within(rows()[0]!).getByRole('button', { name: rowButton.newest }))
 
     expect(await within(preview()).findByRole('alert')).toHaveTextContent("This version can't be shown")
     expect(rows()).toHaveLength(3)

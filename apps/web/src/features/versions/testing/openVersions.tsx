@@ -2,6 +2,7 @@ import { screen, within } from '@testing-library/react'
 import type { Schema } from '@draftroom/contract'
 import type { DataSource } from '../../../data/DataSource.ts'
 import { ApiError } from '../../../data/errors.ts'
+import { versions } from '../../../data/mock/fixtures/collaboration.ts'
 import { launchPlan } from '../../../data/mock/fixtures/documents.ts'
 import { daniel } from '../../../data/mock/fixtures/index.ts'
 import { renderScreen, type RenderScreenOptions } from '../../documents/testing/renderScreen.tsx'
@@ -31,12 +32,26 @@ export async function versionRows() {
   return rows()
 }
 
-/** What each version of the launch plan is called in the fixtures, newest first. */
-export const launchPlanVersions = {
-  newest: /^Automatic version.*Oct 13, 2026/,
+/** When a version was made, the way the screen says it in English; the machine's time zone is the screen's too. */
+export const when = (isoDate: string) =>
+  new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(isoDate))
+export const day = (isoDate: string) =>
+  new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(isoDate))
+
+const escaped = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const [oldest, named, newest] = versions.filter((version) => version.documentId === launchPlan.id)
+if (oldest === undefined || named === undefined || newest === undefined)
+  throw new Error('The launch plan has three versions')
+
+/** The three versions of the launch plan, as the fixtures hold them. */
+export const launchPlanVersions = { newest, named, oldest }
+
+/** The name of the button that opens each one, from its row. */
+export const rowButton = {
+  newest: new RegExp(`^Automatic version.*${escaped(day(newest.createdAt))}`),
   named: /^Before the pricing review/,
-  oldest: /^Automatic version.*Oct 9, 2026/,
-} as const
+  oldest: new RegExp(`^Automatic version.*${escaped(day(oldest.createdAt))}`),
+}
 
 export const unavailable = () =>
   new ApiError({ type: 'about:blank', title: 'Unavailable', status: 503, code: 'unavailable' })
