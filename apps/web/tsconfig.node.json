@@ -10,24 +10,35 @@
     "tsBuildInfoFile": "${configDir}/node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
   // What this project covers, besides the build tooling and its tests (`vite.config.ts`, `scripts`) and the browser
-  // specs (`e2e`, `e2e-demo`):
+  // specs (`e2e`, `e2e-demo`, `e2e-collab`, the suite against the real stack):
   //  - the few modules of `src` that the Vite configuration reads (`i18n/locale.ts`, `i18n/localeScript.ts`, the
   //    catalogues, `theme.ts`);
   //  - the fixtures that the bundle guard searches the production build for (`data/mock/fixtures`, `data/mock/ids.ts`);
-  //  - the clipboard HTML that the editor spec pastes (`features/editor/testing/wordProcessorHtml.ts`).
+  //  - the clipboard HTML that the editor spec pastes (`features/editor/testing/wordProcessorHtml.ts`);
+  //  - the HTTP client and the shared contract suite, which the real-stack suite talks to the server with and runs
+  //    (`data/DataSource.ts`, `data/errors.ts`, `data/http`, `data/contract.suite.ts`, `data/testing/contract.ts`, `ordering.ts`).
   "include": [
     "vite.config.ts",
     "scripts",
     "e2e",
     "e2e-demo",
+    "e2e-collab",
+    "playwright.collab.config.ts",
     "src/i18n/locale.ts",
     "src/i18n/localeScript.ts",
     "src/i18n/*.json",
     "src/theme.ts",
     "src/data/mock/fixtures",
     "src/data/mock/ids.ts",
-    "src/features/editor/testing/wordProcessorHtml.ts"
+    "src/features/editor/testing/wordProcessorHtml.ts",
+    "src/data/DataSource.ts",
+    "src/data/errors.ts",
+    "src/data/http",
+    "src/data/contract.suite.ts",
+    "src/data/testing/contract.ts",
+    "src/data/testing/ordering.ts"
   ],
+  "exclude": ["src/data/http/*.test.ts"],
   // The fixtures import types from the contract, so a change of `schema.ts` has to rebuild this project too.
   "references": [{ "path": "../../packages/contract" }]
 }
