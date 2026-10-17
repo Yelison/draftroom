@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { Algorithm, hash as argon2Hash, verify as argon2Verify } from '@node-rs/argon2'
+import { hash as argon2Hash, verify as argon2Verify } from '@node-rs/argon2'
 
 /**
  * Argon2id at the first configuration OWASP's Password Storage Cheat Sheet lists (19 MiB, two passes, one lane). It takes
@@ -7,7 +7,8 @@ import { Algorithm, hash as argon2Hash, verify as argon2Verify } from '@node-rs/
  * the others on a small server. ADR 0004 says why these figures and what would make them change.
  */
 export const hashParameters = {
-  algorithm: Algorithm.Argon2id,
+  // 2 is Argon2id. The library's `Algorithm` is an ambient `const enum`, which `verbatimModuleSyntax` does not let a module import.
+  algorithm: 2,
   memoryCost: 19_456,
   timeCost: 2,
   parallelism: 1,
