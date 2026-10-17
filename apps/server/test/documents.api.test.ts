@@ -153,6 +153,20 @@ describe('creating a document', () => {
       expect(JSON.stringify(content)).toContain('Orden del día')
     })
 
+    it('starts with the first paragraph of the template as its excerpt, as one typed in the editor would, and a blank document with none', async () => {
+      const fromTemplate = bodyAs<Document>(await create({ title: 'Update', templateId: 'weekly-update' }))
+      const blank = bodyAs<Document>(await create({ title: 'Blank' }))
+
+      expect(fromTemplate.excerpt).toBe('The most important thing that moved forward')
+      expect(blank.excerpt).toBeNull()
+      const stored = await db
+        .selectFrom('documents')
+        .select('excerpt')
+        .where('id', '=', fromTemplate.id)
+        .executeTakeFirstOrThrow()
+      expect(stored.excerpt).toBe(fromTemplate.excerpt)
+    })
+
     it('uses English when no language is given', async () => {
       const { id } = bodyAs<Document>(await create({ title: 'Meeting', templateId: 'meeting-notes' }))
 

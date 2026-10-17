@@ -93,7 +93,7 @@ export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { 
             title,
             folderId: folderId ?? null,
             createdBy: userId,
-            ...(template === undefined ? {} : { state: template.state }),
+            ...(template === undefined ? {} : { state: template.state, excerpt: template.excerpt }),
           }),
         )
         .catch((error: unknown) => {

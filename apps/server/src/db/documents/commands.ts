@@ -13,6 +13,8 @@ export interface NewDocument {
   readonly createdBy: string
   /** The Yjs state it starts with, from a template; none for a blank document. */
   readonly state?: Uint8Array
+  /** The excerpt of that content, computed with the rule the collaboration server uses after a store. */
+  readonly excerpt?: string | null
 }
 
 /**
@@ -27,6 +29,7 @@ export async function createDocumentRows(trx: Transaction<Database>, document: N
       workspace_id: document.workspaceId,
       title: document.title,
       folder_id: document.folderId,
+      excerpt: document.excerpt ?? null,
       created_by: document.createdBy,
       archived_at: null,
     })
