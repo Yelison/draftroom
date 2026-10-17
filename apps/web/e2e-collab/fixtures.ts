@@ -120,10 +120,15 @@ export class Participant {
     }
   }
 
-  /** The offline copies this browser keeps for the signed-in accounts, by database name (`draftroom:<user>:<workspace>:<document>`). */
-  async localCopies(): Promise<string[]> {
-    return this.page.evaluate(async () =>
-      (await indexedDB.databases()).flatMap(({ name }) => (name?.startsWith('draftroom:') ? [name] : [])),
+  /**
+   * The offline copies this browser keeps, by database name (`draftroom:<user>:<workspace>:<document>`): those of every account
+   * that has used it, or only the ones of `userId` when it is given, which is what a test about one account's copies means.
+   */
+  async localCopies(userId?: string): Promise<string[]> {
+    const prefix = userId === undefined ? 'draftroom:' : `draftroom:${userId}:`
+    return this.page.evaluate(
+      async (wanted) => (await indexedDB.databases()).flatMap(({ name }) => (name?.startsWith(wanted) ? [name] : [])),
+      prefix,
     )
   }
 

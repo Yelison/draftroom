@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { environment } from './environment.ts'
 import { expect, Participant, test } from './fixtures.ts'
-import { demoPassword, people } from './people.ts'
+import { demoPassword, people, restAs } from './people.ts'
 import { createDocument } from './scene.ts'
 
 const lucia = 'lucia.fernandez@almazara.example'
@@ -24,6 +24,8 @@ test.describe('a change of account in one tab of the browser', () => {
     browser,
   }) => {
     const documentId = await createDocument('daniel', [])
+    // Only his copies are counted: a copy of Lucía's would be no proof that his is still there.
+    const { id: danielId } = await restAs('daniel').getMe()
     const context = await browser.newContext({ baseURL: environment.appOrigin, locale: 'en-US', colorScheme: 'light' })
     const first = await context.newPage()
     const daniel = new Participant('daniel', context, first)
@@ -38,7 +40,7 @@ test.describe('a change of account in one tab of the browser', () => {
     collaboration.setReachable(false)
     await expect(daniel.syncStatus).not.toHaveText('Sync status: Synced')
     await daniel.typeAtEnd('Written while the connection was cut.')
-    await expect.poll(() => daniel.localCopies()).toHaveLength(1)
+    await expect.poll(() => daniel.localCopies(danielId)).toHaveLength(1)
     await first.getByRole('link', { name: 'Home' }).click()
     await expect(first.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible()
 
@@ -51,12 +53,17 @@ test.describe('a change of account in one tab of the browser', () => {
     // The first tab goes back to the document while the question is open. It has been told who is signed in: nothing is asked
     // as Lucía for Daniel's document, and the copy he made is not taken for one that was lost.
     await first.goBack()
-    await expect(first.getByRole('heading', { level: 1 })).toHaveText(/isn't available|was removed/)
-    expect(await daniel.localCopies(), 'the copy of the account that was left is still on the device').toHaveLength(1)
+    // Exactly the document that is not there for the new account: the screen of an access that was removed, which is what the
+    // old account's copy being purged would show, is not it.
+    await expect(first.getByRole('heading', { level: 1 })).toHaveText("This document isn't available")
+    expect(
+      await daniel.localCopies(danielId),
+      'the copy of the account that was left is still on the device',
+    ).toHaveLength(1)
 
     await question.getByRole('button', { name: 'Keep them' }).click()
     await expect(second).toHaveURL(/\/$/)
-    expect(await daniel.localCopies(), 'and after the person chose to keep it').toHaveLength(1)
+    expect(await daniel.localCopies(danielId), 'and after the person chose to keep it').toHaveLength(1)
     await context.close()
   })
 })
