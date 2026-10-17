@@ -284,6 +284,17 @@ describe('what cannot be duplicated', () => {
     expect(await snapshotOf(original)).toEqual(before)
   })
 
+  it('checks the folder before the content: a folder that is not there is a 400 even when the state is unreadable', async () => {
+    const broken = new Y.Doc()
+    broken.getXmlFragment(fragmentName).insert(0, [withAttribute(new Y.XmlElement('heading'), 'level', 9)])
+    const original = await originalWith(Y.encodeStateAsUpdate(broken))
+    const foreign = await createFolder(db, await createWorkspace(db, 'Almazara'))
+
+    const response = await duplicate(original, { title: 'Copy into a foreign folder', folderId: foreign })
+
+    expect(response).toMatchObject({ statusCode: 400, body: { code: 'validation-failed' } })
+  })
+
   it('answers a document whose content is gone as a document that is not there, and creates nothing', async () => {
     const original = await originalWith(stateWith(0))
     await db.deleteFrom('document_states').where('document_id', '=', original).execute()
