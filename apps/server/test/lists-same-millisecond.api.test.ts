@@ -1,5 +1,5 @@
 import type { Schema } from '@draftroom/contract'
-import type { Kysely } from 'kysely'
+import { sql, type Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, bodyAs, type Api } from './support/api.ts'
@@ -163,5 +163,57 @@ describe('the history and the versions, where several share a millisecond', () =
     await setInstants(db, 'document_versions', 'created_at', instantsAgainstIds(ids, 8))
 
     expect(await readOneByOne(owner, `/api/documents/${own}/versions`)).toEqual(byIdDescending(ids))
+  })
+})
+
+describe('the members of a workspace and the grants of a document, where several share a millisecond', () => {
+  async function peopleJoining(count: number): Promise<Person[]> {
+    const people: Person[] = []
+    for (let index = 0; index < count; index += 1) people.push(await createPerson(db, `Member ${index}`))
+    return people
+  }
+
+  it('orders the members by the millisecond they joined and then by person, whatever the microseconds', async () => {
+    const own = await createWorkspace(db, 'Ties')
+    await join(db, own, owner, 'owner')
+    const members = await peopleJoining(4)
+    for (const member of members) await join(db, own, member)
+    const stamps = instantsAgainstIds(
+      members.map(({ id }) => id),
+      9,
+    )
+    for (const [userId, stamp] of stamps) {
+      await sql`update memberships set created_at = ${stamp}::timestamptz where workspace_id = ${own} and user_id = ${userId}`.execute(
+        db,
+      )
+    }
+
+    const response = await api({ as: owner, method: 'GET', url: `/api/workspaces/${own}/members` })
+
+    const listed = bodyAs<Schema<'MemberList'>>(response).items.map((member) => member.userId)
+    expect(listed.filter((id) => stamps.has(id))).toEqual(byIdAscending([...stamps.keys()]))
+  })
+
+  it('orders the grants of a document the same way', async () => {
+    const documentId = await createDocument(db, { workspaceId, creator: owner })
+    const people = await peopleJoining(4)
+    for (const person of people) {
+      await join(db, workspaceId, person)
+      await grant(db, { workspaceId, documentId, person, role: 'viewer' })
+    }
+    const stamps = instantsAgainstIds(
+      people.map(({ id }) => id),
+      10,
+    )
+    for (const [userId, stamp] of stamps) {
+      await sql`update document_access set created_at = ${stamp}::timestamptz where document_id = ${documentId} and user_id = ${userId}`.execute(
+        db,
+      )
+    }
+
+    const response = await api({ as: owner, method: 'GET', url: `/api/documents/${documentId}/access` })
+
+    const listed = bodyAs<Schema<'AccessList'>>(response).items.map((entry) => entry.userId)
+    expect(listed.filter((id) => stamps.has(id))).toEqual(byIdAscending([...stamps.keys()]))
   })
 })

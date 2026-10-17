@@ -23,7 +23,7 @@ describe('catalogueModule', () => {
   it('keeps the arguments of a message as nodes', () => {
     const trees = exported(catalogueModule(catalogue, { directory })?.code ?? '')
 
-    expect(trees['preferences.language.announcement']).toContainEqual({ type: 1, value: 'language' })
+    expect(trees['sharing.announce.removed']).toContainEqual({ type: 1, value: 'name' })
   })
 
   it.each([
@@ -42,6 +42,6 @@ describe('catalogueModule', () => {
     expect(Object.keys(pseudo).sort()).toEqual(Object.keys(real).sort())
     expect(text(pseudo['nav.documents'] ?? [])).toMatch(/\P{ASCII}/u)
     expect(text(pseudo['nav.documents'] ?? []).length).toBeGreaterThan(text(real['nav.documents'] ?? []).length)
-    expect(pseudo['preferences.language.announcement']).toContainEqual({ type: 1, value: 'language' })
+    expect(pseudo['sharing.announce.removed']).toContainEqual({ type: 1, value: 'name' })
   })
 })

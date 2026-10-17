@@ -287,6 +287,21 @@ describe('the last owner in the share dialog', () => {
     expect(within(share).getByRole('combobox', { name: 'Role of Sofía Lindqvist' })).toBeInTheDocument()
   })
 
+  it.each([
+    ['viewer', 'lector'],
+    ['commenter', 'comentarista'],
+    ['editor', 'editor'],
+    ['owner', 'propietario'],
+  ] as const)('announces a change to %s in Spanish with the role inside the sentence', async (role, name) => {
+    localStorage.setItem(localeStorageKey, 'es')
+    const { user } = renderScreen(pathOf(launchPlan.id))
+    const share = await screen.findByRole('dialog', { name: /^Compartir «/ })
+
+    await user.selectOptions(await within(share).findByRole('combobox', { name: 'Rol de Sofía Lindqvist' }), role)
+
+    await waitFor(() => expect(status(share)).toContain(`El rol de Sofía Lindqvist ahora es ${name}.`))
+  })
+
   it('says it in Spanish when the app is in Spanish', async () => {
     localStorage.setItem(localeStorageKey, 'es')
     renderScreen(pathOf(launchPlan.id))

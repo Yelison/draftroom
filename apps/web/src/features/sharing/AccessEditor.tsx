@@ -47,10 +47,7 @@ export function AccessEditor({ document, access, members, meId, announce }: Acce
           { name: change.name, role: intl.formatMessage({ id: permissionLabelId(change.role) }) },
         )
       case 'changed':
-        return intl.formatMessage(
-          { id: 'sharing.announce.changed' },
-          { name: change.name, role: intl.formatMessage({ id: permissionLabelId(change.role) }) },
-        )
+        return intl.formatMessage({ id: 'sharing.announce.changed' }, { name: change.name, role: change.role })
       case 'removed':
         return intl.formatMessage({ id: 'sharing.announce.removed' }, { name: change.name })
       case 'general':

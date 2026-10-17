@@ -224,6 +224,28 @@ export async function copiesOf(userId: string): Promise<string[]> {
   return databases.flatMap(({ name }) => (name?.startsWith(prefix) ? [name] : []))
 }
 
+/** What this device kept of a document that was purged: whether there was a copy, and whether it held unstored changes. */
+export interface PurgedDocument {
+  readonly hadCopy: boolean
+  readonly hadUnstoredChanges: boolean
+}
+
+/**
+ * Deletes what this device keeps of one document for one account, whichever workspace the copy was made in, and says what
+ * it held, so that the screen can tell the person what was lost (protocol section 12.4). It is for a document the API says
+ * is not there when no session was ever made to purge it: the person opened it with the page closed, so there is no answer
+ * to tell which workspace it was in, and the name of the copy has to be searched for. It never touches the copy of another
+ * account, nor of another document: the name is matched whole, not by its ending.
+ */
+export async function purgeCopiesOfDocument(userId: string, documentId: string): Promise<PurgedDocument> {
+  const prefix = accountPrefix(userId)
+  const names = (await copiesOf(userId)).filter((name) => name.slice(prefix.length).split(':')[1] === documentId)
+  // Read before the deletion: the marker goes with the copy.
+  const unstored = await Promise.all(names.map(hasUnstoredChanges))
+  await purgeCopies(names)
+  return { hadCopy: names.length > 0, hadUnstoredChanges: unstored.some(Boolean) }
+}
+
 /** Whether a copy holds changes that were never stored, read without loading its content. */
 export function hasUnstoredChanges(name: string): Promise<boolean> {
   return new Promise((resolve) => {

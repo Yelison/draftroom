@@ -5,12 +5,22 @@ import { describe, expect, it } from 'vitest'
 import { AppProviders } from '../../app/AppProviders.tsx'
 import { DataSourceContext } from '../../data/DataSourceContext.ts'
 import { createMockDataSource } from '../../data/mock/createMockDataSource.ts'
-import { LanguageChoice } from '../preferences/LanguageChoice.tsx'
 import { TemplatePickerDialog } from './TemplatePickerDialog.tsx'
 import type { DataSource } from '../../data/DataSource.ts'
 import { ApiError } from '../../data/errors.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
+import { useLocale } from '../../i18n/useLocale.ts'
 import { renderScreen } from '../documents/testing/renderScreen.tsx'
+
+/** Changes the language of the app the way a person would, from a control that is on screen next to what is under test. */
+function SpanishButton() {
+  const { setLocale } = useLocale()
+  return (
+    <button type="button" onClick={() => setLocale('es')}>
+      Español
+    </button>
+  )
+}
 
 const unavailable = () => new ApiError({ type: 'about:blank', title: 'Unavailable', status: 503, code: 'unavailable' })
 
@@ -140,7 +150,7 @@ describe('changing the language while the templates are on screen', () => {
         <DataSourceContext value={createMockDataSource()}>
           <AppProviders>
             <MemoryRouter>
-              <LanguageChoice onChange={() => undefined} />
+              <SpanishButton />
               <TemplatePickerDialog open onClose={() => undefined} />
             </MemoryRouter>
           </AppProviders>
@@ -148,7 +158,7 @@ describe('changing the language while the templates are on screen', () => {
       )
       expect(await screen.findByRole('link', { name: /Meeting notes/ })).toBeInTheDocument()
 
-      await user.click(screen.getByRole('radio', { name: 'Español', hidden: true }))
+      await user.click(screen.getByRole('button', { name: 'Español' }))
 
       expect(await screen.findByRole('link', { name: /Notas de reunión/ })).toBeInTheDocument()
     } finally {

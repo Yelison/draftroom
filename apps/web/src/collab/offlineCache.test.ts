@@ -7,6 +7,7 @@ import {
   hasUnstoredChanges,
   openLocalCopy,
   purgeCopies,
+  purgeCopiesOfDocument,
   type CopyKey,
   type LocalCopy,
 } from './offlineCache.ts'
@@ -279,5 +280,48 @@ describe('purging one copy', () => {
     expect(textOf(again.doc)).toBe('')
     expect(again.copy.hadContent).toBe(false)
     expect(again.copy.hadUnstoredChanges).toBe(false)
+  })
+})
+
+describe('purging the copies of one document, whatever its workspace', () => {
+  it('deletes the copy of the account for that document and nothing else', async () => {
+    await leave(await open())
+    await leave(await open({ ...aCopy, workspaceId: 'w2' }))
+    await leave(await open({ ...aCopy, documentId: 'd2' }))
+    await leave(await open({ ...aCopy, userId: 'u2' }))
+
+    await purgeCopiesOfDocument('u1', 'd1')
+
+    expect(await copiesOf('u1')).toEqual(['draftroom:u1:w1:d2'])
+    // Another account of the same browser keeps its copy of the very same document.
+    expect(await copiesOf('u2')).toEqual(['draftroom:u2:w1:d1'])
+  })
+
+  it('matches the whole id of the document, not how it ends', async () => {
+    await leave(await open({ ...aCopy, documentId: 'xd1' }))
+
+    await purgeCopiesOfDocument('u1', 'd1')
+
+    expect(await copiesOf('u1')).toEqual(['draftroom:u1:w1:xd1'])
+  })
+
+  it('says there was nothing to delete for a document that was never opened on this device', async () => {
+    await expect(purgeCopiesOfDocument('u1', 'd1')).resolves.toEqual({ hadCopy: false, hadUnstoredChanges: false })
+  })
+
+  it('says what the copy held: changes that were never stored, or only what the server has', async () => {
+    const written = await open()
+    write(written.doc, 'Not stored yet')
+    await leave(written)
+    const marked = await purgeCopiesOfDocument('u1', 'd1')
+
+    const stored = await open()
+    write(stored.doc, 'Stored')
+    await stored.copy.settle(Y.snapshot(stored.doc))
+    await leave(stored)
+    const unmarked = await purgeCopiesOfDocument('u1', 'd1')
+
+    expect(marked).toEqual({ hadCopy: true, hadUnstoredChanges: true })
+    expect(unmarked).toEqual({ hadCopy: true, hadUnstoredChanges: false })
   })
 })
