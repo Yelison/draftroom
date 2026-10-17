@@ -19,7 +19,7 @@ The API is described by [`packages/contract/openapi.yaml`](../../packages/contra
 
 Each operation states its requirement in `security`. Reads need `session`; methods that change state need `session` **and** `csrf` in a single requirement (AND), so the token cannot be skipped. Four operations need neither: `signUp`, `signIn`, `getLiveness` and `getReadiness`. `signOut` needs both.
 
-A missing or wrong token is `403 csrf`; a missing or expired session is `401 unauthenticated`. Wrong email and wrong password are indistinguishable (`401 unauthenticated`). The development identity header used by local development and the mocked end-to-end suite is not part of the contract. Sessions and CSRF are specified in ADR 0004, written with the authentication task.
+A missing or wrong token is `403 csrf`; a missing or expired session is `401 unauthenticated`. Wrong email and wrong password are indistinguishable (`401 unauthenticated`). The development identity header used by local development and the mocked end-to-end suite is not part of the contract. Sessions, the CSRF token, the cookies' attributes and the limit on sign-in attempts (`429 rate-limited`, with `Retry-After`) are specified in [ADR 0004](../decisions/0004-authentication.md).
 
 ## Roles and permissions
 
@@ -185,5 +185,5 @@ The plan did not fix these; the contract does, and a change to any of them goes 
 - **Activity** events are the document-scoped actions only; `actor` is `null` when the server acted.
 - **Text limits** beyond the plan's: workspace name 1–80, version label 1–100, person name 1–80, password 12–128 (the authentication task may tighten it).
 - **Sign-up** with an email that already has a signed-up account is `409 conflict`; sign-in never says which accounts exist.
-- **Left to the authentication task (T7.1):** whether `409` on sign-up is acceptable given that it reveals which emails have accounts, how passwords are normalised (NFKC or not at all), whether emails are verified (without it, whoever signs up first with a pending email inherits its grants), and the CSRF exemption of sign-in (login CSRF).
+- **Decided in ADR 0004:** `409` on sign-up is kept and limited by a sign-up limit per network address; passwords are normalised to NFKC before they are hashed and checked (the limits above count them as sent); emails are not verified, which is a known gap (whoever signs up first with a pending email inherits its grants); sign-in stays exempt from CSRF because a body that is not JSON is refused.
 - **The version download** is typed as `string` by the generator; read the response body as bytes.
