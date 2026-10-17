@@ -1,9 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { TransportError } from '../../data/errors.ts'
+import { ApiError, TransportError } from '../../data/errors.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { marta } from '../../data/mock/fixtures/index.ts'
 import { renderScreen } from '../documents/testing/renderScreen.tsx'
+import { rememberAccount, rememberedAccount } from './lastAccount.ts'
 
 // Signing out from the app: what is done about the copies this browser keeps, in what order, and what the person is told
 // when it cannot be done (protocol §12.2).
@@ -25,12 +26,17 @@ beforeEach(() => {
 })
 
 /** The app on Home, signed in as Marta, with a note of every call that ends the session. */
-function open(options: { signOutFails?: boolean } = {}) {
+function open(options: { signOutFails?: boolean | 'ended' } = {}) {
   return renderScreen('/', {
     wrap: (dataSource) => ({
       ...dataSource,
       signOut: () => {
         order.push('signOut')
+        if (options.signOutFails === 'ended') {
+          return Promise.reject(
+            new ApiError({ type: 'about:blank', title: 'Ended', status: 401, code: 'unauthenticated' }),
+          )
+        }
         return options.signOutFails === true ? Promise.reject(new TransportError(null)) : dataSource.signOut()
       },
     }),
@@ -84,6 +90,24 @@ describe('signing out from the app', () => {
           .filter((query) => query.state.data !== undefined),
       ).toEqual([]),
     )
+  })
+
+  it('forgets the account this browser held, so the next sign-in does not leave it a second time', async () => {
+    rememberAccount(marta.id)
+    const { user, router } = open()
+
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
+
+    expect(rememberedAccount()).toBeNull()
+  })
+
+  it('counts a session that had already ended as signed out, which is what the person asked for', async () => {
+    const { user, router } = open({ signOutFails: 'ended' })
+
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
   })
 
   it('is said in the language of the person', async () => {
