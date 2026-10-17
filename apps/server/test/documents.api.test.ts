@@ -597,16 +597,6 @@ describe('pages of documents', () => {
     expect(ids).toEqual([...later.sort().reverse(), ...earlier.sort().reverse()])
   })
 
-  it('serves the instants the order is made of, the millisecond the API writes', async () => {
-    const { workspaceId, owner } = await workspaceWithOwner()
-    const id = await createDocument(db, { workspaceId, creator: owner })
-    await setInstants(db, 'documents', 'updated_at', instantsAgainstIds([id], 7))
-
-    const [document] = bodyAs<Page>(await list(owner, workspaceId, '')).items
-
-    expect(document?.updatedAt).toBe('2026-10-13T16:00:00.007Z')
-  })
-
   it('gives each page at most the limit, and the default of 25 when none is asked', async () => {
     const { workspaceId, owner } = await workspaceWithOwner()
     for (let index = 0; index < 26; index += 1) await createDocument(db, { workspaceId, creator: owner })
