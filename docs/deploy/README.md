@@ -92,7 +92,7 @@ The server reads these and nothing else from its environment; it refuses to star
 | Variable          | Required                    | Meaning                                                                                                   |
 | ----------------- | --------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `NODE_ENV`        | yes, set to `production`    | Anything else may enable the development identity. Only an explicit `development` or `test` does.         |
-| `DATABASE_URL`    | yes                         | `postgres://user:password@host:5432/database`. The password must be URL-safe.                             |
+| `DATABASE_URL`    | yes                         | `postgres://<user>:<password>@<host>:5432/<database>`. The password must be URL-safe.                             |
 | `SESSION_SECRET`  | in production               | At least 32 characters, different per environment. It keys the CSRF tokens. Changing it or restarting without it makes every CSRF cookie fail until the person signs in again; the sessions themselves live in the database and survive. |
 | `ALLOWED_ORIGINS` | in production               | Comma-separated origins (scheme, host, port; no path) the browser may use. The Compose file sets it from `PUBLIC_ORIGIN`. |
 | `API_PORT`        | no, 8380                    | The REST listener. Must differ from `COLLAB_PORT`.                                                        |
@@ -109,7 +109,7 @@ command line or the repository.
 readable by its owner only, and prints its path. `scripts/restore.sh` restores one into a database you name.
 
 ```sh
-scripts/backup.sh                                  # -> deploy/backups/draftroom-draftroom-20261017T031500Z.dump
+scripts/backup.sh                                  # -> deploy/backups/draftroom-<database>-<time>.dump
 scripts/restore.sh deploy/backups/<file>.dump draftroom_restored
 ```
 
