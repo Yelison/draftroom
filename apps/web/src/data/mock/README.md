@@ -60,6 +60,6 @@ An operation without a handler never answers with a made-up value: it rejects wi
 the reason on the console, which fails the end-to-end test that reached it.
 
 **People for a layout test.** The page has one browser and so nobody else. `createMockServer().addPeople(documentId, names)`
-puts people in a document, each with a session of their own (they become members of its workspace), and the mock the app
+puts people in a document, each with a session of their own (they become members of its workspace; it loads the collaboration session only when it is called, so the demo's first render does not), and the mock the app
 starts with offers the same as `window.draftroomMock.addPeople(...)`, which is how an end-to-end test sees the editor with
 others in it. Both are in the mock, so in no build for the real API.

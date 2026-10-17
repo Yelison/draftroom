@@ -699,53 +699,64 @@ test.describe('the code mark', () => {
   })
 })
 
-// The band above the sheet is 708 px and holds the toolbar and, at its end, the way to the history, Share, who is in the
-// document and the sync status. What does not fit beside the toolbar goes to a second row; it never leaves the card.
+// The band above the sheet is 708 px and has two rows, always: the toolbar in the first and, at the end of the second, the
+// versions, Share, who is in the document and the sync status. Nothing about the text moves when someone comes or goes.
 test.describe('the band above the sheet', () => {
   for (const locale of ['en-US', 'es-ES'] as const) {
-    for (const others of [0, 5]) {
-      test.describe(`in ${locale} at 1280 px with ${others === 0 ? 'nobody else' : 'five other people'}`, () => {
-        test.use({ locale, viewport: { width: 1280, height: 900 } })
+    for (const width of [1280, 1440]) {
+      test.describe(`in ${locale} at ${width} px`, () => {
+        test.use({ locale, viewport: { width, height: 900 } })
 
-        test('keeps the status group inside the band, the toolbar whole in its row and the page free of horizontal scroll', async ({
+        test('holds two rows of the toolbar height, keeps its group inside and does not move the text when people come', async ({
           page,
         }) => {
           await page.goto(documentPath)
           await textArea(page).waitFor()
-          if (others > 0) {
-            await page.evaluate(
-              ([documentId, names]) => {
-                const mock = Reflect.get(window, 'draftroomMock') as { addPeople(id: string, names: string[]): void }
-                mock.addPeople(documentId as string, names as string[])
-              },
-              [
-                launchPlan.id,
-                ['Ines Varga', 'Omar Haddad', 'Lucía Ferrer', 'Tobias Lind', 'Noor Aziz'].slice(0, others),
-              ],
-            )
-            await expect(
-              page
-                .getByRole('list', { name: /People in this document|Personas en este documento/ })
-                .getByRole('listitem'),
-            ).toHaveCount(others)
+          const token = await page.evaluate(() =>
+            Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--layout-toolbar-height')),
+          )
+          const topOfText = async () => (await textArea(page).boundingBox())?.y ?? Number.NaN
+          const toolbar = page.getByRole('toolbar')
+
+          async function expectBandToHold() {
+            const band = await toolbar.locator('xpath=..').boundingBox()
+            const tools = await toolbar.boundingBox()
+            // The status group is the one the Share button is in; it ends with the sync status.
+            const status = await page
+              .getByRole('button', { name: /^(Share|Compartir)$/ })
+              .locator('xpath=..')
+              .boundingBox()
+            const bandRight = (band?.x ?? 0) + (band?.width ?? 0)
+            // Two rows of exactly the token, and the line of the band is drawn inside them, so there is nothing to add.
+            expect(band?.height).toBe(2 * token)
+            expect(tools?.height).toBeLessThanOrEqual(token)
+            expect(tools?.width).toBeGreaterThanOrEqual(396)
+            expect((status?.x ?? 0) + (status?.width ?? 0)).toBeLessThanOrEqual(bandRight)
+            // The group is in the second row, under the toolbar.
+            expect(status?.y).toBeGreaterThanOrEqual((band?.y ?? 0) + token)
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
           }
 
-          const toolbar = page.getByRole('toolbar')
-          const band = await toolbar.locator('xpath=..').boundingBox()
-          const tools = await toolbar.boundingBox()
-          // The status group is the one the Share button is in; it ends with the sync status.
-          const status = await page
-            .getByRole('button', { name: /^(Share|Compartir)$/ })
-            .locator('xpath=..')
-            .boundingBox()
-          expect(band).not.toBeNull()
-          const bandRight = (band?.x ?? 0) + (band?.width ?? 0)
-          expect((status?.x ?? 0) + (status?.width ?? 0)).toBeLessThanOrEqual(bandRight)
-          // The toolbar keeps its own row: whole, at its height, and not squeezed.
-          expect(tools?.height).toBeLessThanOrEqual(56)
-          expect((tools?.x ?? 0) + (tools?.width ?? 0)).toBeLessThanOrEqual(bandRight)
-          expect(tools?.width).toBeGreaterThanOrEqual(396)
-          expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+          const before = await topOfText()
+          await expectBandToHold()
+
+          await page.evaluate(
+            async ([documentId, names]) => {
+              const mock = Reflect.get(window, 'draftroomMock') as {
+                addPeople(id: string, names: string[]): Promise<unknown>
+              }
+              await mock.addPeople(documentId as string, names as string[])
+            },
+            [launchPlan.id, ['Ines Varga', 'Omar Haddad', 'Lucía Ferrer', 'Tobias Lind', 'Noor Aziz']],
+          )
+          await expect(
+            page
+              .getByRole('list', { name: /People in this document|Personas en este documento/ })
+              .getByRole('listitem'),
+          ).toHaveCount(5)
+
+          expect(await topOfText()).toBe(before)
+          await expectBandToHold()
         })
       })
     }

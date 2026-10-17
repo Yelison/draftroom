@@ -36,7 +36,10 @@ const fixtureTexts = [...new Set(readableTexts(seed))]
 /** What only the mock or the test tooling has: the mock's own words and the messages of the validator and the parser. */
 // The mock leaves nothing out any more (it implements every operation of the client), so `UnhandledOperationError`, the
 // error of an operation it leaves out, is in no build and is not searched for: a marker that is in no build proves
-// nothing. What stays is what the mock has by its nature: the choice of the data source, its entry point and its words.
+// nothing. What stays is of two kinds. `createMockDataSource`, `draftroomMock` and `malformed-message` are in the build with
+// the mock, and the control below finds them there, so a search that finds nothing in the real build can see. `VITE_DATA_SOURCE`,
+// `"mock"` and `'mock'` watch something else: that the mode leaves no literal in the real build. They have no positive
+// control because they are not in the build with the mock either (the comparison is resolved when the app is built).
 const forbiddenMarkers = [
   // The choice of data source is made when the app is built and leaves no value behind in a build for the real API.
   'VITE_DATA_SOURCE',

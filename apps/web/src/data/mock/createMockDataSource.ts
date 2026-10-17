@@ -1,6 +1,5 @@
 import type { DataSource, RestSource } from '../DataSource.ts'
 import { replaceLiveContent } from './collab/liveContent.ts'
-import { joinDocument } from './collab/presence.ts'
 import { SimulatedCollabServer, type Access, type Identity } from './collab/SimulatedCollabServer.ts'
 import { marta } from './fixtures/index.ts'
 import type { Context, Session } from './guards.ts'
@@ -34,8 +33,8 @@ export interface MockServer {
   connect(options?: ConnectOptions): DataSource
   /** The collaboration server of this world, which every connection's documents are opened on. */
   readonly collaboration: SimulatedCollabServer
-  /** Puts people in a document, each with a connection of their own; the function returned ends them. */
-  addPeople(documentId: string, names: readonly string[]): () => void
+  /** Puts people in a document, each with a connection of their own; resolves with what ends them. */
+  addPeople(documentId: string, names: readonly string[]): Promise<() => void>
 }
 
 /** What the collaboration server lets a person do with a document: the role decides, and an archived one is only read. */
@@ -74,7 +73,11 @@ export function createMockServer(): MockServer {
   })
   return {
     collaboration,
-    addPeople: (documentId, names) => joinDocument(world, collaboration, documentId, names),
+    // Loaded when it is asked for: it brings the collaboration session, which the first render of the demo does not need.
+    addPeople: async (documentId, names) => {
+      const { joinDocument } = await import('./collab/presence.ts')
+      return joinDocument(world, collaboration, documentId, names)
+    },
     connect({ signedInAs } = {}) {
       const person = signedInAs === undefined ? undefined : world.people.find((row) => row.email === signedInAs)
       if (signedInAs !== undefined && person === undefined) throw new Error(`The mock has no account for ${signedInAs}`)
