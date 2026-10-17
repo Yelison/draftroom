@@ -70,7 +70,7 @@ written. A password cannot appear in `ps` if there is none.
 - A host that does not run the stack in Docker takes the same two commands by hand (`docs/deploy/README.md`); the scripts exist for
   the Compose stack, and that is what the tests and the CI drill exercise.
 
-The CI drill (`deploy-drill`, optional) is what keeps this honest: it starts the production stack, creates an account and a
+The CI drill (`Backup and restore drill`, optional) is what keeps this honest: it starts the production stack, creates an account and a
 document with content, takes a backup, restores it into a new database and opens the document from a server pointed at it.
 
 ### 4. Nothing secret is ever in the repository, and a test says so
@@ -86,8 +86,12 @@ unprivileged `node` user with a read-only file system, no capabilities and no wa
 - A host with Docker runs the product with one file of settings and one command; a host with Node 24 and PostgreSQL 17 runs it with
   the two commands of the image's `CMD`.
 - Only Caddy publishes ports. The database and the server are not reachable from outside the Compose network.
-- Security headers, a content security policy, CORS and `trustProxy` are not part of this change (T7.2), and neither is a shared
-  store for the sign-in rate limit; both are listed in `docs/deploy/README.md` as what the deployment does not yet have.
+- The proxy sends one header, `Strict-Transport-Security: max-age=31536000`, as ADR 0004 assigns to this task: without HSTS a
+  browser can be sent back to plain HTTP, where the `Secure` session cookie is never sent. It has no `includeSubDomains` and no
+  `preload`: this site cannot speak for the other names under its domain, and a preload list cannot be left.
+- The other security headers, a content security policy, CORS and `trustProxy` are not part of this change (T7.2; headers there are
+  the server's), and neither is a shared store for the sign-in rate limit; both are listed in `docs/deploy/README.md` as what the
+  deployment does not yet have.
 - Scaling out is not possible and not attempted: one process serves a document (ADR 0001). The guide says why.
 
 ## Alternatives considered

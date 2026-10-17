@@ -60,7 +60,9 @@ tested.
 1. **Terminate TLS.** The server speaks plain HTTP and plain WebSocket; the browser must reach it over HTTPS and WSS. In production
    the server marks both cookies `Secure` ([ADR 0004](../decisions/0004-authentication.md)), and a browser never sends a `Secure`
    cookie over plain HTTP, so nobody could stay signed in; a page served over HTTPS also cannot open an unencrypted WebSocket.
-   The proxy needs to add nothing about cookies: it passes `Set-Cookie` and `Cookie` as they are.
+   The proxy needs to add nothing about cookies: it passes `Set-Cookie` and `Cookie` as they are. It should send
+   `Strict-Transport-Security: max-age=31536000`, so that a browser which has seen the site over HTTPS never goes back to HTTP
+   (the reference Caddyfile does; leave out `includeSubDomains` and `preload` unless you own every name under the domain).
 2. **Send `/api/*` to `API_PORT`** (8380) and keep the path as it is.
 3. **Send `/collab` to `COLLAB_PORT`** (8480), keep the path, and forward the WebSocket handshake: the `Connection: Upgrade` and
    `Upgrade: websocket` headers have to reach the server, and an idle connection must not be closed by the proxy sooner than
@@ -145,7 +147,7 @@ and the broadcast of revocations across processes. That is deferred; this stack 
   what was shared with it, and the sign-up answer tells which addresses have an account. This is a known risk the owner accepted
   (ADR 0004, README); it needs email delivery in both languages before the product is public.
 - **Security headers, a content security policy, CORS, `trustProxy` and the production build guard against the development
-  identity** are T7.2. Until then the proxy adds none of the headers, and the server sees the proxy's address, not the visitor's:
+  identity** are T7.2. Until then the only header the deployment sends is `Strict-Transport-Security` (from the proxy), and the server sees the proxy's address, not the visitor's:
   **every visitor shares the network address of the proxy**, so the per-address limits on sign-in and sign-up (30 failed sign-ins
   per 15 minutes, 10 sign-ups per hour) are counted for everybody together and one person's attempts can use them up. The
   per-account limit (10 failed sign-ins per 15 minutes) is not affected.

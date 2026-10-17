@@ -4,6 +4,11 @@
 {$SITE_ADDRESS} {
 	encode zstd gzip
 
+	# A browser that has seen this site over HTTPS keeps using HTTPS for a year, which is what makes the `Secure` session cookie
+	# reliable. No `includeSubDomains` and no `preload`: this site cannot speak for the other names under its domain, and a
+	# preload cannot be taken back.
+	header Strict-Transport-Security "max-age=31536000"
+
 	handle /api/* {
 		reverse_proxy server:8380
 	}

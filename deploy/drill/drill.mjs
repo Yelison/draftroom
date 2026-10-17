@@ -153,6 +153,13 @@ const collabOf = (base) => `${base.replace(/^http/, 'ws')}/collab`
 step(`the stack answers on ${origin}`)
 await waitUntilReady(origin)
 
+step('the proxy tells browsers to keep using HTTPS')
+const page = await fetch(origin)
+check(
+  page.headers.get('strict-transport-security') === 'max-age=31536000',
+  'the proxy sends no Strict-Transport-Security',
+)
+
 step('the person signs up, and the session cookie is HttpOnly and Secure')
 const session = new Session(origin)
 const signUp = await session.request('POST', '/api/auth/sign-up', account)
