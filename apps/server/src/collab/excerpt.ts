@@ -1,0 +1,76 @@
+import { yUpdateToJson } from '@draftroom/editor-schema/convert'
+import { sql, type Kysely } from 'kysely'
+import type { Database } from '../db/tables.ts'
+import { excerptOf } from '../domain/excerpt.ts'
+import type { CollabLog } from './log.ts'
+
+// The excerpt a document shows in lists is the start of its first paragraph. It is derived from the Yjs state that was
+// just stored and written to `documents.excerpt` after the store is acknowledged, so computing it never delays the
+// acknowledgement of "stored" (plan, T6.1). Who may read it is decided where it is listed, with the rest of the document.
+
+/** Where excerpts are kept; PostgreSQL unless a test needs a writer that is slow or fails. */
+export interface ExcerptWriter {
+  /** Writes nothing, and does not fail, for a document that no longer exists. */
+  write(documentId: string, excerpt: string | null): Promise<void>
+}
+
+/**
+ * Only the excerpt changes: `revision` and `updated_at` belong to what people do to a document, and a typing session
+ * must neither fail their If-Match checks nor reorder the lists.
+ */
+export function createPostgresExcerptWriter(database: Kysely<Database>): ExcerptWriter {
+  return {
+    async write(documentId, excerpt) {
+      await database
+        .updateTable('documents')
+        .set({ excerpt })
+        .where('id', '=', documentId)
+        // Not written when it is already right: most stores do not change the first paragraph.
+        .where(sql<boolean>`excerpt is distinct from ${excerpt}`)
+        .execute()
+    },
+  }
+}
+
+export interface ExcerptUpdates {
+  /** Computes and writes the excerpt of a state that was just stored, once the work already queued has run. */
+  schedule(documentId: string, state: Uint8Array): void
+  /** Resolves when every excerpt scheduled so far, and any scheduled while waiting, has been written or has failed. */
+  settled(): Promise<void>
+}
+
+export function createExcerptUpdates(writer: ExcerptWriter, log: CollabLog): ExcerptUpdates {
+  // The last write of each document that is still running. A later one waits for it, so two stores in quick succession
+  // cannot reach the database in the other order and leave the older excerpt.
+  const tails = new Map<string, Promise<void>>()
+  // Every scheduled excerpt until it is written, so that a shutdown can wait for them before the database goes away.
+  const jobs = new Set<Promise<void>>()
+
+  async function update(documentId: string, state: Uint8Array): Promise<void> {
+    try {
+      await writer.write(documentId, excerptOf(yUpdateToJson(state)))
+    } catch (error) {
+      // The excerpt is a convenience: the next store computes it again, and the content is already safe.
+      log.error({ documentId, error }, 'updating the excerpt of a document failed')
+    }
+  }
+
+  return {
+    schedule(documentId, state) {
+      // A macrotask, not a microtask: the acknowledgement is sent by hooks that run as microtasks after the store.
+      const job = new Promise<void>((resolve) => setImmediate(resolve)).then(() => {
+        const next = (tails.get(documentId) ?? Promise.resolve()).then(() => update(documentId, state))
+        tails.set(documentId, next)
+        return next.finally(() => {
+          if (tails.get(documentId) === next) tails.delete(documentId)
+        })
+      })
+      jobs.add(job)
+      void job.finally(() => jobs.delete(job))
+    },
+
+    async settled() {
+      while (jobs.size > 0) await Promise.all(jobs)
+    },
+  }
+}

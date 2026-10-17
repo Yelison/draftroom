@@ -1,5 +1,6 @@
 import type { JSONContent } from '@tiptap/core'
 import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
+import { excerptOf } from './excerpt.ts'
 
 export type TemplateLocale = 'en' | 'es'
 
@@ -18,6 +19,8 @@ export interface Template {
   readonly description: string
   /** The Yjs update to store as the state of a document that starts from this template. */
   readonly state: Uint8Array
+  /** What a document that starts from it shows in lists, so it is not blank until its first edit. */
+  readonly excerpt: string | null
 }
 
 export interface TemplateCatalog {
@@ -75,7 +78,13 @@ export function loadTemplates(sources: TemplateSources): TemplateCatalog {
         if (source === undefined) throw new InvalidTemplateError(`Template "${id}" (${locale}) is missing.`)
         check(locale, id, source)
         try {
-          return { id, name: source.name, description: source.description, state: jsonToYUpdate(source.content) }
+          return {
+            id,
+            name: source.name,
+            description: source.description,
+            state: jsonToYUpdate(source.content),
+            excerpt: excerptOf(source.content),
+          }
         } catch (cause) {
           throw new InvalidTemplateError(`Template "${id}" (${locale}): its content is not a document of the schema.`, {
             cause,

@@ -77,6 +77,7 @@ describe('the ticket of a connection that fails on the way', () => {
       durability: new DurabilityRegistry(),
       retry: new StoreRetry([1], silent),
       marks,
+      excerpts: { schedule: () => undefined, settled: () => Promise.resolve() },
       log: silent,
     })
     const context: ConnectionContext = {

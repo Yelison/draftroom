@@ -1,6 +1,7 @@
 import type { Server } from '@hocuspocus/server'
 import type { ConnectionContext } from './context.ts'
 import type { DurabilityRegistry } from './durability.ts'
+import type { ExcerptUpdates } from './excerpt.ts'
 import type { CollabLog } from './log.ts'
 import { storeNow, type StoreRetry } from './storeRetry.ts'
 import type { OpenSockets } from './openSockets.ts'
@@ -90,6 +91,7 @@ export async function shutDownCollaboration({
   server,
   durability,
   retry,
+  excerpts,
   sockets,
   timing,
   log,
@@ -97,6 +99,7 @@ export async function shutDownCollaboration({
   readonly server: Server<ConnectionContext>
   readonly durability: DurabilityRegistry
   readonly retry: StoreRetry
+  readonly excerpts: ExcerptUpdates
   readonly sockets: OpenSockets
   readonly timing: Pick<CollabTiming, 'shutdownWaitMs' | 'shutdownGraceMs' | 'socketCloseMs' | 'retryDelaysMs'>
   readonly log: CollabLog
@@ -135,4 +138,9 @@ export async function shutDownCollaboration({
   for (const socket of established) socket.close(GOING_AWAY, 'going-away')
   // The ones with no document, which nobody can ask to close, and any that does not answer, are destroyed.
   await sockets.closeAll(timing.socketCloseMs)
+  // The last store of `destroy()` scheduled excerpts too. They are waited for because the database is closed by whoever
+  // called this, and a write that starts as the pool ends would never finish; one that hangs is left, and said.
+  if (!(await finishesWithin(excerpts.settled(), timing.shutdownGraceMs))) {
+    log.error({}, 'shutting down with excerpts that are still being written')
+  }
 }

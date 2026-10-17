@@ -1,0 +1,8 @@
+/* The mark of a pinned document: the star is filled and takes the accent colour, which the line of an unpinned one lacks. */
+.pin[data-pinned='true'] {
+  color: var(--color-blue-ink);
+}
+
+.pin[data-pinned='true'] svg {
+  fill: currentColor;
+}

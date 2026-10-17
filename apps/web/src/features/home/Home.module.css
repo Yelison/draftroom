@@ -1,0 +1,37 @@
+.group {
+  margin: var(--space-24) 0 var(--space-12);
+  font: var(--font-section);
+}
+
+/* The height a pinned card has when its title takes one line and its excerpt two: the loading cards are as tall. A title
+   that wraps makes its card taller, and never lets its text out of it. Two classes, to win over the card's own minimum
+   whichever style sheet comes last. */
+.item > .card {
+  min-height: calc(var(--button-height) + var(--space-48));
+}
+
+.skeleton > li {
+  height: calc(var(--button-height) + var(--space-48));
+}
+
+.excerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.problem {
+  margin: 0 0 var(--space-12);
+  color: var(--color-red-ink);
+  font: var(--font-body);
+}
+
+.activitySkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-16);
+  padding: 0;
+  list-style: none;
+}
