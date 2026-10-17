@@ -13,6 +13,7 @@ import type { ConnectionContext } from './context.ts'
 import { inFlightExtension, RevocationMarks } from './inFlight.ts'
 import { DurabilityRegistry } from './durability.ts'
 import { durableAckExtension } from './durableAck.ts'
+import { createExcerptUpdates, createPostgresExcerptWriter, type ExcerptWriter } from './excerpt.ts'
 import { limitsExtension } from './limits.ts'
 import { broadcastToDocument } from './broadcastToDocument.ts'
 import { createLiveDocuments } from './liveDocuments.ts'
@@ -40,6 +41,8 @@ export interface CollabServerOptions {
   readonly log: CollabLog
   /** Where the Yjs state lives; PostgreSQL unless a test needs a store that fails. */
   readonly store?: StateStore
+  /** Where the excerpt of a document is written after a store; PostgreSQL unless a test needs a writer that is slow or fails. */
+  readonly excerpts?: ExcerptWriter
   /** What a restore keeps in the database; PostgreSQL unless a test needs one that is slow or fails. */
   readonly restoreVersions?: RestoreVersions
   readonly timing?: CollabTiming
@@ -96,6 +99,7 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
   const retry = new StoreRetry(timing.retryDelaysMs, log)
   const sockets = new OpenSockets()
   const marks = new RevocationMarks(stuckConnectionMs, now)
+  const excerpts = createExcerptUpdates(options.excerpts ?? createPostgresExcerptWriter(database), log)
 
   const server = new Server<ConnectionContext>({
     port: config.collabPort,
@@ -116,7 +120,7 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
     extensions: [
       upgradeGuardExtension({ allowedOrigins: config.allowedOrigins, development: config.devIdentity }, sockets),
       authenticateExtension({ database, authProvider, sessionSecret: config.sessionSecret, log, marks }),
-      persistenceExtension({ store, durability, retry, marks, log }),
+      persistenceExtension({ store, durability, retry, marks, excerpts, log }),
       // Before the acknowledgement: a connection that a revocation names is closed before it is told anything is stored.
       inFlightExtension(marks),
       durableAckExtension({ durability, log }),

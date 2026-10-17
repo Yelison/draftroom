@@ -4,6 +4,7 @@ import type { ConnectionContext } from './context.ts'
 import { isReadable, removeForbiddenBlocks } from './contentValidation.ts'
 import { documentIdOf } from './documentId.ts'
 import { snapshotOf, type CapturedWrite, type DocumentDurability, type DurabilityRegistry } from './durability.ts'
+import type { ExcerptUpdates } from './excerpt.ts'
 import type { CollabLog } from './log.ts'
 import type { StateStore } from './stateStore.ts'
 import type { RevocationMarks } from './inFlight.ts'
@@ -14,6 +15,7 @@ export interface PersistenceOptions {
   readonly durability: DurabilityRegistry
   readonly retry: StoreRetry
   readonly marks: RevocationMarks
+  readonly excerpts: ExcerptUpdates
   readonly log: CollabLog
 }
 
@@ -23,6 +25,7 @@ export function persistenceExtension({
   durability,
   retry,
   marks,
+  excerpts,
   log,
 }: PersistenceOptions): Extension<ConnectionContext> {
   return {
@@ -52,6 +55,8 @@ export function persistenceExtension({
         await store.save(documentIdOf(documentName), write.state)
         durable.commit(write)
         retry.succeeded(documentName)
+        // Of the bytes that were written, and after the hooks that acknowledge them have run.
+        excerpts.schedule(documentIdOf(documentName), write.state)
       } catch (error) {
         // Hocuspocus logs a failed store with no mention of the document, and does not try again (F4).
         log.error({ documentName, error }, 'storing a document failed')
