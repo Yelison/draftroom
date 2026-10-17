@@ -569,9 +569,11 @@ test.describe('the keyboard and the focus', () => {
     await textArea(page).waitFor()
     await page.getByRole('textbox', { name: 'Document title' }).focus()
 
-    // The Share button of an owner sits between the toolbar and the title.
+    // The link to the history and the Share button of an owner sit between the toolbar and the title.
     await page.keyboard.press('Shift+Tab')
     await expect(page.getByRole('button', { name: 'Share' })).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(page.getByRole('button', { name: 'Version history' })).toBeFocused()
     await page.keyboard.press('Shift+Tab')
     await expect(toolbarButton(page, 'Bold')).toBeFocused()
     await expect(toolbarButton(page, 'Bold')).toHaveCSS('outline-style', 'solid')
@@ -579,6 +581,8 @@ test.describe('the keyboard and the focus', () => {
     await expect(toolbarButton(page, 'Italic')).toBeFocused()
     await page.keyboard.press('End')
     await expect(toolbarButton(page, 'Link')).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: 'Version history' })).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Share' })).toBeFocused()
     await page.keyboard.press('Tab')
@@ -590,6 +594,7 @@ test.describe('the keyboard and the focus', () => {
     await textArea(page).waitFor()
     await page.getByRole('textbox', { name: 'Document title' }).focus()
 
+    await page.keyboard.press('Shift+Tab')
     await page.keyboard.press('Shift+Tab')
     await page.keyboard.press('Shift+Tab')
 
@@ -605,7 +610,7 @@ test.describe('the keyboard and the focus', () => {
     await page.getByRole('tree').waitFor()
 
     const stops: (string | null)[] = []
-    for (let press = 0; press < 14; press++) {
+    for (let press = 0; press < 15; press++) {
       await page.keyboard.press('Tab')
       stops.push(
         await page.evaluate(() => {
@@ -634,6 +639,7 @@ test.describe('the keyboard and the focus', () => {
       'New folder',
       'Autumn launch plan',
       'Bold',
+      'Version history',
       'Share',
       'Document title',
       'Document content',
@@ -691,6 +697,70 @@ test.describe('the code mark', () => {
     expect(paragraphWithCode).toBe(paragraph)
     expect(titleWithCode).toBe(title)
   })
+})
+
+// The band above the sheet is 708 px and has two rows, always: the toolbar in the first and, at the end of the second, the
+// versions, Share, who is in the document and the sync status. Nothing about the text moves when someone comes or goes.
+test.describe('the band above the sheet', () => {
+  for (const locale of ['en-US', 'es-ES'] as const) {
+    for (const width of [1280, 1440]) {
+      test.describe(`in ${locale} at ${width} px`, () => {
+        test.use({ locale, viewport: { width, height: 900 } })
+
+        test('holds two rows of the toolbar height, keeps its group inside and does not move the text when people come', async ({
+          page,
+        }) => {
+          await page.goto(documentPath)
+          await textArea(page).waitFor()
+          const token = await page.evaluate(() =>
+            Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--layout-toolbar-height')),
+          )
+          const topOfText = async () => (await textArea(page).boundingBox())?.y ?? Number.NaN
+          const toolbar = page.getByRole('toolbar')
+
+          async function expectBandToHold() {
+            const band = await toolbar.locator('xpath=..').boundingBox()
+            const tools = await toolbar.boundingBox()
+            // The status group is the one the Share button is in; it ends with the sync status.
+            const status = await page
+              .getByRole('button', { name: /^(Share|Compartir)$/ })
+              .locator('xpath=..')
+              .boundingBox()
+            const bandRight = (band?.x ?? 0) + (band?.width ?? 0)
+            // Two rows of exactly the token, and the line of the band is drawn inside them, so there is nothing to add.
+            expect(band?.height).toBe(2 * token)
+            expect(tools?.height).toBeLessThanOrEqual(token)
+            expect(tools?.width).toBeGreaterThanOrEqual(396)
+            expect((status?.x ?? 0) + (status?.width ?? 0)).toBeLessThanOrEqual(bandRight)
+            // The group is in the second row, under the toolbar.
+            expect(status?.y).toBeGreaterThanOrEqual((band?.y ?? 0) + token)
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+          }
+
+          const before = await topOfText()
+          await expectBandToHold()
+
+          await page.evaluate(
+            async ([documentId, names]) => {
+              const mock = Reflect.get(window, 'draftroomMock') as {
+                addPeople(id: string, names: string[]): Promise<unknown>
+              }
+              await mock.addPeople(documentId as string, names as string[])
+            },
+            [launchPlan.id, ['Ines Varga', 'Omar Haddad', 'Lucía Ferrer', 'Tobias Lind', 'Noor Aziz']],
+          )
+          await expect(
+            page
+              .getByRole('list', { name: /People in this document|Personas en este documento/ })
+              .getByRole('listitem'),
+          ).toHaveCount(5)
+
+          expect(await topOfText()).toBe(before)
+          await expectBandToHold()
+        })
+      })
+    }
+  }
 })
 
 test.describe('the layout', () => {

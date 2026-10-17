@@ -79,6 +79,7 @@ export const calls: Record<Implemented, (api: DataSource) => Promise<unknown>> =
   deleteComment: (api) => api.deleteComment({ params: { path: { commentId } } }),
   listVersions: (api) => api.listVersions({ params: { path: { documentId: launchPlan.id }, query: { limit: 2 } } }),
   createVersion: (api) => api.createVersion({ ...documentPath(launchPlan.id), body: { label: 'Before the review' } }),
+  getVersionContent: (api) => api.getVersionContent({ params: { path: { versionId: versionFixtures[0]?.id ?? '' } } }),
   restoreVersion: (api) => api.restoreVersion({ params: { path: { versionId: versionFixtures[0]?.id ?? '' } } }),
   listWorkspaceActivity: (api) =>
     api.listWorkspaceActivity({ params: { path: { workspaceId: harborPine.id }, query: { limit: 4 } } }),

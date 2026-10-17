@@ -1,5 +1,9 @@
+// The mock plays the server, which stores versions as Yjs updates and so may build them.
+// oxlint-disable-next-line no-restricted-imports
+import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
 import type { DataSource } from '../../DataSource.ts'
 import type { VersionRecord } from '../fixtures/collaboration.ts'
+import { versionContent } from '../fixtures/versionContent.ts'
 import { record } from '../events.ts'
 import { caller, documentOf, requireRole, type Context } from '../guards.ts'
 import { textLimits } from '../limits.ts'
@@ -8,10 +12,13 @@ import { notFound } from '../problems.ts'
 import { checkTexts } from '../text.ts'
 import { versionView } from '../views.ts'
 
-type VersionOperations = Pick<DataSource, 'listVersions' | 'createVersion' | 'restoreVersion'>
+type VersionOperations = Pick<DataSource, 'listVersions' | 'createVersion' | 'getVersionContent' | 'restoreVersion'>
 
-/** The size of a version stands in for the size of the document's state, which the mock does not keep. */
+/** The size of a version stands in for the size of the document's state, which the mock does not measure. */
 const defaultSizeBytes = 2048
+
+/** An empty document: what a version holds when nothing before it did. */
+const emptyContent = () => jsonToYUpdate({ type: 'doc', content: [{ type: 'paragraph' }] })
 
 export function versionOperations(ctx: Context): VersionOperations {
   const { world } = ctx
@@ -24,6 +31,7 @@ export function versionOperations(ctx: Context): VersionOperations {
     createdBy: string,
     label: string | null,
     sizeBytes: number,
+    content: Uint8Array,
   ): VersionRecord {
     const version: VersionRecord = {
       id: world.newId(),
@@ -35,15 +43,22 @@ export function versionOperations(ctx: Context): VersionOperations {
       sizeBytes,
     }
     world.versions.push(version)
+    world.versionContent.set(version.id, content)
     return version
   }
 
-  const latestSize = (documentId: string) =>
+  const latestOf = (documentId: string) =>
     versionsOf(documentId).reduce<VersionRecord | undefined>(
       (latest, row) => (latest === undefined || row.createdAt > latest.createdAt ? row : latest),
       undefined,
-    )?.sizeBytes ?? defaultSizeBytes
-
+    )
+  const latestSize = (documentId: string) => latestOf(documentId)?.sizeBytes ?? defaultSizeBytes
+  const contentOf = (versionId: string) => {
+    const kept = world.versionContent.get(versionId)
+    if (kept !== undefined) return kept
+    const fixture = versionContent[versionId]
+    return fixture === undefined ? emptyContent() : jsonToYUpdate(fixture)
+  }
   return {
     listVersions: async ({ params: { path, query = {} } }) => {
       caller(ctx)
@@ -63,9 +78,25 @@ export function versionOperations(ctx: Context): VersionOperations {
       if (label !== null) checkTexts(['/label', label, textLimits.versionLabel])
       const { document, role } = documentOf(ctx, path.documentId)
       requireRole(role, 'editor')
-      const version = addVersion(document.id, 'manual', user.id, label, latestSize(document.id))
+      const version = addVersion(
+        document.id,
+        'manual',
+        user.id,
+        label,
+        latestSize(document.id),
+        ctx.live.state(document.id),
+      )
       record(world, 'version.created', user.id, document.id)
       return versionView(world, version)
+    },
+
+    getVersionContent: async ({ params: { path } }) => {
+      caller(ctx)
+      const version = world.versions.find((row) => row.id === path.versionId)
+      if (version === undefined) throw notFound()
+      // Reading a version needs to read its document, which is `404` when the caller cannot.
+      documentOf(ctx, version.documentId)
+      return contentOf(version.id)
     },
 
     restoreVersion: async ({ params: { path } }) => {
@@ -76,8 +107,16 @@ export function versionOperations(ctx: Context): VersionOperations {
       requireRole(role, 'owner')
 
       // What the document held before the restore is kept, then the restored state is saved as the newest version.
-      addVersion(document.id, 'pre-restore', user.id, null, latestSize(document.id))
-      const restored = addVersion(document.id, 'restore', user.id, target.label, target.sizeBytes)
+      addVersion(document.id, 'pre-restore', user.id, null, latestSize(document.id), ctx.live.state(document.id))
+      ctx.live.replace(document.id, contentOf(target.id))
+      const restored = addVersion(
+        document.id,
+        'restore',
+        user.id,
+        target.label,
+        target.sizeBytes,
+        ctx.live.state(document.id),
+      )
       record(world, 'version.restored', user.id, document.id)
       return versionView(world, restored)
     },

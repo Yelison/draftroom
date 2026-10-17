@@ -23,6 +23,8 @@ export interface World {
   pins: PinRecord[]
   threads: ThreadRecord[]
   versions: VersionRecord[]
+  /** The Yjs update of the versions made after the fixtures, by version id: the fixtures' own text is in `fixtures/versionContent.ts`. */
+  versionContent: Map<string, Uint8Array>
   activity: ActivityRecord[]
   templates: readonly TemplateRecord[]
 }
@@ -48,6 +50,7 @@ export function createWorld(): World {
       comments: row.comments.map((comment) => ({ ...comment })),
     })),
     versions: seed.versions.map((row) => ({ ...row })),
+    versionContent: new Map(),
     activity: seed.activity.map((row) => ({ ...row })),
     templates: seed.templates,
   }

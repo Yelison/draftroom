@@ -9,6 +9,7 @@ import { SearchScreen } from '../features/search/SearchScreen.tsx'
 import { SharedScreen } from '../features/shared/SharedScreen.tsx'
 import { TemplateScreen } from '../features/templates/TemplateScreen.tsx'
 import { TrashScreen } from '../features/trash/TrashScreen.tsx'
+import { VersionsSkeleton } from '../features/versions/VersionsSkeleton.tsx'
 import type { MessageId } from '../i18n/messages.ts'
 import { AppFrame } from './AppFrame.tsx'
 import { EditorLayout } from './layouts/EditorLayout.tsx'
@@ -84,7 +85,15 @@ export const routes: RouteObject[] = [
               },
             ],
           },
-          { path: 'documents/:documentId/versions', ...screen('screen.versions', 'documents') },
+          {
+            // Its own chunk, as the editor's: the preview brings Tiptap, ProseMirror and Yjs.
+            path: 'documents/:documentId/versions',
+            HydrateFallback: VersionsSkeleton,
+            lazy: async () => ({
+              Component: (await import('../features/versions/VersionsScreen.tsx')).VersionsScreen,
+            }),
+            handle: { section: 'documents' } satisfies RouteHandle,
+          },
         ],
       },
     ],

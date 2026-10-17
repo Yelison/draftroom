@@ -3,7 +3,7 @@ import { checkedAgainstContract, loadContract } from '../testing/contract.ts'
 import { calls } from '../testing/operationCalls.ts'
 import { createMockServer } from './createMockDataSource.ts'
 import { marta } from './fixtures/index.ts'
-import { UnhandledOperationError, excludedOperations } from './unhandled.ts'
+import { UnhandledOperationError, excludedOperations, unhandled } from './unhandled.ts'
 
 const contract = loadContract()
 
@@ -31,15 +31,12 @@ describe('the operations of the mock', () => {
 
   it('fails visibly on an operation it leaves out, saying why', async () => {
     const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const api = createMockServer().connect({ signedInAs: marta.email })
 
-    const error = await api
-      .getVersionContent({ params: { path: { versionId: 'x' } } })
-      .catch((caught: unknown) => caught)
+    const error = await unhandled('getLiveness')().catch((caught: unknown) => caught)
 
     expect(error).toBeInstanceOf(UnhandledOperationError)
-    expect(error).toMatchObject({ message: expect.stringContaining('Yjs') })
-    expect(report).toHaveBeenCalledWith(expect.stringContaining('getVersionContent'))
+    expect(error).toMatchObject({ message: expect.stringContaining('probe') })
+    expect(report).toHaveBeenCalledWith(expect.stringContaining('getLiveness'))
     report.mockRestore()
   })
 })

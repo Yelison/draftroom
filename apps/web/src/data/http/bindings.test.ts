@@ -30,7 +30,11 @@ const pathPattern = (template: string) => new RegExp(`^${template.replace(/\{[^}
 describe('the HTTP bindings', () => {
   it.each(Object.entries(calls))('%s sends the method and path the contract gives it', async (id, call) => {
     const operation = contract.operations.find((row) => row.id === id)
-    const { source, requests } = recordingSource(contract.successStatus(id))
+    // The version download is the one answer that is bytes, not JSON.
+    const { source, requests } = recordingSource(
+      contract.successStatus(id),
+      id === 'getVersionContent' ? 'application/octet-stream' : 'application/json',
+    )
 
     await call(source)
 

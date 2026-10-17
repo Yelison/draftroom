@@ -1,4 +1,5 @@
 import type { DataSource, RestSource } from '../DataSource.ts'
+import { replaceLiveContent } from './collab/liveContent.ts'
 import { SimulatedCollabServer, type Access, type Identity } from './collab/SimulatedCollabServer.ts'
 import { marta } from './fixtures/index.ts'
 import type { Context, Session } from './guards.ts'
@@ -14,7 +15,6 @@ import { threadOperations } from './operations/threads.ts'
 import { versionOperations } from './operations/versions.ts'
 import { workspaceOperations } from './operations/workspaces.ts'
 import { atLeast, documentRole } from './roles.ts'
-import { unhandled } from './unhandled.ts'
 import { createWorld, type World } from './world.ts'
 import { documentName, parseDocumentName } from '@draftroom/contract/collab'
 import * as Y from 'yjs'
@@ -33,6 +33,8 @@ export interface MockServer {
   connect(options?: ConnectOptions): DataSource
   /** The collaboration server of this world, which every connection's documents are opened on. */
   readonly collaboration: SimulatedCollabServer
+  /** Puts people in a document, each with a connection of their own; resolves with what ends them. */
+  addPeople(documentId: string, names: readonly string[]): Promise<() => void>
 }
 
 /** What the collaboration server lets a person do with a document: the role decides, and an archived one is only read. */
@@ -57,7 +59,6 @@ function operationsOf(ctx: Context, collaboration: SimulatedCollabServer, identi
     ...versionOperations(ctx),
     ...activityOperations(ctx),
     ...templateOperations(ctx),
-    getVersionContent: unhandled('getVersionContent'),
   }
   return {
     ...rest,
@@ -72,6 +73,11 @@ export function createMockServer(): MockServer {
   })
   return {
     collaboration,
+    // Loaded when it is asked for: it brings the collaboration session, which the first render of the demo does not need.
+    addPeople: async (documentId, names) => {
+      const { joinDocument } = await import('./collab/presence.ts')
+      return joinDocument(world, collaboration, documentId, names)
+    },
     connect({ signedInAs } = {}) {
       const person = signedInAs === undefined ? undefined : world.people.find((row) => row.email === signedInAs)
       if (signedInAs !== undefined && person === undefined) throw new Error(`The mock has no account for ${signedInAs}`)
@@ -79,12 +85,23 @@ export function createMockServer(): MockServer {
       const identity = person === undefined ? null : { userId: person.id, displayName: person.name ?? person.email }
       const startContent = (documentId: string, update: Uint8Array) =>
         Y.applyUpdate(collaboration.document(documentName(documentId)), update)
-      return operationsOf({ world, session, startContent }, collaboration, identity)
+      const live = {
+        state: (documentId: string) => Y.encodeStateAsUpdate(collaboration.document(documentName(documentId))),
+        replace: (documentId: string, update: Uint8Array) =>
+          replaceLiveContent(collaboration.document(documentName(documentId)), update),
+      }
+      return operationsOf({ world, session, startContent, live }, collaboration, identity)
     },
   }
 }
 
-/** A mock with a single person on it, the way the app uses it: the demo starts with Marta Ruiz signed in. */
+/**
+ * A mock with a single person on it, the way the app uses it: the demo starts with Marta Ruiz signed in. The page has
+ * one browser and so nobody else, which a layout test needs: `window.draftroomMock.addPeople(documentId, names)` puts
+ * people in a document. It is here, in the mock, and so in no build for the real API.
+ */
 export function createMockDataSource({ signedInAs = marta.email }: ConnectOptions = {}): DataSource {
-  return createMockServer().connect({ signedInAs })
+  const server = createMockServer()
+  if (typeof window !== 'undefined') Reflect.set(window, 'draftroomMock', { addPeople: server.addPeople })
+  return server.connect({ signedInAs })
 }

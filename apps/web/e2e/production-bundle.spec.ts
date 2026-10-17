@@ -34,14 +34,20 @@ function readableTexts(node: unknown, key?: string): string[] {
 const fixtureTexts = [...new Set(readableTexts(seed))]
 
 /** What only the mock or the test tooling has: the mock's own words and the messages of the validator and the parser. */
+// The mock leaves nothing out any more (it implements every operation of the client), so `UnhandledOperationError`, the
+// error of an operation it leaves out, is in no build and is not searched for: a marker that is in no build proves
+// nothing. What stays is of two kinds. `createMockDataSource`, `draftroomMock` and `malformed-message` are in the build with
+// the mock, and the control below finds them there, so a search that finds nothing in the real build can see. `VITE_DATA_SOURCE`,
+// `"mock"` and `'mock'` watch something else: that the mode leaves no literal in the real build. They have no positive
+// control because they are not in the build with the mock either (the comparison is resolved when the app is built).
 const forbiddenMarkers = [
   // The choice of data source is made when the app is built and leaves no value behind in a build for the real API.
   'VITE_DATA_SOURCE',
   '"mock"',
   "'mock'",
-  'UnhandledOperationError',
-  'The mock does not implement',
   'createMockDataSource',
+  // What the mock puts on the page for the end-to-end suite to place people in a document.
+  'draftroomMock',
   'YAMLParseError',
   // The vocabulary URLs of the 2020-12 metaschema, which only the schema validator carries. The `$schema` URL itself is
   // not a marker: zod, which the client runs to read what the collaboration server sends, writes it too.
@@ -153,7 +159,7 @@ test.describe('the production bundle', () => {
     const missing = fixtureTexts.filter((text) => !served.some(({ content }) => content.includes(text)))
 
     expect(missing, 'fixture texts the search could not find even where they are').toEqual([])
-    expect(served.some(({ content }) => content.includes('UnhandledOperationError'))).toBe(true)
     expect(served.some(({ content }) => content.includes('malformed-message'))).toBe(true)
+    expect(served.some(({ content }) => content.includes('draftroomMock'))).toBe(true)
   })
 })

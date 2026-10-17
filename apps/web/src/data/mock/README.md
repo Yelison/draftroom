@@ -34,6 +34,7 @@ authorization is the server's and is tested there (plan, section 9.2).
 - No connection that closes when access is revoked or a member is removed: the collaboration server below decides access when a document is opened, and nothing ends a connection afterwards.
 - No email verification: whoever signs up with an invited email claims it.
 - Made-up values: the `sizeBytes` of a version, and the label a restored version copies from the one it restores.
+- Version content: the stored versions of the fixtures hold text of their own. A version saved later (and the `pre-restore` one) holds the live text of the document as the simulated collaboration server has it, and a restore writes the version's text into that live document by diff, in one transaction, so an open editor shows it. The live text is the simulation's: nothing of it is durable or shared between tabs.
 
 ## Collaboration
 
@@ -51,10 +52,14 @@ Documents start empty, and two tabs do not share one (each page has its own worl
 
 ## Operations it leaves out
 
-| Operation                     | Why                                                                                                    |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `getLiveness`, `getReadiness` | Probes for the orchestrator; the data source does not carry them.                                      |
-| `getVersionContent`           | The bytes are a Yjs update, which needs a document with content and the versions of the server (T5.1). It fails loudly. |
+| Operation                     | Why                                                               |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `getLiveness`, `getReadiness` | Probes for the orchestrator; the data source does not carry them. |
 
 An operation without a handler never answers with a made-up value: it rejects with `UnhandledOperationError` and logs
 the reason on the console, which fails the end-to-end test that reached it.
+
+**People for a layout test.** The page has one browser and so nobody else. `createMockServer().addPeople(documentId, names)`
+puts people in a document, each with a session of their own (they become members of its workspace; it loads the collaboration session only when it is called, so the demo's first render does not), and the mock the app
+starts with offers the same as `window.draftroomMock.addPeople(...)`, which is how an end-to-end test sees the editor with
+others in it. Both are in the mock, so in no build for the real API.

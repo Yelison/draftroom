@@ -8,8 +8,6 @@ import type { OperationId } from '../DataSource.ts'
 export const excludedOperations = {
   getLiveness: 'A probe for the orchestrator: the data source does not carry probes, so no screen can call it.',
   getReadiness: 'A probe for the orchestrator: the data source does not carry probes, so no screen can call it.',
-  getVersionContent:
-    'The bytes are a Yjs update. A valid one is a version the server kept of a document, and versions arrive with their own task (T5.1).',
 } as const satisfies Partial<Record<OperationId | 'getLiveness' | 'getReadiness', string>>
 
 export class UnhandledOperationError extends Error {
