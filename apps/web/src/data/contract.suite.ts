@@ -67,6 +67,94 @@ type Document = Schema<'Document'>
 
 export function describeDataSourceContract(name: string, harness: Harness) {
   describe(`DataSource contract: ${name}`, () => {
+    describe('signing up, signing in and signing out', () => {
+      const newAccount = () => ({
+        email: `${unique()}@suite.example`,
+        password: 'correct horse battery staple',
+        name: 'Suite Person',
+      })
+
+      it('creates an account that its person can then sign in to, with the same address and password', async () => {
+        const { anonymous } = await harness.scenario()
+        const account = newAccount()
+
+        const created = await anonymous.signUp({ body: account })
+        const signedIn = await anonymous.signIn({ body: { email: account.email, password: account.password } })
+
+        expect(created).toEqual({ id: expect.any(String), email: account.email, name: account.name })
+        expect(signedIn).toEqual(created)
+      })
+
+      it('refuses a second account for an address that has one, in whatever case it is written', async () => {
+        const { anonymous } = await harness.scenario()
+        const account = newAccount()
+        await anonymous.signUp({ body: account })
+
+        await expectRefusal(anonymous.signUp({ body: { ...account, email: account.email.toUpperCase() } }), 'conflict')
+      })
+
+      it('answers a wrong password and an address with no account in the same way, so it never says which exist', async () => {
+        const { anonymous } = await harness.scenario()
+        const account = newAccount()
+        await anonymous.signUp({ body: account })
+
+        const wrongPassword = await refusalOf(
+          anonymous.signIn({ body: { email: account.email, password: 'not the password at all' } }),
+        )
+        const noAccount = await refusalOf(
+          anonymous.signIn({ body: { email: `${unique()}@suite.example`, password: account.password } }),
+        )
+
+        expect([wrongPassword.status, wrongPassword.code]).toEqual([401, 'unauthenticated'])
+        expect([noAccount.status, noAccount.code]).toEqual([wrongPassword.status, wrongPassword.code])
+      })
+
+      it('keeps to the limits of the password, which count code points and have no rules of composition', async () => {
+        const { anonymous } = await harness.scenario()
+
+        await expectRefusal(
+          anonymous.signUp({ body: { ...newAccount(), password: 'a'.repeat(11) } }),
+          'validation-failed',
+          '/password',
+        )
+        await expectRefusal(
+          anonymous.signUp({ body: { ...newAccount(), password: 'a'.repeat(129) } }),
+          'too-large',
+          '/password',
+        )
+        await expect(anonymous.signUp({ body: { ...newAccount(), password: emoji(12) } })).resolves.toMatchObject({
+          name: 'Suite Person',
+        })
+      })
+
+      it('claims what an invitation made: the same person, now with a name, and a member of the workspace', async () => {
+        const { owner, workspaceId, anonymous } = await harness.scenario()
+        const account = newAccount()
+        const invited = await owner.addMember({
+          ...inWorkspace(workspaceId),
+          body: { email: account.email, role: 'member' },
+        })
+
+        const created = await anonymous.signUp({ body: { ...account, email: account.email.toUpperCase() } })
+
+        expect(created.id).toBe(invited.userId)
+        const members = await owner.listMembers(inWorkspace(workspaceId))
+        expect(members.items.find((member) => member.userId === invited.userId)).toMatchObject({ name: account.name })
+      })
+
+      it('needs a session to sign out', async () => {
+        const { anonymous } = await harness.scenario()
+
+        await expectRefusal(anonymous.signOut(), 'unauthenticated')
+      })
+
+      it('ends the session of the person who signs out, with nothing to say', async () => {
+        const { member } = await harness.scenario()
+
+        await expect(member.signOut()).resolves.toBeUndefined()
+      })
+    })
+
     describe('the account of the person', () => {
       it('refuses to change the profile with no session', async () => {
         const { anonymous } = await harness.scenario()
