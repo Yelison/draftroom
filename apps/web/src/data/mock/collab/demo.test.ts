@@ -10,6 +10,7 @@ import { createMockServer } from '../createMockDataSource.ts'
 import { collaboratorScripts } from '../fixtures/collaboratorScripts.ts'
 import { demoContent } from '../fixtures/demoContent.ts'
 import { demoFixtures } from '../fixtures/demoSeed.ts'
+import { withdrawnThread } from '../fixtures/demoThreads.ts'
 import { documents, interviews, launchPlan, weeklyEnglish } from '../fixtures/documents.ts'
 import { marta } from '../fixtures/index.ts'
 import { seedId } from '../ids.ts'
@@ -112,9 +113,10 @@ describe('the world of the demo', () => {
     }
   })
 
-  it('anchors each comment in text that its document has', () => {
+  it('anchors each comment in text that its document has, but the one whose text was taken out', () => {
     for (const locale of locales) {
-      for (const { documentId, quote } of demoFixtures(locale).seed.threads) {
+      const threads = demoFixtures(locale).seed.threads.filter(({ id }) => id !== withdrawnThread.id)
+      for (const { documentId, quote } of threads) {
         expect(textOf(jsonToYUpdate(contentOf(locale, documentId))).join('\n'), `${locale}: ${quote}`).toContain(quote)
       }
     }

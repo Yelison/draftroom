@@ -1,5 +1,6 @@
 import type { Locale } from '../../../i18n/locale.ts'
 import { seedId } from '../ids.ts'
+import { demoThreads, threadText } from './demoThreads.ts'
 import { demoVersionContent } from './demoVersionContent.ts'
 import {
   brandVoice,
@@ -112,49 +113,6 @@ const folderNames: Record<Locale, Readonly<Record<string, string>>> = {
   },
 }
 
-interface ThreadText {
-  quote: string
-  /** In the order of the thread's comments. */
-  comments: readonly string[]
-}
-
-const threadText: Record<Locale, Readonly<Record<string, ThreadText>>> = {
-  en: {
-    [seedId(5, 1)]: {
-      quote: 'once the pricing review is signed off',
-      comments: [
-        'Who signs it off? Finance has not seen the new tiers yet.',
-        'I will ask for a slot on Thursday and update the date here.',
-      ],
-    },
-    [seedId(5, 2)]: {
-      quote: 'second week of November',
-      comments: ['Can we confirm this does not clash with the conference?'],
-    },
-    [seedId(5, 3)]: {
-      quote: 'keep the language selector in settings',
-      comments: ['What if we also keep it on the sign-in screen?'],
-    },
-  },
-  es: {
-    [seedId(5, 1)]: {
-      quote: 'cuando se apruebe la revisión de precios',
-      comments: [
-        '¿Quién lo aprueba? Finanzas todavía no ha visto las nuevas tarifas.',
-        'Pediré un hueco para el jueves y actualizaré la fecha aquí.',
-      ],
-    },
-    [seedId(5, 2)]: {
-      quote: 'segunda semana de noviembre',
-      comments: ['¿Podemos confirmar que esto no coincide con la conferencia?'],
-    },
-    [seedId(5, 3)]: {
-      quote: 'dejar el selector de idioma en los ajustes',
-      comments: ['¿Y si lo dejamos también en la pantalla de inicio de sesión?'],
-    },
-  },
-}
-
 const versionLabels: Record<Locale, Readonly<Record<string, string>>> = {
   en: { [seedId(7, 2)]: 'Before the pricing review', [seedId(7, 4)]: 'Draft for the team' },
   es: { [seedId(7, 2)]: 'Antes de la revisión de precios', [seedId(7, 4)]: 'Borrador para el equipo' },
@@ -175,7 +133,7 @@ export function demoFixtures(locale: Locale): Fixtures {
       folders: seed.folders.map((row) => ({ ...row, name: folderNames[locale][row.id] ?? row.name })),
       grants: seed.grants.filter(isKept),
       pins: seed.pins.filter(isKept),
-      threads: seed.threads.filter(isKept).map((row) => {
+      threads: demoThreads.filter(isKept).map((row) => {
         const written = threadText[locale][row.id]
         return written === undefined
           ? row
