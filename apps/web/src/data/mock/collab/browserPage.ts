@@ -8,10 +8,11 @@ export interface PageEnvironment extends CollaboratorEnvironment {
   /** Calls `listener` once, when the page is going away. */
   onPageHide(listener: () => void): void
   /**
-   * Becomes the one tab that plays a part for a document, for as long as the tab keeps it: with two tabs open, two copies
-   * of the same person would be writing. Resolves with what gives it up, or `null` when another tab has it.
+   * Waits for the turn to play a part for a document, which one tab has at a time while it keeps it: with two tabs open, two
+   * copies of the same person would be writing. A tab that waits gets it when the other gives it up or goes away. Resolves with
+   * what gives the turn up, or with `null` when `signal` aborts the wait.
    */
-  takeTurn(key: string): Promise<(() => void) | null>
+  takeTurn(key: string, signal: AbortSignal): Promise<(() => void) | null>
   /** Whether this page was loaded by a reload, which starts the demo again instead of joining the tabs that are open. */
   isReload(): boolean
 }
@@ -26,14 +27,13 @@ export function browserPage(): PageEnvironment {
       return () => document.removeEventListener('visibilitychange', listener)
     },
     onPageHide: (listener) => addEventListener('pagehide', listener, { once: true }),
-    takeTurn(key) {
+    takeTurn(key, signal) {
       // Without locks there is one tab to think of, or none that can tell: the person plays a part in every tab.
       if (!('locks' in navigator)) return Promise.resolve(() => undefined)
       return new Promise((resolveTurn) => {
-        void navigator.locks.request(`draftroom-demo:${key}`, { ifAvailable: true }, (lock) => {
-          if (lock === null) return resolveTurn(null)
-          return new Promise<void>((release) => resolveTurn(release))
-        })
+        navigator.locks
+          .request(`draftroom-demo:${key}`, { signal }, () => new Promise<void>((release) => resolveTurn(release)))
+          .catch(() => resolveTurn(null))
       })
     },
     isReload: () => {

@@ -48,6 +48,19 @@ function serverWithCollaborator(page: PageEnvironment) {
   return server
 }
 
+/** Another tab that has the turn to play her: whoever asks waits until it lets go, or gives up when the wait is aborted. */
+function tabThatHasTheTurn() {
+  const waiting: (() => void)[] = []
+  return {
+    takeTurn: (_key: string, signal: AbortSignal) =>
+      new Promise<(() => void) | null>((resolve) => {
+        waiting.push(() => resolve(() => undefined))
+        signal.addEventListener('abort', () => resolve(null))
+      }),
+    letGo: () => waiting.splice(0).forEach((grant) => grant()),
+  }
+}
+
 const connections = (server: SimulatedCollabServer) => server.connectionsTo(name)
 const settle = () => new Promise((resolve) => setTimeout(resolve, 150))
 
@@ -76,14 +89,43 @@ describe('the collaborators of the demo', () => {
     await expect.poll(() => connections(server)).toBe(2)
   })
 
-  it('are not in a tab when another tab has them', async () => {
-    const server = serverWithCollaborator(fakePage({ takeTurn: () => Promise.resolve(null) }).page)
+  it('wait their turn while another tab has them, and come in when it lets go', async () => {
+    const otherTab = tabThatHasTheTurn()
+    const server = serverWithCollaborator(fakePage({ takeTurn: otherTab.takeTurn }).page)
 
     visitor(server)
-    await expect.poll(() => connections(server)).toBe(1)
+    await settle()
+    expect(connections(server)).toBe(1)
+
+    otherTab.letGo()
+    await expect.poll(() => connections(server)).toBe(2)
+  })
+
+  it('do not come in after the wait was given up because the tab was hidden', async () => {
+    const otherTab = tabThatHasTheTurn()
+    const { page, show } = fakePage({ takeTurn: otherTab.takeTurn })
+    const server = serverWithCollaborator(page)
+    visitor(server)
+    await settle()
+
+    show(true)
+    otherTab.letGo()
     await settle()
 
     expect(connections(server)).toBe(1)
+  })
+
+  it('are in the document once when the tab is hidden and shown again at once', async () => {
+    const { page, show } = fakePage()
+    const server = serverWithCollaborator(page)
+    visitor(server)
+    await expect.poll(() => connections(server)).toBe(2)
+
+    show(true)
+    show(false)
+    await settle()
+
+    expect(connections(server)).toBe(2)
   })
 
   it('are not in a document nobody has opened', async () => {

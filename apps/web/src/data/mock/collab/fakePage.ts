@@ -1,6 +1,9 @@
 import type { PageEnvironment } from './browserPage.ts'
 
-/** A page the test drives: it is shown or hidden when the test says, nobody asked for less motion, and no other tab is open. */
+/**
+ * A page the test drives: it is shown or hidden when the test says, and no other tab is open. The person asked for less
+ * motion, so that she takes her place in the tests of the controller and does not type.
+ */
 export function fakePage(overrides: Partial<PageEnvironment> = {}) {
   let hidden = false
   const listeners = new Set<() => void>()

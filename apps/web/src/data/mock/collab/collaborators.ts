@@ -32,24 +32,17 @@ function seatOf(
 ): () => void {
   const name = documentName(documentId)
   let visitors = 0
-  /** Whether she is in the document or on her way in. */
-  let present = false
+  /** What is waiting for the turn or has it, while she is wanted in the document. */
+  let attempt: AbortController | undefined
   /** What takes her out of the document, once she is in it. */
   let leave: (() => void) | undefined
-  /** Changes whenever she is sent in or out, so that a turn that was waited for after that is not taken. */
-  let request = 0
 
-  async function enter(): Promise<void> {
-    const mine = (request += 1)
-    const giveUpTurn = await page.takeTurn(name)
-    if (giveUpTurn === null) {
-      // Another tab has her: this one tries again the next time something changes.
-      if (mine === request) present = false
-      return
-    }
+  async function enter(mine: AbortController): Promise<void> {
+    const giveUpTurn = await page.takeTurn(name, mine.signal)
+    if (giveUpTurn === null) return
     // Loaded now and not before: the demo's first screen has no use for the collaboration session.
     const { createCollabSession } = await import('../../../collab/session.ts')
-    if (mine !== request) return giveUpTurn()
+    if (mine.signal.aborted) return giveUpTurn()
     const session = createCollabSession({
       documentId,
       url: 'ws://simulated.invalid',
@@ -74,21 +67,23 @@ function seatOf(
       page,
     )
     leave = () => {
+      // What she wrote goes before she does, so the document is as it was when she came.
       stop()
       session.destroy()
       giveUpTurn()
     }
   }
 
+  /** She is in the document while somebody else has it open and the tab can be seen; a tab that is not the one to play her waits its turn. */
   function reconcile(): void {
     const wanted = visitors > 0 && !page.hidden()
-    if (wanted && !present) {
-      present = true
-      void enter()
+    if (wanted && attempt === undefined) {
+      attempt = new AbortController()
+      void enter(attempt)
     }
-    if (!wanted) {
-      request += 1
-      present = false
+    if (!wanted && attempt !== undefined) {
+      attempt.abort()
+      attempt = undefined
       leave?.()
       leave = undefined
     }
