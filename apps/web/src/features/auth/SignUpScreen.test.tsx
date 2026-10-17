@@ -122,6 +122,8 @@ describe('creating an account', () => {
     // A submit that does not come through the button (`requestSubmit`, a password manager): the button's own refusal of a
     // click does not stop it, the form does.
     fireEvent.submit(passwordField().closest('form') as HTMLFormElement)
+    // The query library starts a mutation a moment after it is asked to: let a second one show itself before counting.
+    await new Promise((resolve) => setTimeout(resolve, 20))
 
     expect(sent).toBe(1)
     answer()
