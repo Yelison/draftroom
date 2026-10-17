@@ -131,7 +131,7 @@ describe('the collaborator of the demo', () => {
   })
 
   it('writes nothing more once she is stopped', () => {
-    const { ydoc, seat, edits } = scene()
+    const { seat, edits } = scene()
     const stop = startCollaborator(seat, lines, lively)
     live(20_000)
 
