@@ -123,6 +123,67 @@ describe('HttpDataSource requests', () => {
   })
 })
 
+describe('HttpDataSource CSRF token on each method', () => {
+  const userId = '9b8a7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d'
+  // One operation for each method the contract lets change something, and two that only read.
+  const calls: readonly (readonly [
+    string,
+    string,
+    (source: ReturnType<typeof connect>['source']) => Promise<unknown>,
+  ])[] = [
+    [
+      'POST',
+      'createFolder',
+      (source) => source.createFolder({ params: { path: { workspaceId } }, body: { name: 'Launch' } }),
+    ],
+    [
+      'PUT',
+      'setAccess',
+      (source) => source.setAccess({ params: { path: { documentId, userId } }, body: { role: 'editor' } }),
+    ],
+    ['PATCH', 'updateMe', (source) => source.updateMe({ body: { name: 'Marta' } })],
+    ['DELETE', 'deleteDocument', (source) => source.deleteDocument({ params: { path: { documentId } } })],
+  ]
+  const reads: readonly (readonly [
+    string,
+    string,
+    (source: ReturnType<typeof connect>['source']) => Promise<unknown>,
+  ])[] = [
+    ['GET', 'getMe', (source) => source.getMe()],
+    ['GET', 'listWorkspaces', (source) => source.listWorkspaces()],
+  ]
+
+  it.each(calls)(
+    'echoes the token on a %s (%s), for the server to find it in the header',
+    async (method, _operation, call) => {
+      const { source, requests } = connect(() => new Response(null, { status: 204 }), 'the-token')
+
+      await call(source).catch(() => undefined)
+
+      expect([requests[0]?.method, requests[0]?.headers.get('X-CSRF-Token')]).toEqual([method, 'the-token'])
+    },
+  )
+
+  it.each(reads)(
+    'does not send it on a %s (%s), which changes nothing and so asks for none',
+    async (_method, _operation, call) => {
+      const { source, requests } = connect(() => json({ items: [] }), 'the-token')
+
+      await call(source).catch(() => undefined)
+
+      expect(requests[0]?.headers.has('X-CSRF-Token')).toBe(false)
+    },
+  )
+
+  it('sends none when there is no token to echo, which is the server to refuse and not the client to guess', async () => {
+    const { source, requests } = connect(() => new Response(null, { status: 204 }))
+
+    await source.signOut()
+
+    expect(requests[0]?.headers.has('X-CSRF-Token')).toBe(false)
+  })
+})
+
 describe('HttpDataSource CSRF token from the cookie', () => {
   afterEach(() => {
     document.cookie = 'dr_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
