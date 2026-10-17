@@ -90,6 +90,11 @@ describe('loadConfig', () => {
     })
   })
 
+  it('trusts no proxy unless the deployment names it', () => {
+    expect(loadConfig({ DATABASE_URL: database }).trustProxy).toBe(false)
+    expect(loadConfig({ DATABASE_URL: database, TRUST_PROXY: 'uniquelocal' }).trustProxy).toEqual(['uniquelocal'])
+  })
+
   it('treats a variable set to an empty string as absent', () => {
     expect(loadConfig({ DATABASE_URL: database, API_PORT: '', ALLOWED_ORIGINS: '' }).apiPort).toBe(8380)
   })
@@ -108,6 +113,7 @@ describe('loadConfig', () => {
         'ALLOWED_ORIGINS',
       ],
       ['with a wildcard origin', { DATABASE_URL: database, ALLOWED_ORIGINS: '*' }, 'ALLOWED_ORIGINS'],
+      ['with a proxy that trusts everybody', { DATABASE_URL: database, TRUST_PROXY: 'true' }, 'TRUST_PROXY'],
       [
         'with the collaboration port on the default API port',
         { DATABASE_URL: database, COLLAB_PORT: '8380' },
