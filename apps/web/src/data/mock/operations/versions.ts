@@ -3,6 +3,7 @@
 import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
 import type { DataSource } from '../../DataSource.ts'
 import type { VersionRecord } from '../fixtures/collaboration.ts'
+import { versionContent } from '../fixtures/versionContent.ts'
 import { record } from '../events.ts'
 import { caller, documentOf, requireRole, type Context } from '../guards.ts'
 import { textLimits } from '../limits.ts'
@@ -17,7 +18,7 @@ type VersionOperations = Pick<DataSource, 'listVersions' | 'createVersion' | 'ge
 const defaultSizeBytes = 2048
 
 /** An empty document: what a version holds when nothing before it did. */
-const emptyContent = jsonToYUpdate({ type: 'doc', content: [{ type: 'paragraph' }] })
+const emptyContent = () => jsonToYUpdate({ type: 'doc', content: [{ type: 'paragraph' }] })
 
 export function versionOperations(ctx: Context): VersionOperations {
   const { world } = ctx
@@ -52,10 +53,16 @@ export function versionOperations(ctx: Context): VersionOperations {
       undefined,
     )
   const latestSize = (documentId: string) => latestOf(documentId)?.sizeBytes ?? defaultSizeBytes
+  const contentOf = (versionId: string) => {
+    const kept = world.versionContent.get(versionId)
+    if (kept !== undefined) return kept
+    const fixture = versionContent[versionId]
+    return fixture === undefined ? emptyContent() : jsonToYUpdate(fixture)
+  }
   // The mock does not keep the live state of a document, so what a new version holds is what the latest one held.
   const latestContent = (documentId: string) => {
     const latest = latestOf(documentId)
-    return (latest && world.versionContent.get(latest.id)) ?? emptyContent
+    return latest === undefined ? emptyContent() : contentOf(latest.id)
   }
 
   return {
@@ -95,7 +102,7 @@ export function versionOperations(ctx: Context): VersionOperations {
       if (version === undefined) throw notFound()
       // Reading a version needs to read its document, which is `404` when the caller cannot.
       documentOf(ctx, version.documentId)
-      return world.versionContent.get(version.id) ?? emptyContent
+      return contentOf(version.id)
     },
 
     restoreVersion: async ({ params: { path } }) => {
@@ -107,14 +114,7 @@ export function versionOperations(ctx: Context): VersionOperations {
 
       // What the document held before the restore is kept, then the restored state is saved as the newest version.
       addVersion(document.id, 'pre-restore', user.id, null, latestSize(document.id), latestContent(document.id))
-      const restored = addVersion(
-        document.id,
-        'restore',
-        user.id,
-        target.label,
-        target.sizeBytes,
-        world.versionContent.get(target.id) ?? emptyContent,
-      )
+      const restored = addVersion(document.id, 'restore', user.id, target.label, target.sizeBytes, contentOf(target.id))
       record(world, 'version.restored', user.id, document.id)
       return versionView(world, restored)
     },

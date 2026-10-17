@@ -42,4 +42,13 @@ describe('the HTTP bindings', () => {
     expect(requests[0]?.method).toBe(operation?.method.toUpperCase())
     expect(new URL(requests[0]?.url ?? '').pathname).toMatch(pathPattern(operation?.path ?? ''))
   })
+
+  it('downloads a version as bytes from its content path', async () => {
+    const { source, requests } = recordingSource(200, 'application/octet-stream')
+
+    await source.getVersionContent({ params: { path: { versionId: 'v-1' } } })
+
+    expect(requests[0]?.method).toBe('GET')
+    expect(new URL(requests[0]?.url ?? '').pathname).toBe('/api/versions/v-1/content')
+  })
 })
