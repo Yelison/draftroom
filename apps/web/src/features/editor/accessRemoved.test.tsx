@@ -1,6 +1,7 @@
 import { documentName } from '@draftroom/contract/collab'
-import { focusManager, onlineManager, useQuery } from '@tanstack/react-query'
+import { onlineManager, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { act, screen, waitFor } from '@testing-library/react'
+import { useEffect } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { copiesOf } from '../../collab/offlineCache.ts'
 import type { DataSource } from '../../data/DataSource.ts'
@@ -62,10 +63,18 @@ function documentApi() {
   }
 }
 
-/** The window gets its focus back, which is what makes the screen read the document again. */
+/**
+ * The screen reads the document again, as it does when something invalidates it (an event of the connection, a change of
+ * the document). The trigger is explicit and not the window's focus, which these tests do not test: it is the answer of the
+ * screen to the API's refusal that they pin.
+ */
+const onScreen: { queryClient: QueryClient | null } = { queryClient: null }
 function readAgain() {
-  act(() => focusManager.setFocused(false))
-  act(() => focusManager.setFocused(true))
+  const { queryClient } = onScreen
+  if (queryClient === null) throw new Error('The document query is not on screen')
+  act(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.document(launchPlan.id) })
+  })
 }
 
 const copiesOnDevice = () => copiesOf(marta.id)
@@ -88,6 +97,13 @@ const CLOSED = 3
  * waits for `error` here has the screen's answer to it and not only the cache's.
  */
 function DocumentQueryStatus() {
+  const queryClient = useQueryClient()
+  useEffect(() => {
+    onScreen.queryClient = queryClient
+    return () => {
+      onScreen.queryClient = null
+    }
+  }, [queryClient])
   const { status, fetchStatus } = useQuery({ queryKey: queryKeys.document(launchPlan.id), enabled: false })
   return <output aria-label="Document query">{`${status} ${fetchStatus}`}</output>
 }
@@ -108,6 +124,7 @@ describe('access removed while the person was offline, when the API answers befo
     await readFully()
     api.refuse(404)
     comeBack()
+    readAgain()
 
     expect(await screen.findByRole('heading', { name: removedHeading })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Go to Documents' })).toHaveAttribute('href', '/documents')
@@ -143,6 +160,7 @@ describe('access removed while the person was offline, when the API answers befo
     await readFully()
     api.refuse(status)
     comeBack()
+    readAgain()
 
     expect(await screen.findByRole('heading', { name: "We couldn't open this document" })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: removedHeading })).not.toBeInTheDocument()
