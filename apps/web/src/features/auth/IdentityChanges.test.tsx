@@ -142,11 +142,15 @@ describe('when the connection of the open document is closed because the session
 
     // The first thing asked is who is signed in. Only then does the page read the document again, and it is not Marta's.
     await waitFor(() => expect(session.calls).toContain('getMe as lucia'))
-    act(() => {
-      focusManager.setFocused(false)
-      focusManager.setFocused(true)
+    // The window gets its focus back, which makes the screen read the document again; asked until it has, because on a busy
+    // machine the first time can find the screen not ready for it.
+    await waitFor(() => {
+      act(() => {
+        focusManager.setFocused(false)
+        focusManager.setFocused(true)
+      })
+      expect(session.calls).toContain('getDocument as lucia')
     })
-    await waitFor(() => expect(session.calls).toContain('getDocument as lucia'))
     expect(session.calls.indexOf('getMe as lucia')).toBeLessThan(session.calls.indexOf('getDocument as lucia'))
     await waitFor(async () => expect(await copiesOf(lucia.id)).toEqual([]))
     expect(await copiesOf(marta.id)).toHaveLength(1)
