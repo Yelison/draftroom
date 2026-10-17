@@ -114,8 +114,16 @@ describe('the way in and out of the history', () => {
     await versionRows()
     expect(view.router.state.location.pathname).toBe(versionsPath(launchPlan.id))
 
-    await view.user.click(screen.getByRole('link', { name: 'Back to “Autumn launch plan”' }))
+    await view.user.click(screen.getByRole('link', { name: 'Back to the document “Autumn launch plan”' }))
     expect(await screen.findByRole('textbox', { name: 'Document title' })).toBeInTheDocument()
+  })
+
+  it('says "Back to the document" and names the title only in the accessible name, which contains the visible words', async () => {
+    await openVersions()
+
+    const back = screen.getByRole('link', { name: /^Back to the document/ })
+    expect(back).toHaveTextContent(/^Back to the document$/)
+    expect(back).toHaveAccessibleName('Back to the document “Autumn launch plan”')
   })
 
   it('is open to a person who can only read the document', async () => {

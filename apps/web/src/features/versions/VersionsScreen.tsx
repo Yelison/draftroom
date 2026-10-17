@@ -47,8 +47,13 @@ export function VersionsScreen() {
         <PageTitle titleId="screen.versions" />
         {document !== undefined && (
           <div className={styles.actions}>
-            <Link to={`/documents/${document.id}`} className={buttonClassName({ variant: 'secondary' })}>
-              {intl.formatMessage({ id: 'versions.back' }, { title: document.title })}
+            {/* The name adds the title to the visible words, which it contains (WCAG 2.5.3); the title is the person's and can be long, so it is not drawn. */}
+            <Link
+              to={`/documents/${document.id}`}
+              className={buttonClassName({ variant: 'secondary' })}
+              aria-label={intl.formatMessage({ id: 'versions.backLabel' }, { title: document.title })}
+            >
+              {intl.formatMessage({ id: 'versions.back' })}
             </Link>
             {canEdit(document.role) && (
               <Button onClick={() => setSaving(true)}>{intl.formatMessage({ id: 'versions.save.button' })}</Button>

@@ -58,7 +58,7 @@ test.describe('the version history', () => {
     await expect(list(page).getByRole('listitem').nth(1)).toContainText('Version before a restore')
 
     // Back to the document.
-    const back = page.getByRole('link', { name: 'Back to “Autumn launch plan”' })
+    const back = page.getByRole('link', { name: 'Back to the document “Autumn launch plan”' })
     await back.focus()
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL(new RegExp(`/documents/${launchPlan.id}$`))
