@@ -1,6 +1,7 @@
 import type { ActivityRecord, ThreadRecord, VersionRecord } from './fixtures/collaboration.ts'
 import type { DocumentRecord, GrantRecord, PinRecord } from './fixtures/documents.ts'
-import { seed, seedNow } from './fixtures/index.ts'
+import type { JSONContent } from '@tiptap/core'
+import { fixtures, seedNow, type Fixtures } from './fixtures/index.ts'
 import type { PersonRecord } from './fixtures/people.ts'
 import type { TemplateRecord } from './fixtures/templates.ts'
 import type { FolderRecord, MembershipRecord, WorkspaceRecord } from './fixtures/workspaces.ts'
@@ -25,11 +26,14 @@ export interface World {
   versions: VersionRecord[]
   /** The Yjs update of the versions made after the fixtures, by version id: the fixtures' own text is in `fixtures/versionContent.ts`. */
   versionContent: Map<string, Uint8Array>
+  /** What the stored versions of the fixtures held, by version id. */
+  fixtureVersionContent: Readonly<Record<string, JSONContent>>
   activity: ActivityRecord[]
   templates: readonly TemplateRecord[]
 }
 
-export function createWorld(): World {
+/** A world starts from `source`, which is the fixtures of the tests unless the demo gives it its own. */
+export function createWorld({ seed, versionContent }: Fixtures = fixtures): World {
   let instant = Date.parse(seedNow)
   return {
     now() {
@@ -51,6 +55,7 @@ export function createWorld(): World {
     })),
     versions: seed.versions.map((row) => ({ ...row })),
     versionContent: new Map(),
+    fixtureVersionContent: versionContent,
     activity: seed.activity.map((row) => ({ ...row })),
     templates: seed.templates,
   }

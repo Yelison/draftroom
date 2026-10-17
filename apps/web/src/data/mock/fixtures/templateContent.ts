@@ -1,31 +1,9 @@
 import type { JSONContent } from '@tiptap/core'
+import { bold, bulletList, heading, orderedList, paragraph } from './blocks.ts'
 
 // The body of each template, as the server writes it into a new document (`apps/server/src/domain/templates`): the
 // mock stands in for that server, so a document made from a template opens with its text.
 // `templateContent.test.ts` holds the two copies together.
-
-const text = (value: string, marks?: readonly string[]): JSONContent => ({
-  type: 'text',
-  text: value,
-  ...(marks === undefined ? {} : { marks: marks.map((type) => ({ type })) }),
-})
-const paragraph = (...parts: (string | JSONContent)[]): JSONContent => ({
-  type: 'paragraph',
-  content: parts.map((part) => (typeof part === 'string' ? text(part) : part)),
-})
-const heading = (level: 2 | 3, value: string): JSONContent => ({
-  type: 'heading',
-  attrs: { level },
-  content: [text(value)],
-})
-type Item = string | JSONContent | readonly (string | JSONContent)[]
-const items = (type: 'bulletList' | 'orderedList', rows: Item[]): JSONContent => ({
-  type,
-  content: rows.map((row) => ({ type: 'listItem', content: [paragraph(...(Array.isArray(row) ? row : [row]))] })),
-})
-const bulletList = (...rows: Item[]) => items('bulletList', rows)
-const orderedList = (...rows: Item[]) => items('orderedList', rows)
-const bold = (value: string) => text(value, ['bold'])
 
 export const templateContent: Readonly<Record<'en' | 'es', Readonly<Record<string, readonly JSONContent[]>>>> = {
   en: {

@@ -42,9 +42,32 @@ export interface SimulatedServerOptions {
   pingIntervalMs?: number
   /** What a connection may send before its authentication finishes (protocol section 3.1). */
   unauthenticatedLimits?: { messages: number; bytes: number }
+  /** The Yjs update a document starts with, when it is first needed: what the server holds before anyone has written. */
+  initialContent?(documentName: string): Uint8Array | undefined
+}
+
+/** What changed in the awareness of a client: the state is `null` when it left. */
+export interface AwarenessChange {
+  readonly clientId: number
+  readonly clock: number
+  readonly state: unknown
+}
+
+/** Who hears what happens on the server, besides the connections: another tab's copy of this server, a script. */
+export interface RoomObserver {
+  /** A document was opened on this server for the first time. */
+  created?(documentName: string): void
+  /** A document changed by something of this server's own; what `receiveUpdate` brings in is not reported back. */
+  updated?(documentName: string, update: Uint8Array): void
+  /** The awareness of connections of this server changed; what `receiveAwareness` brings in is not reported back. */
+  awareness?(documentName: string, changes: readonly AwarenessChange[]): void
+  /** A person's connection was authenticated on a document, or ended. */
+  joined?(documentName: string, userId: string): void
+  left?(documentName: string, userId: string): void
 }
 
 const defaults = {
+  initialContent: (): undefined => undefined,
   loadDelayMs: 0,
   storeDelayMs: STORE_DEBOUNCE_MS,
   pingIntervalMs: 10_000,
@@ -134,11 +157,19 @@ function socketClass(
   }
 }
 
+/** What stands for a tab of the same demo whose people are in a room: the owner of the awareness it brought in. */
+interface RemotePeer {
+  readonly peerId: string
+}
+
 interface AwarenessEntry {
   clock: number
   state: unknown
-  owner: Connection
+  owner: Connection | RemotePeer
 }
+
+/** The origin of an update that came from another tab: the server does not send it on again. */
+const REMOTE = Symbol('remote')
 
 interface DocumentRoom {
   readonly name: string
@@ -262,6 +293,7 @@ export class Connection {
     const room = this.server.roomOf(documentName)
     this.room = room
     room.connections.add(this)
+    this.tellObservers((observer, userId) => observer.joined?.(room.name, userId))
     for (const data of this.buffered.splice(0)) this.receive(data)
     this.deliver(this.syncStep1(room))
     if (this.isWritable) this.deliver(this.storedEvent(room))
@@ -387,13 +419,7 @@ export class Connection {
 
   /** @internal */
   awarenessFrame(room: DocumentRoom, clientIds: readonly number[]): Uint8Array {
-    const update = new FrameWriter().uint(clientIds.length)
-    for (const clientId of clientIds) {
-      const entry = room.awareness.get(clientId)
-      if (entry === undefined) continue
-      update.uint(clientId).uint(entry.clock).string(JSON.stringify(entry.state))
-    }
-    return new FrameWriter().string(room.name).uint(MessageType.Awareness).bytes(update.toBytes()).toBytes()
+    return awarenessFrame(room, clientIds)
   }
 
   /** @internal */
@@ -429,6 +455,12 @@ export class Connection {
     room.connections.delete(this)
     this.room = null
     this.scope = null
+    this.tellObservers((observer, userId) => observer.left?.(room.name, userId))
+  }
+
+  private tellObservers(tell: (observer: RoomObserver, userId: string) => void): void {
+    const { identity } = this
+    if (identity !== null) this.server.observers.forEach((observer) => tell(observer, identity.userId))
   }
 
   /** @internal The client closed the socket before it opened. */
@@ -445,6 +477,16 @@ export class Connection {
   }
 }
 
+function awarenessFrame(room: DocumentRoom, clientIds: readonly number[]): Uint8Array {
+  const update = new FrameWriter().uint(clientIds.length)
+  for (const clientId of clientIds) {
+    const entry = room.awareness.get(clientId)
+    if (entry === undefined) continue
+    update.uint(clientId).uint(entry.clock).string(JSON.stringify(entry.state))
+  }
+  return new FrameWriter().string(room.name).uint(MessageType.Awareness).bytes(update.toBytes()).toBytes()
+}
+
 /** What the awareness guard (protocol section 5.3) lets through: the person, under the name the server knows, and the caret. */
 function guardedState(state: unknown, { userId, displayName }: Identity): Record<string, unknown> | null {
   if (!isRecord(state) || !isRecord(state['user'])) return null
@@ -454,10 +496,16 @@ function guardedState(state: unknown, { userId, displayName }: Identity): Record
   return { user: { id: userId, name: displayName, color }, ...(cursor === undefined ? {} : { cursor }) }
 }
 
+function isRemoteOf(owner: Connection | RemotePeer, peerId: string): boolean {
+  return !(owner instanceof Connection) && owner.peerId === peerId
+}
+
 export class SimulatedCollabServer {
   readonly settings: Required<SimulatedServerOptions>
   private readonly rooms = new Map<string, DocumentRoom>()
   private readonly open = new Set<Connection>()
+  /** @internal */
+  readonly observers = new Set<RoomObserver>()
   /** How many sockets a client closed before they opened: what a browser logs as an error and `ws` raises. */
   abortedConnections = 0
   /** How many document updates connections that may only read sent: a client that behaves sends none. */
@@ -487,6 +535,8 @@ export class SimulatedCollabServer {
     const existing = this.rooms.get(documentName)
     if (existing !== undefined) return existing
     const doc = new Y.Doc()
+    const initial = this.settings.initialContent(documentName)
+    if (initial !== undefined) Y.applyUpdate(doc, initial)
     const room: DocumentRoom = {
       name: documentName,
       doc,
@@ -498,6 +548,7 @@ export class SimulatedCollabServer {
       retries: 0,
     }
     doc.on('update', (update: Uint8Array, origin: unknown) => {
+      if (origin !== REMOTE) this.observers.forEach((observer) => observer.updated?.(documentName, update))
       for (const connection of room.connections) {
         if (connection === origin) continue
         connection.deliver(
@@ -508,7 +559,62 @@ export class SimulatedCollabServer {
       this.scheduleStore(room)
     })
     this.rooms.set(documentName, room)
+    this.observers.forEach((observer) => observer.created?.(documentName))
     return room
+  }
+
+  /** Reports what happens on the server to `observer`; returns what stops it. */
+  observe(observer: RoomObserver): () => void {
+    this.observers.add(observer)
+    return () => this.observers.delete(observer)
+  }
+
+  /** Whether a document has been opened on this server: asking for it never opens it. */
+  hasDocument(documentName: string): boolean {
+    return this.rooms.has(documentName)
+  }
+
+  // --- What another tab of the demo brings in -----------------------------------------------------------------------
+
+  /** Applies a change another tab made, and gives it to the connections here as any other; it is not reported back. */
+  receiveUpdate(documentName: string, update: Uint8Array): void {
+    Y.applyUpdate(this.roomOf(documentName).doc, update, REMOTE)
+  }
+
+  /** Shows the connections here the awareness of people connected to another tab; `peerId` owns those client ids. */
+  receiveAwareness(documentName: string, peerId: string, changes: readonly AwarenessChange[]): void {
+    const room = this.rooms.get(documentName)
+    if (room === undefined) return
+    const accepted: number[] = []
+    for (const { clientId, clock, state } of changes) {
+      const current = room.awareness.get(clientId)
+      if (current !== undefined && (!isRemoteOf(current.owner, peerId) || current.clock > clock)) continue
+      room.awareness.set(clientId, { clock, state, owner: { peerId } })
+      accepted.push(clientId)
+    }
+    this.relayAwareness(room, accepted, null)
+  }
+
+  /** The awareness this server's connections have in a document, as changes: what another tab is told when it opens it. */
+  awarenessOf(documentName: string): readonly AwarenessChange[] {
+    const room = this.rooms.get(documentName)
+    if (room === undefined) return []
+    return [...room.awareness]
+      .filter(([, entry]) => entry.owner instanceof Connection && entry.state !== null)
+      .map(([clientId, { clock, state }]) => ({ clientId, clock, state }))
+  }
+
+  /** Ends the awareness of everyone who was connected to a tab that has gone. */
+  dropPeer(peerId: string): void {
+    for (const room of this.rooms.values()) {
+      const gone: number[] = []
+      for (const [clientId, entry] of room.awareness) {
+        if (!isRemoteOf(entry.owner, peerId) || entry.state === null) continue
+        room.awareness.set(clientId, { clock: entry.clock + 1, state: null, owner: entry.owner })
+        gone.push(clientId)
+      }
+      this.relayAwareness(room, gone, null)
+    }
   }
 
   /** Makes every connection wait to be authenticated, as a server that cannot be reached for a moment does, until `release`. */
@@ -533,12 +639,18 @@ export class SimulatedCollabServer {
     this.open.delete(connection)
   }
 
-  /** @internal Tells the others in the room what changed in the awareness of `from`. */
-  relayAwareness(room: DocumentRoom, clientIds: readonly number[], from: Connection): void {
+  /** @internal Tells the others in the room what changed in the awareness of `from`, and the observers when it was a connection of this server. */
+  relayAwareness(room: DocumentRoom, clientIds: readonly number[], from: Connection | null): void {
     if (clientIds.length === 0) return
     for (const connection of room.connections) {
-      if (connection !== from) connection.deliver(from.awarenessFrame(room, clientIds))
+      if (connection !== from) connection.deliver(awarenessFrame(room, clientIds))
     }
+    if (from === null) return
+    const changes = clientIds.flatMap((clientId) => {
+      const entry = room.awareness.get(clientId)
+      return entry === undefined ? [] : [{ clientId, clock: entry.clock, state: entry.state }]
+    })
+    this.observers.forEach((observer) => observer.awareness?.(room.name, changes))
   }
 
   // --- The store: a debounce after a change, acknowledged with the snapshot of what was stored -------------------

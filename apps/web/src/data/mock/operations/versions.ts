@@ -3,7 +3,6 @@
 import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
 import type { DataSource } from '../../DataSource.ts'
 import type { VersionRecord } from '../fixtures/collaboration.ts'
-import { versionContent } from '../fixtures/versionContent.ts'
 import { record } from '../events.ts'
 import { caller, documentOf, requireRole, type Context } from '../guards.ts'
 import { textLimits } from '../limits.ts'
@@ -56,7 +55,7 @@ export function versionOperations(ctx: Context): VersionOperations {
   const contentOf = (versionId: string) => {
     const kept = world.versionContent.get(versionId)
     if (kept !== undefined) return kept
-    const fixture = versionContent[versionId]
+    const fixture = world.fixtureVersionContent[versionId]
     return fixture === undefined ? emptyContent() : jsonToYUpdate(fixture)
   }
   return {
