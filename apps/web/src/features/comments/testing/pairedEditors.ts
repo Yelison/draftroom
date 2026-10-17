@@ -1,5 +1,5 @@
 import { editorExtensions, fragmentName } from '@draftroom/editor-schema'
-import { Editor, type Content } from '@tiptap/core'
+import { Editor, type Content, type Extensions } from '@tiptap/core'
 import { Collaboration } from '@tiptap/extension-collaboration'
 import * as Y from 'yjs'
 import '../../editor/testing/jsdomShims.ts'
@@ -10,10 +10,14 @@ export interface Person {
   editor: Editor
 }
 
-const personWith = (): Person => {
+const personWith = (extensions: Extensions): Person => {
   const ydoc = new Y.Doc()
   const editor = new Editor({
-    extensions: [...editorExtensions(), Collaboration.configure({ document: ydoc, field: fragmentName })],
+    extensions: [
+      ...editorExtensions(),
+      Collaboration.configure({ document: ydoc, field: fragmentName }),
+      ...extensions,
+    ],
   })
   return { ydoc, editor }
 }
@@ -21,11 +25,12 @@ const personWith = (): Person => {
 /**
  * Two people on one document, each with a Yjs document of their own and the real editor over it, and the updates of each
  * carried to the other at once. What one types reaches the other the way it does through the collaboration server, which
- * is the case the anchors have to survive: a position made by one person and resolved by the other.
+ * is the case the anchors have to survive: a position made by one person and resolved by the other. The extensions are
+ * the local person's own, the ones the screen adds to the editor.
  */
-export function pairedEditors(content: Content) {
-  const local = personWith()
-  const remote = personWith()
+export function pairedEditors(content: Content, localExtensions: Extensions = []) {
+  const local = personWith(localExtensions)
+  const remote = personWith([])
   const carry = (from: Y.Doc, to: Y.Doc) =>
     from.on('update', (update: Uint8Array, origin: unknown) => {
       if (origin !== 'carried') Y.applyUpdate(to, update, 'carried')
