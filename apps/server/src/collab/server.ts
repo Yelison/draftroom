@@ -176,7 +176,7 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
 
     shutDown() {
       autoVersions.stop()
-      return shutDownCollaboration({ server, durability, retry, sockets, timing, log })
+      return shutDownCollaboration({ server, durability, retry, excerpts, sockets, timing, log })
     },
   }
 }

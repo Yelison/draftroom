@@ -66,12 +66,16 @@ export function createPostgresExcerptWriter(database: Kysely<Database>): Excerpt
 export interface ExcerptUpdates {
   /** Computes and writes the excerpt of a state that was just stored, once the work already queued has run. */
   schedule(documentId: string, state: Uint8Array): void
+  /** Resolves when every excerpt scheduled so far, and any scheduled while waiting, has been written or has failed. */
+  settled(): Promise<void>
 }
 
 export function createExcerptUpdates(writer: ExcerptWriter, log: CollabLog): ExcerptUpdates {
   // The last write of each document that is still running. A later one waits for it, so two stores in quick succession
   // cannot reach the database in the other order and leave the older excerpt.
   const tails = new Map<string, Promise<void>>()
+  // Every scheduled excerpt until it is written, so that a shutdown can wait for them before the database goes away.
+  const jobs = new Set<Promise<void>>()
 
   async function update(documentId: string, state: Uint8Array): Promise<void> {
     try {
@@ -85,13 +89,19 @@ export function createExcerptUpdates(writer: ExcerptWriter, log: CollabLog): Exc
   return {
     schedule(documentId, state) {
       // A macrotask, not a microtask: the acknowledgement is sent by hooks that run as microtasks after the store.
-      setImmediate(() => {
+      const job = new Promise<void>((resolve) => setImmediate(resolve)).then(() => {
         const next = (tails.get(documentId) ?? Promise.resolve()).then(() => update(documentId, state))
         tails.set(documentId, next)
-        void next.then(() => {
+        return next.finally(() => {
           if (tails.get(documentId) === next) tails.delete(documentId)
         })
       })
+      jobs.add(job)
+      void job.finally(() => jobs.delete(job))
+    },
+
+    async settled() {
+      while (jobs.size > 0) await Promise.all(jobs)
     },
   }
 }

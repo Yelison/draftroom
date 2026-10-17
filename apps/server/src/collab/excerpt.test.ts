@@ -145,4 +145,19 @@ describe('scheduling the update of an excerpt', () => {
     expect(errors).toHaveLength(2)
     expect(errors[0]).toMatchObject({ documentId: 'd1' })
   })
+
+  it('says when everything scheduled has been written, so a shutdown can wait before the database goes away', async () => {
+    const { writer, calls, releases } = heldWriter()
+    const updates = createExcerptUpdates(writer, silent)
+    updates.schedule('d1', state('One'))
+    updates.schedule('d2', state('Two'))
+    let settled = false
+    void updates.settled().then(() => (settled = true))
+
+    await nextMacrotask()
+    expect(calls).toHaveLength(2)
+    expect(settled).toBe(false)
+    for (const release of releases) release()
+    await vi.waitFor(() => expect(settled).toBe(true))
+  })
 })

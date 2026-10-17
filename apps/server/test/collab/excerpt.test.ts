@@ -43,6 +43,8 @@ afterAll(async () => {
 class WatchedWriter implements ExcerptWriter {
   failing = false
   hanging = false
+  /** Every write takes this long: a database that is slow, so that the shutdown has something to wait for. */
+  delayMs = 0
   /** How many states the store had written when each call came: zero would mean the excerpt ran ahead of the store. */
   readonly storesWrittenAtCall: number[] = []
   private readonly inner = createPostgresExcerptWriter(db)
@@ -56,6 +58,7 @@ class WatchedWriter implements ExcerptWriter {
   async write(documentId: string, excerpt: string | null): Promise<void> {
     this.storesWrittenAtCall.push(this.store.succeeded)
     if (this.hanging) return new Promise<void>(() => undefined)
+    if (this.delayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.delayMs))
     if (this.failing) throw new Error('The database is down')
     await this.inner.write(documentId, excerpt)
   }
@@ -153,6 +156,32 @@ describe('after a store', () => {
     writer.failing = false
     editor.edit((doc) => appendParagraph(doc, 'And the next store recovers it'))
     await vi.waitFor(async () => expect(await excerptOf(documentId)).toBe('Safe in the database'))
+  })
+})
+
+describe('a shutdown', () => {
+  it('waits for the excerpt of the last store, which the database would otherwise be closed under', async () => {
+    const { writer, harness, editor, documentId } = await start()
+    writer.delayMs = 150
+
+    const typed = editor.edit((doc) => appendParagraph(doc, 'Written as the server leaves'))
+    await editor.waitForStoredCovering(typed)
+    await harness.close()
+
+    expect(await excerptOf(documentId)).toBe('Written as the server leaves')
+  })
+
+  it('does not wait for ever for an excerpt that never finishes, and says so', async () => {
+    const { writer, harness, editor } = await start()
+    writer.hanging = true
+
+    await editor.waitForStoredCovering(editor.edit((doc) => appendParagraph(doc, 'Never written')))
+    await vi.waitFor(() => expect(writer.storesWrittenAtCall.length).toBe(1))
+    await harness.close()
+
+    expect(harness.log.entries).toContainEqual(
+      expect.objectContaining({ level: 'error', message: 'shutting down with excerpts that are still being written' }),
+    )
   })
 })
 
