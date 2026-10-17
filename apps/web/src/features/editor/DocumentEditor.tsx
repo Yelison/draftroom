@@ -12,7 +12,6 @@ import { SyncStatus } from '../../components/SyncStatus/SyncStatus.tsx'
 import { ShareControl } from '../sharing/ShareControl.tsx'
 import { VersionsButton } from '../versions/VersionsButton.tsx'
 import { useDataSource } from '../../data/useDataSource.ts'
-import { problemMessageId } from '../documents/problemMessage.ts'
 import type { CollaboratingPerson } from './CollaborationExtensions.ts'
 import { EditorSkeleton } from './EditorSkeleton.tsx'
 import { EditorStatePanel } from './EditorStatePanel.tsx'
@@ -26,7 +25,7 @@ import { canEdit } from './roles.ts'
 import { meQuery } from './meQuery.ts'
 import { useCollabSession } from './useCollabSession.ts'
 import { useDocumentEditor } from './useDocumentEditor.ts'
-import { useDuplicateDocument } from './useDuplicateDocument.ts'
+import { duplicateProblemId, useDuplicateDocument } from './useDuplicateDocument.ts'
 import styles from './Sheet.module.css'
 
 type LinkChange = 'added' | 'updated' | 'removed'
@@ -244,7 +243,7 @@ function EditorWorkspace({
   // A refusal is shown in the alert and said in a region that was already in the page (below), where it is heard.
   const duplicating = useDuplicateDocument(document)
   const duplicateProblem =
-    duplicating.error === null ? null : intl.formatMessage({ id: problemMessageId(duplicating.error) })
+    duplicating.error === null ? null : intl.formatMessage({ id: duplicateProblemId(duplicating.error) })
 
   const retry = () => {
     handBackFocus()

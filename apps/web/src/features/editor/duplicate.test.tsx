@@ -131,6 +131,29 @@ describe('duplicating a document that is too large to keep editing', () => {
     await waitFor(() => expect(router.state.location.pathname).not.toBe(`/documents/${launchPlan.id}`))
   })
 
+  it('says a copy that cannot be made is not worth trying again, when the stored state is one the editor cannot read', async () => {
+    const { user, router } = await openTooLarge({
+      wrap: (dataSource) => ({
+        ...dataSource,
+        duplicateDocument: () =>
+          Promise.reject(
+            new ApiError({
+              type: '/problems/conflict',
+              title: 'The request conflicts with the current state.',
+              status: 409,
+              code: 'conflict',
+            }),
+          ),
+      }),
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Duplicate as a new document' }))
+
+    expect(await screen.findAllByText("This document can't be copied.")).toHaveLength(2)
+    expect(screen.queryByText('Something went wrong. Try again.')).not.toBeInTheDocument()
+    expect(router.state.location.pathname).toBe(`/documents/${launchPlan.id}`)
+  })
+
   it('is not offered when the connection stopped for another reason', async () => {
     const { server } = await openEditor()
     await screen.findByText('Sync status: Synced')

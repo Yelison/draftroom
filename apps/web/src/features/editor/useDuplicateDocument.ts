@@ -2,7 +2,10 @@ import type { Schema } from '@draftroom/contract'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useIntl } from 'react-intl'
 import { useNavigate } from 'react-router'
+import { isApiError } from '../../data/errors.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
+import type { MessageId } from '../../i18n/messages.ts'
+import { problemMessageId } from '../documents/problemMessage.ts'
 import { invalidateAfter } from '../documents/invalidate.ts'
 import { copyTitle } from './copyTitle.ts'
 
@@ -28,4 +31,12 @@ export function useDuplicateDocument(document: Schema<'Document'>) {
       await navigate(`/documents/${copy.id}`)
     },
   })
+}
+
+/**
+ * What the person is told when the copy was refused. A `conflict` here is a stored state the editor cannot read, which
+ * trying again does not mend, so it says so instead of the generic "try again".
+ */
+export function duplicateProblemId(error: unknown): MessageId {
+  return isApiError(error, 'conflict') ? 'sync.problem.duplicate.conflict' : problemMessageId(error)
 }

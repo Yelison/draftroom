@@ -12,7 +12,17 @@ function stateOf(text: string, migrations = 0): Uint8Array {
   paragraph.insert(0, [new Y.XmlText(text)])
   doc.getXmlFragment(fragmentName).insert(0, [paragraph])
   for (let entry = 0; entry < migrations; entry += 1) {
-    doc.getMap(migrationsMap).set(`${entry}:1`, { seen: { 1: entry }, transfers: ['x'.repeat(500)] })
+    // The shape of a `PositionMigration`, as `@tiptap/y-tiptap` writes it.
+    doc.getMap(migrationsMap).set(`1:${entry}`, {
+      version: 1,
+      client: 1,
+      clock: entry,
+      seen: [[1, entry]],
+      transfers: Array.from({ length: 10 }, (_, index) => ({
+        source: { client: 1, clock: entry * 10 + index, length: 1 },
+        target: null,
+      })),
+    })
   }
   return Y.encodeStateAsUpdate(doc)
 }

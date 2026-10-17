@@ -20,11 +20,11 @@ export interface SyncAlertsProps {
 }
 
 /**
- * What the person needs to know and may do about their changes: why the connection stopped or could not confirm them, and
- * what they can do (try again; or, for a document too large to keep editing, duplicate it or discard what was not stored and
- * reload), and the notice that what they wrote
- * offline was not kept. They are above the text, where they are seen. They are not live regions of their own: a region
- * that arrives with its text may go unheard, so the editor says the same in one that was already in the page.
+ * What the person needs to know and may do about their changes: why the connection stopped or could not confirm them,
+ * what they can do (try again; or, for a document too large to keep editing, duplicate it or discard what was not stored
+ * and reload), and the notice that what they wrote offline was not kept. They are above the text, where they are seen.
+ * They are not live regions of their own: a region that arrives with its text may go unheard, so the editor says the
+ * same in one that was already in the page.
  */
 export function SyncAlerts({ snapshot, duplicate, onRetry, onDiscard, onDismissNotice }: SyncAlertsProps) {
   const intl = useIntl()

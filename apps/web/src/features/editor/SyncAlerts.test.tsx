@@ -83,12 +83,17 @@ describe('what is said about the changes when the connection has a problem', () 
     })
 
     it.each([
-      { cause: 'store-timeout', action: 'retry', notice: null },
-      { cause: 'unauthenticated', action: 'retry', notice: null },
-      { cause: 'not-found', action: 'retry', notice: null },
-      { cause: null, action: null, notice: 'offline-changes-discarded' },
-    ] as const)('is not offered for $cause$notice, which are not about size', (snapshot) => {
-      show(snapshot)
+      { name: 'a store timeout', cause: 'store-timeout', action: 'retry', notice: null },
+      { name: 'an ended session', cause: 'unauthenticated', action: 'retry', notice: null },
+      { name: 'a document that is gone', cause: 'not-found', action: 'retry', notice: null },
+      {
+        name: 'the notice of discarded offline changes',
+        cause: null,
+        action: null,
+        notice: 'offline-changes-discarded',
+      },
+    ] as const)('is not offered for $name, which is not about size', ({ cause, action, notice }) => {
+      show({ cause, action, notice })
 
       expect(screen.queryByRole('button', { name: /duplicate/i })).not.toBeInTheDocument()
     })
