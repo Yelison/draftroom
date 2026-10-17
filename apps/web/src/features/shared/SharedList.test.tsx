@@ -170,6 +170,27 @@ describe('a selected document beyond the first page', () => {
     expect(within(main()).queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
   })
 
+  const last = `${(29).toString().padStart(8, '0')}-0000-4000-8000-000000000000`
+
+  it.each([
+    {
+      how: 'its button',
+      close: () => within(preview()).getByRole('button', { name: 'Close preview' }),
+    },
+    {
+      how: 'its row',
+      close: () => within(main()).getByRole('button', { name: 'Shared document 30' }),
+    },
+  ])('keeps its row, and the focus on it, when the preview is closed with $how', async ({ close }) => {
+    const { user } = await openShared(`/shared?selected=${last}`, { wrap: thirty })
+
+    await user.click(close())
+
+    expect(within(main()).queryByRole('complementary')).not.toBeInTheDocument()
+    expect(titles()).toHaveLength(30)
+    expect(within(main()).getByRole('button', { name: 'Shared document 30' })).toHaveFocus()
+  })
+
   it('keeps the page of 25 when the selected document is on it', async () => {
     const early = `${(2).toString().padStart(8, '0')}-0000-4000-8000-000000000000`
     await openShared(`/shared?selected=${early}`, { wrap: thirty })

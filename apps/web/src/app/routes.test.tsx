@@ -57,22 +57,35 @@ describe('the route table', () => {
 describe('the share route', () => {
   afterEach(() => localStorage.clear())
   const shareOf = `/documents/${launchPlan.id}/share`
+  // The route loads the editor, with Tiptap and the collaboration, in StrictMode: the first test of a file waits for Vitest
+  // to load and transform it, and on a machine that is busy that took longer than the second of a wait and the five of a
+  // test. The same margin as `features/sharing/testing/openShare.tsx`; a dialog that never arrives still fails.
+  const arrival = { timeout: 10_000 }
+  const testTimeout = 20_000
 
-  it('is a dialog over the editor: Documents stays current, the rail stays compact and the document stays behind', async () => {
-    renderApp(shareOf)
+  it(
+    'is a dialog over the editor: Documents stays current, the rail stays compact and the document stays behind',
+    async () => {
+      renderApp(shareOf)
 
-    expect(await screen.findByRole('dialog', { name: 'Share “Autumn launch plan”' })).toBeInTheDocument()
-    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass('compact')
-    expect(screen.queryAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual(['Documents'])
-    expect(screen.getByRole('heading', { level: 1, hidden: true })).toHaveTextContent('Autumn launch plan')
-  })
+      expect(await screen.findByRole('dialog', { name: 'Share “Autumn launch plan”' }, arrival)).toBeInTheDocument()
+      expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass('compact')
+      expect(screen.queryAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual(['Documents'])
+      expect(screen.getByRole('heading', { level: 1, hidden: true })).toHaveTextContent('Autumn launch plan')
+    },
+    testTimeout,
+  )
 
-  it('names the dialog in Spanish when the app is in Spanish', async () => {
-    localStorage.setItem(localeStorageKey, 'es')
-    renderApp(shareOf)
+  it(
+    'names the dialog in Spanish when the app is in Spanish',
+    async () => {
+      localStorage.setItem(localeStorageKey, 'es')
+      renderApp(shareOf)
 
-    expect(await screen.findByRole('dialog', { name: 'Compartir «Autumn launch plan»' })).toBeInTheDocument()
-  })
+      expect(await screen.findByRole('dialog', { name: 'Compartir «Autumn launch plan»' }, arrival)).toBeInTheDocument()
+    },
+    testTimeout,
+  )
 })
 
 describe('the texts of the shell in both languages', () => {

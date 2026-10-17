@@ -95,9 +95,11 @@ function SharedResults({ documents, selectedId, onSelect }: SharedResultsProps) 
   const focusOnArrival = useRef<string | undefined>(undefined)
 
   // A selected document is shown whatever page it is on: an address that names the 30th document opens its preview, with
-  // the rows up to it, instead of ignoring it.
+  // the rows up to it, instead of ignoring it. What is shown only grows: closing the preview must not take rows away from
+  // under the focus. Adjusted while rendering, so that no effect has to set state.
   const selectedIndex = documents.findIndex((document) => document.id === selectedId)
-  const shown = documents.slice(0, Math.max(visible, selectedIndex + 1))
+  if (selectedIndex >= visible) setVisible(selectedIndex + 1)
+  const shown = documents.slice(0, visible)
   const selected = documents[selectedIndex]
 
   const previewButton = (documentId: string) => (button: HTMLButtonElement | null) => {
