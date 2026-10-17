@@ -1,4 +1,5 @@
 import type { Kysely } from 'kysely'
+import { inMilliseconds } from '../milliseconds.ts'
 import type { Database, WorkspaceRole } from '../tables.ts'
 
 /** A member of a workspace, pending ones included: `signedUpAt` is `null` until their email signs up. */
@@ -25,9 +26,9 @@ const membersOf = (db: Kysely<Database>, workspaceId: string) =>
     ])
     .where('m.workspace_id', '=', workspaceId)
 
-/** The members of a workspace, in the order they joined and then by person. */
+/** The members of a workspace, in the order they joined (to the millisecond, as the API shows it) and then by person. */
 export function listMembers(db: Kysely<Database>, workspaceId: string): Promise<MemberRow[]> {
-  return membersOf(db, workspaceId).orderBy('m.created_at').orderBy('m.user_id').execute()
+  return membersOf(db, workspaceId).orderBy(inMilliseconds('m.created_at')).orderBy('m.user_id').execute()
 }
 
 export function findMember(db: Kysely<Database>, workspaceId: string, userId: string): Promise<MemberRow | undefined> {

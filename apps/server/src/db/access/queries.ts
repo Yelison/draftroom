@@ -1,5 +1,6 @@
 import { sql, type Kysely } from 'kysely'
 import type { OwnerCandidate } from '../../domain/access.ts'
+import { inMilliseconds } from '../milliseconds.ts'
 import type { Database, DocumentRole, GeneralAccess, WorkspaceRole } from '../tables.ts'
 
 // The reads of who can open a document, and the facts a live connection is held against when access changes.
@@ -20,9 +21,9 @@ const grantsOf = (db: Kysely<Database>, documentId: string) =>
     .select(['a.user_id as userId', 'u.email', 'u.name', 'a.role', 'a.created_at as createdAt'])
     .where('a.document_id', '=', documentId)
 
-/** Every explicit grant on a document, the creator's included, oldest first and then by person. */
+/** Every explicit grant on a document, the creator's included, oldest first, to the millisecond as the API shows it, and then by person. */
 export function listGrants(db: Kysely<Database>, documentId: string): Promise<GrantRow[]> {
-  return grantsOf(db, documentId).orderBy('a.created_at').orderBy('a.user_id').execute()
+  return grantsOf(db, documentId).orderBy(inMilliseconds('a.created_at')).orderBy('a.user_id').execute()
 }
 
 export function findGrant(db: Kysely<Database>, documentId: string, userId: string): Promise<GrantRow | undefined> {
