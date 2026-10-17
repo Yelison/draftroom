@@ -72,6 +72,12 @@ describe('the size of a request body', () => {
   })
 })
 
+describe('the limit that is decided', () => {
+  it('is 64 KiB: more than any body the contract allows, and little enough that a flood of them costs nothing', () => {
+    expect(maxRequestBodyBytes).toBe(64 * 1024)
+  })
+})
+
 describe('the limit and the contract', () => {
   // A JSON string escapes a control character as six bytes (\u0001); a character outside the basic plane takes four as
   // UTF-8, or twelve if a client escapes both halves of its surrogate pair. Six is the most a client that serialises
