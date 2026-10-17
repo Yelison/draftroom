@@ -2,6 +2,7 @@ import fastifyCookie from '@fastify/cookie'
 import fastifyRateLimit from '@fastify/rate-limit'
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify'
 import type { Kysely } from 'kysely'
+import type { Config } from '../config.ts'
 import type { Database } from '../db/tables.ts'
 import type { AuthProvider } from './auth/auth-provider.ts'
 import { requireAuthentication } from './auth/authenticate.ts'
@@ -10,6 +11,7 @@ import type { Passwords } from './auth/passwords.ts'
 import type { RateLimits } from './auth/rateLimit.ts'
 import type { Sessions } from './auth/sessions.ts'
 import { loadContract, type Contract } from './contract.ts'
+import { registerCors } from './cors.ts'
 import type { DocumentBroadcaster } from './document-broadcaster.ts'
 import type { LiveAccess } from './live-access.ts'
 import type { LiveDocuments } from './live-documents.ts'
@@ -22,6 +24,8 @@ import {
   problemMediaType,
   sendProblem,
 } from './problem.ts'
+import { defaultRequestLimits, limitByAddress, limitBySession, type RequestLimits } from './request-limits.ts'
+import { registerSecurityHeaders } from './security.ts'
 import { accessRoutes } from './routes/access.ts'
 import { activityRoutes } from './routes/activity.ts'
 import { authRoutes } from './routes/auth.ts'
@@ -50,8 +54,18 @@ export interface ContractViolation {
   readonly reason: string
 }
 
+/** What the app is told of the deployment it runs in: how its answers are hardened (ADR 0017). */
+export type Hardening = Pick<Config, 'allowedOrigins' | 'trustProxy'> & { readonly production: boolean }
+
+/** The largest request body the server reads, in bytes (ADR 0017); anything bigger is `413 too-large` before it is parsed. */
+export const maxRequestBodyBytes = 64 * 1024
+
 export interface AppDependencies {
   readonly database: Kysely<Database>
+  /** Headers, CORS and who the caller's address is. Required: an app that forgets it is open, not neutral. */
+  readonly hardening: Hardening
+  /** The limits on requests; the decided ones unless a test needs a smaller window. */
+  readonly requestLimits?: RequestLimits
   /** Who the callers are. Required: an app without one would have to choose between serving everyone and no one. */
   readonly authProvider: AuthProvider
   /** Who hears about a change to a document that people have open. Required, so that an app cannot forget to tell them. */
@@ -77,6 +91,8 @@ export interface AppDependencies {
 /** The REST application. Nothing is listening: tests drive it with `inject()`, the entry point calls `listen()`. */
 export function buildApp({
   database,
+  hardening,
+  requestLimits = defaultRequestLimits,
   authProvider,
   broadcaster,
   liveAccess,
@@ -90,7 +106,14 @@ export function buildApp({
   onContractViolation,
 }: AppDependencies): FastifyInstance {
   // The contract has no HEAD operations, so none is exposed.
-  const app = Fastify({ logger, exposeHeadRoutes: false, frameworkErrors: handleFrameworkError })
+  const app = Fastify({
+    logger,
+    exposeHeadRoutes: false,
+    frameworkErrors: handleFrameworkError,
+    bodyLimit: maxRequestBodyBytes,
+    // Nobody is trusted to say where a request came from unless the deployment names its proxies.
+    trustProxy: hardening.trustProxy,
+  })
   const implementedOperations = new Set<string>()
   app.decorate('implementedOperations', implementedOperations)
 
@@ -101,8 +124,14 @@ export function buildApp({
     if (config?.operationId !== undefined) implementedOperations.add(config.operationId)
   })
 
+  // Before anything that costs: a preflight is answered, and an address that sends too much is refused, without a session
+  // being looked up or a body read.
+  registerCors(app, hardening.allowedOrigins)
+  limitByAddress(app, requestLimits)
+
   // First and second in the order of checks: the session and the CSRF token.
   requireAuthentication(app, contract, authProvider)
+  limitBySession(app, requestLimits)
 
   // Third in the order of checks, after the session and the CSRF token: the shape of the request, the same whether or
   // not the resource exists.
@@ -136,6 +165,9 @@ export function buildApp({
     reply.code(500).type(problemMediaType)
     return JSON.stringify(problemBody('internal-error'))
   })
+
+  // After the hook above, which strips the headers of the answer it replaces: these go on whatever the answer is.
+  registerSecurityHeaders(app, hardening)
 
   // The plugins the authentication routes stand on. `global: false`: no route is limited unless it asks, and the limits
   // of sign-in are asked for by the routes, because they count failures and not requests.

@@ -5,6 +5,7 @@ import type { TestProject } from 'vitest/node'
 import { createDatabase } from '../../src/db/database.ts'
 import { buildApp } from '../../src/http/app.ts'
 import { createDevIdentity } from '../../src/http/auth/devIdentity.ts'
+import { developmentHardening, unlimitedRequests } from './hardening.ts'
 import { sessionStackFor } from './auth.ts'
 import { noLiveDocuments, silentBroadcaster, silentLiveAccess } from './broadcasters.ts'
 import { ContractCoverage } from './contract-coverage.ts'
@@ -23,6 +24,8 @@ async function implementedOperations(): Promise<ReadonlySet<string>> {
   const { sessions, sessionCookies } = sessionStackFor(database)
   const app = buildApp({
     database,
+    hardening: developmentHardening,
+    requestLimits: unlimitedRequests,
     authProvider: createDevIdentity(database),
     broadcaster: silentBroadcaster,
     liveAccess: silentLiveAccess,

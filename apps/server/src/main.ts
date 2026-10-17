@@ -34,6 +34,7 @@ const broadcaster: DocumentBroadcaster = {
 }
 const app = buildApp({
   database,
+  hardening: { production: config.nodeEnv === 'production', ...config },
   authProvider,
   sessions,
   sessionCookies: sessionCookiesFor(config),

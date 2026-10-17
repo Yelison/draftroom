@@ -7,6 +7,7 @@ import { createContractClient, findOperation, ContractError } from './contract-c
 import { ContractCoverage } from './contract-coverage.ts'
 import { createDatabase } from '../../src/db/database.ts'
 import type { AuthProvider } from '../../src/http/auth/auth-provider.ts'
+import { developmentHardening } from './hardening.ts'
 import { sessionStackFor } from './auth.ts'
 import { noLiveDocuments, silentBroadcaster, silentLiveAccess } from './broadcasters.ts'
 import {
@@ -56,6 +57,7 @@ describe('the contract client', () => {
     const { sessions, sessionCookies } = sessionStackFor(database)
     app = buildApp({
       database,
+      hardening: developmentHardening,
       authProvider,
       sessions,
       sessionCookies,
@@ -90,6 +92,7 @@ describe('the contract client', () => {
     const { sessions, sessionCookies } = sessionStackFor(database)
     app = buildApp({
       database,
+      hardening: developmentHardening,
       authProvider,
       sessions,
       sessionCookies,

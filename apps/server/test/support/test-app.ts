@@ -10,6 +10,7 @@ import type { LiveAccess } from '../../src/http/live-access.ts'
 import type { LiveDocuments } from '../../src/http/live-documents.ts'
 import { sessionStackFor, type SessionStack } from './auth.ts'
 import { silentBroadcaster, silentLiveAccess } from './broadcasters.ts'
+import { developmentHardening, unlimitedRequests } from './hardening.ts'
 import { createContractClient } from './contract-client.ts'
 import { storedDocuments } from './live-documents.ts'
 import { runCoverage } from './run-coverage.ts'
@@ -23,7 +24,10 @@ export interface TestApp {
 }
 
 /** What a test may say about authentication, beyond who the callers are: the sessions, the limits and the passwords. */
-export interface TestAuthentication extends Pick<AppDependencies, 'rateLimits' | 'passwords'> {
+export interface TestAuthentication
+  extends
+    Pick<AppDependencies, 'rateLimits' | 'passwords' | 'requestLimits'>,
+    Partial<Pick<AppDependencies, 'hardening'>> {
   /** The stack the app's routes use; the provider is passed apart, because most tests do not sign in. */
   readonly session?: Pick<SessionStack, 'sessions' | 'sessionCookies'>
 }
@@ -41,6 +45,8 @@ export function createTestApp(
   const violations: ContractViolation[] = []
   const app = buildApp({
     database,
+    hardening: developmentHardening,
+    requestLimits: unlimitedRequests,
     authProvider,
     broadcaster,
     liveAccess,

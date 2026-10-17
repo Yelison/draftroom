@@ -7,6 +7,7 @@ import type { Database } from '../db/tables.ts'
 import { buildApp, type ContractViolation } from './app.ts'
 import type { AuthProvider } from './auth/auth-provider.ts'
 import { sessionStackFor } from '../../test/support/auth.ts'
+import { developmentHardening } from '../../test/support/hardening.ts'
 import { noLiveDocuments, silentBroadcaster, silentLiveAccess } from '../../test/support/broadcasters.ts'
 import {
   contractWithSyntheticOperation,
@@ -63,6 +64,7 @@ function appWithoutDatabase(
   const { sessions, sessionCookies } = sessionStackFor(database)
   app = buildApp({
     database,
+    hardening: developmentHardening,
     authProvider,
     sessions,
     sessionCookies,
