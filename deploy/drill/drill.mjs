@@ -46,6 +46,8 @@ function check(condition, message) {
 
 // ---- HTTP, with the cookies a browser would keep ----------------------------------------------------------------------
 
+const csrfHeader = 'x-csrf-token'
+
 class Session {
   cookies = new Map()
   constructor(base) {
@@ -69,7 +71,7 @@ class Session {
         ...(body === undefined ? {} : { 'content-type': 'application/json' }),
         cookie: this.cookieHeader,
         origin: this.base,
-        ...(csrf === undefined || method === 'GET' ? {} : { 'x-csrf-token': csrf }),
+        ...(csrf === undefined || method === 'GET' ? {} : { [csrfHeader]: csrf }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })

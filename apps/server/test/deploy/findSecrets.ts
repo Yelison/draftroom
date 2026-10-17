@@ -3,8 +3,12 @@ export interface Finding {
   readonly rule: string
 }
 
-/** What stands where a secret goes in an example or a template: nothing, a marker or a reference to the environment. */
-const placeholder = /^(?:|CHANGE_ME\w*|<[^>]*>|\$\{[^}]*\}|\$\$?\w+|["']{2})$/
+/**
+ * What stands where a secret goes in an example, a template or a script: nothing, a marker, a reference to the environment
+ * or to a variable of the code (a dotted path), a command that makes one, a call, or a keyword.
+ */
+const placeholder =
+  /^(?:|CHANGE_ME\w*|<[^>]*>|\$\{[^}]*\}|\$\(.*\)|\$\$?\w+|["']{2}|(?:null|undefined|true|false)|[A-Za-z_]\w*(?:\.\w+)+|.*\(.*)$/
 
 const tokenShapes: ReadonlyArray<readonly [rule: string, shape: RegExp]> = [
   ['private key', /-----BEGIN [A-Z ]*PRIVATE KEY-----/],
@@ -18,7 +22,7 @@ const tokenShapes: ReadonlyArray<readonly [rule: string, shape: RegExp]> = [
 // A name that says what it holds, then a value. The value is a reference to the environment, which may hold spaces, or
 // runs to a quote or to a space.
 const secretAssignment =
-  /\b\w*(?:PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_?KEY|CREDENTIALS?)\w*["']?\s*[=:]\s*["']?(\$\{[^}]*\}|[^\s"']*)/i
+  /(?<![\w${])\w*(?:PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_?KEY|CREDENTIALS?)\w*["']?\s*[=:]\s*["']?(\$\{[^}]*\}|\$\([^)]*\)|[^\s"',;]*)/i
 const urlPassword = /\b[a-z][a-z0-9+.-]*:\/\/(?:\$\{[^}]*\}|[^\s:/@$]+):(\$\{[^}]*\}|[^\s@/]+)@/i
 // A long run of the characters of hexadecimal and base64: a key or a hash of one.
 const longRandomRun = /(?<![\w/+-])(?:[A-Za-z0-9+/_]-?){32,}={0,2}(?![\w/+=-])/
@@ -26,9 +30,9 @@ const longRandomRun = /(?<![\w/+-])(?:[A-Za-z0-9+/_]-?){32,}={0,2}(?![\w/+=-])/
 // value is still to be filled in, and a path is long and made of words (a key in base64 has capitals).
 const imageDigest = /sha256:[0-9a-f]{64}/g
 const marker = /CHANGE_ME\w*/g
-const lowercasePath = /(?<![\w/+=-])(?:[a-z0-9._-]+\/)+[a-z0-9._-]*(?![\w/+=-])/g
+const lowercasePath = /(?<![\w/+=-])\/?(?:[a-z0-9._-]+\/)+[a-z0-9._-]*(?![\w/+=-])/g
 
-const isComment = (line: string): boolean => /^\s*#/.test(line)
+const isComment = (line: string): boolean => /^\s*(?:#|\/\/)/.test(line)
 
 /** The lines of `text` that look like they hold a secret, and the rule each one broke. */
 export function findSecrets(text: string): Finding[] {
