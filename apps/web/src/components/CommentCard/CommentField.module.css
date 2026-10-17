@@ -1,0 +1,21 @@
+.field {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-block-size: calc(var(--space-24) * 3);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: var(--font-body);
+  resize: vertical;
+}
+
+.field:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--space-2);
+}
+
+.field[aria-invalid='true'] {
+  border-color: var(--color-red-ink);
+}
