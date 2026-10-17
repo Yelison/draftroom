@@ -4,6 +4,7 @@ import { useIntl } from 'react-intl'
 import { DocumentRow } from '../../components/DocumentRow/DocumentRow.tsx'
 import { DocumentRowLink } from '../../components/DocumentRow/DocumentRowLink.tsx'
 import { usePinDocument } from './actions/usePinDocument.ts'
+import { PinButton } from './PinButton.tsx'
 import { problemMessageId } from './problemMessage.ts'
 import styles from './DocumentCard.module.css'
 
@@ -31,10 +32,10 @@ export function DocumentCard({ document, onActions }: DocumentCardProps) {
       trailing={
         <span className={styles.actions}>
           {/* A toggle: the name stays and `aria-pressed` carries the state, which a screen reader says when it changes. */}
-          <IconButton
-            icon="star"
+          <PinButton
+            toggle
+            pinned={document.pinned}
             label={intl.formatMessage({ id: 'documents.row.pin' }, { title: document.title })}
-            aria-pressed={document.pinned}
             // Not `disabled`: a disabled button gives up the focus, and the person is still on it when the answer arrives.
             onClick={() => {
               if (!pin.isPending) pin.mutate(document)

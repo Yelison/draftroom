@@ -1,5 +1,5 @@
 /* Home in the production build, with a real browser: a document is pinned, shown with its excerpt, and unpinned with the keyboard alone. */
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { interviews, launchPlan, weeklyEnglish } from '../src/data/mock/fixtures/documents.ts'
 import { expect, test } from './fixtures.ts'
 
@@ -84,3 +84,43 @@ for (const { name, locale, colorScheme, pinned } of looks) {
     })
   })
 }
+
+test('draws a pinned document differently from one that is not, on Documents and on Home', async ({ page }) => {
+  const look = (button: Locator) =>
+    button.evaluate((element) => ({
+      color: getComputedStyle(element).color,
+      fill: getComputedStyle(element.querySelector('svg') as SVGElement).fill,
+    }))
+
+  await page.goto('/documents')
+  const pinned = await look(main(page).getByRole('button', { name: `Pin ${launchPlan.title}` }))
+  const loose = await look(main(page).getByRole('button', { name: `Pin ${weeklyEnglish.title}` }))
+  expect(pinned.fill).not.toBe('none')
+  expect(loose.fill).toBe('none')
+  expect(pinned.color).not.toBe(loose.color)
+
+  await page.getByRole('link', { name: 'Home' }).click()
+  const onHome = await look(main(page).getByRole('button', { name: `Unpin ${launchPlan.title}` }))
+  expect(onHome).toEqual(pinned)
+})
+
+test('lets a card with a long title grow instead of spilling its text out of it', async ({ page }) => {
+  const longTitle = `${'A title that someone wrote at great length '.repeat(3).trim()} and then some more words`
+  await page.goto('/documents')
+  await main(page)
+    .getByRole('button', { name: `Actions for ${launchPlan.title}` })
+    .click()
+  const dialog = page.getByRole('dialog', { name: 'Rename or move' })
+  await dialog.getByRole('textbox', { name: 'Title' }).fill(longTitle)
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(dialog).toBeHidden()
+
+  await page.getByRole('link', { name: 'Home' }).click()
+  const card = main(page).getByRole('region', { name: 'Pinned' }).getByRole('listitem').first().locator('> div')
+  await expect(card).toContainText(longTitle)
+  const { scroll, client } = await card.evaluate((element) => ({
+    scroll: element.scrollHeight,
+    client: element.clientHeight,
+  }))
+  expect(scroll).toBeLessThanOrEqual(client)
+})

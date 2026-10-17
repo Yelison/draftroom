@@ -3,8 +3,13 @@
   font: var(--font-section);
 }
 
-/* The height a pinned card has when its title takes one line and its excerpt two: the loading cards are as tall. */
-.card,
+/* The height a pinned card has when its title takes one line and its excerpt two: the loading cards are as tall. A title
+   that wraps makes its card taller, and never lets its text out of it. Two classes, to win over the card's own minimum
+   whichever style sheet comes last. */
+.item > .card {
+  min-height: calc(var(--button-height) + var(--space-48));
+}
+
 .skeleton > li {
   height: calc(var(--button-height) + var(--space-48));
 }

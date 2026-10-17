@@ -1,12 +1,13 @@
 import type { Schema } from '@draftroom/contract'
 import type { UseQueryResult } from '@tanstack/react-query'
-import { Button, IconButton } from '@yelison/forma-ui'
-import { useDeferredValue, useEffect, useRef, useState } from 'react'
+import { Button } from '@yelison/forma-ui'
+import { useEffect, useRef, useState } from 'react'
 import { useIntl } from 'react-intl'
 import { DocumentRow } from '../../components/DocumentRow/DocumentRow.tsx'
 import { DocumentRowLink } from '../../components/DocumentRow/DocumentRowLink.tsx'
 import { usePinDocument } from '../documents/actions/usePinDocument.ts'
 import { useCreateDocument } from '../documents/actions/useCreateDocument.ts'
+import { PinButton } from '../documents/PinButton.tsx'
 import { problemMessageId } from '../documents/problemMessage.ts'
 import { StateMessage } from '../documents/StateMessage.tsx'
 import layout from '../documents/ListLayout.module.css'
@@ -34,11 +35,8 @@ export function PinnedDocuments({ workspaceId, pinned }: PinnedDocumentsProps) {
   // The card that gets the focus when the one that was unpinned is gone: the next one, the one before, or the button of the empty state.
   const [focusNext, setFocusNext] = useState<string | 'create' | null>(null)
   const [unpinnedTitle, setUnpinnedTitle] = useState<string | null>(null)
-  // A live region says what is put into it after it is in the page, so it is first rendered empty.
-  const announcement = useDeferredValue(
-    unpinnedTitle === null ? '' : intl.formatMessage({ id: 'home.pinned.unpinned' }, { title: unpinnedTitle }),
-    '',
-  )
+  const announcement =
+    unpinnedTitle === null ? '' : intl.formatMessage({ id: 'home.pinned.unpinned' }, { title: unpinnedTitle })
 
   const documents = pinned.data?.items
   const ids = documents?.map((document) => document.id).join()
@@ -107,7 +105,7 @@ export function PinnedDocuments({ workspaceId, pinned }: PinnedDocumentsProps) {
       ) : (
         <ul ref={list} className={layout.grid}>
           {items.map((document) => (
-            <li key={document.id} data-document={document.id}>
+            <li key={document.id} data-document={document.id} className={styles.item}>
               <DocumentRow
                 card
                 className={styles.card}
@@ -118,8 +116,8 @@ export function PinnedDocuments({ workspaceId, pinned }: PinnedDocumentsProps) {
                   </span>
                 }
                 trailing={
-                  <IconButton
-                    icon="star"
+                  <PinButton
+                    pinned
                     label={intl.formatMessage({ id: 'home.pinned.unpin' }, { title: document.title })}
                     onClick={() => takeOff(document)}
                   />
