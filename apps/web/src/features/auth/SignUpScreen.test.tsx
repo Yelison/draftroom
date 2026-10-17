@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError, TransportError } from '../../data/errors.ts'
 import { demoPassword, marta } from '../../data/mock/fixtures/index.ts'
@@ -119,9 +119,9 @@ describe('creating an account', () => {
     await fill(user, { name: 'Lena Fischer', email: 'lena@harborpine.example', password })
 
     await user.click(submit())
-    // Enter in a field submits the form, which the button's own refusal of a click does not stop.
-    await user.click(passwordField())
-    await user.keyboard('{Enter}')
+    // A submit that does not come through the button (`requestSubmit`, a password manager): the button's own refusal of a
+    // click does not stop it, the form does.
+    fireEvent.submit(passwordField().closest('form') as HTMLFormElement)
 
     expect(sent).toBe(1)
     answer()
