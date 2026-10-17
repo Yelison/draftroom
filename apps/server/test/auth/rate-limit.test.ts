@@ -1,4 +1,4 @@
-import type { Kysely } from 'kysely'
+import { sql, type Kysely } from 'kysely'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../../src/db/tables.ts'
 import { createPasswords, type Passwords } from '../../src/http/auth/passwords.ts'
@@ -288,5 +288,40 @@ describe('attempts that arrive at the same time', () => {
 
     expect(right).toEqual([200, 200, 200])
     expect(after).toEqual([401, 401, 401, 429])
+  })
+})
+
+describe('attempts that the server could not answer', () => {
+  it('give back what they held and count as nothing, so a database that fails for a while does not shut the people out', async () => {
+    const failing = await provisionDatabase()
+    try {
+      const stack = sessionStackFor(failing.db)
+      const server = createTestApp(failing.db, stack.provider, undefined, undefined, undefined, undefined, {
+        session: stack,
+        rateLimits: small,
+      })
+      const person = newAccount()
+      await new Browser(server).request({ method: 'POST', url: '/api/auth/sign-up', body: person })
+
+      // The query for the account fails: the table is not there. Every attempt ends in a failure of the server, more of them
+      // than the limit allows failures of any other kind.
+      await sql`alter table users rename to users_away`.execute(failing.db)
+      const failures = []
+      for (let attempt = 0; attempt < 5; attempt++) {
+        failures.push((await signIn(server, person.email, person.password)).statusCode)
+      }
+      await sql`alter table users_away rename to users`.execute(failing.db)
+
+      expect(failures).toEqual([500, 500, 500, 500, 500])
+      // Nothing was held and nothing counted: the next attempt is answered, and the allowance is whole.
+      const next = []
+      for (const password of [person.password, wrong, wrong, wrong, wrong]) {
+        next.push((await signIn(server, person.email, password)).statusCode)
+      }
+      expect(next).toEqual([200, 401, 401, 401, 429])
+      await server.app.close()
+    } finally {
+      await failing.drop()
+    }
   })
 })
