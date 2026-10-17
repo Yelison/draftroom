@@ -1,7 +1,13 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { daniel, demoPassword, marta, sofia } from '../../data/mock/fixtures/index.ts'
-import { accountsBeingLeft, lastAccountKey, rememberAccount, rememberedAccount } from './lastAccount.ts'
+import {
+  accountsBeingLeft,
+  lastAccountKey,
+  markAccountsBeingLeft,
+  rememberAccount,
+  rememberedAccount,
+} from './lastAccount.ts'
 import { renderSignedOut } from './testing/renderSignedOut.tsx'
 
 // Signing in as somebody else on a browser that held another account leaves that account (protocol §12.2): its copies are
@@ -168,7 +174,7 @@ describe('signing in on a browser that held another account', () => {
     expect(leaving.leaveAccount.mock.calls.map(([options]) => options.userId)).toEqual([marta.id, marta.id, daniel.id])
   })
 
-  it('stops asking about an account once it has been left, and about one the person has come back to', async () => {
+  it('stops asking about an account once it has been left, and nothing is left behind', async () => {
     rememberAccount(marta.id)
     const first = await signInAs(daniel)
     await waitFor(() => expect(first.router.state.location.pathname).toBe('/'))
@@ -184,6 +190,17 @@ describe('signing in on a browser that held another account', () => {
     await waitFor(() => expect(second.router.state.location.pathname).toBe('/'))
 
     expect(leaving.leaveAccount.mock.calls.map(([options]) => options.userId)).toEqual([marta.id, daniel.id])
+  })
+
+  it('does not ask about an account the person has come back to: it is the one they are signing in as', async () => {
+    markAccountsBeingLeft([marta.id])
+    rememberAccount(daniel.id)
+
+    const { router } = await signInAs(marta)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(leaving.leaveAccount.mock.calls.map(([options]) => options.userId)).toEqual([daniel.id])
+    expect(accountsBeingLeft()).toEqual([])
   })
 
   it('writes down that the copies could not be cleared and signs in all the same', async () => {
