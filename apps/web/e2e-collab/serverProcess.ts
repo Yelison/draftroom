@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync } from 'node:fs'
+import { connect } from 'node:net'
 import { dirname, resolve } from 'node:path'
 import { environment, repositoryRoot } from './environment.ts'
 import { waitFor } from './waitFor.ts'
@@ -17,6 +18,19 @@ export const serverEnvironment = (): NodeJS.ProcessEnv => ({
   ALLOWED_ORIGINS: appOrigin,
 })
 
+const serverPorts = [ports.api, ports.collaboration]
+
+function acceptsConnections(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = connect({ host: '127.0.0.1', port })
+    socket.once('connect', () => {
+      socket.destroy()
+      resolve(true)
+    })
+    socket.once('error', () => resolve(false))
+  })
+}
+
 /**
  * The server of the stack as a process of its own, which the tests stop and start: the durability of what a person was
  * told is "Synced" can only be shown by taking the server away. Its output goes to a file that CI keeps when a test fails.
@@ -30,6 +44,15 @@ export class ServerProcess {
 
   async start(): Promise<void> {
     if (this.child !== undefined) throw new Error('The server is already running')
+    // Whatever answers on these ports is not this process, and waiting for it would take its answers for this server's: a
+    // test that kills "the server" would kill a process that serves nothing and leave the other one answering.
+    for (const port of serverPorts) {
+      if (await acceptsConnections(port)) {
+        throw new Error(
+          `Port ${port} already accepts connections: a server of an earlier run is still running. Stop it first.`,
+        )
+      }
+    }
     mkdirSync(dirname(serverLog), { recursive: true })
     const log = openSync(serverLog, 'a')
     const child = spawn(process.execPath, ['src/main.ts'], {
@@ -44,6 +67,10 @@ export class ServerProcess {
       if (this.child === child) this.child = undefined
     })
     await waitFor([`tcp://127.0.0.1:${ports.collaboration}`, `${apiOrigin}/api/health/ready`])
+    // What answered has to be this process: one that died while the ports were taken by another has answered for nothing.
+    if (child.exitCode !== null) {
+      throw new Error(`The server exited with code ${child.exitCode} while the stack answered; see ${serverLog}`)
+    }
   }
 
   /**
