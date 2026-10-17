@@ -7,7 +7,7 @@ import { isApiError } from '../../data/errors.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { AuthCard } from './AuthCard.tsx'
 import { signInFailureMessage } from './authProblem.ts'
-import { emailProblem, passwordLimits, signInPasswordProblem } from './validation.ts'
+import { emailProblem, maxEmailLength, passwordLimits, signInPasswordProblem } from './validation.ts'
 import { useStartSession } from './useStartSession.tsx'
 import styles from './Auth.module.css'
 
@@ -77,7 +77,7 @@ export function SignInScreen() {
           error={
             problems.email === null
               ? undefined
-              : intl.formatMessage({ id: `auth.email.${problems.email}` }, { max: 254 })
+              : intl.formatMessage({ id: `auth.email.${problems.email}` }, { max: maxEmailLength })
           }
         />
         <Input

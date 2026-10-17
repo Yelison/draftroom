@@ -439,7 +439,7 @@
   "auth.signIn.description": "Te damos la bienvenida de nuevo. Inicia sesión para seguir donde lo dejaste.",
   "auth.signIn.submit": "Iniciar sesión",
   "auth.signIn.problem.credentials": "El correo o la contraseña no son correctos. Revísalos e inténtalo de nuevo.",
-  "auth.signIn.toSignUp": "¿Eres nuevo en Draftroom? <link>Crea una cuenta</link>",
+  "auth.signIn.toSignUp": "¿Primera vez en Draftroom? <link>Crea una cuenta</link>",
   "auth.signUp.title": "Crea tu cuenta",
   "auth.signUp.description": "Escribe, comenta y comparte documentos con las personas con las que trabajas.",
   "auth.signUp.submit": "Crear cuenta",

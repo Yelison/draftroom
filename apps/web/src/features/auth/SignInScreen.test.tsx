@@ -122,6 +122,17 @@ describe('what is wrong before anything is sent', () => {
     expect(emailField()).toHaveAccessibleDescription('Enter an email like name@example.com.')
   })
 
+  it('says the longest email there can be, from the limit of the contract and not from a figure of its own', async () => {
+    const { user } = await open()
+    await user.click(emailField())
+    await user.paste(`${'a'.repeat(250)}@b.co`)
+    await user.type(passwordField(), demoPassword)
+
+    await user.click(submit())
+
+    expect(emailField()).toHaveAccessibleDescription('An email can have up to 254 characters.')
+  })
+
   it('puts the focus on the password when only that is missing', async () => {
     const { user } = await open()
     await user.type(emailField(), marta.email)
@@ -234,6 +245,8 @@ describe('the sign-in screen in Spanish', () => {
     )
     expect(screen.getByLabelText('Contraseña')).toHaveAccessibleDescription('Escribe tu contraseña.')
     expect(within(screen.getByRole('main')).getByRole('link', { name: 'Crea una cuenta' })).toBeInTheDocument()
+    // Without a grammatical gender, as the rest of the catalogue.
+    expect(screen.getByRole('main')).toHaveTextContent('¿Primera vez en Draftroom?')
     localStorage.clear()
   })
 })

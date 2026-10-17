@@ -8,7 +8,7 @@ import { useDataSource } from '../../data/useDataSource.ts'
 import { textProblem } from '../documents/actions/textProblem.ts'
 import { AuthCard } from './AuthCard.tsx'
 import { signUpFailureMessage } from './authProblem.ts'
-import { emailProblem, passwordLimits, signUpPasswordProblem } from './validation.ts'
+import { emailProblem, maxEmailLength, passwordLimits, signUpPasswordProblem } from './validation.ts'
 import { useStartSession } from './useStartSession.tsx'
 import styles from './Auth.module.css'
 
@@ -93,7 +93,7 @@ export function SignUpScreen() {
           error={
             problems.email === null
               ? undefined
-              : intl.formatMessage({ id: `auth.email.${problems.email}` }, { max: 254 })
+              : intl.formatMessage({ id: `auth.email.${problems.email}` }, { max: maxEmailLength })
           }
         />
         <Input
