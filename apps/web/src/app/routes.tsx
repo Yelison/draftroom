@@ -6,6 +6,11 @@ import { EditorSkeleton } from '../features/editor/EditorSkeleton.tsx'
 import { HistoryScreen } from '../features/history/HistoryScreen.tsx'
 import { HomeScreen } from '../features/home/HomeScreen.tsx'
 import { SearchScreen } from '../features/search/SearchScreen.tsx'
+import { AppearanceTab } from '../features/settings/AppearanceTab.tsx'
+import { MembersTab } from '../features/settings/MembersTab.tsx'
+import { ProfileTab } from '../features/settings/ProfileTab.tsx'
+import { SettingsScreen } from '../features/settings/SettingsScreen.tsx'
+import { WorkspaceTab } from '../features/settings/WorkspaceTab.tsx'
 import { SharedScreen } from '../features/shared/SharedScreen.tsx'
 import { TemplateScreen } from '../features/templates/TemplateScreen.tsx'
 import { TrashScreen } from '../features/trash/TrashScreen.tsx'
@@ -21,6 +26,9 @@ function screen(titleId: MessageId, section?: Section): Pick<RouteObject, 'eleme
   const handle: RouteHandle = { section }
   return { element: <PageTitle titleId={titleId} />, handle }
 }
+
+/** The tabs of Settings: the rail keeps Settings current, and moving between them leaves the focus on the tab. */
+const settingsTab = { section: 'settings', tab: true } satisfies RouteHandle
 
 /**
  * The route table. Each screen replaces the `screen(…)` of its route when it is built; the section stays the one the
@@ -49,13 +57,14 @@ export const routes: RouteObject[] = [
           { path: 'history', Component: HistoryScreen, handle: { section: 'history' } satisfies RouteHandle },
           {
             path: 'settings',
+            Component: SettingsScreen,
             children: [
               // Done by the router before anything renders, so there is no page in between to take the focus.
               { index: true, loader: () => redirect('/settings/profile') },
-              { path: 'profile', ...screen('nav.settings', 'settings') },
-              { path: 'workspace', ...screen('nav.settings', 'settings') },
-              { path: 'members', ...screen('nav.settings', 'settings') },
-              { path: 'appearance', ...screen('nav.settings', 'settings') },
+              { path: 'profile', Component: ProfileTab, handle: settingsTab },
+              { path: 'workspace', Component: WorkspaceTab, handle: settingsTab },
+              { path: 'members', Component: MembersTab, handle: settingsTab },
+              { path: 'appearance', Component: AppearanceTab, handle: settingsTab },
             ],
           },
           { path: 'trash', Component: TrashScreen, handle: { section: 'documents' } satisfies RouteHandle },

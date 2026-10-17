@@ -1,0 +1,136 @@
+import type { Schema } from '@draftroom/contract'
+import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
+import { useIntl } from 'react-intl'
+import { isApiError } from '../../data/errors.ts'
+import { useDataSource } from '../../data/useDataSource.ts'
+import type { MessageId } from '../../i18n/messages.ts'
+import { WorkspaceGate } from '../documents/WorkspaceGate.tsx'
+import { meQuery } from '../editor/meQuery.ts'
+import { peopleOptionsQuery } from '../history/queries.ts'
+import { FormStatus } from './FormStatus.tsx'
+import { InviteMember } from './InviteMember.tsx'
+import { MemberRow } from './MemberRow.tsx'
+import { RemoveMemberDialog } from './RemoveMemberDialog.tsx'
+import { SettingsFailure } from './SettingsFailure.tsx'
+import { SettingsSkeleton } from './SettingsSkeleton.tsx'
+import { useMemberChanges, type MemberChange } from './useMemberChanges.ts'
+import { isLastOwner } from './workspaceRoles.ts'
+import styles from './Members.module.css'
+
+/** What a refusal says here in this screen's own words; the rest is what every screen says about a refusal. */
+function memberProblemId(error: Error): MessageId | undefined {
+  if (isApiError(error, 'last-owner')) return 'settings.members.error.lastOwner'
+  if (isApiError(error, 'conflict')) return 'settings.members.error.alreadyMember'
+  return undefined
+}
+
+/** Who belongs to the workspace and as what: invite by email, change roles, remove. Only owners can change anything. */
+export function MembersTab() {
+  return <WorkspaceGate loading={<SettingsSkeleton fields={3} />}>{(id) => <Members workspaceId={id} />}</WorkspaceGate>
+}
+
+function Members({ workspaceId }: { workspaceId: string }) {
+  const dataSource = useDataSource()
+  const members = useQuery(peopleOptionsQuery(dataSource, workspaceId))
+  const me = useQuery(meQuery(dataSource))
+
+  if (members.isError || me.isError) {
+    return (
+      <SettingsFailure
+        onRetry={() => {
+          void members.refetch()
+          void me.refetch()
+        }}
+        retrying={members.isFetching || me.isFetching}
+      />
+    )
+  }
+  if (members.data === undefined || me.data === undefined) return <SettingsSkeleton fields={3} />
+  return <MemberList workspaceId={workspaceId} members={members.data.items} meId={me.data.id} />
+}
+
+interface MemberListProps {
+  workspaceId: string
+  members: readonly Schema<'Member'>[]
+  meId: string
+}
+
+function MemberList({ workspaceId, members, meId }: MemberListProps) {
+  const intl = useIntl()
+  const [removal, setRemoval] = useState<Schema<'Member'> | null>(null)
+  const [announcement, setAnnouncement] = useState<{ id: MessageId; values: Record<string, string> } | null>(null)
+  const [failure, setFailure] = useState<Error | null>(null)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const focusHeading = useRef(false)
+  const emailField = useRef<HTMLInputElement>(null)
+  const canManage = members.some((member) => member.userId === meId && member.role === 'owner')
+
+  const changes = useMemberChanges({
+    workspaceId,
+    onDone: (change: MemberChange) => {
+      setFailure(null)
+      const role = change.kind === 'removed' ? '' : intl.formatMessage({ id: `settings.members.role.${change.role}` })
+      setAnnouncement({ id: `settings.members.announce.${change.kind}`, values: { name: change.name, role } })
+      if (change.kind === 'removed') {
+        focusHeading.current = true
+        setRemoval(null)
+      }
+    },
+    onFailed: (error) => {
+      setFailure(error)
+      setAnnouncement(null)
+      setRemoval(null)
+    },
+  })
+
+  // The row that opened the dialog is gone, so the focus has nowhere to return to: the headline takes it once the dialog
+  // has closed, and never the body.
+  useEffect(() => {
+    if (removal !== null || !focusHeading.current) return
+    focusHeading.current = false
+    heading.current?.focus()
+  }, [removal])
+
+  return (
+    <section className={styles.panel} aria-labelledby="settings-members-heading">
+      <div>
+        <h2 id="settings-members-heading" ref={heading} tabIndex={-1} className={styles.heading}>
+          {intl.formatMessage({ id: 'settings.members.title' })}
+        </h2>
+        <p className={styles.description}>
+          {intl.formatMessage({ id: canManage ? 'settings.members.description' : 'settings.members.readOnly' })}
+        </p>
+      </div>
+      {canManage && (
+        <InviteMember busy={changes.busy} failure={failure} emailRef={emailField} onInvite={changes.invite} />
+      )}
+      <ul className={styles.members} aria-label={intl.formatMessage({ id: 'settings.members.list' })}>
+        {members.map((member) => (
+          <MemberRow
+            key={member.userId}
+            member={member}
+            isMe={member.userId === meId}
+            canManage={canManage}
+            lastOwner={isLastOwner(members, member)}
+            busy={changes.busy}
+            onRole={(target, role) => changes.setRole({ member: target, role })}
+            onRemove={setRemoval}
+          />
+        ))}
+      </ul>
+      <p role="status" className="forma-visually-hidden">
+        {announcement !== null && intl.formatMessage({ id: announcement.id }, announcement.values)}
+      </p>
+      <FormStatus saved={null} failure={failure} explain={memberProblemId} />
+      <RemoveMemberDialog
+        member={removal}
+        removing={changes.removing}
+        onConfirm={changes.remove}
+        onClose={() => {
+          if (!changes.removing) setRemoval(null)
+        }}
+      />
+    </section>
+  )
+}
