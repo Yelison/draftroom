@@ -27,22 +27,32 @@ describe('commenting on a selection', () => {
     { who: 'a commenter, whose text takes no edits', signedInAs: people.sofia, editable: 'false' },
   ]
 
-  it.each(people_)('is offered to $who once text is selected, and not before', async ({ signedInAs, editable }) => {
-    const user = userEvent.setup()
-    renderCommentedDocument({ signedInAs, paragraphs })
-    const editor = await editorOf()
-    const panel = await findPanel()
-    expect(await textArea()).toHaveAttribute('contenteditable', editable)
+  it.each(people_)(
+    'is offered to $who once text is selected, and not before, and creates the thread',
+    async ({ signedInAs, editable }) => {
+      const user = userEvent.setup()
+      renderCommentedDocument({ signedInAs, paragraphs })
+      const editor = await editorOf()
+      const panel = await findPanel()
+      expect(await textArea()).toHaveAttribute('contenteditable', editable)
 
-    expect(within(panel).getByText('Select some text to comment on it.')).toBeInTheDocument()
-    expect(within(panel).queryByRole('button', { name: 'Comment on the selected text' })).not.toBeInTheDocument()
-    await select(editor, 'second week')
+      expect(within(panel).getByText('Select some text to comment on it.')).toBeInTheDocument()
+      expect(within(panel).queryByRole('button', { name: 'Comment on the selected text' })).not.toBeInTheDocument()
+      await select(editor, 'second week')
 
-    const action = await within(panel).findByRole('button', { name: 'Comment on the selected text' })
-    expect(action).toHaveAttribute('aria-keyshortcuts', 'Control+Alt+M')
-    await user.click(action)
-    expect(within(panel).getByRole('region', { name: 'New comment' })).toHaveTextContent('second week')
-  })
+      const action = await within(panel).findByRole('button', { name: 'Comment on the selected text' })
+      expect(action).toHaveAttribute('aria-keyshortcuts', 'Control+Alt+M')
+      await user.click(action)
+      expect(within(panel).getByRole('region', { name: 'New comment' })).toHaveTextContent('second week')
+
+      // Whatever the text allows, the thread is the server's: it is created, listed and highlighted.
+      await user.type(within(panel).getByRole('textbox', { name: 'Your comment' }), 'Is this date final?')
+      await user.click(within(panel).getByRole('button', { name: 'Comment' }))
+      expect(await within(panel).findByText('Comment added.')).toBeInTheDocument()
+      expect(within(panel).getByText('Is this date final?')).toBeInTheDocument()
+      await waitFor(() => expect(document.querySelector('mark')?.textContent).toBe('second week'))
+    },
+  )
 
   it('creates the thread with an anchor on the selection, the quote and the text, and takes the person to its card', async () => {
     const user = userEvent.setup()

@@ -128,7 +128,19 @@ for (const [language, said] of Object.entries(words)) {
       await page.keyboard.press('Enter')
       await expect(panel.getByRole('button', { name: said.resolvedFilter })).toHaveAttribute('aria-pressed', 'true')
       await expect(panel.getByRole('article')).toHaveAttribute('data-state', 'resolved')
-      await panel.getByRole('button', { name: said.reopen }).focus()
+      // Past the last choice of the filter, the card: the buttons of each of its two comments, then Reopen.
+      await page.keyboard.press('Tab')
+      for (const [index, name] of [
+        /^(Edit|Editar)/,
+        /^(Delete|Eliminar)/,
+        /^(Edit|Editar)/,
+        /^(Delete|Eliminar)/,
+      ].entries()) {
+        await page.keyboard.press('Tab')
+        await expect(card.getByRole('button', { name }).nth(Math.floor(index / 2))).toBeFocused()
+      }
+      await page.keyboard.press('Tab')
+      await expect(card.getByRole('button', { name: said.reopen })).toBeFocused()
       await page.keyboard.press('Enter')
       await expect(marks(page)).toHaveText('small')
       expect(await tagWithFocus(page)).not.toBe('BODY')
