@@ -36,7 +36,6 @@ function goOffline() {
 function documentApi() {
   const answers = { refusal: null as ApiError | null, held: false }
   const waiting: Array<() => void> = []
-  let refusals = 0
   return {
     wrap: (dataSource: DataSource): DataSource => ({
       ...dataSource,
@@ -44,7 +43,6 @@ function documentApi() {
         const { refusal } = answers
         if (refusal === null) return dataSource.getDocument(request)
         if (answers.held) await new Promise<void>((resolve) => waiting.push(resolve))
-        refusals += 1
         throw refusal
       },
     }),
@@ -54,8 +52,13 @@ function documentApi() {
       answers.refusal = new ApiError({ type: 'about:blank', title: 'Refused', status, code: code[status] })
       answers.held = held
     },
-    answer: () => act(async () => waiting.splice(0).forEach((resolve) => resolve())),
-    refusals: () => refusals,
+    /** How many requests are being held back. */
+    held: () => waiting.length,
+    /** Lets the held requests through, and holds none of the ones that come later. */
+    answer: () => {
+      answers.held = false
+      return act(async () => waiting.splice(0).forEach((resolve) => resolve()))
+    },
   }
 }
 
@@ -66,6 +69,12 @@ function readAgain() {
 }
 
 const copiesOnDevice = () => copiesOf(marta.id)
+
+/**
+ * No read of the document is on its way and the last one worked. One that is would take in the next read the screen makes
+ * (React Query joins them) and answer it with what the API said before the test changed it.
+ */
+const readFully = () => waitFor(() => expect(screen.getByLabelText('Document query')).toHaveTextContent('success idle'))
 
 /** The sockets of the simulated server that the session has used, whether they are open or not. */
 function usedSockets() {
@@ -79,15 +88,15 @@ const CLOSED = 3
  * waits for `error` here has the screen's answer to it and not only the cache's.
  */
 function DocumentQueryStatus() {
-  const { status } = useQuery({ queryKey: queryKeys.document(launchPlan.id), enabled: false })
-  return <output aria-label="Document query">{status}</output>
+  const { status, fetchStatus } = useQuery({ queryKey: queryKeys.document(launchPlan.id), enabled: false })
+  return <output aria-label="Document query">{`${status} ${fetchStatus}`}</output>
 }
 
 describe('access removed while the person was offline, when the API answers before the connection', () => {
   it('purges the copy, says so, and sends nothing of what was written, after a not found', async () => {
     const api = documentApi()
     const sockets = usedSockets()
-    const { editor, server } = await openEditor({ wrap: api.wrap })
+    const { editor, server } = await openEditor({ wrap: api.wrap, extra: <DocumentQueryStatus /> })
     await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument())
     const comeBack = goOffline()
     act(() => editor.commands.insertContent('Written offline'))
@@ -96,6 +105,7 @@ describe('access removed while the person was offline, when the API answers befo
 
     // The connection is not answered until the API has: the refusal of the document is what the screen sees first.
     server.collaboration.holdAuthentication()
+    await readFully()
     api.refuse(404)
     comeBack()
 
@@ -124,12 +134,13 @@ describe('access removed while the person was offline, when the API answers befo
     { status: 403, answer: 'forbids something, which is not that the person lost the document' },
   ] as const)('keeps the copy when the API $answer', async ({ status }) => {
     const api = documentApi()
-    const { editor } = await openEditor({ wrap: api.wrap })
+    const { editor } = await openEditor({ wrap: api.wrap, extra: <DocumentQueryStatus /> })
     await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument())
     const comeBack = goOffline()
     act(() => editor.commands.insertContent('Written offline'))
     await waitFor(() => expect(screen.getByText('Sync status: Offline with local copy')).toBeInTheDocument())
 
+    await readFully()
     api.refuse(status)
     comeBack()
 
@@ -144,15 +155,16 @@ describe('access removed while the document is open, when the connection answers
     const api = documentApi()
     const { server } = await openEditor({ wrap: api.wrap, extra: <DocumentQueryStatus /> })
     await waitFor(() => expect(server.collaboration.connectionsTo(wireName)).toBe(1))
+    await readFully()
     api.refuse(404, { held: true })
     readAgain()
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Autumn launch plan' })).toBeInTheDocument())
+    await waitFor(() => expect(api.held()).toBe(1))
 
     act(() => server.collaboration.closeConnections(4403, 'access-revoked'))
     expect(await screen.findByRole('heading', { name: removedHeading })).toBeInTheDocument()
     await api.answer()
     // The query has failed with the answer, and the screen has been told in the same turn.
-    await waitFor(() => expect(screen.getByLabelText('Document query')).toHaveTextContent('error'))
+    await waitFor(() => expect(screen.getByLabelText('Document query')).toHaveTextContent('error idle'))
 
     expect(screen.getByRole('heading', { name: removedHeading })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: "This document isn't available" })).not.toBeInTheDocument()

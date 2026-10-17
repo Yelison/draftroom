@@ -75,6 +75,11 @@ describe('the plan of the history of a workspace', () => {
   })
 })
 
+// A bound on the cut instant itself, whichever operator the query uses (`<` or `<=`, `>` or `>=`): the comparison of the
+// cursor is on the pair of the instant and the id, which has the id between the instant and the operator.
+const upperBound = /'UTC'::text\)\) <=? /
+const lowerBound = /'UTC'::text\)\) >=? /
+
 // A filter by an instant on the column is not a condition of the index on the cut instant: without a bound on that
 // expression, the index is walked from the newest event and every event after `to` is read and thrown away.
 describe('the plan of the history of a workspace, with a filter by instant that cuts the range', () => {
@@ -88,7 +93,7 @@ describe('the plan of the history of a workspace, with a filter by instant that 
 
     expect(plan).toContain('activity_events_workspace_ms_idx')
     const condition = plan.split('\n').find((line) => line.includes('Index Cond')) ?? ''
-    expect(condition).toMatch(/date_trunc.*<=/)
+    expect(condition).toMatch(upperBound)
     expect(plan).not.toMatch(/Sort/)
   })
 
@@ -97,8 +102,8 @@ describe('the plan of the history of a workspace, with a filter by instant that 
 
     const condition = plan.split('\n').find((line) => line.includes('Index Cond')) ?? ''
     expect(plan).toContain('activity_events_workspace_ms_idx')
-    expect(condition).toMatch(/date_trunc.*>=/)
-    expect(condition).toMatch(/date_trunc.*<=/)
+    expect(condition).toMatch(lowerBound)
+    expect(condition).toMatch(upperBound)
     expect(plan).not.toMatch(/Sort/)
   })
 })
