@@ -17,3 +17,11 @@
 .main {
   padding: var(--space-32);
 }
+
+/* Signing out sits at the foot of the compact rail, over its bottom and out of the flow of the grid. */
+.account {
+  position: fixed;
+  inset-block-end: var(--space-16);
+  inset-inline-start: var(--space-2);
+  inline-size: calc(var(--layout-rail-compact-width) - var(--space-4));
+}
