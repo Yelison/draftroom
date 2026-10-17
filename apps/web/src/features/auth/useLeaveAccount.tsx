@@ -1,5 +1,4 @@
 import { useCallback, useState, type ReactNode } from 'react'
-import { leaveAccount } from '../../collab/leaveAccount.ts'
 import { browserNetwork } from '../../collab/network.ts'
 import { LeaveAccountDialogs, type LeaveReason, type Question } from './LeaveAccountDialogs.tsx'
 
@@ -43,6 +42,9 @@ export function useLeaveAccount(reason: LeaveReason): LeavingAccount {
   const leave = useCallback(
     async (userId: string): Promise<LeaveOutcome> => {
       try {
+        // Its own chunk: clearing the copies needs Yjs, which no page but the editor does, and the first load of the app
+        // (this control is on every page) must not carry it.
+        const { leaveAccount } = await import('../../collab/leaveAccount.ts')
         const outcome = await leaveAccount({
           userId,
           network: browserNetwork,
