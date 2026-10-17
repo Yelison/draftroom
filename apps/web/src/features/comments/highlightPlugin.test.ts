@@ -2,6 +2,7 @@ import type { Editor } from '@tiptap/core'
 import { yUndoPluginKey } from '@tiptap/y-tiptap'
 import { afterEach, describe, expect, it } from 'vitest'
 import { boundDocumentOf, createAnchor, resolveAnchor } from './anchors.ts'
+import { createCommentRequests, type CommentRequest } from './commentRequests.ts'
 import {
   commentHighlights,
   highlightedThreads,
@@ -220,5 +221,71 @@ describe('the threads that are shown', () => {
     showHighlights(editor, [threadOn(editor, 'a', 'cd')], { handshaken: true })
 
     expect(open.local.ydoc.getXmlFragment('default').toJSON()).toBe(before)
+  })
+})
+
+describe('opening a thread from the text', () => {
+  const clickAt = (editor: Editor, position: number) =>
+    editor.view.someProp('handleClick', (handler) => handler(editor.view, position, new MouseEvent('click')))
+  const pressComment = (editor: Editor) =>
+    editor.view.someProp('handleKeyDown', (handler) =>
+      handler(editor.view, new KeyboardEvent('keydown', { key: 'm', ctrlKey: true, altKey: true })),
+    )
+
+  function withRequests(...texts: string[]) {
+    const requests = createCommentRequests()
+    const sent: CommentRequest[] = []
+    requests.subscribe((request) => sent.push(request))
+    open = pairedEditors(document(...texts), [commentHighlights.configure({ requests })])
+    const { editor } = open.local
+    return { editor, sent }
+  }
+
+  it('shows the thread of a highlight that is clicked, and leaves the focus in the text', () => {
+    const { editor, sent } = withRequests('abcdef')
+    showHighlights(editor, [threadOn(editor, 'a', 'cd')], { handshaken: true })
+
+    clickAt(editor, rangeOf(editor, 'cd').from + 1)
+
+    expect(sent).toEqual([{ type: 'thread', threadId: 'a', focus: false }])
+  })
+
+  it('does not take a click outside every highlight, or at the end of one, for a thread', () => {
+    const { editor, sent } = withRequests('abcdef')
+    showHighlights(editor, [threadOn(editor, 'a', 'cd')], { handshaken: true })
+
+    clickAt(editor, rangeOf(editor, 'ab').from)
+    clickAt(editor, rangeOf(editor, 'cd').to)
+
+    expect(sent).toEqual([])
+  })
+
+  it('takes the person to the thread when they press the key with the caret in a highlight, even at its end', () => {
+    const { editor, sent } = withRequests('abcdef')
+    showHighlights(editor, [threadOn(editor, 'a', 'cd')], { handshaken: true })
+
+    editor.commands.setTextSelection(rangeOf(editor, 'cd').to)
+    pressComment(editor)
+
+    expect(sent).toEqual([{ type: 'thread', threadId: 'a', focus: true }])
+  })
+
+  it('starts a comment when they press the key with text selected, even inside a highlight', () => {
+    const { editor, sent } = withRequests('abcdef')
+    showHighlights(editor, [threadOn(editor, 'a', 'cd')], { handshaken: true })
+
+    editor.commands.setTextSelection(rangeOf(editor, 'cd'))
+    pressComment(editor)
+
+    expect(sent).toEqual([{ type: 'comment' }])
+  })
+
+  it('goes to the narrowest thread where highlights overlap', () => {
+    const { editor, sent } = withRequests('abcdef')
+    showHighlights(editor, [threadOn(editor, 'wide', 'bcde'), threadOn(editor, 'narrow', 'cd')], { handshaken: true })
+
+    clickAt(editor, rangeOf(editor, 'cd').from)
+
+    expect(sent).toEqual([{ type: 'thread', threadId: 'narrow', focus: false }])
   })
 })

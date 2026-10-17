@@ -5,6 +5,7 @@ import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { ySyncPluginKey } from '@tiptap/y-tiptap'
 import { boundDocumentOf, resolveAnchor } from './anchors.ts'
+import type { CommentRequests } from './commentRequests.ts'
 import styles from './highlight.module.css'
 
 /** A thread whose text is to be highlighted: the open ones, which is what the caller passes. */
@@ -79,7 +80,7 @@ export function showHighlights(
  * editor's own mapping, which treats the ends the way the anchor does: text typed at the start or at the end of a range
  * falls outside it.
  */
-function highlightPlugin(): Plugin<HighlightState> {
+function highlightPlugin(requests: CommentRequests | null): Plugin<HighlightState> {
   return new Plugin<HighlightState>({
     key: highlightKey,
     state: {
@@ -104,6 +105,12 @@ function highlightPlugin(): Plugin<HighlightState> {
     },
     props: {
       decorations: (state) => highlightKey.getState(state)?.decorations ?? DecorationSet.empty,
+      // A click on highlighted text shows its thread. The text keeps the focus and the caret: the click is also an edit.
+      handleClick(view, position) {
+        const threadId = threadAt(view.state, position, { caret: false })
+        if (threadId !== null) requests?.send({ type: 'thread', threadId, focus: false })
+        return false
+      },
     },
   })
 }
@@ -180,8 +187,46 @@ function samePlacements(a: Placements, b: Placements): boolean {
   })
 }
 
-/** The extension that puts the plugin in the editor. */
-export const commentHighlights = Extension.create({
+/**
+ * The thread whose highlight covers a position of the text, the narrowest one where several do, or `null`. The end of a
+ * range is outside it for a click, as it is for the text typed there, and inside it for a caret, which touches the
+ * highlight when it is at its end.
+ */
+export function threadAt(state: EditorState, position: number, { caret }: { caret: boolean }): string | null {
+  let found: { id: string; length: number } | null = null
+  for (const [id, placement] of placementsOf(state)) {
+    if (placement.status !== 'placed' || position < placement.from) continue
+    if (caret ? position > placement.to : position >= placement.to) continue
+    const length = placement.to - placement.from
+    if (found === null || length < found.length) found = { id, length }
+  }
+  return found?.id ?? null
+}
+
+/** The key that comments on the selection or, with the caret in a highlight, takes the person to its thread. */
+export const commentShortcut = 'Mod-Alt-m'
+
+export interface CommentHighlightsOptions {
+  /** Where the clicks and the key of the text are sent; without it they do nothing. */
+  requests: CommentRequests | null
+}
+
+/** The extension that puts the plugin, and the key that opens a thread from the text, in the editor. */
+export const commentHighlights = Extension.create<CommentHighlightsOptions>({
   name: 'commentHighlights',
-  addProseMirrorPlugins: () => [highlightPlugin()],
+  addOptions: () => ({ requests: null }),
+  addProseMirrorPlugins() {
+    return [highlightPlugin(this.options.requests)]
+  },
+  addKeyboardShortcuts() {
+    return {
+      [commentShortcut]: ({ editor }) => {
+        const { selection } = editor.state
+        // Text that is selected is for a new comment; a caret in a highlight is for its thread.
+        const threadId = selection.empty ? threadAt(editor.state, selection.from, { caret: true }) : null
+        this.options.requests?.send(threadId === null ? { type: 'comment' } : { type: 'thread', threadId, focus: true })
+        return true
+      },
+    }
+  },
 })
