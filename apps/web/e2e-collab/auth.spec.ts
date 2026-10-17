@@ -9,14 +9,12 @@ import { createDocument } from './scene.ts'
  * with the session the server really starts and ends. A context here has no session until the test signs it in.
  */
 test.describe('signing in and out of the real stack', () => {
-  test('sends a person with no session to sign in, brings them back to the document, and sign-out ends the session and its live socket', async ({
+  test('sends a person with no session to sign in, and brings them back to the page they were going to', async ({
     browser,
   }) => {
     const documentId = await createDocument('daniel', [])
     const context = await browser.newContext({ baseURL: environment.appOrigin, locale: 'en-US', colorScheme: 'light' })
     const page = await context.newPage()
-    const closedSockets: string[] = []
-    page.on('websocket', (socket) => socket.on('close', () => closedSockets.push(socket.url())))
 
     await page.goto(`/documents/${documentId}`)
     await expect(page).toHaveURL(/\/sign-in$/)
@@ -27,13 +25,35 @@ test.describe('signing in and out of the real stack', () => {
     await expect(page).toHaveURL(new RegExp(`/documents/${documentId}$`))
     await expect(page.getByRole('textbox', { name: 'Document content' })).toBeVisible()
     await expect(page.getByRole('status').filter({ hasText: /^Sync status/ })).toHaveText('Sync status: Synced')
+    await context.close()
+  })
+
+  test('ends the session when the person signs out, and the server closes a live socket of that session in another tab', async ({
+    browser,
+  }) => {
+    const documentId = await createDocument('daniel', [])
+    const context = await browser.newContext({ baseURL: environment.appOrigin, locale: 'en-US', colorScheme: 'light' })
+    const signedOutTab = await context.newPage()
+    await signedOutTab.goto('/sign-in')
+    await signedOutTab.getByRole('textbox', { name: 'Email' }).fill(people.daniel)
+    await signedOutTab.getByLabel('Password').fill(demoPassword)
+    await signedOutTab.getByRole('button', { name: 'Sign in' }).click()
+    await expect(signedOutTab.getByRole('button', { name: 'Sign out' })).toBeVisible()
     const token = (await context.cookies()).find((cookie) => cookie.name === 'dr_session')?.value
     expect(token).toBeDefined()
 
-    await page.getByRole('button', { name: 'Sign out' }).click()
+    // The editor stays where it is in the other tab, so nothing but the server can end its socket.
+    const editorTab = await context.newPage()
+    const closedSockets: string[] = []
+    editorTab.on('websocket', (socket) => socket.on('close', () => closedSockets.push(socket.url())))
+    await editorTab.goto(`/documents/${documentId}`)
+    await expect(editorTab.getByRole('status').filter({ hasText: /^Sync status/ })).toHaveText('Sync status: Synced')
+    expect(closedSockets).toEqual([])
 
-    await expect(page).toHaveURL(/\/sign-in$/)
-    await expect.poll(() => closedSockets.length, 'the live collaboration socket was closed').toBeGreaterThan(0)
+    await signedOutTab.getByRole('button', { name: 'Sign out' }).click()
+
+    await expect(signedOutTab).toHaveURL(/\/sign-in$/)
+    await expect.poll(() => closedSockets.length, 'the server closed the live collaboration socket').toBeGreaterThan(0)
     // What the browser held is worth nothing now: the session is gone from the server, not only from the page.
     const replay = await playwrightRequest.newContext({
       baseURL: environment.appOrigin,
