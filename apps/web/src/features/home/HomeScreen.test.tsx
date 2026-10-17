@@ -145,7 +145,9 @@ describe('the pinned documents of the Home screen', () => {
       .setGeneralAccess({ params: { path: { documentId: launchPlan.id } }, body: { generalAccess: 'none' } })
     await queryClient.invalidateQueries()
 
-    await waitFor(() => expect(within(main()).queryByRole('link', { name: launchPlan.title })).toBeNull())
+    // The list is answered, and answers without it: a list that failed would not show it either, and would say so.
+    expect(await within(main()).findByText('Nothing pinned yet')).toBeInTheDocument()
+    expect(within(main()).queryByRole('alert')).not.toBeInTheDocument()
     expect(main()).not.toHaveTextContent(launchPlan.excerpt ?? '')
   })
 
