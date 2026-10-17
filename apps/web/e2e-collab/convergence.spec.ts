@@ -1,9 +1,22 @@
 import { storedText } from './database.ts'
-import { expect, test } from './fixtures.ts'
+import { expect, test, type Participant } from './fixtures.ts'
 import { createDocument } from './scene.ts'
 
 /** The paragraph both people start from, written by one of them and seen by the other before anyone else types. */
 const base = 'The launch plan starts with the harbour.'
+
+/** The text two people show once they show the same: the sockets of the two are not read at the same moment. */
+async function agreedText(first: Participant, second: Participant): Promise<string> {
+  let agreed = ''
+  await expect
+    .poll(async () => {
+      const [one, other] = await Promise.all([first.text(), second.text()])
+      agreed = one
+      return one === other
+    })
+    .toBe(true)
+  return agreed
+}
 
 const occurrences = (text: string, part: string) => text.split(part).length - 1
 
@@ -21,8 +34,7 @@ test.describe('two people in the same paragraph', () => {
     await Promise.all([daniel.typeAtEnd(' Daniel adds the dates.', 15), priya.typeAtEnd(' Priya adds the budget.', 15)])
 
     for (const person of [daniel, priya]) await expect(person.syncStatus).toHaveText('Sync status: Synced')
-    const merged = await daniel.text()
-    await expect.poll(() => priya.text()).toBe(merged)
+    const merged = await agreedText(daniel, priya)
     expect(occurrences(merged, base)).toBe(1)
     expect(occurrences(merged, 'Daniel adds the dates.')).toBe(1)
     expect(occurrences(merged, 'Priya adds the budget.')).toBe(1)
@@ -60,8 +72,7 @@ test.describe('two people in the same paragraph', () => {
     await priya.context.setOffline(false)
 
     for (const person of [daniel, priya]) await expect(person.syncStatus).toHaveText('Sync status: Synced')
-    const merged = await daniel.text()
-    await expect.poll(() => priya.text()).toBe(merged)
+    const merged = await agreedText(daniel, priya)
     expect(occurrences(merged, base)).toBe(1)
     expect(occurrences(merged, 'Daniel adds the dates.')).toBe(1)
     expect(occurrences(merged, 'Priya adds the budget, offline.')).toBe(1)
