@@ -112,25 +112,31 @@ export const authRoutes: FastifyPluginCallback<AuthRouteDependencies> = (
   app.route(
     operationRoute(contract, 'signIn', async (request, reply): Promise<Schema<'User'>> => {
       const { email, password } = request.body
-      const wait = await limits.signInBlockedFor(request)
-      if (wait !== null) throw rateLimited(reply, wait)
+      const gate = await limits.beginSignIn(request)
+      if ('blockedFor' in gate) throw rateLimited(reply, gate.blockedFor)
 
-      const account = await database
-        .selectFrom('users')
-        .select(['id', 'email', 'name', 'password_hash'])
-        .where(sql<boolean>`lower(email) = lower(${email})`)
-        .where('signed_up_at', 'is not', null)
-        .executeTakeFirst()
-      // The check is made for an address with no account too, against a hash that belongs to nobody, so that neither the
-      // answer nor the time says which addresses have an account.
-      const matched = await passwords.matches(password, account?.password_hash ?? null)
-      if (!matched || account?.name == null) {
-        await limits.signInFailed(request)
-        throw new ProblemError('unauthenticated')
+      // Whatever happens, what the attempt held is given back; only credentials that were not right count as a failure.
+      let failed = false
+      try {
+        const account = await database
+          .selectFrom('users')
+          .select(['id', 'email', 'name', 'password_hash'])
+          .where(sql<boolean>`lower(email) = lower(${email})`)
+          .where('signed_up_at', 'is not', null)
+          .executeTakeFirst()
+        // The check is made for an address with no account too, against a hash that belongs to nobody, so that neither the
+        // answer nor the time says which addresses have an account.
+        const matched = await passwords.matches(password, account?.password_hash ?? null)
+        if (!matched || account?.name == null) {
+          failed = true
+          throw new ProblemError('unauthenticated')
+        }
+
+        await startSession(request, reply, account.id)
+        return { id: account.id, email: account.email, name: account.name }
+      } finally {
+        await gate.attempt.finish(failed)
       }
-
-      await startSession(request, reply, account.id)
-      return { id: account.id, email: account.email, name: account.name }
     }),
   )
 

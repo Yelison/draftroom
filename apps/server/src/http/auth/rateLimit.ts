@@ -32,14 +32,25 @@ export const defaultRateLimits: RateLimits = {
   signUpsPerAddress: { max: 10, windowMs: 60 * minute },
 }
 
+/** A sign-in that is let to go on: the route says how it ended, and what it held is given back. */
+export interface SignInAttempt {
+  /** `failed` when the credentials were not right: only that counts against the limit. Call it exactly once. */
+  finish(failed: boolean): Promise<void>
+}
+
 /**
- * What the routes ask of the limits. Each question answers with the seconds to wait, or `null` when the request may go on.
- * Only the failures of a sign-in are counted, so signing in does not use up what a person who has forgotten has left.
+ * What the routes ask of the limits. A sign-in is asked for as it begins and answered as it ends; a sign-up is counted as
+ * it begins. Each says the seconds to wait when it is one too many.
  */
 export interface AttemptLimits {
-  signInBlockedFor(request: FastifyRequest): Promise<number | null>
-  /** Counts a sign-in that did not succeed, for its address of email and its network address. */
-  signInFailed(request: FastifyRequest): Promise<void>
+  /**
+   * Starts a sign-in, or refuses it with the seconds to wait. The attempt is **reserved before anything is awaited**: a
+   * check that only looked at the failures counted so far would let every request that arrives while the first ones are
+   * still being verified through, and what a verification costs (a query and Argon2id) is far longer than it takes a
+   * burst to arrive. An attempt in flight counts against the limit until it is known how it ended, so a burst of any size
+   * lets through no more than the limit allows. Only failures are kept afterwards, so signing in right still costs nothing.
+   */
+  beginSignIn(request: FastifyRequest): Promise<{ readonly blockedFor: number } | { readonly attempt: SignInAttempt }>
   /** Counts a sign-up, whatever comes of it, and says whether it is one too many. */
   signUpBlockedFor(request: FastifyRequest): Promise<number | null>
 }
@@ -77,24 +88,60 @@ export function createAttemptLimits(app: FastifyInstance, limits: RateLimits): A
   // `Retry-After` is whole seconds and at least one, whatever is left of the window.
   const seconds = (ttlInSeconds: number): number => Math.max(1, ttlInSeconds)
 
-  return {
-    async signInBlockedFor(request) {
-      // Looked at without counting: a sign-in that succeeds is not an attempt against the limit.
-      const looks = await Promise.all([
-        perEmail(request, { increment: false }),
-        perAddress(request, { increment: false }),
-      ])
-      const blocked = looks.flatMap((look) =>
-        look.isAllowed || look.remaining > 0 ? [] : [seconds(look.ttlInSeconds)],
-      )
-      return blocked.length === 0 ? null : Math.max(...blocked)
-    },
+  // The attempts that have begun and not ended, by key. Node runs this on one thread, so adding to it before the first
+  // `await` is what makes the reservation atomic. It lives in this process, as the counts do.
+  const inFlight = new Map<string, number>()
+  const reserve = (key: string): number => {
+    const before = inFlight.get(key) ?? 0
+    inFlight.set(key, before + 1)
+    return before
+  }
+  const release = (key: string): void => {
+    const now = (inFlight.get(key) ?? 1) - 1
+    if (now === 0) inFlight.delete(key)
+    else inFlight.set(key, now)
+  }
 
-    async signInFailed(request) {
-      await Promise.all([perEmail(request), perAddress(request)])
+  return {
+    async beginSignIn(request) {
+      const keys = [`email:${keyOfEmail(emailOf(request.body))}`, `address:${request.ip}`]
+      const before = keys.map(reserve)
+      const releaseAll = () => keys.forEach(release)
+      let blocked: number[]
+      try {
+        // Looked at without counting: a sign-in that succeeds is not an attempt against the limit. The ones in flight
+        // ahead of this one are, as if they had failed.
+        const looks = await Promise.all([
+          perEmail(request, { increment: false }),
+          perAddress(request, { increment: false }),
+        ])
+        blocked = looks.flatMap((look, index) =>
+          look.isAllowed || look.remaining - (before[index] ?? 0) > 0 ? [] : [seconds(look.ttlInSeconds)],
+        )
+      } catch (error) {
+        releaseAll()
+        throw error
+      }
+      if (blocked.length > 0) {
+        releaseAll()
+        return { blockedFor: Math.max(...blocked) }
+      }
+      return {
+        attempt: {
+          async finish(failed) {
+            try {
+              // Counted before it is given back, so the limit never sees less than there is.
+              if (failed) await Promise.all([perEmail(request), perAddress(request)])
+            } finally {
+              releaseAll()
+            }
+          },
+        },
+      }
     },
 
     async signUpBlockedFor(request) {
+      // Counted as it begins, before any work: the accounts that a burst may create are the limit and no more.
       const count = await signUps(request)
       return count.isAllowed || !count.isExceeded ? null : seconds(count.ttlInSeconds)
     },

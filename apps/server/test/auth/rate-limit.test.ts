@@ -203,3 +203,90 @@ describe('accounts created from one network address', () => {
     expect(elsewhere.statusCode).toBe(201)
   })
 })
+
+describe('attempts that arrive at the same time', () => {
+  // The limit has to hold for a hundred requests sent together as it does for a hundred sent one after another: what each
+  // one costs the server (the query and Argon2id) is far longer than it takes all of them to arrive.
+  const generousRule = { max: 1_000, windowMs: window }
+  const sent = (server: TestApp, count: number, attempt: (index: number) => ReturnType<typeof signIn>) =>
+    Promise.all(Array.from({ length: count }, (_, index) => attempt(index)))
+  const statuses = (answers: Awaited<ReturnType<typeof sent>>) => answers.map(({ statusCode }) => statusCode)
+  const howMany = (list: readonly number[], status: number) => list.filter((code) => code === status).length
+
+  it('are held to the limit of an address of email: ten wrong passwords are checked, and the other twenty are refused', async () => {
+    const server = appWith({
+      signInFailuresPerEmail: { max: 10, windowMs: window },
+      signInFailuresPerAddress: generousRule,
+      signUpsPerAddress: generousRule,
+    })
+
+    const answers = statuses(await sent(server, 30, (index) => signIn(server, account.email, `${wrong} ${index}`)))
+
+    expect([howMany(answers, 401), howMany(answers, 429)]).toEqual([10, 20])
+    expect(checked).toHaveLength(10)
+  })
+
+  it('do not let the right password in because it was sent inside the burst, after the tenth failure', async () => {
+    const server = appWith({
+      signInFailuresPerEmail: { max: 10, windowMs: window },
+      signInFailuresPerAddress: generousRule,
+      signUpsPerAddress: generousRule,
+    })
+
+    const answers = await sent(server, 20, (index) =>
+      signIn(server, account.email, index === 15 ? account.password : `${wrong} ${index}`),
+    )
+
+    expect(answers[15]?.statusCode).toBe(429)
+    expect(statuses(answers)).not.toContain(200)
+    expect(answers[15]?.headers['set-cookie']).toBeUndefined()
+  })
+
+  it('are held to the limit of a network address, whichever accounts they name', async () => {
+    const server = appWith({
+      signInFailuresPerEmail: generousRule,
+      signInFailuresPerAddress: { max: 6, windowMs: window },
+      signUpsPerAddress: generousRule,
+    })
+
+    const answers = statuses(
+      await sent(server, 20, (index) => signIn(server, `guess-${index}@harborpine.example`, wrong, '203.0.113.9')),
+    )
+
+    expect([howMany(answers, 401), howMany(answers, 429)]).toEqual([6, 14])
+  })
+
+  it('are held to the limit of accounts created from a network address', async () => {
+    const server = appWith({
+      signInFailuresPerEmail: generousRule,
+      signInFailuresPerAddress: generousRule,
+      signUpsPerAddress: { max: 2, windowMs: window },
+    })
+
+    const answers = statuses(
+      await Promise.all(
+        Array.from({ length: 6 }, () =>
+          server.request({
+            method: 'POST',
+            url: '/api/auth/sign-up',
+            payload: newAccount(),
+            remoteAddress: '203.0.113.10',
+          }),
+        ),
+      ),
+    )
+
+    expect([howMany(answers, 201), howMany(answers, 429)]).toEqual([2, 4])
+  })
+
+  it('give back what they held once they are answered, so signing in right in a burst leaves the allowance untouched', async () => {
+    const server = appWith()
+
+    const right = statuses(await sent(server, 3, () => signIn(server, account.email, account.password)))
+    const after = []
+    for (let attempt = 0; attempt < 4; attempt++) after.push((await signIn(server, account.email, wrong)).statusCode)
+
+    expect(right).toEqual([200, 200, 200])
+    expect(after).toEqual([401, 401, 401, 429])
+  })
+})
