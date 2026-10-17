@@ -32,13 +32,11 @@ describe('the gate, for a person with no session', () => {
     expect(router.state.location.state).toEqual({ from: '/search?q=budget#top' })
   })
 
-  it('does not leave the page they were on in the history, so Back does not bring them to a door that sends them away', async () => {
+  it('replaces the page they were on in the history, so Back does not bring them to a door that sends them away', async () => {
     const { router } = renderSignedOut('/documents')
     await screen.findByRole('heading', { level: 1, name: 'Sign in' })
 
-    await router.navigate(-1)
-
-    expect(router.state.location.pathname).toBe('/sign-in')
+    expect(router.state.historyAction).toBe('REPLACE')
   })
 
   it('takes them back to that page once they have signed in', async () => {
@@ -68,11 +66,22 @@ describe('the gate, for a person with a session', () => {
   })
 
   it('does not send them anywhere because the server could not be reached: the page says its own failures', async () => {
+    let asked = 0
     const { router } = renderScreen('/documents', {
-      wrap: (dataSource) => ({ ...dataSource, getMe: () => Promise.reject(new TransportError(null)) }),
+      wrap: (dataSource) => ({
+        ...dataSource,
+        getMe: () => {
+          asked += 1
+          return Promise.reject(new TransportError(null))
+        },
+      }),
     })
+    await screen.findByRole('heading', { level: 1, name: 'Documents' })
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Documents' })).toBeInTheDocument()
+    // The question is asked again once, and only then is it known that it could not be answered.
+    await waitFor(() => expect(asked).toBeGreaterThanOrEqual(2), { timeout: 4000 })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
     expect(router.state.location.pathname).toBe('/documents')
   })
 
