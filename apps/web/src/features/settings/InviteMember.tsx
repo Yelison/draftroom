@@ -1,6 +1,6 @@
 import type { Schema } from '@draftroom/contract'
 import { Button, Input, Select } from '@yelison/forma-ui'
-import { useState, type Ref, type SubmitEvent } from 'react'
+import { useState, type SubmitEvent } from 'react'
 import { useIntl } from 'react-intl'
 import { isApiError } from '../../data/errors.ts'
 import { isWorkspaceRole, workspaceRoles } from './workspaceRoles.ts'
@@ -27,12 +27,10 @@ export interface InviteMemberProps {
   failure: Error | null
   /** Sends the invitation; `onSuccess` runs when the server has taken it, and the address stays until then. */
   onInvite: (invitation: Schema<'AddMemberRequest'>, options: { onSuccess: () => void }) => void
-  /** The address field, for the focus to return to after somebody is invited. */
-  emailRef: Ref<HTMLInputElement>
 }
 
 /** Invites somebody by email with a role. A person who has no account yet is pending until they sign up. */
-export function InviteMember({ busy, failure, onInvite, emailRef }: InviteMemberProps) {
+export function InviteMember({ busy, failure, onInvite }: InviteMemberProps) {
   const intl = useIntl()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Schema<'WorkspaceRole'>>('member')
@@ -56,7 +54,6 @@ export function InviteMember({ busy, failure, onInvite, emailRef }: InviteMember
   return (
     <form className={styles.invite} onSubmit={submit} noValidate>
       <Input
-        ref={emailRef}
         type="email"
         label={intl.formatMessage({ id: 'settings.members.invite.email' })}
         value={email}

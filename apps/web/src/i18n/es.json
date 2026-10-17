@@ -407,7 +407,7 @@
   "settings.members.roleLabel": "Rol de {name}",
   "settings.members.remove": "Quitar",
   "settings.members.removeLabel": "Quitar a {name}",
-  "settings.members.lastOwner": "Único propietario. Nombra propietaria a otra persona antes de cambiar este rol.",
+  "settings.members.lastOwner": "Último propietario. Da el rol de propietario a otra persona antes de cambiar este.",
   "settings.members.invite.email": "Correo electrónico",
   "settings.members.invite.role": "Rol",
   "settings.members.invite.action": "Invitar",
@@ -420,7 +420,7 @@
   "settings.members.announce.invited": "Se invitó a {name} como {role}.",
   "settings.members.announce.changed": "El rol de {name} ahora es {role}.",
   "settings.members.announce.removed": "Se quitó a {name} del espacio.",
-  "settings.members.error.lastOwner": "Un espacio necesita al menos un propietario. Nombra primero propietaria a otra persona.",
+  "settings.members.error.lastOwner": "Un espacio necesita al menos un propietario. Da primero el rol de propietario a otra persona.",
   "settings.members.error.alreadyMember": "Esa persona ya pertenece a este espacio.",
   "settings.appearance.title": "Apariencia",
   "settings.appearance.description": "Cómo se ve Draftroom y qué tamaño tiene el texto mientras escribes.",
@@ -433,5 +433,6 @@
   "settings.appearance.textSize.small": "Pequeño",
   "settings.appearance.textSize.medium": "Mediano",
   "settings.appearance.textSize.large": "Grande",
-  "settings.appearance.textSize.saved": "Tamaño del texto guardado"
+  "settings.appearance.textSize.saved": "Tamaño del texto guardado",
+  "settings.members.announce.demoted": "Ya no tienes el rol de propietario de este espacio."
 }

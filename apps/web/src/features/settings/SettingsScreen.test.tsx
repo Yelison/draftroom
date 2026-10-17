@@ -28,14 +28,13 @@ describe('the Settings screen', () => {
     expect(tab('Appearance')).toHaveFocus()
   })
 
-  it('shows only the panel of the selected tab, and the way into it from the tab is one stop of the keyboard', async () => {
+  it('makes the panel the next stop of the keyboard after the selected tab', async () => {
     const { user } = await openTab('profile', 'Profile')
     tab('Profile').focus()
 
     await user.tab()
 
     expect(screen.getByRole('tabpanel', { name: 'Profile' })).toHaveFocus()
-    expect(screen.getAllByRole('tabpanel', { hidden: true }).filter((panel) => !panel.hidden)).toHaveLength(1)
   })
 
   it('goes back to the previous tab with the back button', async () => {

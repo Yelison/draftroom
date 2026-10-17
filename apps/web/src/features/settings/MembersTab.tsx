@@ -63,7 +63,6 @@ function MemberList({ workspaceId, members, meId }: MemberListProps) {
   const [failure, setFailure] = useState<Error | null>(null)
   const heading = useRef<HTMLHeadingElement>(null)
   const focusHeading = useRef(false)
-  const emailField = useRef<HTMLInputElement>(null)
   const canManage = members.some((member) => member.userId === meId && member.role === 'owner')
 
   const changes = useMemberChanges({
@@ -92,6 +91,17 @@ function MemberList({ workspaceId, members, meId }: MemberListProps) {
     heading.current?.focus()
   }, [removal])
 
+  // An owner who steps down, or is demoted by someone else, loses the control that had the focus: the headline takes it and
+  // the change is said, never the body.
+  const couldManage = useRef(canManage)
+  useEffect(() => {
+    const lost = couldManage.current && !canManage
+    couldManage.current = canManage
+    if (!lost) return
+    setAnnouncement({ id: 'settings.members.announce.demoted', values: {} })
+    heading.current?.focus()
+  }, [canManage])
+
   return (
     <section className={styles.panel} aria-labelledby="settings-members-heading">
       <div>
@@ -102,9 +112,7 @@ function MemberList({ workspaceId, members, meId }: MemberListProps) {
           {intl.formatMessage({ id: canManage ? 'settings.members.description' : 'settings.members.readOnly' })}
         </p>
       </div>
-      {canManage && (
-        <InviteMember busy={changes.busy} failure={failure} emailRef={emailField} onInvite={changes.invite} />
-      )}
+      {canManage && <InviteMember busy={changes.busy} failure={failure} onInvite={changes.invite} />}
       <ul className={styles.members} aria-label={intl.formatMessage({ id: 'settings.members.list' })}>
         {members.map((member) => (
           <MemberRow
@@ -122,7 +130,7 @@ function MemberList({ workspaceId, members, meId }: MemberListProps) {
       <p role="status" className="forma-visually-hidden">
         {announcement !== null && intl.formatMessage({ id: announcement.id }, announcement.values)}
       </p>
-      <FormStatus saved={null} failure={failure} explain={memberProblemId} />
+      <FormStatus failure={failure} explain={memberProblemId} />
       <RemoveMemberDialog
         member={removal}
         removing={changes.removing}

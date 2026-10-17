@@ -4,8 +4,8 @@ import type { MessageId } from '../../i18n/messages.ts'
 import styles from './Settings.module.css'
 
 export interface FormStatusProps {
-  /** What the live region says: set once the server has stored the change, and nothing before. */
-  saved: MessageId | null
+  /** What the live region says: set once the server has stored the change, and nothing before. Left out where the screen announces by other means. */
+  saved?: MessageId | null
   /** Why the change was not stored; the message is chosen from the refusal's `code`, in the language of the app. */
   failure: Error | null
   /** What a refusal says in this screen's own words instead of the common one (the last owner, a person already in). */
@@ -21,9 +21,11 @@ export function FormStatus({ saved, failure, explain }: FormStatusProps) {
 
   return (
     <>
-      <p role="status" className={styles.saved}>
-        {saved !== null && intl.formatMessage({ id: saved })}
-      </p>
+      {saved !== undefined && (
+        <p role="status" className={styles.saved}>
+          {saved !== null && intl.formatMessage({ id: saved })}
+        </p>
+      )}
       {failure !== null && (
         <p role="alert" className={styles.problem}>
           {intl.formatMessage({ id: explain?.(failure) ?? problemMessageId(failure) })}

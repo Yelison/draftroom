@@ -104,6 +104,18 @@ describe('the Members tab', () => {
       expect(within(main()).queryByText(/Only owner\./)).not.toBeInTheDocument()
     })
 
+    it('hands the focus to the headline and says so when stepping down takes the controls away', async () => {
+      const { user } = await openTab('members', 'Members')
+      await user.selectOptions(roleOf('Daniel Okafor'), 'Owner')
+      await within(main()).findByText('The role of Daniel Okafor is now Owner.')
+
+      await user.selectOptions(roleOf('Marta Ruiz (you)'), 'Member')
+
+      expect(await within(main()).findByText('You are no longer an owner of this workspace.')).toBeInTheDocument()
+      expect(within(main()).queryByRole('combobox')).not.toBeInTheDocument()
+      expect(within(main()).getByRole('heading', { level: 2, name: 'Members' })).toHaveFocus()
+    })
+
     it('is protected by the server too, which says so in its own words when a change slips through', async () => {
       const { user } = await openTab('members', 'Members', {
         wrap: (dataSource) => ({ ...dataSource, updateMember: () => Promise.reject(refusal(409, 'last-owner')) }),

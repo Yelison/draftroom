@@ -433,5 +433,6 @@
   "settings.appearance.textSize.small": "Small",
   "settings.appearance.textSize.medium": "Medium",
   "settings.appearance.textSize.large": "Large",
-  "settings.appearance.textSize.saved": "Text size saved"
+  "settings.appearance.textSize.saved": "Text size saved",
+  "settings.members.announce.demoted": "You are no longer an owner of this workspace."
 }
