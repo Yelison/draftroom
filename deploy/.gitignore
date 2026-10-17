@@ -1,0 +1,4 @@
+# The real settings and the backups hold secrets and people's documents: they never enter the repository.
+.env
+backups/
+*.dump
