@@ -25,3 +25,22 @@ The server serves no HTML, so its CSP protects nothing about the page; the hash 
 - The Vite proxy stays: the client calls relative `/api` and `/collab`, as in production behind one origin, and the suite uses `localhost` and `127.0.0.1`, which are different sites.
 
 Cookie names (`__Host-` in production) and the device cookie against targeted lockout are specified in ADR 0004 (update pending).
+
+## Threats with a test (plan §9.3)
+
+| Threat | Test |
+| --- | --- |
+| Reading another workspace's document by id (REST and WebSocket) | `apps/server/test/isolation.test.ts`, `apps/server/test/collab/authenticate.test.ts` |
+| Viewer or commenter writing content | `apps/server/test/collab/readonly.test.ts` |
+| Revoked user keeps editing | `apps/server/test/collab/revocation.test.ts`, `apps/web/e2e-collab/revocation.spec.ts` |
+| Spoofed presence identity | `apps/server/test/collab/awareness.test.ts` |
+| Script injection by paste or link | `apps/web/src/features/editor/sanitizePaste.test.ts`, `packages/editor-schema/src/links.test.ts`, the pasting block of `apps/web/e2e/editor.spec.ts` (now also under the CSP) |
+| CSRF on unsafe methods | `apps/server/test/auth/csrf.test.ts`, `apps/server/test/security/cookies.test.ts` (a planted CSRF cookie) |
+| Session fixation, cookie flags, cookie tossing | `apps/server/test/auth/session.test.ts`, `apps/server/test/security/cookies.test.ts` |
+| Oversized messages or documents | `apps/server/test/collab/limits.test.ts`, `apps/server/src/http/body-limit.test.ts`, `apps/server/test/security/rest-limits.test.ts` |
+| Floods (REST and sign-in) | `apps/server/src/http/request-limits.test.ts`, `apps/server/test/security/rest-limits.test.ts`, `apps/server/test/auth/rate-limit.test.ts` |
+| Targeted lockout of an account | `apps/server/test/security/targeted-lockout.test.ts` |
+| Another site reading the API or opening the socket | `apps/server/src/http/cors.test.ts`, `apps/server/src/collab/upgradeGuard.test.ts`, `apps/server/test/collab/authenticate.test.ts` |
+| Script injection into the page that the CSP stops | `apps/web/scripts/content-security-policy.test.ts`, `apps/web/e2e/csp.spec.ts`, `apps/web/e2e-collab/csp.spec.ts`, `apps/web/e2e/production-bundle.spec.ts` |
+| Enumeration through 403 vs 404 | `apps/server/test/access-matrix.test.ts` |
+| Demo or development identity in production | `apps/web/e2e/production-bundle.spec.ts`, `apps/server/src/main.test.ts`, `apps/server/test/security/production-start.test.ts` |
