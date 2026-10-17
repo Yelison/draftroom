@@ -1,6 +1,6 @@
 import { readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { expect, test as base } from '@playwright/test'
+import { expect, test as base, type Page } from '@playwright/test'
 
 const basePath = '/draftroom/'
 const buildDirectory = resolve(import.meta.dirname, '..', 'dist-demo')
@@ -11,6 +11,12 @@ const buildPaths = new Set(
     .filter((entry) => entry.isFile())
     .map((entry) => `${basePath}${`${entry.parentPath}/${entry.name}`.slice(buildDirectory.length + 1)}`),
 )
+
+/** Runs `watch` on a page and on every page the test opens in its context afterwards: a second tab is as watched as the first. */
+function onEveryPage(page: Page, watch: (watched: Page) => void) {
+  watch(page)
+  page.context().on('page', watch)
+}
 
 /**
  * The test every spec of this suite uses. It fails on anything the browser reports as an error, and it watches the
@@ -25,11 +31,13 @@ const buildPaths = new Set(
 export const test = base.extend<{ networkWatch: string[] }>({
   page: async ({ page }, run) => {
     const problems: string[] = []
-    page.on('pageerror', (error) => problems.push(`uncaught: ${error.message}`))
-    page.on('console', (message) => {
-      if (message.type() !== 'error') return
-      const servedAsNotFound = /status of 404/.test(message.text()) && !message.location().url.includes('/assets/')
-      if (!servedAsNotFound) problems.push(`console.error: ${message.text()}`)
+    onEveryPage(page, (watched) => {
+      watched.on('pageerror', (error) => problems.push(`uncaught: ${error.message}`))
+      watched.on('console', (message) => {
+        if (message.type() !== 'error') return
+        const servedAsNotFound = /status of 404/.test(message.text()) && !message.location().url.includes('/assets/')
+        if (!servedAsNotFound) problems.push(`console.error: ${message.text()}`)
+      })
     })
 
     await run(page)
@@ -58,11 +66,13 @@ export const test = base.extend<{ networkWatch: string[] }>({
         refused.push(`${request.method()} ${request.url()}`)
         return route.abort()
       })
-      page.on('response', (response) => {
-        const request = response.request()
-        if (response.status() === 404 && !request.isNavigationRequest()) missing.push(request.url())
+      onEveryPage(page, (watched) => {
+        watched.on('response', (response) => {
+          const request = response.request()
+          if (response.status() === 404 && !request.isNavigationRequest()) missing.push(request.url())
+        })
+        watched.on('websocket', (webSocket) => webSockets.push(webSocket.url()))
       })
-      page.on('websocket', (webSocket) => webSockets.push(webSocket.url()))
 
       await run(requests)
 
