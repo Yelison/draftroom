@@ -12,6 +12,19 @@ The project is at its planning stage. Everything lands through pull requests; se
 
 - **Email addresses are not verified at sign-up.** Whoever signs up first with an address that has a pending invitation inherits what was shared with it, and the sign-up answer tells which addresses have an account. Closing it needs a verification link and email delivery in both languages; see [ADR 0004](docs/decisions/0004-authentication.md#known-risk-no-email-verification).
 
+## Run it yourself
+
+You need Docker with the Compose plugin and a host name that points at the machine (or `draftroom.localhost` to try it on one machine).
+
+```sh
+cp deploy/env.example deploy/.env       # then fill in the values marked CHANGE_ME
+docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom up -d --build --wait
+```
+
+Caddy serves the app over HTTPS, the server migrates the database when it starts, and only the proxy publishes ports. Take a backup
+with `scripts/backup.sh` and restore it with `scripts/restore.sh`. [The deployment guide](docs/deploy/README.md) covers running without
+Docker, the reverse proxy and its WebSocket requirements, every variable, backups, and why a document is served by one process.
+
 ## License
 
 [MIT](LICENSE)
