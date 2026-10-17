@@ -23,7 +23,7 @@ const notFound = { type: '/problems/not-found', title: 'Not found.', status: 404
 
 describe('the contract check', () => {
   it('reads every operation of openapi.yaml', () => {
-    expect(contract.operations).toHaveLength(47)
+    expect(contract.operations).toHaveLength(48)
   })
 
   it('accepts an answer that matches the schema of the operation', () => {

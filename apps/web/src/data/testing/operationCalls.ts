@@ -48,6 +48,8 @@ export const calls: Record<Implemented, (api: DataSource) => Promise<unknown>> =
       body: { title: 'Notas del lunes', templateId: 'meeting-notes', locale: 'es' },
     }),
   getDocument: (api) => api.getDocument(documentPath(launchPlan.id)),
+  duplicateDocument: (api) =>
+    api.duplicateDocument({ ...documentPath(launchPlan.id), body: { title: 'Copia de «Autumn launch plan»' } }),
   updateDocument: (api) =>
     api.updateDocument({
       ...documentPath(launchPlan.id),

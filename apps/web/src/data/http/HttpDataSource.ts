@@ -114,6 +114,7 @@ export function createHttpDataSource({
     listDocuments: (request) => data(client.GET('/api/workspaces/{workspaceId}/documents', request)),
     createDocument: (request) => data(client.POST('/api/workspaces/{workspaceId}/documents', request)),
     getDocument: (request) => data(client.GET('/api/documents/{documentId}', request)),
+    duplicateDocument: (request) => data(client.POST('/api/documents/{documentId}/duplicate', request)),
     updateDocument: (request) => data(client.PATCH('/api/documents/{documentId}', request)),
     deleteDocument: (request) => empty(client.DELETE('/api/documents/{documentId}', request)),
     archiveDocument: (request) => data(client.POST('/api/documents/{documentId}/archive', request)),
