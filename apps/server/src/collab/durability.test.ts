@@ -114,6 +114,20 @@ describe('the registry of loaded documents', () => {
     expect(durable.unconfirmed).toBe(true)
   })
 
+  it('remembers when a document last changed, by the clock it was given, and not when it was loaded', () => {
+    let now = 1_000
+    const doc = new Y.Doc()
+    typed(doc, 'loaded with this')
+    const durable = new DurabilityRegistry(() => now).track(doc, 'doc:one', loaded)
+    expect(durable.lastChangeAt).toBeNull()
+
+    now = 5_000
+    typed(doc, 'typed later')
+    now = 9_000
+
+    expect(durable.lastChangeAt).toBe(5_000)
+  })
+
   it('finds a document by name until it is forgotten', () => {
     const registry = new DurabilityRegistry()
     registry.track(new Y.Doc(), 'doc:one', loaded)

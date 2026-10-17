@@ -7,8 +7,10 @@ import { createDevIdentity } from '../../src/http/auth/devIdentity.ts'
 import { loadContract } from '../../src/http/contract.ts'
 import type { DocumentBroadcaster } from '../../src/http/document-broadcaster.ts'
 import type { LiveAccess } from '../../src/http/live-access.ts'
+import type { LiveDocuments } from '../../src/http/live-documents.ts'
 import { silentBroadcaster, silentLiveAccess } from './broadcasters.ts'
 import { createContractClient } from './contract-client.ts'
+import { storedDocuments } from './live-documents.ts'
 import { runCoverage } from './run-coverage.ts'
 
 /** Compiled once per test file's worker: it is the slow part of building an app. */
@@ -26,6 +28,7 @@ export function createTestApp(
   broadcaster: DocumentBroadcaster = silentBroadcaster,
   logger?: AppDependencies['logger'],
   liveAccess: LiveAccess = silentLiveAccess,
+  liveDocuments: LiveDocuments = storedDocuments(database),
 ): TestApp {
   const violations: ContractViolation[] = []
   const app = buildApp({
@@ -33,6 +36,7 @@ export function createTestApp(
     authProvider,
     broadcaster,
     liveAccess,
+    liveDocuments,
     contract,
     ...(logger === undefined ? {} : { logger }),
     onContractViolation: (violation) => violations.push(violation),

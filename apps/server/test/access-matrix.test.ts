@@ -3,11 +3,13 @@ import type { Kysely } from 'kysely'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Database } from '../src/db/tables.ts'
 import { apiOf, type Api, type Call } from './support/api.ts'
+import { startCollab, type CollabHarness } from './support/collab/harness.ts'
 import { anchor, createThread, quote } from './support/comments.ts'
 import { contractAllows, rolesOf } from './support/contract-roles.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
 import { personFor, scenarios } from './support/scenarios.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
+import { createVersion } from './support/versions.ts'
 import {
   createDocument,
   createFolder,
@@ -28,15 +30,19 @@ let db: Kysely<Database>
 let server: TestApp
 let api: Api
 let studio: Studio
+let collab: CollabHarness
 beforeAll(async () => {
   database = await provisionDatabase()
   db = database.db
-  server = createTestApp(db)
+  // The versions are saved from, and restored into, the documents the collaboration server holds.
+  collab = await startCollab(db)
+  server = createTestApp(db, undefined, undefined, undefined, undefined, collab.server.documents)
   api = apiOf(server)
   studio = await createStudio(db)
 })
 afterAll(async () => {
   await server.app.close()
+  await collab.close()
   await database.drop()
 })
 
@@ -148,6 +154,63 @@ describe.each(threadCases)('$operationId on the threads of a document', ({ opera
 
     const mayDo = scenario.role !== null && rolesOf(operationId).roles.includes(scenario.role)
     expect(response.statusCode).toBe(scenario.role === null ? 404 : mayDo ? allowed : 403)
+  })
+})
+
+interface VersionCase {
+  readonly operationId: string
+  call(ids: { documentId: string; versionId: string }): Omit<Call, 'as'>
+  readonly allowed: number
+}
+
+// Listing, previewing and saving a version, and restoring one, which only an owner may do.
+const versionCases: readonly VersionCase[] = [
+  {
+    operationId: 'listVersions',
+    call: ({ documentId }) => ({ method: 'GET', url: `/api/documents/${documentId}/versions` }),
+    allowed: 200,
+  },
+  {
+    operationId: 'createVersion',
+    call: ({ documentId }) => ({ method: 'POST', url: `/api/documents/${documentId}/versions` }),
+    allowed: 201,
+  },
+  {
+    operationId: 'getVersionContent',
+    call: ({ versionId }) => ({ method: 'GET', url: `/api/versions/${versionId}/content` }),
+    allowed: 200,
+  },
+  {
+    operationId: 'restoreVersion',
+    call: ({ versionId }) => ({ method: 'POST', url: `/api/versions/${versionId}/restore` }),
+    allowed: 200,
+  },
+]
+
+describe.each(versionCases)('$operationId on the versions of a document', ({ operationId, call, allowed }) => {
+  it.each(scenarios)('as a $name ($role)', async (scenario) => {
+    const { subject, documentId } = await arranged(scenario)
+    const versionId = await createVersion(db, { workspaceId: studio.workspaceId, documentId, author: studio.owner })
+
+    const response = await api({ as: subject, ...call({ documentId, versionId }) })
+
+    const mayDo = scenario.role !== null && rolesOf(operationId).roles.includes(scenario.role)
+    expect(response.statusCode).toBe(scenario.role === null ? 404 : mayDo ? allowed : 403)
+  })
+})
+
+describe('the versions of an archived document', () => {
+  it.each(versionCases)('are not reachable by $operationId, not even by the owner', async ({ call }) => {
+    const documentId = await createDocument(db, {
+      workspaceId: studio.workspaceId,
+      creator: studio.owner,
+      archived: true,
+    })
+    const versionId = await createVersion(db, { workspaceId: studio.workspaceId, documentId, author: studio.owner })
+
+    const response = await api({ as: studio.owner, ...call({ documentId, versionId }) })
+
+    expect(response.statusCode).toBe(404)
   })
 })
 

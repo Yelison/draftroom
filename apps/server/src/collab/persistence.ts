@@ -67,7 +67,7 @@ export function persistenceExtension({
  * is repaired and captured again; one that is still refused is never written, because content the server cannot read
  * is content it could not restore, version or show.
  */
-function captureStorable(document: Document, durable: DocumentDurability, log: CollabLog): CapturedWrite {
+export function captureStorable(document: Document, durable: DocumentDurability, log: CollabLog): CapturedWrite {
   const first = durable.capture(document)
   if (isReadable(first.state)) return first
   const removed = removeForbiddenBlocks(document)

@@ -29,6 +29,7 @@ The plan says a restore is one transaction, creates a `pre-restore` version, and
 ## Consequences
 
 - The `pre-restore` version is exactly the state that was replaced: nothing can slip between capture and change, because the check and the change are one synchronous run.
+- **Amended by [0014](0014-versions-and-restore-implementation.md):** the limit below applies only to an edit that lands inside a node the restore removed; edits to nodes the restore keeps, and nodes inserted beside them, survive.
 - **Known limit, accepted:** an edit that was already in flight when the restore applied and that targets nodes the restore removed is not recoverable. The window is the network latency of that edit. The plan's sentence "never discarded silently" holds for everything applied before the change, not for this case. Clients are told that a restore happened (`versions-changed`), and the diff keeps every node the restore did not need to remove.
 - Under continuous typing the verify step can fail repeatedly; after 3 attempts the owner gets `409 conflict` and retries. Restoring never blocks the other editors.
 - Comment threads anchored in removed text become orphaned (they stay listed with their quote). Undo in other clients is unaffected: the restore has a different origin from the undo manager's.

@@ -11,6 +11,7 @@ const tablesOfTheMigrations = [
   'comments',
   'document_access',
   'document_states',
+  'document_versions',
   'documents',
   'folders',
   'memberships',
@@ -47,7 +48,12 @@ describe('the migrations, on a database that starts empty', () => {
   })
 
   it('create the schema and say which ones ran', async () => {
-    expect(await migrateToLatest(database.db)).toEqual(['0001_initial', '0002_activity_events', '0003_comments'])
+    expect(await migrateToLatest(database.db)).toEqual([
+      '0001_initial',
+      '0002_activity_events',
+      '0003_comments',
+      '0004_versions',
+    ])
     expect(await tablesOf()).toEqual(tablesOfTheMigrations)
     expect(await migrationStatus(database.db)).toEqual({ current: true })
   })
@@ -108,7 +114,9 @@ describe('the third migration, on a database that already holds documents and th
         })
         .execute()
 
-      expect(await migrateToLatest(populated.db)).toEqual(['0003_comments'])
+      expect(
+        (await new Migrator({ db: populated.db, provider: migrationProvider }).migrateTo('0003_comments')).error,
+      ).toBeUndefined()
 
       const documents = await populated.db.selectFrom('documents').select('id').execute()
       const events = await populated.db.selectFrom('activity_events').select('type').execute()
@@ -120,6 +128,32 @@ describe('the third migration, on a database that already holds documents and th
         [],
         [],
       ])
+    } finally {
+      await populated.drop()
+    }
+  })
+})
+
+describe('the fourth migration, on a database that already holds documents and their comments', () => {
+  it('adds the versions and leaves what was there, a stored state included', async () => {
+    const populated = await provisionDatabase({ migrated: false })
+    try {
+      const { error } = await new Migrator({ db: populated.db, provider: migrationProvider }).migrateTo('0003_comments')
+      expect(error).toBeUndefined()
+      const workspace = await createPopulatedWorkspace(populated.db)
+      await populated.db
+        .insertInto('document_states')
+        .values({ workspace_id: workspace.id, document_id: workspace.documentId, state: Uint8Array.of(0, 0) })
+        .execute()
+
+      expect(await migrateToLatest(populated.db)).toEqual(['0004_versions'])
+
+      const states = await populated.db
+        .selectFrom('document_states')
+        .select(['document_id', 'versions_checked_at'])
+        .execute()
+      const versions = await populated.db.selectFrom('document_versions').select('id').execute()
+      expect([states, versions]).toEqual([[{ document_id: workspace.documentId, versions_checked_at: null }], []])
     } finally {
       await populated.drop()
     }

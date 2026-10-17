@@ -77,7 +77,7 @@ Every 4xx and 5xx is `application/problem+json` (RFC 9457) with `type`, `title`,
 | `not-found` | 404 | The resource does not exist, or the caller cannot read it. |
 | `revision-conflict` | 409 | A stale `revision`; the body carries `current`. |
 | `last-owner` | 409 | The change would leave a workspace or a document without an owner. |
-| `conflict` | 409 | The request conflicts with the current state: the email is already registered or already a member, deleting a document that is not archived, deleting a folder that still holds documents. |
+| `conflict` | 409 | The request conflicts with the current state: the email is already registered or already a member, deleting a document that is not archived, deleting a folder that still holds documents, and restoring a version while people keep editing the document so that it cannot be replaced after three attempts (nothing is restored and no `pre-restore` version is kept: ask again). |
 | `too-large` | 413 | A text in the request body is longer than its limit, or the body is bigger than the server accepts. |
 | `rate-limited` | 429 | Too many attempts; `Retry-After` says when to retry. |
 | `internal-error` | 500 | An unhandled failure. |

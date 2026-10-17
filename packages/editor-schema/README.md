@@ -30,7 +30,7 @@ is the Collaboration extension's, which only reverts the person's own changes.
 | Import                            | For                                                       |
 | --------------------------------- | --------------------------------------------------------- |
 | `@draftroom/editor-schema`        | `editorExtensions()`, `fragmentName`, `headingLevels`, `isAllowedLinkHref`. The client and the server. |
-| `@draftroom/editor-schema/convert` | `jsonToYUpdate`, `yUpdateToJson`, `InvalidDocumentError`. The server only: a client never rebuilds a document from JSON, and a separate entry point keeps the conversion out of its bundle. |
+| `@draftroom/editor-schema/convert` | `jsonToYUpdate`, `yUpdateToJson`, `replaceFragmentContent`, `InvalidDocumentError`. The server only: a client never rebuilds a document from JSON, and a separate entry point keeps the conversion out of its bundle. |
 
 ## What the conversion does with content it does not accept
 
@@ -46,3 +46,8 @@ product authored (templates, a restored version) and a silent loss would hide a 
 Attributes the schema does not define are left out, so what is written is always the schema's own form.
 
 `yUpdateToJson` applies the same rules to what it reads. A state with no content yet reads as one empty paragraph.
+
+`replaceFragmentContent(fragment, json)` makes a live fragment hold the content, by comparing the two and changing only what
+differs, so the nodes the content keeps keep their identity (an edit made to one of them meanwhile, and a comment anchored
+in it, survive). It writes only the fragment, inside the transaction of its caller, and it checks the content as
+`jsonToYUpdate` does before it writes anything. It is what restoring a version uses.

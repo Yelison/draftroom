@@ -3,6 +3,7 @@ import type { Database } from '../../db/tables.ts'
 import type { Contract } from '../contract.ts'
 import type { DocumentBroadcaster } from '../document-broadcaster.ts'
 import type { LiveAccess } from '../live-access.ts'
+import type { LiveDocuments } from '../live-documents.ts'
 
 /** What every group of routes is registered with. */
 export interface RouteDependencies {
@@ -10,4 +11,5 @@ export interface RouteDependencies {
   readonly database: Kysely<Database>
   readonly broadcaster: DocumentBroadcaster
   readonly liveAccess: LiveAccess
+  readonly liveDocuments: LiveDocuments
 }

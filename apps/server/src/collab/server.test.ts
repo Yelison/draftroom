@@ -59,4 +59,8 @@ describe('the collaboration server as production configures it', () => {
     })
     expect(RETRY_DELAYS_MS).toEqual([1_000, 2_000, 4_000, 8_000, 16_000, 30_000])
   })
+
+  it('looks for documents that are due an automatic version once a minute', () => {
+    expect(productionTiming.autoVersionSweepMs).toBe(60_000)
+  })
 })

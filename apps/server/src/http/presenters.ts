@@ -4,6 +4,7 @@ import type { CommentRecord, PersonRef, ThreadRecord } from '../db/comments/quer
 import { roleOf, type DocumentRecord } from '../db/documents/caller-documents.ts'
 import type { FolderRow } from '../db/folders.ts'
 import type { MemberRow } from '../db/members/queries.ts'
+import type { VersionRecord } from '../db/versions/queries.ts'
 import type { WorkspaceOfMember } from '../db/workspaces.ts'
 import type { DocumentRole } from '../db/tables.ts'
 
@@ -99,4 +100,14 @@ export const presentMember = (member: MemberRow): Schema<'Member'> => ({
   role: member.role,
   status: member.signedUpAt === null ? 'pending' : 'active',
   createdAt: member.createdAt.toISOString(),
+})
+
+export const presentVersion = (version: VersionRecord): Schema<'Version'> => ({
+  id: version.id,
+  documentId: version.document_id,
+  kind: version.kind,
+  label: version.label,
+  createdBy: version.creator === null ? null : presentPerson(version.creator, `creator of version ${version.id}`),
+  createdAt: version.created_at.toISOString(),
+  sizeBytes: version.size_bytes,
 })

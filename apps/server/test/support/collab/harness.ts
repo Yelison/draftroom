@@ -41,6 +41,8 @@ export const fastTiming: CollabTiming = {
   shutdownWaitMs: 3_000,
   shutdownGraceMs: 500,
   socketCloseMs: 200,
+  // A sweep by hand is what a test wants; the timer is tested on its own.
+  autoVersionSweepMs: 3_600_000,
 }
 
 const testConfig: CollabConfig = {

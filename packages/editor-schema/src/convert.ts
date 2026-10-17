@@ -1,6 +1,6 @@
 import { getSchema, type JSONContent } from '@tiptap/core'
 import type { Node } from '@tiptap/pm/model'
-import { prosemirrorToYDoc, yXmlFragmentToProseMirrorRootNode } from '@tiptap/y-tiptap'
+import { prosemirrorToYDoc, prosemirrorToYXmlFragment, yXmlFragmentToProseMirrorRootNode } from '@tiptap/y-tiptap'
 import * as Y from 'yjs'
 import { attributeProblem } from './attributes.ts'
 import { editorExtensions, fragmentName } from './extensions.ts'
@@ -38,6 +38,20 @@ export function jsonToYUpdate(json: JSONContent): Uint8Array {
   } finally {
     ydoc.destroy()
   }
+}
+
+/**
+ * Makes a live fragment hold this content, by comparing the two and changing only what differs, so a node the content
+ * keeps is the same node afterwards: an edit that someone makes to it meanwhile, and a comment anchored in it, stay where
+ * they are. Deleting everything and writing it again would give every node a new identity, and a Yjs type cannot be moved
+ * from one document to another, so the content is written into the fragment itself.
+ *
+ * The caller owns the transaction, and so its origin: wrap the call in `doc.transact(…, origin)`. Only the fragment is
+ * written; no other root of the document is touched. The content is checked as `jsonToYUpdate` checks it, before anything
+ * is written, so a refusal leaves the fragment as it was.
+ */
+export function replaceFragmentContent(fragment: Y.XmlFragment, json: JSONContent): void {
+  prosemirrorToYXmlFragment(parse(json), fragment)
 }
 
 function parse(json: JSONContent): Node {
