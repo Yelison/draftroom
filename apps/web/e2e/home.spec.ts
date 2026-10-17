@@ -124,3 +124,24 @@ test('lets a card with a long title grow instead of spilling its text out of it'
   }))
   expect(scroll).toBeLessThanOrEqual(client)
 })
+
+test('gives a typical pinned card the height of the loading cards it replaces, so the page does not move', async ({
+  page,
+}) => {
+  // The skeleton is on screen for a moment only: its height is taken as it appears, before the cards replace it.
+  await page.addInitScript(() => {
+    const seen = window as unknown as { skeletonHeight?: number }
+    new MutationObserver(() => {
+      const row = document.querySelector('[aria-busy="true"] li')
+      if (row !== null && seen.skeletonHeight === undefined) seen.skeletonHeight = row.getBoundingClientRect().height
+    }).observe(document, { childList: true, subtree: true })
+  })
+  await page.goto('/')
+
+  const card = main(page).getByRole('link', { name: launchPlan.title }).locator('xpath=ancestor::li[1]/div')
+  await expect(card).toBeVisible()
+  const skeletonHeight = await page.evaluate(() => (window as unknown as { skeletonHeight?: number }).skeletonHeight)
+  const cardHeight = await card.evaluate((element) => element.getBoundingClientRect().height)
+  expect(skeletonHeight, 'the skeleton was seen').toBeGreaterThan(0)
+  expect(cardHeight).toBeCloseTo(skeletonHeight ?? 0, 0)
+})
