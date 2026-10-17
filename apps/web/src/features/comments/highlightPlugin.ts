@@ -227,7 +227,7 @@ export interface CommentHighlightsOptions {
 
 /** The extension that puts the plugin in the editor: its highlights, its clicks and the key that opens a thread. */
 export const commentHighlights = Extension.create<CommentHighlightsOptions>({
-  name: 'commentHighlights',
+  name: 'commentThreads',
   addOptions: () => ({ requests: null }),
   addProseMirrorPlugins() {
     return [highlightPlugin(this.options.requests)]
