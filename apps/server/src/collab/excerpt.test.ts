@@ -96,7 +96,8 @@ describe('scheduling the update of an excerpt', () => {
     const { writer, calls } = heldWriter()
     createExcerptUpdates(writer, silent).schedule('d1', state('First'))
 
-    await Promise.resolve()
+    // Every microtask that was queued runs, the ones that send the acknowledgement among them, and the write is not one.
+    for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
     expect(calls).toEqual([])
     await nextMacrotask()
     expect(calls).toEqual([{ documentId: 'd1', excerpt: 'First' }])

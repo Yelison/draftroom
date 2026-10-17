@@ -50,11 +50,28 @@ describe('the pinned documents of the Home screen', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe(`/documents/${launchPlan.id}`))
   })
 
-  it('shows a skeleton with a spoken status while they are on their way, and no activity under it yet', async () => {
-    renderScreen('/', { wrap: (dataSource) => ({ ...dataSource, listPinnedDocuments: never }) })
+  it('shows a skeleton with a spoken status while they are on their way, and asks for no activity until they are in', async () => {
+    let pinnedRequests = 0
+    let activityRequests = 0
+    renderScreen('/', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listPinnedDocuments: () => {
+          pinnedRequests += 1
+          return never()
+        },
+        listWorkspaceActivity: (request) => {
+          activityRequests += 1
+          return dataSource.listWorkspaceActivity(request)
+        },
+      }),
+    })
 
     expect(await within(main()).findByText('Loading your pinned documents')).toHaveAttribute('role', 'status')
+    // The skeleton of the workspace and the one of the pins read the same: the pins are on their way once they are asked for.
+    await waitFor(() => expect(pinnedRequests).toBe(1))
     expect(within(main()).queryByRole('region', { name: 'Recent activity' })).not.toBeInTheDocument()
+    expect(activityRequests).toBe(0)
   })
 
   it('says nothing is pinned, and offers the first document, when the person has no pins', async () => {
