@@ -1,4 +1,4 @@
-# The real settings and the backups hold secrets and people's documents: they never enter the repository.
-.env
+# A backup holds everybody's documents, and the scripts write them here by default: they never enter the repository.
+# (The real settings, deploy/.env, are ignored by the .gitignore at the root.)
 backups/
 *.dump
