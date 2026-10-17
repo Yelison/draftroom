@@ -23,8 +23,16 @@ export interface TabTransport {
 export type TabMessage =
   /** A tab that is opening asks who is there. */
   | { readonly kind: 'hello'; readonly peer: string }
-  /** The answer: the world the tab is in, and when that world started. */
-  | { readonly kind: 'welcome'; readonly peer: string; readonly world: string; readonly startedAt: number }
+  /** The answer: the world the tab is in, when that world started, and when this tab joined it. */
+  | {
+      readonly kind: 'welcome'
+      readonly peer: string
+      readonly world: string
+      readonly startedAt: number
+      readonly joinedAt: number
+    }
+  /** A tab that has found its world says so to the tabs in it. */
+  | { readonly kind: 'joined'; readonly peer: string; readonly world: string; readonly joinedAt: number }
   /** A tab opened a document and asks for what the others have of it. */
   | {
       readonly kind: 'open'
@@ -81,8 +89,14 @@ export function readMessage(data: unknown): TabMessage | null {
     case 'hello':
       return { kind, peer }
     case 'welcome': {
-      const startedAt = data['startedAt']
-      return isText(world) && typeof startedAt === 'number' ? { kind, peer, world, startedAt } : null
+      const { startedAt, joinedAt } = data
+      return isText(world) && typeof startedAt === 'number' && typeof joinedAt === 'number'
+        ? { kind, peer, world, startedAt, joinedAt }
+        : null
+    }
+    case 'joined': {
+      const joinedAt = data['joinedAt']
+      return isText(world) && typeof joinedAt === 'number' ? { kind, peer, world, joinedAt } : null
     }
     case 'bye':
       return isText(world) ? { kind, peer, world } : null
@@ -127,8 +141,8 @@ export interface TabLink {
   readonly world: string
   /**
    * Whether this tab may write a document's starting content when it opens one. Two tabs that each wrote it would
-   * leave every paragraph twice once they met, so only the tab that started the world does, and the others receive it;
-   * when that tab has gone, whichever tab opens a document first writes it.
+   * leave every paragraph twice once they met, so only one tab does, and the others receive it. It is the tab that
+   * started the world; when that tab has gone, it is the oldest of those that are left, which every tab works out the same.
    */
   mayStartContent(): boolean
   close(): void
@@ -140,9 +154,16 @@ export async function joinTabs(
   transport: TabTransport,
   { peer, now, discoveryMs, fresh }: JoinOptions,
 ): Promise<TabLink> {
-  const world = fresh ? { id: peer, startedAt: now() } : await discoverWorld(transport, peer, now, discoveryMs)
-  const startedTheWorld = world.id === peer
-  let founderGone = false
+  const world = fresh
+    ? { id: peer, startedAt: now(), peers: [] }
+    : await discoverWorld(transport, peer, now, discoveryMs)
+  const joinedAt = world.id === peer ? world.startedAt : now()
+  // Who is in the world and since when: the same for every tab once they have heard each other.
+  const roster = new Map([
+    [peer, joinedAt],
+    ...world.peers.map(({ peer: other, joinedAt: since }) => [other, since] as const),
+  ])
+  let founder = world.id
   const post = (message: TabMessage) => transport.post(message)
 
   const observer: RoomObserver = {
@@ -162,14 +183,14 @@ export async function joinTabs(
   const stopListening = transport.listen((message) => {
     if (message.peer === peer) return
     if (message.kind === 'hello') {
-      post({ kind: 'welcome', peer, world: world.id, startedAt: world.startedAt })
+      post({ kind: 'welcome', peer, world: world.id, startedAt: world.startedAt, joinedAt })
       return
     }
     if (message.kind === 'welcome' || message.world !== world.id) return
     switch (message.kind) {
       case 'open':
         // The tab that started the world is who writes the starting content, so it opens the document to answer.
-        if (startedTheWorld || server.hasDocument(message.document)) {
+        if (founder === peer || server.hasDocument(message.document)) {
           const room = server.document(message.document)
           post({
             kind: 'update',
@@ -194,16 +215,22 @@ export async function joinTabs(
       case 'awareness':
         server.receiveAwareness(message.document, message.peer, message.changes)
         break
+      case 'joined':
+        roster.set(message.peer, message.joinedAt)
+        break
       case 'bye':
         server.dropPeer(message.peer)
-        if (message.peer === world.id) founderGone = true
+        roster.delete(message.peer)
+        if (message.peer === founder) founder = oldestOf(roster)
         break
     }
   })
 
+  if (world.id !== peer) post({ kind: 'joined', peer, world: world.id, joinedAt })
+
   return {
     world: world.id,
-    mayStartContent: () => startedTheWorld || founderGone,
+    mayStartContent: () => founder === peer,
     close() {
       stopListening()
       stopObserving()
@@ -212,23 +239,49 @@ export async function joinTabs(
   }
 }
 
+/** The tab that has been in the world the longest; a tie goes to the lower id, so that every tab picks the same one. */
+const oldestOf = (roster: ReadonlyMap<string, number>): string =>
+  [...roster].sort(([a, since], [b, until]) => since - until || a.localeCompare(b))[0]?.[0] ?? ''
+
+interface DiscoveredWorld {
+  id: string
+  startedAt: number
+  /** The tabs that answered from that world. */
+  peers: { peer: string; joinedAt: number }[]
+}
+
 /** Asks the open tabs which world they are in and takes the oldest; the tab starts its own when nobody answers. */
 function discoverWorld(
   transport: TabTransport,
   peer: string,
   now: () => number,
   discoveryMs: number,
-): Promise<{ id: string; startedAt: number }> {
+): Promise<DiscoveredWorld> {
   return new Promise((resolve) => {
-    const worlds: { id: string; startedAt: number }[] = []
+    const answers: (DiscoveredWorld['peers'][number] & { world: string; startedAt: number })[] = []
     const stop = transport.listen((message) => {
-      if (message.kind === 'welcome') worlds.push({ id: message.world, startedAt: message.startedAt })
+      if (message.kind === 'welcome') {
+        answers.push({
+          peer: message.peer,
+          joinedAt: message.joinedAt,
+          world: message.world,
+          startedAt: message.startedAt,
+        })
+      }
     })
     transport.post({ kind: 'hello', peer })
     setTimeout(() => {
       stop()
-      const oldest = worlds.sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id))[0]
-      resolve(oldest ?? { id: peer, startedAt: now() })
+      const oldest = [...answers].sort((a, b) => a.startedAt - b.startedAt || a.world.localeCompare(b.world))[0]
+      resolve(
+        oldest === undefined
+          ? { id: peer, startedAt: now(), peers: [] }
+          : {
+              id: oldest.world,
+              startedAt: oldest.startedAt,
+              peers: answers.filter(({ world }) => world === oldest.world),
+            },
+      )
     }, discoveryMs)
   })
 }

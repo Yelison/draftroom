@@ -41,6 +41,9 @@ function createBus() {
 const startingContent = () =>
   jsonToYUpdate({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'The plan' }] }] })
 
+/** The clock of the tabs: each instant is later than the one before, so that a tab that opens later is younger. */
+let clock = 0
+
 interface Tab {
   server: SimulatedCollabServer
   link: TabLink
@@ -54,7 +57,7 @@ async function openTab(bus: ReturnType<typeof createBus>, peer: string, fresh = 
     storeDelayMs: 20,
     initialContent: () => (link?.mayStartContent() === true ? startingContent() : undefined),
   })
-  link = await joinTabs(server, bus.connect(), { peer, now: () => Date.now(), discoveryMs: 5, fresh })
+  link = await joinTabs(server, bus.connect(), { peer, now: () => (clock += 1), discoveryMs: 5, fresh })
   return { server, link }
 }
 
@@ -170,5 +173,22 @@ describe('the tabs of the demo', () => {
     await vi.waitFor(() => expect(second.link.mayStartContent()).toBe(true))
 
     expect(paragraphs(second.server.document(name))).toEqual(['The plan'])
+  })
+
+  it('give the starting text to one tab only when the first one goes, even if another tab already has the document', async () => {
+    const bus = createBus()
+    const first = await openTab(bus, 'tab-1')
+    const second = await openTab(bus, 'tab-2')
+    const third = await openTab(bus, 'tab-3')
+    const inSecond = second.server.document(name)
+    await vi.waitFor(() => expect(paragraphs(inSecond)).toEqual(['The plan']))
+
+    first.link.close()
+    await vi.waitFor(() => expect(second.link.mayStartContent()).toBe(true))
+    const inThird = third.server.document(name)
+
+    await vi.waitFor(() => expect(paragraphs(inThird)).toEqual(['The plan']))
+    expect(third.link.mayStartContent()).toBe(false)
+    expect(paragraphs(inSecond)).toEqual(['The plan'])
   })
 })
