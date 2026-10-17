@@ -34,7 +34,7 @@ authorization is the server's and is tested there (plan, section 9.2).
 - No connection that closes when access is revoked or a member is removed: the collaboration server below decides access when a document is opened, and nothing ends a connection afterwards.
 - No email verification: whoever signs up with an invited email claims it.
 - Made-up values: the `sizeBytes` of a version, and the label a restored version copies from the one it restores.
-- Version content: the stored versions of the fixtures hold text of their own. A version saved later (and the `pre-restore` one) holds the live text of the document as the simulated collaboration server has it, and a restore writes the version's text into that live document by diff, in one transaction, so an open editor shows it. The live text is the simulation's: nothing of it is durable or shared between tabs.
+- Version content: the stored versions of the fixtures hold text of their own. A version saved later (and the `pre-restore` one) holds the live text of the document as the simulated collaboration server has it, and a restore writes the version's text into that live document by diff, in one transaction, so an open editor shows it. The live text is the simulation's: nothing of it is durable, and it is shared between tabs only in the demo (below).
 
 ## Collaboration
 
@@ -48,7 +48,35 @@ knows, a `stored` event a debounce after each change with a snapshot of exactly 
 
 It is a simulation, and what it proves is the screen and the states, never the server: durability, permissions and
 convergence between browsers are proved against the real stack (T2.4), and its own tests read it with the real provider.
-Documents start empty, and two tabs do not share one (each page has its own world).
+Documents start empty, and two tabs do not share one (each page has its own world), unless the world is the demo's.
+
+## The demo
+
+The build for the static demo (`vite build --mode production` with the mock, which `build:demo` makes) turns on three things
+that the mock of the tests and of the mocked end-to-end suite do not have, so their documents stay empty and nobody else is in
+them. All three live in `collab/` and `fixtures/` and are asked for by `createMockServer({ demo })`; `createMockDataSource` does
+it when `import.meta.env.MODE` is `production`.
+
+- **Content.** Each document opens with the text in `fixtures/demoContent.ts`, in the language the demo started in (the stored
+  choice, then the browser's, as the app picks it), which does not change if the person switches language afterwards. The text
+  is written into the document when it is first opened, not when the world starts, with `jsonToYUpdate` as the server would.
+- **Tabs.** `collab/tabLink.ts` carries the Yjs updates and the awareness of a document between the tabs of one browser over a
+  `BroadcastChannel`. A tab that opens joins the oldest world there is. A tab that is **reloaded starts a world of its own**
+  (the demo starts again on reload): the other tabs keep the one they had and the two share nothing from then on, because every
+  message names its world and a tab ignores the rest. Only the tab that started a world writes the starting text of a document
+  (two tabs that each wrote it would leave every paragraph twice); when it has gone, the first tab to open a document does.
+  Only the collaboration is shared: the lists, the comments and the rest of the contract are each tab's. Where there is no
+  `BroadcastChannel` the demo is one tab and works the same. A tab that closes without `pagehide` (a crash) leaves its people
+  in the other tabs until they reload.
+- **A person who writes.** `collab/scriptedCollaborator.ts` plays a person of the fixtures (`fixtures/collaboratorScripts.ts`:
+  Daniel in the launch plan, Sofía in the brand voice guide) with a connection of her own. She is in the document while someone
+  else has it open and the tab is visible, moves her cursor, and types, rewrites and erases a line at the pace of a person, in
+  the last paragraph of the document and never while someone else's cursor is in it. She stays present and writes nothing when
+  the person prefers reduced motion, and leaves when the tab is hidden. With several tabs, `navigator.locks` picks the one that
+  plays her.
+
+What it proves is the screen, as everything above does: the simulated collaboration is **not** evidence that real browsers
+converge. That is the real stack's (`e2e-collab/`), and nothing in the interface says otherwise or says that it is simulated.
 
 ## Operations it leaves out
 
