@@ -55,7 +55,9 @@ describe('the preview of a version', () => {
             webSocket: new Proxy(Socket, {
               construct(target, [url]: [string]) {
                 sockets.push(url)
-                return Reflect.construct(target, [url])
+                const socket: unknown = Reflect.construct(target, [url])
+                if (typeof socket !== 'object' || socket === null) throw new Error('A socket is an object')
+                return socket
               },
             }),
           },
