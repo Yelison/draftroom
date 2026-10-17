@@ -67,6 +67,8 @@ async function selectLastWord(page: Page, text: Locator) {
   // "small" is five letters.
   for (let index = 0; index < 5; index++) await page.keyboard.press('Shift+ArrowLeft')
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('small')
+  // The editor learns of the selection from an event that the browser sends after the keys; the next key reads what it knows.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
 }
 
 for (const [language, said] of Object.entries(words)) {
