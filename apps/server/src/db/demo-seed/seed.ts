@@ -1,7 +1,8 @@
 import { sql, type Kysely, type Transaction } from 'kysely'
+import { createPasswords } from '../../http/auth/passwords.ts'
 import { createDocumentRows } from '../documents/commands.ts'
 import type { Database } from '../tables.ts'
-import { almazara, demoPeople, harborAndPine, type DemoWorkspace } from './content.ts'
+import { almazara, demoPassword, demoPeople, harborAndPine, type DemoWorkspace } from './content.ts'
 
 // Fills an empty database with two demo workspaces for development and the end-to-end tests. Documents are created by
 // the same function the API uses, so each one has its content, its owner and its first event like a real one; only the
@@ -100,10 +101,12 @@ export async function seedDemo(database: Kysely<Database>): Promise<boolean> {
     .executeTakeFirst()
   if (existing !== undefined) return false
 
+  // One hash for everyone: it is a demo password, and Argon2id takes time that a seed of seven people has no use for.
+  const passwordHash = await createPasswords().hash(demoPassword)
   await database.transaction().execute(async (trx) => {
     await trx
       .insertInto('users')
-      .values(demoPeople.map((person) => ({ ...person, signed_up_at: new Date() })))
+      .values(demoPeople.map((person) => ({ ...person, password_hash: passwordHash, signed_up_at: new Date() })))
       .execute()
     const userIds = new Map(demoPeople.map((person) => [person.email, person.id]))
     for (const workspace of [harborAndPine, almazara]) await seedWorkspace(trx, workspace, userIds)

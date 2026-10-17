@@ -30,7 +30,10 @@ export interface SessionsTable {
   id: Generated<string>
   user_id: string
   token_hash: Uint8Array
+  /** The end of the session's absolute lifetime, however much it is used. */
   expires_at: Date
+  /** The last time it was used, kept to the minute: a session that is not used for a while ends before `expires_at`. */
+  last_seen_at: Generated<Date>
   created_at: Generated<Date>
 }
 

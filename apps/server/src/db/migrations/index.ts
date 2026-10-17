@@ -6,6 +6,7 @@ import * as versions from './0004_versions.ts'
 import * as activityEventsWorkspaceIdx from './0005_activity_events_workspace_idx.ts'
 import * as userPreferences from './0006_user_preferences.ts'
 import * as millisecondOrderIndexes from './0007_millisecond_order_indexes.ts'
+import * as sessionActivity from './0008_session_activity.ts'
 
 /**
  * Every migration, by name, in the order they ran. Kysely sorts by name, hence the numeric prefix. A static list rather
@@ -20,6 +21,7 @@ export const migrations: Readonly<Record<string, Migration>> = {
   '0005_activity_events_workspace_idx': activityEventsWorkspaceIdx,
   '0006_user_preferences': userPreferences,
   '0007_millisecond_order_indexes': millisecondOrderIndexes,
+  '0008_session_activity': sessionActivity,
 }
 
 export const migrationProvider: MigrationProvider = {

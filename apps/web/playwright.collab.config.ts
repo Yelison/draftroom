@@ -6,7 +6,7 @@ const isCI = Boolean(process.env.CI)
 /**
  * The collaboration of two browsers against the real stack: PostgreSQL, the server and the production build of the app in
  * `http` mode, served by `vite preview`. The suite starts and stops the server itself, so the stack outside it is the
- * database alone (see docs/decisions/0015-real-stack-e2e-identity.md for how a browser is identified until T7.1).
+ * database alone. A browser signs in as an account of the demo seed and is its session cookie (docs/decisions/0004-authentication.md).
  */
 export default defineConfig({
   testDir: './e2e-collab',
@@ -33,7 +33,7 @@ export default defineConfig({
       'npx vite build --mode production --outDir dist/collab --emptyOutDir && npx vite preview --outDir dist/collab',
     env: {
       PLAYWRIGHT_PORT: String(environment.ports.app),
-      // Both targets set is what turns on the test proxy of `vite.config.ts`; nothing else does.
+      // Both targets set is what serves the API and the collaboration socket from the origin of the app (`vite.config.ts`).
       E2E_API_ORIGIN: environment.apiOrigin,
       E2E_COLLAB_ORIGIN: environment.collaborationOrigin,
     },

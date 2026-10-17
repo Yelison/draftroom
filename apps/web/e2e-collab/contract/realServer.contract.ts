@@ -54,6 +54,7 @@ describe('the real server', () => {
         memberId: member.id,
         outsider: connect(outsider.email),
         anonymous: connect(),
+        connectAs: connect,
       }
     },
   })

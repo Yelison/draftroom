@@ -1,44 +1,82 @@
-import { request as playwrightRequest } from '@playwright/test'
+import { request as playwrightRequest, type APIRequestContext } from '@playwright/test'
 import { environment } from './environment.ts'
 import { expect, test } from './fixtures.ts'
-import { people } from './people.ts'
+import { demoPassword, people } from './people.ts'
 
 /**
- * Until the session cookie exists (T7.1) the identity is the `X-Dev-User` header, and only the test proxy of the app's
- * origin turns the cookie of a browser context into it. The server itself reads no cookie, and the proxy trusts no header
- * from the browser.
+ * Who a browser is in the real-stack suite: the session cookie the server sets at sign-in, sent through the origin of the
+ * app, which forwards it and rewrites nothing. The server resolves it for REST and for the collaboration socket alike.
  */
 test.describe('the identity of the real-stack suite', () => {
-  const asDaniel = { cookie: `dr_dev_user=${people.daniel}` }
+  const app = () => playwrightRequest.newContext({ baseURL: environment.appOrigin })
+  const credentials = { email: people.daniel, password: demoPassword }
 
-  test('is the cookie, through the origin of the app', async () => {
-    const app = await playwrightRequest.newContext({ baseURL: environment.appOrigin, extraHTTPHeaders: asDaniel })
+  async function signedIn(): Promise<{ context: APIRequestContext; token: string; csrf: string }> {
+    const context = await app()
+    expect((await context.post('/api/auth/sign-in', { data: credentials })).status()).toBe(200)
+    const cookies = (await context.storageState()).cookies
+    const value = (name: string) => cookies.find((cookie) => cookie.name === name)?.value ?? ''
+    return { context, token: value('dr_session'), csrf: value('dr_csrf') }
+  }
 
-    const response = await app.get('/api/me')
+  test('is the session cookie, through the origin of the app', async () => {
+    const { context } = await signedIn()
+
+    const response = await context.get('/api/me')
 
     expect(response.status()).toBe(200)
     expect(await response.json()).toMatchObject({ email: people.daniel, name: 'Daniel Okafor' })
-    await app.dispose()
+    await context.dispose()
   })
 
-  test('is not the cookie for the server itself: it reads none', async () => {
-    const api = await playwrightRequest.newContext({ baseURL: environment.apiOrigin, extraHTTPHeaders: asDaniel })
+  test('is the same session for the server on its own port, which reads the cookie itself', async () => {
+    const { context, token } = await signedIn()
+    const api = await playwrightRequest.newContext({
+      baseURL: environment.apiOrigin,
+      extraHTTPHeaders: { cookie: `dr_session=${token}` },
+    })
 
     const response = await api.get('/api/me')
 
-    expect(response.status()).toBe(401)
-    await api.dispose()
+    expect(response.status()).toBe(200)
+    await Promise.all([context.dispose(), api.dispose()])
   })
 
-  test('is not a header that the browser sends through the origin of the app', async () => {
-    const app = await playwrightRequest.newContext({
+  test('is nobody without the cookie, and not the old cookie of the test either', async () => {
+    const anonymous = await app()
+    const oldCookie = await playwrightRequest.newContext({
       baseURL: environment.appOrigin,
-      extraHTTPHeaders: { 'x-dev-user': people.daniel },
+      extraHTTPHeaders: { cookie: `dr_dev_user=${people.daniel}` },
     })
 
-    const response = await app.get('/api/me')
+    const statuses = [(await anonymous.get('/api/me')).status(), (await oldCookie.get('/api/me')).status()]
 
-    expect(response.status()).toBe(401)
-    await app.dispose()
+    expect(statuses).toEqual([401, 401])
+    await Promise.all([anonymous.dispose(), oldCookie.dispose()])
+  })
+
+  test('is refused a change without the CSRF token, and allowed it with', async () => {
+    const { context, csrf } = await signedIn()
+
+    const without = await context.post('/api/auth/sign-out')
+    const withToken = await context.post('/api/auth/sign-out', { headers: { 'x-csrf-token': csrf } })
+
+    expect([without.status(), withToken.status()]).toEqual([403, 204])
+    await context.dispose()
+  })
+
+  test('is told the same of a wrong password as of an account that does not exist', async () => {
+    const context = await app()
+
+    const wrong = await context.post('/api/auth/sign-in', {
+      data: { ...credentials, password: 'not the password at all' },
+    })
+    const unknown = await context.post('/api/auth/sign-in', {
+      data: { email: 'nobody@harborpine.example', password: demoPassword },
+    })
+
+    expect([wrong.status(), unknown.status()]).toEqual([401, 401])
+    expect(await wrong.json()).toEqual(await unknown.json())
+    await context.dispose()
   })
 })

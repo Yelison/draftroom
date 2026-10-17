@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router'
 import { Explorer } from '../../features/explorer/Explorer.tsx'
 import { NavRail } from '../../components/NavRail/NavRail.tsx'
+import { AccountControl } from '../../features/auth/AccountControl.tsx'
 import { MainContent } from './MainContent.tsx'
 import styles from './EditorLayout.module.css'
 
@@ -15,6 +16,9 @@ export function EditorLayout() {
       <MainContent className={styles.main}>
         <Outlet />
       </MainContent>
+      <div className={styles.account}>
+        <AccountControl variant="compact" />
+      </div>
     </div>
   )
 }

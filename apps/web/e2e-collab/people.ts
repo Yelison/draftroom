@@ -2,7 +2,13 @@ import { createHttpDataSource } from '../src/data/http/HttpDataSource.ts'
 import type { DataSource } from '../src/data/DataSource.ts'
 import { environment } from './environment.ts'
 
-/** The people of the demo workspace Harbor & Pine, by the address that is also their development identity. */
+/**
+ * The password of every demo account: what `apps/server/src/db/demo-seed` gives them, and so what a browser signs in with. A
+ * seed that changed it would fail the sign-in of every test, which says so.
+ */
+export const demoPassword = 'harbor pine rooftop'
+
+/** The people of the demo workspace Harbor & Pine, by the address they sign in with. */
 export const people = {
   marta: 'marta.ruiz@harborpine.example',
   daniel: 'daniel.okafor@harborpine.example',
@@ -14,7 +20,8 @@ export type DemoPerson = keyof typeof people
 
 /**
  * The product's own HTTP client, as whoever has this email (nobody, without one): the development identity header on
- * every request, straight to the API.
+ * every request, straight to the API. It is for setting a scene up from Node, where there is no browser to hold a session;
+ * what a browser does is sign in (`fixtures.ts`).
  */
 export function restWithIdentity(email?: string): DataSource {
   return createHttpDataSource({

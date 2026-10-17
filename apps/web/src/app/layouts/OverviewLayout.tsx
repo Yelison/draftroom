@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router'
 import { NavRail } from '../../components/NavRail/NavRail.tsx'
+import { AccountControl } from '../../features/auth/AccountControl.tsx'
 import { MainContent } from './MainContent.tsx'
 import styles from './OverviewLayout.module.css'
 
@@ -11,6 +12,9 @@ export function OverviewLayout() {
       <MainContent className={styles.main}>
         <Outlet />
       </MainContent>
+      <div className={styles.account}>
+        <AccountControl variant="expanded" />
+      </div>
     </div>
   )
 }

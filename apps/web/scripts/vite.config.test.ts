@@ -1,4 +1,3 @@
-import { EventEmitter } from 'node:events'
 import type { ConfigEnv, ProxyOptions, UserConfig, UserConfigFnObject } from 'vite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import config from '../vite.config.ts'
@@ -46,7 +45,7 @@ describe('the build modes', () => {
   })
 })
 
-describe('the identity proxy of the real-stack end-to-end suite', () => {
+describe('the proxy of the real-stack end-to-end suite', () => {
   afterEach(() => vi.unstubAllEnvs())
 
   const targets = { E2E_API_ORIGIN: 'http://127.0.0.1:8384', E2E_COLLAB_ORIGIN: 'http://127.0.0.1:8484' }
@@ -57,23 +56,6 @@ describe('the identity proxy of the real-stack end-to-end suite', () => {
     const entry = resolve(env)[server]?.proxy?.[path]
     if (entry === undefined || typeof entry === 'string') throw new Error(`No proxy for ${path} in ${server}`)
     return entry
-  }
-
-  /** What the proxy does with a request: the headers the upstream receives for the headers the browser sent. */
-  function forwarded(
-    options: ProxyOptions,
-    event: 'proxyReq' | 'proxyReqWs',
-    browserHeaders: Record<string, string>,
-  ): Record<string, string> {
-    const upstream = new Map(Object.entries(browserHeaders))
-    const request = {
-      removeHeader: (name: string) => upstream.delete(name),
-      setHeader: (name: string, value: string) => upstream.set(name, value),
-    }
-    const proxy = new EventEmitter()
-    options.configure?.(proxy as unknown as Parameters<NonNullable<ProxyOptions['configure']>>[0], options)
-    proxy.emit(event, request, { headers: browserHeaders })
-    return Object.fromEntries(upstream)
   }
 
   it.each([
@@ -107,28 +89,10 @@ describe('the identity proxy of the real-stack end-to-end suite', () => {
     expect(production.preview?.proxy).toBeUndefined()
   })
 
-  it.each(['proxyReq', 'proxyReqWs'] as const)(
-    'turns the cookie of the test into the identity header on a request that is a %s',
-    (event) => {
-      stubTargets()
-      const route = event === 'proxyReq' ? '/api' : '/collab'
-
-      const headers = forwarded(proxyOf(serve, 'preview', route), event, {
-        cookie: 'theme=dark; dr_dev_user=marta.ruiz%40harborpine.example; other=1',
-      })
-
-      expect(headers['x-dev-user']).toBe('marta.ruiz@harborpine.example')
-    },
-  )
-
-  it('sends no identity for a browser that has no cookie, and drops the header that the browser itself sent', () => {
+  it.each(['/api', '/collab'] as const)('forwards what the browser sends to %s and rewrites nothing', (route) => {
     stubTargets()
 
-    const headers = forwarded(proxyOf(serve, 'preview', '/api'), 'proxyReq', {
-      cookie: 'theme=dark',
-      'x-dev-user': 'marta.ruiz@harborpine.example',
-    })
-
-    expect(headers).not.toHaveProperty('x-dev-user')
+    // A hook that touched the request could give the browser an identity it has not got: who it is, is its session cookie.
+    expect(proxyOf(serve, 'preview', route).configure).toBeUndefined()
   })
 })

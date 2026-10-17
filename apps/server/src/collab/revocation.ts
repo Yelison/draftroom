@@ -113,5 +113,10 @@ export function createLiveAccess({ facts, collaboration, broadcaster, log }: Rev
       }
       hold({ userId, where: (context) => context.workspaceId === workspaceId }, decide, { type: 'access-changed' })
     },
+
+    // Nothing is read: a session that has ended opens nothing, whatever the person holds, so there is no fact to ask for.
+    async sessionEnded(sessionId) {
+      collaboration.endConnections({ sessionId }, { code: 'unauthenticated' })
+    },
   }
 }

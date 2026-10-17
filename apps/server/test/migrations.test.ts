@@ -56,6 +56,7 @@ describe('the migrations, on a database that starts empty', () => {
       '0005_activity_events_workspace_idx',
       '0006_user_preferences',
       '0007_millisecond_order_indexes',
+      '0008_session_activity',
     ])
     expect(await tablesOf()).toEqual(tablesOfTheMigrations)
     expect(await migrationStatus(database.db)).toEqual({ current: true })
@@ -154,6 +155,7 @@ describe('the fourth migration, on a database that already holds documents and t
         '0005_activity_events_workspace_idx',
         '0006_user_preferences',
         '0007_millisecond_order_indexes',
+        '0008_session_activity',
       ])
 
       const states = await populated.db
@@ -201,7 +203,11 @@ describe('the seventh migration, on a database that already holds events and ver
       expect(eventsBefore).toHaveLength(1)
       const before = await indexesOf(populated.db)
 
-      expect(await migrateToLatest(populated.db)).toEqual(['0006_user_preferences', '0007_millisecond_order_indexes'])
+      expect(await migrateToLatest(populated.db)).toEqual([
+        '0006_user_preferences',
+        '0007_millisecond_order_indexes',
+        '0008_session_activity',
+      ])
 
       const after = await indexesOf(populated.db)
       expect(Object.keys(after).filter((name) => !(name in before))).toEqual([
@@ -226,6 +232,36 @@ describe('the seventh migration, on a database that already holds events and ver
         populated.db,
       )
       expect(await indexesOf(populated.db)).toEqual({ ...after, ...before })
+    } finally {
+      await populated.drop()
+    }
+  })
+})
+
+describe('the migration of the session activity, on a database that already holds a session', () => {
+  it('gives the session the time of the migration as its last activity and leaves the rest of it', async () => {
+    const populated = await provisionDatabase({ migrated: false })
+    try {
+      const { error } = await new Migrator({ db: populated.db, provider: migrationProvider }).migrateTo(
+        '0005_activity_events_workspace_idx',
+      )
+      expect(error).toBeUndefined()
+      const workspace = await createPopulatedWorkspace(populated.db)
+      const expiresAt = new Date(Date.now() + 60_000)
+      await sql`insert into sessions (user_id, token_hash, expires_at) values (${workspace.userId}, ${Uint8Array.of(1, 2, 3)}, ${expiresAt})`.execute(
+        populated.db,
+      )
+
+      // Whatever other migrations stand between `0005` and the latest also run: this one is the one that matters here.
+      expect(await migrateToLatest(populated.db)).toContain('0008_session_activity')
+
+      const sessions = await populated.db
+        .selectFrom('sessions')
+        .select(['user_id', 'expires_at', 'last_seen_at'])
+        .execute()
+      expect(sessions).toEqual([{ user_id: workspace.userId, expires_at: expiresAt, last_seen_at: expect.any(Date) }])
+      // The default is the moment of the migration, so a session that was open is not expired by being migrated.
+      expect(sessions[0]?.last_seen_at.getTime()).toBeGreaterThan(Date.now() - 60_000)
     } finally {
       await populated.drop()
     }

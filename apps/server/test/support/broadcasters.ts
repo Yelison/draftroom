@@ -9,6 +9,7 @@ export const silentBroadcaster: DocumentBroadcaster = { broadcast: () => undefin
 export const silentLiveAccess: LiveAccess = {
   documentChanged: async () => undefined,
   memberChanged: async () => undefined,
+  sessionEnded: async () => undefined,
 }
 
 /** For an app that is only built or asked about its routes: it has no documents to work on, so any work on one is a mistake of the test. */

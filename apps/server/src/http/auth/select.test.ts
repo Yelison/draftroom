@@ -4,6 +4,7 @@ import { loadConfig } from '../../config.ts'
 import { createDatabase } from '../../db/database.ts'
 import { devUserHeader } from './devIdentity.ts'
 import { authProviderFor } from './select.ts'
+import { createSessions } from './sessions.ts'
 
 // A database nobody can reach: a provider that asks it anything fails, so a provider that answers has not asked.
 const database = createDatabase(unreachableDatabaseUrl)
@@ -21,7 +22,11 @@ const environments = {
   'an empty NODE_ENV': { NODE_ENV: '' },
 }
 const providerFor = (environment: keyof typeof environments) =>
-  authProviderFor(loadConfig({ DATABASE_URL: unreachableDatabaseUrl, ...environments[environment] }), database)
+  authProviderFor(
+    loadConfig({ DATABASE_URL: unreachableDatabaseUrl, ...environments[environment] }),
+    database,
+    createSessions({ database }),
+  )
 
 const requestAs = (email: string) => ({ headers: { [devUserHeader]: email } })
 

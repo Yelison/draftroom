@@ -262,3 +262,28 @@ describe('a change to a member of a workspace', () => {
     expect(log.entries.map(({ level }) => level)).toEqual(['error'])
   })
 })
+
+describe('a session that ends', () => {
+  it('ends the connections of that session and no other, with the code of a session that is over', async () => {
+    const ended: { target: ConnectionTarget; plan: ClosePlan }[] = []
+    const live = createLiveAccess({
+      facts: {
+        ofDocument: () => Promise.reject(new Error('not read')),
+        ofMember: () => Promise.reject(new Error('not read')),
+      },
+      collaboration: {
+        endConnections(target: ConnectionTarget, plan: ClosePlan) {
+          ended.push({ target, plan })
+          return 1
+        },
+        tell: () => 0,
+      },
+      broadcaster: { broadcast: () => undefined },
+      log: new RecordingLog(),
+    })
+
+    await live.sessionEnded('session-1')
+
+    expect(ended).toEqual([{ target: { sessionId: 'session-1' }, plan: { code: 'unauthenticated' } }])
+  })
+})

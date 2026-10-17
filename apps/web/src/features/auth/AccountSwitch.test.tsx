@@ -1,0 +1,238 @@
+import { screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { daniel, demoPassword, marta, sofia } from '../../data/mock/fixtures/index.ts'
+import {
+  accountsBeingLeft,
+  lastAccountKey,
+  markAccountsBeingLeft,
+  rememberAccount,
+  rememberedAccount,
+} from './lastAccount.ts'
+import { renderSignedOut } from './testing/renderSignedOut.tsx'
+
+// Signing in as somebody else on a browser that held another account leaves that account (protocol §12.2): its copies are
+// cleared, with the questions that has, and a failure to clear them is written down and does not stop the sign-in.
+
+const leaving = vi.hoisted(() => ({ leaveAccount: vi.fn() }))
+vi.mock('../../collab/leaveAccount.ts', () => ({ leaveAccount: leaving.leaveAccount, UNSTORED_WAIT_MS: 5_000 }))
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+beforeEach(() => {
+  leaving.leaveAccount.mockReset()
+  leaving.leaveAccount.mockResolvedValue({ purged: true })
+  localStorage.clear()
+})
+
+async function signInAs(person: { email: string }, path = '/sign-in') {
+  const view = renderSignedOut(path)
+  await screen.findByRole('heading', { level: 1, name: path === '/sign-in' ? 'Sign in' : 'Create your account' })
+  await view.user.type(screen.getByRole('textbox', { name: 'Email' }), person.email)
+  await view.user.type(screen.getByLabelText('Password'), demoPassword)
+  await view.user.click(screen.getByRole('button', { name: 'Sign in' }))
+  return view
+}
+
+describe('signing in on a browser that held another account', () => {
+  it('leaves that account first, with its own id, and remembers the new one', async () => {
+    rememberAccount(marta.id)
+    const { router } = await signInAs(daniel)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(leaving.leaveAccount).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: marta.id }))
+    expect(rememberedAccount()).toBe(daniel.id)
+  })
+
+  it('does not leave anything when it is the same account that signs in again', async () => {
+    rememberAccount(marta.id)
+    const { router } = await signInAs(marta)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(leaving.leaveAccount).not.toHaveBeenCalled()
+  })
+
+  it('does not leave anything when the browser held no account, and remembers the one that signs in', async () => {
+    const { router } = await signInAs(marta)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(leaving.leaveAccount).not.toHaveBeenCalled()
+    expect(rememberedAccount()).toBe(marta.id)
+  })
+
+  it('drops what was read for the account that was there, which is not for this one', async () => {
+    rememberAccount(marta.id)
+    const view = renderSignedOut('/sign-in')
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+    view.queryClient.setQueryData(['workspaces', 'list'], { items: [{ name: 'Harbor & Pine' }] })
+    await view.user.type(screen.getByRole('textbox', { name: 'Email' }), daniel.email)
+    await view.user.type(screen.getByLabelText('Password'), demoPassword)
+
+    await view.user.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(view.router.state.location.pathname).toBe('/'))
+
+    expect(view.queryClient.getQueryData(['workspaces', 'list'])).not.toEqual({ items: [{ name: 'Harbor & Pine' }] })
+  })
+
+  it('does not leave anything when the sign-in is refused: the account that was there is still the one', async () => {
+    rememberAccount(marta.id)
+    const view = renderSignedOut('/sign-in')
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+    await view.user.type(screen.getByRole('textbox', { name: 'Email' }), daniel.email)
+    await view.user.type(screen.getByLabelText('Password'), 'not the password at all')
+
+    await view.user.click(screen.getByRole('button', { name: 'Sign in' }))
+    await screen.findByRole('alert')
+
+    expect(leaving.leaveAccount).not.toHaveBeenCalled()
+    expect(rememberedAccount()).toBe(marta.id)
+  })
+
+  it('asks what to do with changes that were never stored, and signs in whichever the answer', async () => {
+    leaving.leaveAccount.mockImplementation(async ({ confirm }: { confirm: (count: number) => Promise<boolean> }) => {
+      await confirm(1)
+      return { purged: true }
+    })
+    rememberAccount(marta.id)
+    const { router, user } = await signInAs(daniel)
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('1 document has changes that were never stored')).toBeInTheDocument()
+    expect(within(dialog).getByText(/under the account you were using/)).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Keep them' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  })
+
+  it('tells the other tabs that the account changed as soon as the session did, not when the person has answered the question', async () => {
+    const written: string[] = []
+    const setItem = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation((key, value) => void written.push(`${key}=${value}`))
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => (key === lastAccountKey ? marta.id : null))
+    let answer: (keep: boolean) => void = () => undefined
+    leaving.leaveAccount.mockImplementation(async ({ confirm }: { confirm: (count: number) => Promise<boolean> }) => {
+      await new Promise<void>((resolve) => (answer = () => resolve()))
+      void confirm
+      return { purged: true }
+    })
+    const view = renderSignedOut('/sign-in')
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+    view.queryClient.setQueryData(['workspaces', 'list'], { items: [{ name: 'Harbor & Pine' }] })
+    await view.user.type(screen.getByRole('textbox', { name: 'Email' }), daniel.email)
+    await view.user.type(screen.getByLabelText('Password'), demoPassword)
+
+    await view.user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    // The question about the old account is still unanswered: the new one is already written down, for the other tabs to hear, and
+    // what this tab read for the old one is already gone.
+    await waitFor(() => expect(leaving.leaveAccount).toHaveBeenCalled())
+    expect(written).toContain(`${lastAccountKey}=${daniel.id}`)
+    expect(view.queryClient.getQueryData(['workspaces', 'list'])).toBeUndefined()
+    expect(leaving.leaveAccount).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: marta.id }))
+    setItem.mockRestore()
+    answer(true)
+  })
+
+  it.each([
+    ['Keep them', false],
+    ['Discard them', true],
+  ])('still leaves what the old account kept as the person says: %s', async (button, discards) => {
+    let said: boolean | undefined
+    leaving.leaveAccount.mockImplementation(async ({ confirm }: { confirm: (count: number) => Promise<boolean> }) => {
+      said = await confirm(1)
+      return { purged: said }
+    })
+    rememberAccount(marta.id)
+    const { router, user } = await signInAs(daniel)
+
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: button }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(said).toBe(discards)
+    expect(leaving.leaveAccount).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: marta.id }))
+  })
+
+  it('asks again about an account whose question was never answered, in the next sign-in, whoever signs in', async () => {
+    // The person closes the tab with the question open: the page is gone and `leave` never came back.
+    leaving.leaveAccount.mockImplementationOnce(() => new Promise(() => undefined))
+    rememberAccount(marta.id)
+    const first = await signInAs(daniel)
+    await waitFor(() => expect(leaving.leaveAccount).toHaveBeenCalledTimes(1))
+    first.unmount()
+    leaving.leaveAccount.mockResolvedValue({ purged: true })
+
+    // Another tab, another sign-in, as a third person: nothing was answered about Marta, so it is asked again.
+    const second = renderSignedOut('/sign-in')
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+    await second.user.type(screen.getByRole('textbox', { name: 'Email' }), sofia.email)
+    await second.user.type(screen.getByLabelText('Password'), demoPassword)
+    await second.user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    await waitFor(() => expect(second.router.state.location.pathname).toBe('/'))
+    expect(leaving.leaveAccount.mock.calls.map(([options]) => options.userId)).toEqual([marta.id, marta.id, daniel.id])
+  })
+
+  it('stops asking about an account once it has been left, and nothing is left behind', async () => {
+    rememberAccount(marta.id)
+    const first = await signInAs(daniel)
+    await waitFor(() => expect(first.router.state.location.pathname).toBe('/'))
+    first.unmount()
+    expect(accountsBeingLeft()).toEqual([])
+
+    // Left and answered: signing in as a third person only leaves the one the browser held.
+    const second = renderSignedOut('/sign-in')
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+    await second.user.type(screen.getByRole('textbox', { name: 'Email' }), sofia.email)
+    await second.user.type(screen.getByLabelText('Password'), demoPassword)
+    await second.user.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(second.router.state.location.pathname).toBe('/'))
+
+    expect(leaving.leaveAccount.mock.calls.map(([options]) => options.userId)).toEqual([marta.id, daniel.id])
+  })
+
+  it('does not ask about an account the person has come back to: it is the one they are signing in as', async () => {
+    markAccountsBeingLeft([marta.id])
+    rememberAccount(daniel.id)
+
+    const { router } = await signInAs(marta)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(leaving.leaveAccount.mock.calls.map(([options]) => options.userId)).toEqual([daniel.id])
+    expect(accountsBeingLeft()).toEqual([])
+  })
+
+  it('writes down that the copies could not be cleared and signs in all the same', async () => {
+    const written = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    leaving.leaveAccount.mockRejectedValue(new Error('indexedDB.databases is not available'))
+    rememberAccount(marta.id)
+
+    const { router } = await signInAs(daniel)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(written).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ message: expect.stringContaining('indexedDB') }),
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(rememberedAccount()).toBe(daniel.id)
+    written.mockRestore()
+  })
+})
+
+describe('signing up on a browser that held another account', () => {
+  it('leaves that account too, because a new account is somebody else', async () => {
+    rememberAccount(marta.id)
+    const { user, router } = renderSignedOut('/sign-up')
+    await screen.findByRole('heading', { level: 1, name: 'Create your account' })
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Lena Fischer')
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'lena@harborpine.example')
+    await user.type(screen.getByLabelText('Password'), 'a phrase of several words')
+
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(leaving.leaveAccount).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: marta.id }))
+  })
+})

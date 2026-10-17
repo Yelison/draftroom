@@ -4,7 +4,9 @@ import { createCollabServer } from './collab/server.ts'
 import { ConfigError, loadConfig } from './config.ts'
 import { createDatabase } from './db/database.ts'
 import { buildApp } from './http/app.ts'
-import { authProviderFor } from './http/auth/select.ts'
+import { createSessions } from './http/auth/sessions.ts'
+import { sessionSweepIntervalMs, startSessionSweep } from './http/auth/sessionSweep.ts'
+import { authProviderFor, sessionCookiesFor } from './http/auth/select.ts'
 import type { DocumentBroadcaster } from './http/document-broadcaster.ts'
 
 // The entry point of the server: `npm start`, or `npm run dev` with a watcher. Run by Node itself, with no build step.
@@ -22,7 +24,8 @@ function readConfig() {
 
 const config = readConfig()
 const database = createDatabase(config.databaseUrl)
-const authProvider = authProviderFor(config, database)
+const sessions = createSessions({ database })
+const authProvider = authProviderFor(config, database, sessions)
 // The collaboration server logs through the app, and the app tells the connections of a document about a change through
 // the collaboration server. The app is built first and the broadcaster reaches the server when a request is served,
 // which is always after both exist.
@@ -32,6 +35,8 @@ const broadcaster: DocumentBroadcaster = {
 const app = buildApp({
   database,
   authProvider,
+  sessions,
+  sessionCookies: sessionCookiesFor(config),
   logger: { level: 'info' },
   broadcaster,
   liveDocuments: {
@@ -41,6 +46,7 @@ const app = buildApp({
   liveAccess: {
     documentChanged: (documentId) => liveAccess.documentChanged(documentId),
     memberChanged: (workspaceId, userId) => liveAccess.memberChanged(workspaceId, userId),
+    sessionEnded: (sessionId) => liveAccess.sessionEnded(sessionId),
   },
 })
 const collaboration = createCollabServer({
@@ -58,8 +64,17 @@ const liveAccess = createLiveAccess({
   log: app.log,
 })
 
+// A session that nobody signed out of ends by time: this removes it and closes the connections it opened.
+const sessionSweep = startSessionSweep({
+  sessions,
+  liveAccess,
+  log: app.log,
+  intervalMs: sessionSweepIntervalMs,
+})
+
 async function shutDown(signal: NodeJS.Signals): Promise<void> {
   app.log.info({ signal }, 'shutting down')
+  sessionSweep.stop()
   // The collaboration server first: it stores the documents that are waiting, and that needs the database.
   await collaboration.shutDown()
   await app.close()

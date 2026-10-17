@@ -6,6 +6,7 @@ import type { Database } from '../src/db/tables.ts'
 import { devUserHeader } from '../src/http/auth/devIdentity.ts'
 import { loadConfig } from '../src/config.ts'
 import { authProviderFor } from '../src/http/auth/select.ts'
+import { createSessions } from '../src/http/auth/sessions.ts'
 import { apiOf, bodyAs, type Api, type Call } from './support/api.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
@@ -133,7 +134,11 @@ describe('the development identity outside development', () => {
   const request = (environment: keyof typeof environments) =>
     createTestApp(
       db,
-      authProviderFor(loadConfig({ DATABASE_URL: database.url, ...environments[environment] }), db),
+      authProviderFor(
+        loadConfig({ DATABASE_URL: database.url, ...environments[environment] }),
+        db,
+        createSessions({ database: db }),
+      ),
     ).request({
       method: 'GET',
       url: `/api/documents/${studio.documentId}`,
@@ -156,7 +161,11 @@ describe('the development identity outside development', () => {
   it('leaves the health probes open in production, which need no one', async () => {
     const production = createTestApp(
       db,
-      authProviderFor(loadConfig({ DATABASE_URL: database.url, ...environments.production }), db),
+      authProviderFor(
+        loadConfig({ DATABASE_URL: database.url, ...environments.production }),
+        db,
+        createSessions({ database: db }),
+      ),
     )
 
     const live = await production.request({ method: 'GET', url: '/api/health/live' })
