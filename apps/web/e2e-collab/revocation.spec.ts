@@ -121,3 +121,28 @@ test.describe('access removed while the person was offline, when the API refuses
     await expect(priya.page.getByRole('link', { name: 'Go to Documents' })).toBeVisible()
   })
 })
+
+test.describe('access removed while the page was closed, when the document is opened cold', () => {
+  test('says the document is not available, never mounts the editor, and purges the copy on the device', async ({
+    join,
+  }) => {
+    const documentId = await createDocument('daniel', ['priya'])
+    const priya = await join('priya')
+    // The 404 she is about to get is logged by the browser as a failed resource: it is the point of the test.
+    priya.toleratesConnectionErrors()
+    await priya.open(documentId)
+    await priya.typeAtEnd(shared)
+    await expect(priya.syncStatus).toHaveText('Sync status: Synced')
+    expect(await priya.localCopies(), 'her device keeps the document she opened').toHaveLength(1)
+    // The tab is left: no session of hers is alive to be told anything when her access goes.
+    await priya.page.goto('/documents')
+    await revokeAccess('daniel', documentId, 'priya')
+
+    await priya.page.goto(`/documents/${documentId}`)
+
+    await expect(priya.page.getByRole('heading', { name: "This document isn't available" })).toBeVisible()
+    await expect.poll(() => priya.localCopies()).toEqual([])
+    await expect(priya.editor).toHaveCount(0)
+    await expect(priya.syncStatus).toHaveCount(0)
+  })
+})
