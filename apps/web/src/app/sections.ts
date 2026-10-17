@@ -12,6 +12,11 @@ export interface RouteHandle {
    * page: the focus is the dialog's to take and to give back, not the headline's.
    */
   dialog?: boolean | undefined
+  /**
+   * The route is one tab of its parent's screen, which stays on screen. Going from one tab to another is the person
+   * moving along the tab list, so the focus stays on the tab they chose and not on the headline.
+   */
+  tab?: boolean | undefined
 }
 
 const isSection = (value: unknown): value is Section => sections.some((section) => section === value)
