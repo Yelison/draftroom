@@ -55,7 +55,20 @@ suffix="$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
 scratch="restore_scratch_$suffix"
 previous="restore_previous_$suffix"
 drop_if_exists() { sql "drop database if exists \"$1\"" >/dev/null 2>&1 || true; }
-trap 'drop_if_exists "$scratch"' EXIT
+# Whatever ends the script, the scratch database goes. A swap that stopped between its two renames, because the second one failed
+# or because the script was cut (the target is gone and the one it was renamed to is not), is undone first, so a person is never
+# left without the database they named.
+cleanup() {
+  if ! database_exists "$target" && database_exists "$previous"; then
+    if sql "alter database \"$previous\" rename to \"$target\"" >/dev/null 2>&1; then
+      echo "'$target' was put back as it was" >&2
+    else
+      echo "could not put '$target' back: your database is now called '$previous', rename it back by hand" >&2
+    fi
+  fi
+  drop_if_exists "$scratch"
+}
+trap cleanup EXIT
 
 sql "create database \"$scratch\"" >/dev/null
 # One transaction into a database nobody else knows: a restore that fails leaves the scratch database to be dropped and the
@@ -68,11 +81,12 @@ if [[ "$tables" == 0 ]] && ! database_exists "$target"; then
   echo "created the database '$target'" >&2
 else
   # Renaming needs a database nobody is connected to; PostgreSQL refuses while a server is, which is the reminder to stop it.
+  # Between the two renames there is no database called `$target`: Ctrl-C, a dropped SSH session or a stop signal must not land
+  # there, so they are ignored until both have been done.
+  trap '' INT TERM HUP
   sql "alter database \"$target\" rename to \"$previous\"" >/dev/null || die "'$target' is in use: stop whatever is connected to it first; it was not touched"
-  if ! sql "alter database \"$scratch\" rename to \"$target\"" >/dev/null; then
-    sql "alter database \"$previous\" rename to \"$target\"" >/dev/null || die "could not put '$target' back: it is now called '$previous'"
-    die "could not move the restored database into place; '$target' was put back as it was"
-  fi
+  sql "alter database \"$scratch\" rename to \"$target\"" >/dev/null || die "could not move the restored database into place"
+  trap - INT TERM HUP
   # The restore is in place: what it replaced goes last.
   drop_if_exists "$previous"
   echo "replaced '$target'" >&2

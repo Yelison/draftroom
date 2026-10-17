@@ -17,6 +17,8 @@ export DRILL_RESTORED_NAME="${COMPOSE_PROJECT_NAME}-restored" DRAFTROOM_VERSION=
 
 umask 077
 work="$(mktemp -d)"
+# The backup the drill takes holds the account and the document it made: it goes where everything else of the run goes.
+export BACKUP_DIR="$work/backups"
 compose=(docker compose --env-file "$work/drill.env" -f "$repository/deploy/docker-compose.prod.yml")
 cleanup() {
   status=$?

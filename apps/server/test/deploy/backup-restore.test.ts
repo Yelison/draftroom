@@ -185,7 +185,9 @@ describe('backup.sh', () => {
   })
 })
 
-describe('restore.sh', () => {
+// Each restore reads the archive to its end, restores it into a scratch database and renames: three passes, and a machine under
+// load takes longer than the five seconds a test is given by default.
+describe('restore.sh', { timeout: 30_000 }, () => {
   it('creates the database it is told to restore into, with the content of the backup, byte for byte', async () => {
     const outcome = await run('restore.sh', [archive, 'restored_copy'])
 
@@ -268,6 +270,51 @@ describe('restore.sh', () => {
     expect(outcome.stderr).toContain("'survives_failure' was not touched")
     expect((await notes('survives_failure')).map((note) => note.body)).toEqual(['written before the restore failed'])
     expect(await query('postgres', `select datname from pg_database where datname like 'restore\\_%'`)).toEqual([])
+  })
+
+  describe('when something goes wrong while the restored database takes the place of the old one', () => {
+    /** A hook for the `docker` shim that acts on the call that renames the scratch database to `target`: the second rename. */
+    const atSecondRename = (target: string, action: string): string =>
+      `case "$*" in *restore_scratch_*'rename to "${target}"'*) ${action} ;; esac`
+    const leftovers = () => query('postgres', `select datname from pg_database where datname like 'restore\\_%'`)
+
+    it('puts the database back as it was when the second rename fails, and says so', async () => {
+      await populate('swap_fails', 'written before the swap failed')
+      const shim = dockerShim(atSecondRename('swap_fails', "echo 'injected failure' >&2; exit 1"))
+
+      const outcome = await run('restore.sh', ['--yes', archive, 'swap_fails'], { PATH: shim.path })
+
+      expect(outcome.code).not.toBe(0)
+      expect(outcome.stderr).toContain('could not move the restored database into place')
+      expect(outcome.stderr).toContain("'swap_fails' was put back as it was")
+      expect((await notes('swap_fails')).map((note) => note.body)).toEqual(['written before the swap failed'])
+      expect(await leftovers()).toEqual([])
+    })
+
+    it('ignores a stop signal that arrives between the two renames, and finishes the swap', async () => {
+      await populate('swap_stopped', 'replaced although the script was told to stop')
+      // The shim signals the script, which is the shim's parent, as the second rename starts.
+      const shim = dockerShim(atSecondRename('swap_stopped', 'kill -TERM $PPID'))
+
+      const outcome = await run('restore.sh', ['--yes', archive, 'swap_stopped'], { PATH: shim.path })
+
+      expect(outcome.code, outcome.stderr).toBe(0)
+      expect((await notes('swap_stopped')).map((note) => note.body)).toEqual(['the minutes of the board'])
+      expect(await leftovers()).toEqual([])
+    })
+
+    it('puts the database back, and says where everything is, when it is cut between the two renames anyway', async () => {
+      await populate('swap_killed', 'written before the script was cut')
+      // A signal the script does not ignore, and the shim never lets the second rename happen.
+      const shim = dockerShim(atSecondRename('swap_killed', 'kill -USR1 $PPID; sleep 5; exit 1'))
+
+      const outcome = await run('restore.sh', ['--yes', archive, 'swap_killed'], { PATH: shim.path })
+
+      expect(outcome.code).not.toBe(0)
+      expect(outcome.stderr).toContain("'swap_killed' was put back as it was")
+      expect((await notes('swap_killed')).map((note) => note.body)).toEqual(['written before the script was cut'])
+      expect(await leftovers()).toEqual([])
+    })
   })
 
   it('leaves no scratch or previous database behind after replacing one', async () => {
