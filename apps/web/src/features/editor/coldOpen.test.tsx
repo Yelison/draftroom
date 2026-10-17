@@ -1,12 +1,24 @@
-import { focusManager, onlineManager } from '@tanstack/react-query'
-import { act, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { focusManager, onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { act, renderHook, screen, waitFor } from '@testing-library/react'
+import { StrictMode, type ReactNode } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Y from 'yjs'
-import { copiesOf, openLocalCopy } from '../../collab/offlineCache.ts'
+import { copiesOf, openLocalCopy, purgeCopiesOfDocument } from '../../collab/offlineCache.ts'
 import type { DataSource } from '../../data/DataSource.ts'
 import { ApiError, TransportError } from '../../data/errors.ts'
+import { DataSourceContext } from '../../data/DataSourceContext.ts'
+import { createMockServer } from '../../data/mock/createMockDataSource.ts'
 import { daniel, marta } from '../../data/mock/fixtures/index.ts'
-import { launchPlan, renderEditor } from './testing/renderEditor.tsx'
+import { meQuery } from './meQuery.ts'
+import { budget, launchPlan, renderEditor } from './testing/renderEditor.tsx'
+import { usePurgeUnavailableCopy } from './usePurgeUnavailableCopy.ts'
+
+// The copies are the real ones: the mock only watches how many times the purge is asked for.
+vi.mock('../../collab/offlineCache.ts', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../collab/offlineCache.ts')>()
+  return { ...original, purgeCopiesOfDocument: vi.fn(original.purgeCopiesOfDocument) }
+})
+beforeEach(() => vi.mocked(purgeCopiesOfDocument).mockClear())
 
 // A person who lost access while the page was closed opens the document cold: the API answers with no document, so no
 // editor is mounted and no session is made to purge what this device kept. The screen has to see that the copy goes, and
@@ -115,6 +127,56 @@ describe('opening a document with the page closed, after access was removed', ()
     expect(await screen.findByRole('heading', { name: 'Your access to this document was removed' })).toBeInTheDocument()
     expect(screen.queryByText('Loading document')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: "This document isn't available" })).not.toBeInTheDocument()
+  })
+
+  it('asks for the purge once for a document and an account, though the effect that starts it runs again', async () => {
+    await keepCopy(marta.id)
+    const dataSource = createMockServer().connect({ signedInAs: marta.email })
+    const queryClient = new QueryClient()
+    await queryClient.fetchQuery(meQuery(dataSource))
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <StrictMode>
+        <DataSourceContext value={dataSource}>
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        </DataSourceContext>
+      </StrictMode>
+    )
+    const { result, rerender } = renderHook(({ unavailable }) => usePurgeUnavailableCopy(launchPlan.id, unavailable), {
+      wrapper,
+      initialProps: { unavailable: true },
+    })
+    await waitFor(() => expect(result.current).toEqual({ hadCopy: true, hadUnstoredChanges: true }))
+
+    // The refusal goes and comes back for the same document (a retry of the read): the effect runs again with the same
+    // account and document. A second purge would delete nothing and replace what the first one found.
+    rerender({ unavailable: false })
+    rerender({ unavailable: true })
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    expect(result.current).toEqual({ hadCopy: true, hadUnstoredChanges: true })
+    expect(purgeCopiesOfDocument).toHaveBeenCalledExactlyOnceWith(marta.id, launchPlan.id)
+  })
+
+  it('never says that access was removed for the next document, which is not available and was never kept', async () => {
+    await keepCopy(marta.id)
+    const { router } = renderEditor({ wrap: refusing(notFound).wrap })
+    const removed = () => screen.queryByRole('heading', { name: 'Your access to this document was removed' })
+    expect(await screen.findByText("Changes that weren't stored were not sent.")).toBeInTheDocument()
+
+    // Once the removal has gone from the screen, it must not come back with what the previous document found.
+    let gone = false
+    let cameBack = false
+    const watching = new MutationObserver(() => {
+      if (removed() === null) gone = true
+      else if (gone) cameBack = true
+    })
+    watching.observe(document.body, { childList: true, subtree: true, characterData: true })
+    await act(() => router.navigate(`/documents/${budget.id}`))
+
+    expect(await screen.findByRole('heading', { name: "This document isn't available" })).toBeInTheDocument()
+    watching.disconnect()
+    expect(gone).toBe(true)
+    expect(cameBack).toBe(false)
   })
 
   it('says that access was removed and nothing of changes when the copy held only what the server stored', async () => {

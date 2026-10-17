@@ -30,8 +30,8 @@ export function usePurgeUnavailableCopy(documentId: string, unavailable: boolean
       purgeCopiesOfDocument(userId, documentId).catch(() => nothingKept),
   })
   const { mutate } = purge
-  // StrictMode runs the effect twice before the mutation has had a render to say it started: the reference is what stops
-  // the second run from deleting nothing and replacing what the first one found.
+  // The effect can run again for the same account and document (StrictMode, a refusal that goes and comes back): a second
+  // purge would delete nothing and replace what the first one found, so the reference is what stops it.
   const started = useRef<string | null>(null)
   useEffect(() => {
     if (!unavailable || userId === undefined || started.current === `${userId}:${documentId}`) return
@@ -41,6 +41,6 @@ export function usePurgeUnavailableCopy(documentId: string, unavailable: boolean
 
   if (!unavailable) return undefined
   if (me.isError) return nothingKept
-  // What a previous document found is not this one's.
-  return purge.variables?.documentId === documentId ? purge.data : undefined
+  // What a previous document, or another account, found is not this one's: the same key as the one that starts it.
+  return purge.variables?.userId === userId && purge.variables?.documentId === documentId ? purge.data : undefined
 }
