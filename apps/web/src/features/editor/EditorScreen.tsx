@@ -27,11 +27,16 @@ export function EditorScreen() {
 
   // An answer of the contract that says "not found" is the same for a document that is gone and one the person cannot
   // read: the server never says which, and neither does this screen.
-  const notFound = query.isError && isApiError(query.error, 'not-found')
+  const refused = query.isError && (isApiError(query.error, 'not-found') || isApiError(query.error, 'forbidden'))
+  // The same answer to a document that was open is not a screen of its own: the person has the document, its session and
+  // the copy of this device in front of them, and it is the session that purges the copy and says that access was removed.
+  // Taking the editor out for a message here would end the session before it could.
+  const accessRemoved = refused && query.data !== undefined
+  const notFound = query.isError && query.data === undefined && isApiError(query.error, 'not-found')
   // A retry puts the query back to pending: the screen stays on its message until the answer comes, so the button that was
   // pressed is still there, with the focus on it, instead of giving way to the skeleton.
   const retrying = query.isPending && query.isFetching && query.errorUpdateCount > 0
-  const failed = (query.isError && !notFound) || retrying
+  const failed = (query.isError && !notFound && !accessRemoved) || retrying
 
   // The button that was pressed to try again is gone once the document is there: the focus goes to the headline, as it
   // does when a page opens, instead of falling to the page.
@@ -42,6 +47,8 @@ export function EditorScreen() {
   useEffect(() => {
     if (recovered) headline.current?.focus()
   }, [recovered])
+
+  const opened = query.isSuccess || accessRemoved ? query.data : undefined
 
   const heading = notFound
     ? intl.formatMessage({ id: 'editor.state.notFound.title' })
@@ -70,7 +77,9 @@ export function EditorScreen() {
         </EditorStatePanel>
       )}
       {query.isPending && !retrying && <EditorSkeleton />}
-      {query.isSuccess && <DocumentEditor key={query.data.id} document={query.data} focusHeadline={focusHeadline} />}
+      {opened !== undefined && (
+        <DocumentEditor key={opened.id} document={opened} accessRemoved={accessRemoved} focusHeadline={focusHeadline} />
+      )}
     </>
   )
 }

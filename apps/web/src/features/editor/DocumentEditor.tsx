@@ -36,16 +36,19 @@ type LinkChange = 'added' | 'updated' | 'removed'
  */
 export function DocumentEditor({
   document,
+  accessRemoved,
   focusHeadline,
 }: {
   document: Schema<'Document'>
+  /** The API says the person can no longer read the document: the session purges its copy and the screen says so. */
+  accessRemoved: boolean
   /** Where the focus goes when what had it is gone and the text cannot take it: the headline of the screen. */
   focusHeadline: () => void
 }) {
   const dataSource = useDataSource()
   const me = useQuery(meQuery(dataSource))
   // The id, not the answer: a new answer for the same person must not end the connection and make it again.
-  const session = useCollabSession(document, me.data?.id)
+  const session = useCollabSession(document, me.data?.id, accessRemoved)
   const person = useMemo<CollaboratingPerson | null>(
     () =>
       me.data === undefined ? null : { id: me.data.id, name: me.data.name, color: presenceLookOf(me.data.id).color },
