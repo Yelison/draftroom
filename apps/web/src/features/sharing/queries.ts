@@ -11,12 +11,3 @@ export const accessQuery = (dataSource: DataSource, documentId: string, enabled:
     retry: retryTransportOnce,
     enabled,
   })
-
-/** The people of the workspace, the ones a document can be shared with. */
-export const membersQuery = (dataSource: DataSource, workspaceId: string, enabled: boolean) =>
-  queryOptions({
-    queryKey: queryKeys.members(workspaceId),
-    queryFn: () => dataSource.listMembers({ params: { path: { workspaceId } } }),
-    retry: retryTransportOnce,
-    enabled,
-  })
