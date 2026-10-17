@@ -10,6 +10,7 @@ import type { Database } from '../src/db/tables.ts'
 import { apiOf, bodyAs, type Api } from './support/api.ts'
 import { whileFolderIsBeingDeleted, whileRowIsLocked } from './support/overlap.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
+import { instantsAgainstIds, setInstants } from './support/stamps.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
 import {
   createDocument,
@@ -19,7 +20,6 @@ import {
   createWorkspace,
   grant,
   join,
-  setUpdatedAt,
   type Person,
   type Studio,
 } from './support/world.ts'
@@ -580,22 +580,31 @@ describe('pages of documents', () => {
     expect(ids).toEqual([...created].sort().reverse())
   })
 
-  it('does not skip documents whose timestamps differ by less than a millisecond', async () => {
+  it('orders by the millisecond and then by id, not by the microseconds, and does not skip or repeat any when paged one at a time', async () => {
     const { workspaceId, owner } = await workspaceWithOwner()
-    const stamps = ['.000100Z', '.000200Z', '.000200Z', '.000300Z', '.000300Z', '.000900Z']
-    const created: { id: string; stamp: string }[] = []
-    for (const stamp of stamps) {
-      const id = await createDocument(db, { workspaceId, creator: owner })
-      await setUpdatedAt(db, id, `2026-10-13T16:00:00${stamp}`)
-      created.push({ id, stamp })
+    const create = async (count: number, millisecond: number) => {
+      const ids: string[] = []
+      for (let index = 0; index < count; index += 1) ids.push(await createDocument(db, { workspaceId, creator: owner }))
+      await setInstants(db, 'documents', 'updated_at', instantsAgainstIds(ids, millisecond))
+      return ids
     }
-    const newestFirst = created
-      .sort((a, b) => b.stamp.localeCompare(a.stamp) || b.id.localeCompare(a.id))
-      .map(({ id }) => id)
+    const earlier = await create(3, 0)
+    const later = await create(3, 1)
 
     const { ids } = await readAll(owner, workspaceId, 1)
 
-    expect(ids).toEqual(newestFirst)
+    // The 999 µs mark of the earlier millisecond is still in it: an instant that is cut and not rounded.
+    expect(ids).toEqual([...later.sort().reverse(), ...earlier.sort().reverse()])
+  })
+
+  it('serves the instants the order is made of, the millisecond the API writes', async () => {
+    const { workspaceId, owner } = await workspaceWithOwner()
+    const id = await createDocument(db, { workspaceId, creator: owner })
+    await setInstants(db, 'documents', 'updated_at', instantsAgainstIds([id], 7))
+
+    const [document] = bodyAs<Page>(await list(owner, workspaceId, '')).items
+
+    expect(document?.updatedAt).toBe('2026-10-13T16:00:00.007Z')
   })
 
   it('gives each page at most the limit, and the default of 25 when none is asked', async () => {

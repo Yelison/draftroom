@@ -8,8 +8,9 @@ import { isStorableInstant } from './instants.ts'
 
 export interface CursorPosition {
   /**
-   * The timestamp of the last row, written by PostgreSQL with microseconds. A JavaScript `Date` keeps milliseconds, and
-   * a cursor built from one would skip the rows that share its millisecond.
+   * The timestamp of the last row, written by PostgreSQL with six decimals. A list ordered by the instant cut to the
+   * millisecond (`db/milliseconds.ts`) holds zeros in the last three. A JavaScript `Date` keeps milliseconds only, and a
+   * cursor built from one would skip the rows that share its millisecond in a list ordered by the whole column.
    */
   readonly timestamp: string
   readonly id: string

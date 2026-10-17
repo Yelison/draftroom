@@ -1,6 +1,7 @@
 import { sql, type ExpressionBuilder, type Kysely, type SelectQueryBuilder } from 'kysely'
 import { effectiveRole } from '../../domain/permissions.ts'
 import type { CursorPosition } from '../../domain/pagination.ts'
+import { inMilliseconds, isBefore, millisecondKey } from '../milliseconds.ts'
 import type { Database, DocumentRole, GeneralAccess, WorkspaceRole } from '../tables.ts'
 
 // Every read of documents goes through one query: the documents of the workspaces a person belongs to, each with that
@@ -25,12 +26,9 @@ export interface DocumentRecord {
   readonly workspaceRole: WorkspaceRole
   readonly grant: DocumentRole | null
   readonly pinned: boolean
-  /** `updated_at` as PostgreSQL writes it, microseconds included: what a cursor holds. */
+  /** `updated_at` cut to the millisecond, as PostgreSQL writes it: what a cursor holds. */
   readonly updatedAtKey: string
 }
-
-// Written by PostgreSQL, in UTC, so a cursor does not depend on a time zone setting and keeps the microseconds.
-const timestampKey = sql<string>`to_char(d.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
 
 /**
  * The documents of the workspaces a person belongs to, each beside that person's membership (`m`) and their explicit
@@ -71,7 +69,7 @@ function callerDocuments(db: Kysely<Database>, userId: string) {
       'm.role as workspaceRole',
       'g.role as grant',
       sql<boolean>`p.user_id is not null`.as('pinned'),
-      timestampKey.as('updatedAtKey'),
+      millisecondKey('d.updated_at').as('updatedAtKey'),
     ])
 }
 
@@ -104,7 +102,7 @@ const archivedAndOwned = (query: CallerDocuments): CallerDocuments =>
   query.where('d.archived_at', 'is not', null).where(ownsDocument)
 
 const newestFirst = (query: CallerDocuments): CallerDocuments =>
-  query.orderBy('d.updated_at', 'desc').orderBy('d.id', 'desc')
+  query.orderBy(inMilliseconds('d.updated_at'), 'desc').orderBy('d.id', 'desc')
 
 /** The document with the person's facts, readable or not, or nothing when it does not exist or is not in their workspaces. */
 export async function findDocumentFor(
@@ -177,8 +175,7 @@ export async function listDocuments(db: Kysely<Database>, search: DocumentSearch
     )
   }
   if (search.after !== undefined) {
-    const { timestamp, id } = search.after
-    query = query.where(sql<boolean>`(d.updated_at, d.id) < (${timestamp}::timestamptz, ${id}::uuid)`)
+    query = query.where(isBefore('d.updated_at', 'd.id', search.after))
   }
 
   const rows = await newestFirst(query)
