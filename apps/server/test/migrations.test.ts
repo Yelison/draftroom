@@ -147,7 +147,7 @@ describe('the fourth migration, on a database that already holds documents and t
         .values({ workspace_id: workspace.id, document_id: workspace.documentId, state: Uint8Array.of(0, 0) })
         .execute()
 
-      expect(await migrateToLatest(populated.db)).toEqual(['0004_versions'])
+      expect(await migrateToLatest(populated.db)).toEqual(['0004_versions', '0005_activity_events_workspace_idx'])
 
       const states = await populated.db
         .selectFrom('document_states')
