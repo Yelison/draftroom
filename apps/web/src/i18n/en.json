@@ -407,7 +407,7 @@
   "settings.members.roleLabel": "Role of {name}",
   "settings.members.remove": "Remove",
   "settings.members.removeLabel": "Remove {name}",
-  "settings.members.lastOwner": "Only owner. Make someone else an owner before changing this role.",
+  "settings.members.lastOwner": "Last owner. Give the owner role to someone else before changing this one.",
   "settings.members.invite.email": "Email",
   "settings.members.invite.role": "Role",
   "settings.members.invite.action": "Invite",
@@ -420,6 +420,7 @@
   "settings.members.announce.invited": "{name} was invited as {role, select, owner {Owner} other {Member}}.",
   "settings.members.announce.changed": "The role of {name} is now {role, select, owner {Owner} other {Member}}.",
   "settings.members.announce.removed": "{name} was removed from the workspace.",
+  "settings.members.announce.demoted": "You are no longer an owner of this workspace.",
   "settings.members.error.lastOwner": "A workspace needs at least one owner. Make someone else an owner first.",
   "settings.members.error.alreadyMember": "That person already belongs to this workspace.",
   "settings.appearance.title": "Appearance",
@@ -433,6 +434,5 @@
   "settings.appearance.textSize.small": "Small",
   "settings.appearance.textSize.medium": "Medium",
   "settings.appearance.textSize.large": "Large",
-  "settings.appearance.textSize.saved": "Text size saved",
-  "settings.members.announce.demoted": "You are no longer an owner of this workspace."
+  "settings.appearance.textSize.saved": "Text size saved"
 }

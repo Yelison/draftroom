@@ -420,6 +420,7 @@
   "settings.members.announce.invited": "Se invitó a {name} como {role, select, owner {propietario} other {miembro}}.",
   "settings.members.announce.changed": "El rol de {name} ahora es {role, select, owner {propietario} other {miembro}}.",
   "settings.members.announce.removed": "Se quitó a {name} del espacio.",
+  "settings.members.announce.demoted": "Ya no tienes el rol de propietario de este espacio.",
   "settings.members.error.lastOwner": "Un espacio necesita al menos un propietario. Da primero el rol de propietario a otra persona.",
   "settings.members.error.alreadyMember": "Esa persona ya pertenece a este espacio.",
   "settings.appearance.title": "Apariencia",
@@ -433,6 +434,5 @@
   "settings.appearance.textSize.small": "Pequeño",
   "settings.appearance.textSize.medium": "Mediano",
   "settings.appearance.textSize.large": "Grande",
-  "settings.appearance.textSize.saved": "Tamaño del texto guardado",
-  "settings.members.announce.demoted": "Ya no tienes el rol de propietario de este espacio."
+  "settings.appearance.textSize.saved": "Tamaño del texto guardado"
 }

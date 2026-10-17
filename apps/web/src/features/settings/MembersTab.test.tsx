@@ -92,7 +92,7 @@ describe('the Members tab', () => {
       })
 
       expect(roleOf('Marta Ruiz (you)')).toHaveAttribute('aria-disabled', 'true')
-      expect(within(main()).getByText(/Only owner\. Make someone else an owner/)).toBeInTheDocument()
+      expect(within(main()).getByText(/Last owner\. Give the owner role to someone else/)).toBeInTheDocument()
       await user.selectOptions(roleOf('Marta Ruiz (you)'), 'Member')
 
       expect(calls).toBe(0)
@@ -106,7 +106,7 @@ describe('the Members tab', () => {
       await within(main()).findByText('idris@harborpine.example was invited as Owner.')
 
       expect(roleOf('Marta Ruiz (you)')).toHaveAttribute('aria-disabled', 'true')
-      expect(within(main()).getByText(/Only owner\. Make someone else an owner/)).toBeInTheDocument()
+      expect(within(main()).getByText(/Last owner\. Give the owner role to someone else/)).toBeInTheDocument()
     })
 
     it('is free to step down once somebody else is an owner too', async () => {
@@ -116,7 +116,7 @@ describe('the Members tab', () => {
       await within(main()).findByText('The role of Daniel Okafor is now Owner.')
 
       expect(roleOf('Marta Ruiz (you)')).not.toHaveAttribute('aria-disabled')
-      expect(within(main()).queryByText(/Only owner\./)).not.toBeInTheDocument()
+      expect(within(main()).queryByText(/Last owner\./)).not.toBeInTheDocument()
     })
 
     it('hands the focus to the headline and says so when stepping down takes the controls away', async () => {
