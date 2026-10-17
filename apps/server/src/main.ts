@@ -5,6 +5,7 @@ import { ConfigError, loadConfig } from './config.ts'
 import { createDatabase } from './db/database.ts'
 import { buildApp } from './http/app.ts'
 import { createSessions } from './http/auth/sessions.ts'
+import { sessionSweepIntervalMs, startSessionSweep } from './http/auth/sessionSweep.ts'
 import { authProviderFor, sessionCookiesFor } from './http/auth/select.ts'
 import type { DocumentBroadcaster } from './http/document-broadcaster.ts'
 
@@ -63,8 +64,17 @@ const liveAccess = createLiveAccess({
   log: app.log,
 })
 
+// A session that nobody signed out of ends by time: this removes it and closes the connections it opened.
+const sessionSweep = startSessionSweep({
+  sessions,
+  liveAccess,
+  log: app.log,
+  intervalMs: sessionSweepIntervalMs,
+})
+
 async function shutDown(signal: NodeJS.Signals): Promise<void> {
   app.log.info({ signal }, 'shutting down')
+  sessionSweep.stop()
   // The collaboration server first: it stores the documents that are waiting, and that needs the database.
   await collaboration.shutDown()
   await app.close()
