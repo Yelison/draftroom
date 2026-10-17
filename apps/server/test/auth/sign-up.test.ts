@@ -148,6 +148,25 @@ describe('signing up with an address that has an account', () => {
   })
 })
 
+describe('signing up with an address that is taken between the check and the write', () => {
+  it('is a conflict and not a failure of the server, whoever wrote first', async () => {
+    const account = newAccount()
+    let answer: Promise<Awaited<ReturnType<typeof signUp>>> | undefined
+    // Another sign-up has written the address and not committed yet: this one does not see the row, goes on to write its own, and
+    // waits for the first at the unique index. When the first commits, the write is refused and the answer is the contract's.
+    await db.transaction().execute(async (transaction) => {
+      await transaction
+        .insertInto('users')
+        .values({ email: account.email, name: 'First Of Two', signed_up_at: new Date() })
+        .execute()
+      answer = signUp(new Browser(server), account)
+      await new Promise((resolve) => setTimeout(resolve, 400))
+    })
+
+    expect((await answer)?.statusCode).toBe(409)
+  })
+})
+
 describe('signing up with an address that was invited', () => {
   it('claims the invitation: same person, now active in the workspace, with the grants given to the address', async () => {
     const workspaceId = await createWorkspace(db)
