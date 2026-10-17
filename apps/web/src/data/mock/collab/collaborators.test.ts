@@ -115,6 +115,20 @@ describe('the collaborators of the demo', () => {
     expect(connections(server)).toBe(1)
   })
 
+  it('do not come in when their turn arrives just as the tab is hidden', async () => {
+    const otherTab = tabThatHasTheTurn()
+    const { page, show } = fakePage({ takeTurn: otherTab.takeTurn })
+    const server = serverWithCollaborator(page)
+    visitor(server)
+    await settle()
+
+    otherTab.letGo()
+    show(true)
+    await settle()
+
+    expect(connections(server)).toBe(1)
+  })
+
   it('are in the document once when the tab is hidden and shown again at once', async () => {
     const { page, show } = fakePage()
     const server = serverWithCollaborator(page)
