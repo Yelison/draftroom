@@ -20,7 +20,11 @@ export function demoDocument(locale: Locale, documentId: string): SeededContent 
     const quotes = demoThreads
       .filter((thread) => thread.documentId === documentId)
       .flatMap((thread) => threadText[locale][thread.id]?.quote ?? [])
-    content = seedContent(blocks, { anchoredOn: quotes, withdrawn: withdrawnBlocks[locale][documentId] ?? [] })
+    content = seedContent(blocks, {
+      writtenBy: key,
+      anchoredOn: quotes,
+      withdrawn: withdrawnBlocks[locale][documentId] ?? [],
+    })
     seeded.set(key, content)
   }
   return content

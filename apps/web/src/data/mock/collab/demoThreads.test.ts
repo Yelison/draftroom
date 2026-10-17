@@ -12,6 +12,7 @@ import { marta } from '../fixtures/index.ts'
 import { seedId } from '../ids.ts'
 import { createMockServer } from '../createMockDataSource.ts'
 import { fakePage } from './fakePage.ts'
+import { demoDocument } from './demoDocuments.ts'
 import { seedContent } from './seededContent.ts'
 
 const locales = ['en', 'es'] as const
@@ -87,10 +88,29 @@ describe('the starting content of a document', () => {
   it('is the same bytes every time, so every tab holds the same items and the anchors find them', () => {
     const blocks = demoContent.en[launchPlan.id] ?? []
 
-    const first = seedContent(blocks, { anchoredOn: ['second week'] })
-    const second = seedContent(blocks, { anchoredOn: ['second week'] })
+    const first = seedContent(blocks, { writtenBy: 'en:plan', anchoredOn: ['second week'] })
+    const second = seedContent(blocks, { writtenBy: 'en:plan', anchoredOn: ['second week'] })
 
     expect(second.update).toEqual(first.update)
     expect(second.anchors).toEqual(first.anchors)
+  })
+
+  it('has a writer of its own for each language, so a copy kept in one language is not taken for the other', () => {
+    const english = demoDocument('en', launchPlan.id)
+    const spanish = demoDocument('es', launchPlan.id)
+    if (english === undefined || spanish === undefined) throw new Error('The launch plan has no text')
+
+    // A browser that kept the English copy and is given the Spanish text: both are in the document, none replaces the other.
+    const ydoc = new Y.Doc()
+    Y.applyUpdate(ydoc, english.update)
+    Y.applyUpdate(ydoc, spanish.update)
+
+    expect(Y.decodeUpdate(english.update).structs[0]?.id.client).not.toBe(
+      Y.decodeUpdate(spanish.update).structs[0]?.id.client,
+    )
+    const text = ydoc.getXmlFragment(fragmentName).toString()
+    expect(text).toContain('The launch moves')
+    expect(text).toContain('El lanzamiento pasa')
+    ydoc.destroy()
   })
 })

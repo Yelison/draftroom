@@ -33,11 +33,18 @@ export function anchorOnText(doc: Y.Doc, quote: string): Schema<'Anchor'> {
 }
 
 /**
- * The client that wrote the starting content. A document that is written from JSON gets new ids for its text every time,
- * and a comment anchored in it names those ids, so the demo writes it as one fixed client: every tab, and every build,
- * holds the same items, and the anchors of the fixtures find them.
+ * The client that wrote the starting content, which comes from a name (the language and the document). Text written from
+ * JSON gets new ids every time, and a comment anchored in it names those ids, so the demo writes it as a client that is
+ * always the same: every tab and every build hold the same items, and the anchors of the fixtures find them. A name of its
+ * own for each language and document keeps two texts from sharing ids: a copy that a browser kept of one language, opened
+ * in the other, would otherwise be taken for the same items and leave the two sides disagreeing about the text.
  */
-const seedClientId = 2_026_101_317
+function seedClientId(name: string): number {
+  // FNV-1a, 32 bits: stable, and spread enough that two names do not meet. A client id is never 0.
+  let hash = 0x811c9dc5
+  for (const character of name) hash = Math.imul(hash ^ character.codePointAt(0)!, 0x01000193) >>> 0
+  return hash === 0 ? 1 : hash
+}
 
 export interface SeededContent {
   /** The Yjs update to start the document with. */
@@ -49,14 +56,18 @@ export interface SeededContent {
 /**
  * The starting content of a document and the anchors of the comments on it. `withdrawn` is text that was there when a
  * comment was made and was deleted afterwards, the way someone else's edit would: its comment is orphaned from the start,
- * which is what a thread whose text is gone looks like.
+ * which is what a thread whose text is gone looks like. `writtenBy` names who wrote it (see `seedClientId`).
  */
 export function seedContent(
   blocks: readonly JSONContent[],
-  { anchoredOn, withdrawn = [] }: { anchoredOn: readonly string[]; withdrawn?: readonly JSONContent[] },
+  {
+    writtenBy,
+    anchoredOn,
+    withdrawn = [],
+  }: { writtenBy: string; anchoredOn: readonly string[]; withdrawn?: readonly JSONContent[] },
 ): SeededContent {
   const doc = new Y.Doc()
-  doc.clientID = seedClientId
+  doc.clientID = seedClientId(writtenBy)
   const fragment = doc.getXmlFragment(fragmentName)
   try {
     doc.transact(() => replaceFragmentContent(fragment, { type: 'doc', content: [...blocks, ...withdrawn] }))
