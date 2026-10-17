@@ -8,3 +8,9 @@
 .description {
   margin: 0 0 var(--space-8);
 }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}

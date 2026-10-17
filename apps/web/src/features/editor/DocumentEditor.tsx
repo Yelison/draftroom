@@ -12,6 +12,7 @@ import { SyncStatus } from '../../components/SyncStatus/SyncStatus.tsx'
 import { ShareControl } from '../sharing/ShareControl.tsx'
 import { VersionsButton } from '../versions/VersionsButton.tsx'
 import { useDataSource } from '../../data/useDataSource.ts'
+import { problemMessageId } from '../documents/problemMessage.ts'
 import type { CollaboratingPerson } from './CollaborationExtensions.ts'
 import { EditorSkeleton } from './EditorSkeleton.tsx'
 import { EditorStatePanel } from './EditorStatePanel.tsx'
@@ -25,6 +26,7 @@ import { canEdit } from './roles.ts'
 import { meQuery } from './meQuery.ts'
 import { useCollabSession } from './useCollabSession.ts'
 import { useDocumentEditor } from './useDocumentEditor.ts'
+import { useDuplicateDocument } from './useDuplicateDocument.ts'
 import styles from './Sheet.module.css'
 
 type LinkChange = 'added' | 'updated' | 'removed'
@@ -239,6 +241,11 @@ function EditorWorkspace({
     textWantsFocus.current = true
   }
 
+  // A refusal is shown in the alert and said in a region that was already in the page (below), where it is heard.
+  const duplicating = useDuplicateDocument(document)
+  const duplicateProblem =
+    duplicating.error === null ? null : intl.formatMessage({ id: problemMessageId(duplicating.error) })
+
   const retry = () => {
     handBackFocus()
     session.retry()
@@ -296,7 +303,13 @@ function EditorWorkspace({
           <SyncStatus state={snapshot.state} keepsCopy={snapshot.keepsCopy} />
         </div>
       </div>
-      <SyncAlerts snapshot={snapshot} onRetry={retry} onDiscard={discard} onDismissNotice={dismissNotice} />
+      <SyncAlerts
+        snapshot={snapshot}
+        duplicate={{ run: () => duplicating.mutate(), pending: duplicating.isPending, problem: duplicateProblem }}
+        onRetry={retry}
+        onDiscard={discard}
+        onDismissNotice={dismissNotice}
+      />
       <div className={styles.sheet}>
         <OfflineNotice snapshot={snapshot} />
         <TitleField document={document} editable={mayEdit} onEnter={() => editor.commands.focus('start')} />
@@ -313,6 +326,9 @@ function EditorWorkspace({
       {/* Heard, not seen. The region is in the page before anything is said in it: one that appears with its text is not announced. */}
       <p role="status" className="forma-visually-hidden">
         {linkChange !== null && intl.formatMessage({ id: 'editor.link.announcement' }, { change: linkChange })}
+      </p>
+      <p role="status" className="forma-visually-hidden">
+        {duplicateProblem}
       </p>
       <p role="status" className="forma-visually-hidden">
         {refusals > 0 && <span key={refusals}>{intl.formatMessage({ id: 'editor.paste.tooLarge' })}</span>}
