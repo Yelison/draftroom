@@ -1,0 +1,102 @@
+import { execFileSync } from 'node:child_process'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { findSecrets } from './findSecrets.ts'
+
+const repository = new URL('../../../../', import.meta.url).pathname
+
+// Built from parts, so that this file holds nothing a scanner of the repository would take for a real token.
+const fake = {
+  githubToken: `ghp_${'a1B2'.repeat(9)}`,
+  awsKey: `AKIA${'Q7'.repeat(8)}`,
+  jwt: `eyJ${'a'.repeat(12)}.eyJ${'b'.repeat(12)}.${'c'.repeat(12)}`,
+  hex32: 'c0ffee'.repeat(11),
+}
+
+describe('what counts as a secret in a file meant to be published', () => {
+  const secrets: ReadonlyArray<readonly [what: string, line: string]> = [
+    ['a private key', '-----BEGIN OPENSSH PRIVATE KEY-----'],
+    ['a GitHub token', `GITHUB=${fake.githubToken}`],
+    ['an AWS access key id', `  access: ${fake.awsKey}`],
+    ['a JSON web token', `Authorization: Bearer ${fake.jwt}`],
+    ['a password in a connection URL', 'DATABASE_URL=postgres://draftroom:hunter2@db:5432/draftroom'],
+    ['a session secret with a value', `SESSION_SECRET=${fake.hex32}`],
+    ['a short password with a value', 'POSTGRES_PASSWORD: draftroom'],
+    ['a quoted token with a value', `api_token = "abc123"`],
+    ['a long random string under any name', `salt=${fake.hex32}`],
+    ['a long key in base64 with slashes', `salt=Zm9vYmFy/Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFy+Zm9v`],
+    ['a secret left in a comment', `# SESSION_SECRET=${fake.hex32}`],
+  ]
+  it.each(secrets)('finds %s', (_what, line) => {
+    expect(findSecrets(line)).toHaveLength(1)
+  })
+
+  const harmless: ReadonlyArray<readonly [what: string, line: string]> = [
+    ['a marker in an example', 'SESSION_SECRET=CHANGE_ME_with_openssl_rand_hex_32'],
+    ['a reference to the environment', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in deploy/.env}'],
+    [
+      'a connection URL built from references',
+      'postgres://${POSTGRES_USER:-draftroom}:${POSTGRES_PASSWORD}@postgres:5432/db',
+    ],
+    ['an empty value', 'POSTGRES_PASSWORD='],
+    ['a password given by name only', 'docker exec -e PGPASSWORD "$container" psql'],
+    ['a commented explanation', '# The password goes inside a connection URL: password=letters-and-digits-only'],
+    ['a pinned image digest', `image: postgres:17.11@sha256:${'ab12'.repeat(16)}`],
+    ['a long path in a comment', '# docs/decisions/0016-production-packaging.md says why the proxy serves the app'],
+    ['prose about a secret', '# Signs and checks sessions, at least 32 characters.'],
+  ]
+  it.each(harmless)('lets through %s', (_what, line) => {
+    expect(findSecrets(line)).toEqual([])
+  })
+})
+
+const ignoredByGit = new Set(['.env', 'backups'])
+
+/** Every file under `directory`, except where the real settings and the backups legitimately live: git ignores those. */
+function filesUnder(directory: string): string[] {
+  return readdirSync(directory)
+    .filter((name) => !ignoredByGit.has(name) && !name.endsWith('.dump'))
+    .flatMap((name) => {
+      const path = join(directory, name)
+      return statSync(path).isDirectory() ? filesUnder(path) : [path]
+    })
+}
+
+// What is published for anyone to read or to copy into an image: the deployment directory, the image recipe and the scripts
+// that run with the database's credentials.
+const published = [
+  ...filesUnder(join(repository, 'deploy')),
+  ...['Dockerfile', '.dockerignore', 'scripts/backup.sh', 'scripts/restore.sh'].map((file) => join(repository, file)),
+]
+
+describe('the deployment files', () => {
+  it('are found, so that the scan below is not an empty one', () => {
+    const names = published.map((path) => relative(repository, path))
+
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'deploy/Caddyfile',
+        'deploy/docker-compose.prod.yml',
+        'deploy/env.example',
+        'Dockerfile',
+        'scripts/backup.sh',
+        'scripts/restore.sh',
+      ]),
+    )
+  })
+
+  it.each(published.map((path) => [relative(repository, path), path] as const))(
+    '%s holds nothing shaped like a secret',
+    (_name, path) => {
+      expect(findSecrets(readFileSync(path, 'utf8'))).toEqual([])
+    },
+  )
+
+  it.each(['deploy/.env', 'deploy/backups/draftroom.dump', 'deploy/anything.dump'])(
+    'are never given the real settings or a backup: git ignores %s',
+    (path) => {
+      expect(() => execFileSync('git', ['check-ignore', '--quiet', path], { cwd: repository })).not.toThrow()
+    },
+  )
+})
