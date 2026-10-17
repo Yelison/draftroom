@@ -27,7 +27,6 @@ const required = (name) => {
 
 const origin = required('DRILL_ORIGIN')
 const restored = { api: required('DRILL_RESTORED_API'), collab: required('DRILL_RESTORED_COLLAB') }
-const project = required('COMPOSE_PROJECT_NAME')
 const scripts = new URL('../../scripts/', import.meta.url).pathname
 const drillDirectory = new URL('./', import.meta.url).pathname
 
@@ -154,46 +153,6 @@ const collabOf = (base) => `${base.replace(/^http/, 'ws')}/collab`
 step(`the stack answers on ${origin}`)
 await waitUntilReady(origin)
 
-// TEMPORARY. Until the authentication task (T7.1) is on this branch, sign-up gives a person no workspace, so a pending
-// member is inserted by hand to be claimed at sign-up. Once it lands, signing up without an invitation creates the person's
-// own workspace in the same transaction: this step and the SQL below are deleted, and the drill signs up through the API alone.
-step('an operator invites the first owner of a workspace (a pending member, as the API does it)')
-const postgres = execFileSync('docker', [
-  'ps',
-  '--quiet',
-  '--no-trunc',
-  '--filter',
-  `label=com.docker.compose.project=${project}`,
-  '--filter',
-  'label=com.docker.compose.service=postgres',
-])
-  .toString()
-  .trim()
-execFileSync(
-  'docker',
-  [
-    'exec',
-    '-i',
-    postgres,
-    'psql',
-    '--username',
-    'draftroom',
-    '--dbname',
-    'draftroom',
-    '--set',
-    'ON_ERROR_STOP=1',
-    '--quiet',
-    '--file',
-    '-',
-  ],
-  {
-    input: `
-    with person as (insert into users (email) values ('${account.email}') returning id),
-         place as (insert into workspaces (name) values ('Drill workspace') returning id)
-    insert into memberships (workspace_id, user_id, role) select place.id, person.id, 'owner' from person, place;`,
-  },
-)
-
 step('the person signs up, and the session cookie is HttpOnly and Secure')
 const session = new Session(origin)
 const signUp = await session.request('POST', '/api/auth/sign-up', account)
@@ -202,10 +161,12 @@ const sessionCookie = session.cookies.get('dr_session')
 check(sessionCookie !== undefined, 'sign-up set no dr_session cookie')
 check(sessionCookie.flags.includes('httponly'), 'the session cookie is not HttpOnly')
 check(sessionCookie.flags.includes('secure'), 'the session cookie is not Secure')
-check(session.cookies.has('dr_csrf'), 'sign-up set no dr_csrf cookie')
+const csrfCookie = session.cookies.get('dr_csrf')
+check(csrfCookie !== undefined, 'sign-up set no dr_csrf cookie')
+check(csrfCookie.flags.includes('secure'), 'the CSRF cookie is not Secure')
 
 step('the person creates a document and writes into it over WSS, until the server says it stored it')
-const workspaces = await (await session.request('GET', '/api/workspaces')).json()
+const { items: workspaces } = await (await session.request('GET', '/api/workspaces')).json()
 check(workspaces.length === 1, `the person belongs to ${workspaces.length} workspaces`)
 const created = await session.request('POST', `/api/workspaces/${workspaces[0].id}/documents`, { title: 'Minutes' })
 check(created.status === 201, `creating the document answered ${created.status}`)
