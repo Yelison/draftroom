@@ -1,0 +1,42 @@
+name: Backup and restore drill
+
+# A backup nobody has restored is a hope. This starts the production stack, signs up with a real account, writes a document,
+# takes a backup, restores it into a new database and opens the document from a server that runs on the restored data
+# (deploy/drill/drill.sh). It is not one of the required checks: it runs when the packaging changes, and on request.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'deploy/**'
+      - 'scripts/backup.sh'
+      - 'scripts/restore.sh'
+      - 'apps/server/src/**'
+      - 'apps/web/src/**'
+      - '.github/workflows/backup-drill.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-drill-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  drill:
+    name: Backup and restore drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # The script removes the stack and everything it started when it ends, and prints what the containers said if it failed.
+      - run: deploy/drill/drill.sh
