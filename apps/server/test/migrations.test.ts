@@ -55,6 +55,7 @@ describe('the migrations, on a database that starts empty', () => {
       '0004_versions',
       '0005_activity_events_workspace_idx',
       '0006_user_preferences',
+      '0007_millisecond_order_indexes',
     ])
     expect(await tablesOf()).toEqual(tablesOfTheMigrations)
     expect(await migrationStatus(database.db)).toEqual({ current: true })
@@ -152,6 +153,7 @@ describe('the fourth migration, on a database that already holds documents and t
         '0004_versions',
         '0005_activity_events_workspace_idx',
         '0006_user_preferences',
+        '0007_millisecond_order_indexes',
       ])
 
       const states = await populated.db
@@ -160,6 +162,66 @@ describe('the fourth migration, on a database that already holds documents and t
         .execute()
       const versions = await populated.db.selectFrom('document_versions').select('id').execute()
       expect([states, versions]).toEqual([[{ document_id: workspace.documentId, versions_checked_at: null }], []])
+    } finally {
+      await populated.drop()
+    }
+  })
+})
+
+describe('the seventh migration, on a database that already holds events and versions', () => {
+  const indexesOf = async (db: TestDatabase['db']): Promise<Record<string, string>> => {
+    const { rows } = await sql<{ indexname: string; indexdef: string }>`
+      select indexname, indexdef from pg_indexes
+      where tablename in ('activity_events', 'document_versions') order by indexname`.execute(db)
+    return Object.fromEntries(rows.map((row) => [row.indexname, row.indexdef]))
+  }
+
+  it('swaps the indexes of the history for the ones of the millisecond order, keeps the one the versions still need, and leaves the rows', async () => {
+    const populated = await provisionDatabase({ migrated: false })
+    try {
+      const { error } = await new Migrator({ db: populated.db, provider: migrationProvider }).migrateTo(
+        '0005_activity_events_workspace_idx',
+      )
+      expect(error).toBeUndefined()
+      const workspace = await createPopulatedWorkspace(populated.db)
+      await populated.db
+        .insertInto('document_versions')
+        .values({
+          workspace_id: workspace.id,
+          document_id: workspace.documentId,
+          kind: 'auto',
+          state: Uint8Array.of(0, 0),
+        })
+        .execute()
+      await populated.db
+        .insertInto('activity_events')
+        .values({ workspace_id: workspace.id, document_id: workspace.documentId, type: 'document.created' })
+        .execute()
+      const eventsBefore = await populated.db.selectFrom('activity_events').select('id').execute()
+      expect(eventsBefore).toHaveLength(1)
+      const before = await indexesOf(populated.db)
+
+      expect(await migrateToLatest(populated.db)).toEqual(['0006_user_preferences', '0007_millisecond_order_indexes'])
+
+      const after = await indexesOf(populated.db)
+      expect(Object.keys(after).filter((name) => !(name in before))).toEqual([
+        'activity_events_document_ms_idx',
+        'activity_events_workspace_ms_idx',
+        'document_versions_document_ms_idx',
+      ])
+      expect(Object.keys(before).filter((name) => !(name in after))).toEqual([
+        'activity_events_document_idx',
+        'activity_events_workspace_idx',
+      ])
+      expect(after['document_versions_document_idx']).toBe(before['document_versions_document_idx'])
+      expect(await populated.db.selectFrom('activity_events').select('id').execute()).toEqual(eventsBefore)
+      expect(await populated.db.selectFrom('document_versions').select('id').execute()).toHaveLength(1)
+
+      // Going back is a new migration: creating the two indexes again from what they were gives exactly what there was.
+      for (const name of ['activity_events_document_idx', 'activity_events_workspace_idx']) {
+        await sql.raw(before[name] ?? '').execute(populated.db)
+      }
+      expect(await indexesOf(populated.db)).toEqual({ ...after, ...before })
     } finally {
       await populated.drop()
     }

@@ -19,7 +19,7 @@ export function instantsAgainstIds(ids: readonly string[], millisecond: number):
   return stamps
 }
 
-type StampedTable = 'documents' | 'threads' | 'comments'
+type StampedTable = 'documents' | 'threads' | 'comments' | 'activity_events' | 'document_versions'
 
 /** Sets the instants of the rows exactly, microseconds included. */
 export async function setInstants(

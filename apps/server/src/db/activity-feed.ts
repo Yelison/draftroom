@@ -2,6 +2,7 @@ import { sql, type Kysely } from 'kysely'
 import { sharingActivity } from '../domain/activity.ts'
 import type { CursorPosition } from '../domain/pagination.ts'
 import { memberDocuments, ownsDocument, readableDocument } from './documents/caller-documents.ts'
+import { inMilliseconds, isBefore, millisecondKey } from './milliseconds.ts'
 import type { ActivityType, Database } from './tables.ts'
 
 // The history as a person is told it: the events of the documents they can read, at the moment they ask. The right to
@@ -24,7 +25,7 @@ export interface ActivityRecord {
   readonly actor: ActivityPerson | null
   readonly document: { readonly id: string; readonly title: string }
   readonly targetUser: ActivityPerson | null
-  /** `created_at` as PostgreSQL writes it, microseconds included: what a cursor holds. */
+  /** `created_at` cut to the millisecond, as PostgreSQL writes it: what a cursor holds. */
   readonly createdAtKey: string
 }
 
@@ -46,9 +47,6 @@ export interface ActivityPage {
   /** Where the next page starts, or `null` on the last one. */
   readonly next: CursorPosition | null
 }
-
-// Written by PostgreSQL, in UTC, so a cursor does not depend on a time zone setting and keeps the microseconds.
-const createdAtKey = sql<string>`to_char(e.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
 
 const instant = (timestamp: string) => sql<Date>`${timestamp}::timestamptz`
 
@@ -76,7 +74,7 @@ export function activityPageQuery(db: Kysely<Database>, search: ActivitySearch) 
       'target.id as targetId',
       'target.name as targetName',
       'target.email as targetEmail',
-      createdAtKey.as('createdAtKey'),
+      millisecondKey('e.created_at').as('createdAtKey'),
     ])
     .where('d.workspace_id', '=', search.workspaceId)
     .where(readableDocument)
@@ -86,12 +84,11 @@ export function activityPageQuery(db: Kysely<Database>, search: ActivitySearch) 
   if (search.from !== undefined) query = query.where('e.created_at', '>=', instant(search.from))
   if (search.to !== undefined) query = query.where('e.created_at', '<', instant(search.to))
   if (search.after !== undefined) {
-    const { timestamp, id } = search.after
-    query = query.where(sql<boolean>`(e.created_at, e.id) < (${timestamp}::timestamptz, ${id}::uuid)`)
+    query = query.where(isBefore('e.created_at', 'e.id', search.after))
   }
 
   return query
-    .orderBy('e.created_at', 'desc')
+    .orderBy(inMilliseconds('e.created_at'), 'desc')
     .orderBy('e.id', 'desc')
     .limit(search.limit + 1)
 }

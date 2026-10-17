@@ -7,6 +7,7 @@ import { encodeCursor } from '../src/domain/pagination.ts'
 import { apiOf, bodyAs, type Api } from './support/api.ts'
 import { recordEvent, recordEventsAt } from './support/activity.ts'
 import { provisionDatabase, type TestDatabase } from './support/postgres.ts'
+import { instantsAgainstIds, setInstants } from './support/stamps.ts'
 import { personFor, scenarios } from './support/scenarios.ts'
 import { createTestApp, type TestApp } from './support/test-app.ts'
 import { createDocument, createPerson, createWorkspace, grant, join, type Person } from './support/world.ts'
@@ -415,24 +416,20 @@ describe('paging through the history', () => {
     expect(paged.pages).toBe(Math.ceil(62 / 7))
   })
 
-  it('does not lose events that differ by less than a millisecond, which a JavaScript date cannot tell apart', async () => {
+  it('orders events of one millisecond by id, whatever their microseconds, and loses none when paged by two', async () => {
     const { workspaceId, owner, colleague } = await newWorkspace()
     const documentId = await createDocument(db, { workspaceId, creator: owner })
-    const events: string[] = []
-    for (const micros of ['123401', '123402', '123403', '123404', '123405']) {
-      events.push(
-        await recordEvent(db, {
-          workspaceId,
-          documentId,
-          actor: colleague,
-          createdAt: `2026-10-13T10:00:00.${micros}Z`,
-        }),
-      )
-    }
+    const events = await recordEventsAt(db, 5, {
+      workspaceId,
+      documentId,
+      actor: colleague,
+      createdAt: '2026-10-13T10:00:00Z',
+    })
+    await setInstants(db, 'activity_events', 'created_at', instantsAgainstIds(events, 123))
 
     const paged = await everyPage(owner, `/api/workspaces/${workspaceId}/activity`, 2)
 
-    expect(paged.ids).toEqual(events.reverse())
+    expect(paged.ids).toEqual([...events].sort().reverse())
   })
 
   it('ends on the page that holds the last event, not on one more that is empty', async () => {

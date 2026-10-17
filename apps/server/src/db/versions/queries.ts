@@ -1,6 +1,7 @@
 import { sql, type Kysely } from 'kysely'
 import type { CursorPosition } from '../../domain/pagination.ts'
 import type { PersonRef } from '../comments/queries.ts'
+import { inMilliseconds, isBefore, millisecondKey } from '../milliseconds.ts'
 import type { Database, VersionKind } from '../tables.ts'
 
 // The reads of versions. A version comes with the name of the person who saved it and the size of what it holds, which is
@@ -17,7 +18,7 @@ export interface VersionRecord {
   readonly size_bytes: number
   /** `null` when the server made it on its own. */
   readonly creator: PersonRef | null
-  /** `created_at` as PostgreSQL writes it, microseconds included: what a cursor holds. */
+  /** `created_at` cut to the millisecond, as PostgreSQL writes it: what a cursor holds. */
   readonly createdAtKey: string
 }
 
@@ -28,9 +29,6 @@ export interface VersionLocation {
   readonly document_id: string
   readonly kind: VersionKind
 }
-
-// Written by PostgreSQL, in UTC, so a cursor does not depend on a time zone setting and keeps the microseconds.
-const timestampKey = sql<string>`to_char(v.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
 
 function versionsQuery(db: Kysely<Database>) {
   return db
@@ -46,7 +44,7 @@ function versionsQuery(db: Kysely<Database>) {
       sql<number>`octet_length(v.state)`.as('size_bytes'),
       'creator.id as creatorId',
       'creator.name as creatorName',
-      timestampKey.as('createdAtKey'),
+      millisecondKey('v.created_at').as('createdAtKey'),
     ])
 }
 
@@ -84,20 +82,24 @@ export interface VersionPage {
   readonly next: CursorPosition | null
 }
 
-/** The versions of a document, newest first, a page at a time. */
-export async function listVersions(db: Kysely<Database>, search: VersionSearch): Promise<VersionPage> {
+/**
+ * The query of a page of the versions of a document, newest first by the millisecond and then by `id`, with one row more
+ * than `limit`: that row says there is a next page. Apart from `listVersions` so that a test can ask the database for its plan.
+ */
+export function versionsPageQuery(db: Kysely<Database>, search: VersionSearch) {
   let query = versionsQuery(db)
     .where('v.workspace_id', '=', search.workspaceId)
     .where('v.document_id', '=', search.documentId)
-  if (search.after !== undefined) {
-    const { timestamp, id } = search.after
-    query = query.where(sql<boolean>`(v.created_at, v.id) < (${timestamp}::timestamptz, ${id}::uuid)`)
-  }
-  const rows = await query
-    .orderBy('v.created_at', 'desc')
+  if (search.after !== undefined) query = query.where(isBefore('v.created_at', 'v.id', search.after))
+  return query
+    .orderBy(inMilliseconds('v.created_at'), 'desc')
     .orderBy('v.id', 'desc')
     .limit(search.limit + 1)
-    .execute()
+}
+
+/** The versions of a document, newest first, a page at a time. */
+export async function listVersions(db: Kysely<Database>, search: VersionSearch): Promise<VersionPage> {
+  const rows = await versionsPageQuery(db, search).execute()
   const records = rows.slice(0, search.limit).map(toRecord)
   const last = records.at(-1)
   return {
