@@ -3,6 +3,8 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { collaboratorScripts } from '../src/data/mock/fixtures/collaboratorScripts.ts'
+import { demoContent } from '../src/data/mock/fixtures/demoContent.ts'
 import { seed } from '../src/data/mock/fixtures/index.ts'
 import { expect, test } from './fixtures.ts'
 
@@ -31,7 +33,23 @@ function readableTexts(node: unknown, key?: string): string[] {
   return []
 }
 
-const fixtureTexts = [...new Set(readableTexts(seed))]
+/** The words of the documents of the demo and of what its collaborators write: text nodes, which `readableTexts` does not read. */
+function writtenTexts(node: unknown): string[] {
+  if (Array.isArray(node)) return node.flatMap(writtenTexts)
+  if (typeof node !== 'object' || node === null) return []
+  return Object.entries(node).flatMap(([key, child]) =>
+    key === 'text' && typeof child === 'string' ? [child] : writtenTexts(child),
+  )
+}
+
+const demoTexts = [
+  ...writtenTexts(demoContent),
+  ...collaboratorScripts.flatMap(({ lines }) =>
+    Object.values(lines).flatMap((script) => script.flatMap(({ draft, final }) => [draft, final])),
+  ),
+]
+
+const fixtureTexts = [...new Set([...readableTexts(seed), ...demoTexts])]
 
 /** What only the mock or the test tooling has: the mock's own words and the messages of the validator and the parser. */
 // The mock leaves nothing out any more (it implements every operation of the client), so `UnhandledOperationError`, the
@@ -55,6 +73,9 @@ const forbiddenMarkers = [
   // The reason the simulated collaboration server gives when it ends a connection over a message it cannot read: its own
   // text, which the real server and the client do not have. It is what tells that the simulator did not come in alone.
   'malformed-message',
+  // The name of the channel the tabs of the demo share the documents on, and the prefix of the lock that picks which tab
+  // plays a person in a document: the mock's own words, and in the build with the mock.
+  'draftroom-demo',
 ]
 
 /** What the provider and Yjs write into the chunk that holds them, and the app's own session over them. */
@@ -161,5 +182,6 @@ test.describe('the production bundle', () => {
     expect(missing, 'fixture texts the search could not find even where they are').toEqual([])
     expect(served.some(({ content }) => content.includes('malformed-message'))).toBe(true)
     expect(served.some(({ content }) => content.includes('draftroomMock'))).toBe(true)
+    expect(served.some(({ content }) => content.includes('draftroom-demo'))).toBe(true)
   })
 })
