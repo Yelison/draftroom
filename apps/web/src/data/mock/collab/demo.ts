@@ -47,7 +47,7 @@ export function createDemo({
       // Written once, by one tab, when the document is opened: two tabs that each wrote it would leave it twice.
       const documentId = parseDocumentName(documentName)
       const content = documentId === null ? undefined : demoContent[locale][documentId]
-      const mayStart = link === undefined ? transport === null : link.mayStartContent()
+      const mayStart = link === undefined ? transport === null : link.mayStartContent(documentName)
       return content === undefined || !mayStart ? undefined : jsonToYUpdate({ type: 'doc', content: [...content] })
     },
     start(server) {

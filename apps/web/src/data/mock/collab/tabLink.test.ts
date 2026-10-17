@@ -55,7 +55,7 @@ async function openTab(bus: ReturnType<typeof createBus>, peer: string, fresh = 
   const server = new SimulatedCollabServer({
     authorize: () => ({ scope: 'read-write' }),
     storeDelayMs: 20,
-    initialContent: () => (link?.mayStartContent() === true ? startingContent() : undefined),
+    initialContent: (document) => (link?.mayStartContent(document) === true ? startingContent() : undefined),
   })
   link = await joinTabs(server, bus.connect(), { peer, now: () => (clock += 1), discoveryMs: 5, fresh })
   return { server, link }
@@ -167,10 +167,10 @@ describe('the tabs of the demo', () => {
     const bus = createBus()
     const first = await openTab(bus, 'tab-1')
     const second = await openTab(bus, 'tab-2')
-    expect(second.link.mayStartContent()).toBe(false)
+    expect(second.link.mayStartContent(name)).toBe(false)
 
     first.link.close()
-    await vi.waitFor(() => expect(second.link.mayStartContent()).toBe(true))
+    await vi.waitFor(() => expect(second.link.mayStartContent(name)).toBe(true))
 
     expect(paragraphs(second.server.document(name))).toEqual(['The plan'])
   })
@@ -184,11 +184,28 @@ describe('the tabs of the demo', () => {
     await vi.waitFor(() => expect(paragraphs(inSecond)).toEqual(['The plan']))
 
     first.link.close()
-    await vi.waitFor(() => expect(second.link.mayStartContent()).toBe(true))
+    await vi.waitFor(() => expect(second.link.mayStartContent('another-document')).toBe(true))
     const inThird = third.server.document(name)
 
     await vi.waitFor(() => expect(paragraphs(inThird)).toEqual(['The plan']))
-    expect(third.link.mayStartContent()).toBe(false)
+    expect(third.link.mayStartContent(name)).toBe(false)
     expect(paragraphs(inSecond)).toEqual(['The plan'])
+  })
+
+  it('do not write a document again when the tab that takes over opens one that another tab already has', async () => {
+    const bus = createBus()
+    const first = await openTab(bus, 'tab-1')
+    const second = await openTab(bus, 'tab-2')
+    const third = await openTab(bus, 'tab-3')
+    const inThird = third.server.document(name)
+    await vi.waitFor(() => expect(paragraphs(inThird)).toEqual(['The plan']))
+
+    first.link.close()
+    await vi.waitFor(() => expect(second.link.mayStartContent('another-document')).toBe(true))
+    const inSecond = second.server.document(name)
+
+    await vi.waitFor(() => expect(paragraphs(inSecond)).toEqual(['The plan']))
+    expect(second.link.mayStartContent(name)).toBe(false)
+    expect(paragraphs(inThird)).toEqual(['The plan'])
   })
 })

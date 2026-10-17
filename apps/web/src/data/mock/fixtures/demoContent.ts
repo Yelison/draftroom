@@ -18,7 +18,8 @@ import {
 //
 // The two documents a collaborator writes in (`collaboratorScripts.ts`) end with a paragraph of plain text. It is the
 // one she adds to and deletes from, so it reads as a line that is still being worked on.
-// A document with a stored version continues the last of them (`versionContent.ts`).
+// The last stored version of a document is taken from the beginning of its text (`demoVersionContent.ts`), so the text
+// continues it.
 
 type Blocks = readonly JSONContent[]
 

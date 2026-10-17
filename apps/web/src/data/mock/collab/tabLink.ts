@@ -134,11 +134,12 @@ export interface TabLink {
   /** The world this tab is in: the peer that started it. */
   readonly world: string
   /**
-   * Whether this tab may write a document's starting content when it opens one. Two tabs that each wrote it would
-   * leave every paragraph twice once they met, so only one tab does, and the others receive it. It is the tab that
-   * started the world; when that tab has gone, it is the oldest of those that are left, which every tab works out the same.
+   * Whether this tab may write a document's starting content when it opens it. Two tabs that each wrote it would leave
+   * every paragraph twice once they met, so only one tab does, and the others receive it. It is the tab that started the
+   * world; when that tab has gone, it is the oldest of those that are left, which every tab works out the same. Not for
+   * a document that someone in the world has already opened: that tab has the content, and this one asks it for it.
    */
-  mayStartContent(): boolean
+  mayStartContent(documentName: string): boolean
   close(): void
 }
 
@@ -159,17 +160,21 @@ export async function joinTabs(
     ...world.peers.map(({ peer: other, joinedAt: since }) => [other, since] as const),
   ])
   let founder = world.id
+  /** The documents that someone in the world has opened, so that whoever writes starting content later does not write them again. */
+  const opened = new Set<string>()
   const post = (message: TabMessage) => transport.post(message)
 
   const observer: RoomObserver = {
-    created: (document) =>
+    created: (document) => {
+      opened.add(document)
       post({
         kind: 'open',
         world: world.id,
         peer,
         document,
         stateVector: Y.encodeStateVector(server.document(document)),
-      }),
+      })
+    },
     updated: (document, update) => post({ kind: 'update', world: world.id, peer, document, update }),
     awareness: (document, changes) => post({ kind: 'awareness', world: world.id, peer, document, changes }),
   }
@@ -184,7 +189,7 @@ export async function joinTabs(
     if (message.kind === 'welcome' || message.world !== world.id) return
     switch (message.kind) {
       case 'open':
-        // The tab that started the world is who writes the starting content, so it opens the document to answer.
+        // The tab that is the founder now writes the starting content of a document nobody has opened, so it opens it to answer.
         if (founder === peer || server.hasDocument(message.document)) {
           const room = server.document(message.document)
           post({
@@ -202,6 +207,8 @@ export async function joinTabs(
             changes: server.awarenessOf(message.document),
           })
         }
+        // After answering: the founder's own answer is the first to write the content of a document that is new.
+        opened.add(message.document)
         break
       case 'update':
         // A document nobody opened here is asked for when it is opened, and not before.
@@ -220,7 +227,7 @@ export async function joinTabs(
 
   return {
     world: world.id,
-    mayStartContent: () => founder === peer,
+    mayStartContent: (document) => founder === peer && !opened.has(document),
     close() {
       stopListening()
       stopObserving()
