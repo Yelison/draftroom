@@ -17,9 +17,13 @@ COPY apps/web/package.json apps/web/
 COPY packages/contract/package.json packages/contract/
 COPY packages/editor-schema/package.json packages/editor-schema/
 
-# What the server needs to run, and nothing a test, a linter or a browser needs: no development dependencies.
+# What the server needs to run, and nothing a test, a linter or a browser needs: no development dependencies. `--omit=dev` alone
+# is not enough, because the lockfile also serves the web workspace: the script removes what the server's own production
+# dependencies do not reach, and fails the build if a development dependency of the server is left.
 FROM manifests AS server-dependencies
+COPY deploy/image/prune-server-dependencies.ts /opt/prune-server-dependencies.ts
 RUN npm ci --omit=dev --ignore-scripts --workspace @draftroom/server --include-workspace-root=false \
+  && node /opt/prune-server-dependencies.ts \
   && npm cache clean --force
 
 # The web app, built with its development dependencies. The production mode talks to the real API; the mock data source
@@ -31,10 +35,19 @@ COPY apps/web apps/web
 COPY packages packages
 RUN npm run build --workspace @draftroom/web
 
+# Node without what installs packages. The base image carries npm, yarn and corepack (some 25 MB), which a running server never
+# uses and somebody with a shell in the container would. Copying the root of this stage into an empty image makes one layer
+# without them: deleting files in a later layer would hide them and still ship them.
+FROM ${NODE_IMAGE} AS node-runtime
+RUN rm -rf /usr/local/lib/node_modules /usr/local/include /opt/yarn-v1.22.22 \
+  /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg
+
 # Node 24 runs the TypeScript sources itself (ADR 0009), so the image keeps the workspace layout: `node_modules/@draftroom/*`
 # are links to `packages/*`, and Node strips types from files it reaches through a link but not from files inside
 # `node_modules`.
-FROM ${NODE_IMAGE} AS server
+FROM scratch AS server
+COPY --from=node-runtime / /
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=server-dependencies /app/node_modules node_modules

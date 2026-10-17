@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // These scripts run with Node's type stripping, like the server (ADR 0009): tsc only checks them.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "erasableSyntaxOnly": true,
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}
