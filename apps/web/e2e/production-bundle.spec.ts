@@ -153,7 +153,8 @@ test.describe('the production bundle', () => {
     const missing = fixtureTexts.filter((text) => !served.some(({ content }) => content.includes(text)))
 
     expect(missing, 'fixture texts the search could not find even where they are').toEqual([])
-    expect(served.some(({ content }) => content.includes('UnhandledOperationError'))).toBe(true)
+    // `UnhandledOperationError` is no longer here: the mock implements every operation of the client, so nothing uses it
+    // and the build leaves it out. It stays on the list of what the production bundle must not hold.
     expect(served.some(({ content }) => content.includes('malformed-message'))).toBe(true)
   })
 })

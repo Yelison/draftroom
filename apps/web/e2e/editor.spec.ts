@@ -573,7 +573,7 @@ test.describe('the keyboard and the focus', () => {
     await page.keyboard.press('Shift+Tab')
     await expect(page.getByRole('button', { name: 'Share' })).toBeFocused()
     await page.keyboard.press('Shift+Tab')
-    await expect(page.getByRole('link', { name: 'Version history' })).toBeFocused()
+    await expect(page.getByRole('link', { name: 'Versions' })).toBeFocused()
     await page.keyboard.press('Shift+Tab')
     await expect(toolbarButton(page, 'Bold')).toBeFocused()
     await expect(toolbarButton(page, 'Bold')).toHaveCSS('outline-style', 'solid')
@@ -582,7 +582,7 @@ test.describe('the keyboard and the focus', () => {
     await page.keyboard.press('End')
     await expect(toolbarButton(page, 'Link')).toBeFocused()
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('link', { name: 'Version history' })).toBeFocused()
+    await expect(page.getByRole('link', { name: 'Versions' })).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Share' })).toBeFocused()
     await page.keyboard.press('Tab')
@@ -639,7 +639,7 @@ test.describe('the keyboard and the focus', () => {
       'New folder',
       'Autumn launch plan',
       'Bold',
-      'Version history',
+      'Versions',
       'Share',
       'Document title',
       'Document content',

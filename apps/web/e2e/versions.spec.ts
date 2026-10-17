@@ -20,7 +20,7 @@ test.describe('the version history', () => {
     page,
   }) => {
     await page.goto(`/documents/${launchPlan.id}`)
-    const link = page.getByRole('link', { name: 'Version history' })
+    const link = page.getByRole('link', { name: 'Versions' })
     await expect(link).toBeVisible()
     await link.focus()
     await page.keyboard.press('Enter')

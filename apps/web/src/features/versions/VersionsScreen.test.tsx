@@ -109,7 +109,7 @@ describe('the way in and out of the history', () => {
   it('is a link from the editor, and the document is one link away', async () => {
     const view = renderScreen(`/documents/${launchPlan.id}`)
 
-    await view.user.click(await screen.findByRole('link', { name: 'Version history' }))
+    await view.user.click(await screen.findByRole('link', { name: 'Versions' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Version history' })).toBeInTheDocument()
     await versionRows()
     expect(view.router.state.location.pathname).toBe(versionsPath(launchPlan.id))

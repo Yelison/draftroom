@@ -195,7 +195,7 @@ describe('moving along the toolbar with the keyboard', () => {
     await user.tab({ shift: true })
     expect(screen.getByRole('button', { name: 'Share' })).toHaveFocus()
     await user.tab({ shift: true })
-    expect(screen.getByRole('link', { name: 'Version history' })).toHaveFocus()
+    expect(screen.getByRole('link', { name: 'Versions' })).toHaveFocus()
     await user.tab({ shift: true })
     expect(screen.getByRole('button', { name: 'Bold' })).toHaveFocus()
     await user.tab()
