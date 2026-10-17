@@ -6,6 +6,7 @@ import {
 } from '@draftroom/contract/collab'
 import type { Connection, Extension } from '@hocuspocus/server'
 import * as Y from 'yjs'
+import { createTokenBucket, type TokenBucket } from '../rate-limit/tokenBucket.ts'
 import { endConnection } from './closeConnections.ts'
 import type { ConnectionContext } from './context.ts'
 import type { DurabilityRegistry } from './durability.ts'
@@ -16,31 +17,6 @@ import type { DurabilityRegistry } from './durability.ts'
 /** The Sync sub-messages that carry an update, as numbered by y-protocols; SyncStep1 (0) carries a state vector. */
 const SYNC_STEP_2 = 1
 const SYNC_UPDATE = 2
-
-export interface TokenBucket {
-  /** Takes one token if there is one. */
-  take(): boolean
-}
-
-/** A bucket that refills continuously, as the clock says: no timer, so nothing to clean up when a connection ends. */
-export function createTokenBucket(options: {
-  readonly perSecond: number
-  readonly burst: number
-  readonly now: () => number
-}): TokenBucket {
-  let tokens = options.burst
-  let last = options.now()
-  return {
-    take() {
-      const now = options.now()
-      tokens = Math.min(options.burst, tokens + ((now - last) / 1000) * options.perSecond)
-      last = now
-      if (tokens < 1) return false
-      tokens -= 1
-      return true
-    },
-  }
-}
 
 export interface WriteAttempt {
   readonly document: Y.Doc
