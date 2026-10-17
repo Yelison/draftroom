@@ -41,6 +41,7 @@ const app = buildApp({
   liveAccess: {
     documentChanged: (documentId) => liveAccess.documentChanged(documentId),
     memberChanged: (workspaceId, userId) => liveAccess.memberChanged(workspaceId, userId),
+    sessionEnded: (sessionId) => liveAccess.sessionEnded(sessionId),
   },
 })
 const collaboration = createCollabServer({

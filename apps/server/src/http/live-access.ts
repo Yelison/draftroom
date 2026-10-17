@@ -3,7 +3,7 @@
  * stop being what the change took away (protocol §6.3). The collaboration server implements it; the routes only know
  * this, as they know `DocumentBroadcaster`, and a test can watch what they say.
  *
- * Both are called **after** the change is committed, never inside its transaction, and they do not fail: whatever goes wrong
+ * All of them are called **after** the change is committed, never inside its transaction, and they do not fail: whatever goes wrong
  * is the implementation's to handle, because the change stands and the caller has nothing to undo.
  */
 export interface LiveAccess {
@@ -11,4 +11,6 @@ export interface LiveAccess {
   documentChanged(documentId: string): Promise<void>
   /** This person's role in the workspace changed or they left: their connections in it are held to what they hold now. */
   memberChanged(workspaceId: string, userId: string): Promise<void>
+  /** A session ended (sign-out, a new sign-in in its place, expiry): every connection it opened closes with `4401`. */
+  sessionEnded(sessionId: string): Promise<void>
 }
