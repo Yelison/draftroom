@@ -1,4 +1,5 @@
 import type { DataSource, RestSource } from '../DataSource.ts'
+import { createDemo, type DemoOptions } from './collab/demo.ts'
 import { replaceLiveContent } from './collab/liveContent.ts'
 import { SimulatedCollabServer, type Access, type Identity } from './collab/SimulatedCollabServer.ts'
 import { marta } from './fixtures/index.ts'
@@ -17,6 +18,7 @@ import { workspaceOperations } from './operations/workspaces.ts'
 import { atLeast, documentRole } from './roles.ts'
 import { createWorld, type World } from './world.ts'
 import { documentName, parseDocumentName } from '@draftroom/contract/collab'
+import { readStoredLocale, resolveLocale } from '../../i18n/locale.ts'
 import * as Y from 'yjs'
 
 export interface ConnectOptions {
@@ -66,11 +68,19 @@ function operationsOf(ctx: Context, collaboration: SimulatedCollabServer, identi
   }
 }
 
-export function createMockServer(): MockServer {
+export interface MockServerOptions {
+  /** Makes the world the demo's: documents with their text, tabs that share them and people who write in some. */
+  demo?: DemoOptions
+}
+
+export function createMockServer({ demo }: MockServerOptions = {}): MockServer {
   const world: World = createWorld()
+  const demonstration = demo === undefined ? undefined : createDemo(demo)
   const collaboration = new SimulatedCollabServer({
     authorize: (documentName, identity) => accessTo(world, documentName, identity),
+    ...(demonstration === undefined ? {} : { initialContent: (name: string) => demonstration.initialContent(name) }),
   })
+  demonstration?.start(collaboration)
   return {
     collaboration,
     // Loaded when it is asked for: it brings the collaboration session, which the first render of the demo does not need.
@@ -96,12 +106,21 @@ export function createMockServer(): MockServer {
 }
 
 /**
+ * Only the build for the static demo is the demo (`vite build --mode production` with the mock, which `build:demo` makes):
+ * the mocked end-to-end suite builds in its own mode and keeps empty documents and nobody else in them. The comparison is
+ * between literals, so the mode alone decides.
+ */
+const isDemoBuild = import.meta.env.MODE === 'production'
+
+/**
  * A mock with a single person on it, the way the app uses it: the demo starts with Marta Ruiz signed in. The page has
  * one browser and so nobody else, which a layout test needs: `window.draftroomMock.addPeople(documentId, names)` puts
  * people in a document. It is here, in the mock, and so in no build for the real API.
  */
 export function createMockDataSource({ signedInAs = marta.email }: ConnectOptions = {}): DataSource {
-  const server = createMockServer()
+  const server = createMockServer({
+    ...(isDemoBuild ? { demo: { locale: resolveLocale(readStoredLocale(), navigator.languages) } } : {}),
+  })
   if (typeof window !== 'undefined') Reflect.set(window, 'draftroomMock', { addPeople: server.addPeople })
   return server.connect({ signedInAs })
 }
