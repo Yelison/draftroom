@@ -16,6 +16,9 @@ export const serverEnvironment = (): NodeJS.ProcessEnv => ({
   COLLAB_PORT: String(ports.collaboration),
   // A browser always sends its origin with the upgrade, and the app's is the one the proxy of the suite serves.
   ALLOWED_ORIGINS: appOrigin,
+  // The CSRF tokens are made with it: one that is the same after the server is stopped and started keeps the pages of the
+  // tests that do that signed in (their sessions are in the database), which a secret chosen at each start would not.
+  SESSION_SECRET: 'the-session-secret-of-the-real-stack-end-to-end-suite',
 })
 
 const serverPorts = [ports.api, ports.collaboration]

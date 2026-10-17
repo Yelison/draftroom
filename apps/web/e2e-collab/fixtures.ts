@@ -8,13 +8,13 @@ import {
   type WebSocketRoute,
 } from '@playwright/test'
 import { environment } from './environment.ts'
-import { people, type DemoPerson } from './people.ts'
+import { demoPassword, people, type DemoPerson } from './people.ts'
 import { ServerProcess } from './serverProcess.ts'
 
 /** What the browser reports when the network or the server goes away on purpose: expected in a test that does it. */
 const connectionErrors = [/WebSocket connection to .* failed/, /Failed to load resource/, /ERR_INTERNET_DISCONNECTED/]
 
-/** One person in one browser context, signed in with the development identity cookie that the test proxy turns into a header. */
+/** One person in one browser context, signed in as the real accounts of the demo are: with the session cookie the server set. */
 export class Participant {
   private readonly problems: string[] = []
   private tolerated: readonly RegExp[] = []
@@ -154,9 +154,20 @@ export class Participant {
   }
 }
 
+/**
+ * Signs the context in through the origin of the app, as its page will: the server answers with the session cookie and the
+ * CSRF cookie, which the context keeps and sends with every request and with the upgrade of the collaboration socket.
+ */
+async function signIn(context: BrowserContext, person: DemoPerson): Promise<void> {
+  const response = await context.request.post('/api/auth/sign-in', {
+    data: { email: people[person], password: demoPassword },
+  })
+  expect(response.status(), `${person} could not sign in: was the demo seed run?`).toBe(200)
+}
+
 async function join(browser: Browser, person: DemoPerson): Promise<Participant> {
   const context = await browser.newContext({ baseURL: environment.appOrigin, locale: 'en-US', colorScheme: 'light' })
-  await context.addCookies([{ name: 'dr_dev_user', value: people[person], url: environment.appOrigin }])
+  await signIn(context, person)
   return new Participant(person, context, await context.newPage())
 }
 

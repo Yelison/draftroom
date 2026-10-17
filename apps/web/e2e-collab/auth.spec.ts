@@ -1,0 +1,84 @@
+import { request as playwrightRequest } from '@playwright/test'
+import { environment } from './environment.ts'
+import { expect, test } from './fixtures.ts'
+import { demoPassword, people } from './people.ts'
+import { createDocument } from './scene.ts'
+
+/**
+ * The screens of sign-in, sign-up and sign-out against the real server: what the mocked suite shows with a mock, shown
+ * with the session the server really starts and ends. A context here has no session until the test signs it in.
+ */
+test.describe('signing in and out of the real stack', () => {
+  test('sends a person with no session to sign in, brings them back to the document, and sign-out ends the session and its live socket', async ({
+    browser,
+  }) => {
+    const documentId = await createDocument('daniel', [])
+    const context = await browser.newContext({ baseURL: environment.appOrigin, locale: 'en-US', colorScheme: 'light' })
+    const page = await context.newPage()
+    const closedSockets: string[] = []
+    page.on('websocket', (socket) => socket.on('close', () => closedSockets.push(socket.url())))
+
+    await page.goto(`/documents/${documentId}`)
+    await expect(page).toHaveURL(/\/sign-in$/)
+    await page.getByRole('textbox', { name: 'Email' }).fill(people.daniel)
+    await page.getByLabel('Password').fill(demoPassword)
+    await page.getByRole('button', { name: 'Sign in' }).click()
+
+    await expect(page).toHaveURL(new RegExp(`/documents/${documentId}$`))
+    await expect(page.getByRole('textbox', { name: 'Document content' })).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: /^Sync status/ })).toHaveText('Sync status: Synced')
+    const token = (await context.cookies()).find((cookie) => cookie.name === 'dr_session')?.value
+    expect(token).toBeDefined()
+
+    await page.getByRole('button', { name: 'Sign out' }).click()
+
+    await expect(page).toHaveURL(/\/sign-in$/)
+    await expect.poll(() => closedSockets.length, 'the live collaboration socket was closed').toBeGreaterThan(0)
+    // What the browser held is worth nothing now: the session is gone from the server, not only from the page.
+    const replay = await playwrightRequest.newContext({
+      baseURL: environment.appOrigin,
+      extraHTTPHeaders: { cookie: `dr_session=${token}` },
+    })
+    expect((await replay.get('/api/me')).status()).toBe(401)
+    await Promise.all([replay.dispose(), context.close()])
+  })
+
+  test('says the email or the password is not right, in the same words for an account that does not exist', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ baseURL: environment.appOrigin, locale: 'en-US' })
+    const page = await context.newPage()
+    await page.goto('/sign-in')
+
+    const attempt = async (email: string) => {
+      await page.getByRole('textbox', { name: 'Email' }).fill(email)
+      await page.getByLabel('Password').fill('not the password at all')
+      await page.getByRole('button', { name: 'Sign in' }).click()
+      return page.getByRole('alert').textContent()
+    }
+    const forWrongPassword = await attempt(people.daniel)
+    const forUnknownAccount = await attempt('nobody@harborpine.example')
+
+    expect(forWrongPassword).toBe('The email or the password is not right. Check them and try again.')
+    expect(forUnknownAccount).toBe(forWrongPassword)
+    await context.close()
+  })
+
+  test('creates an account from the sign-up screen and leaves the person signed in', async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: environment.appOrigin, locale: 'en-US' })
+    const page = await context.newPage()
+    const email = `new-${crypto.randomUUID()}@harborpine.example`
+    await page.goto('/sign-up')
+
+    await page.getByRole('textbox', { name: 'Name' }).fill('Lena Fischer')
+    await page.getByRole('textbox', { name: 'Email' }).fill(email)
+    await page.getByLabel('Password').fill('a phrase of several words')
+    await page.getByRole('button', { name: 'Create account' }).click()
+
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
+    const me = await context.request.get('/api/me')
+    expect(await me.json()).toMatchObject({ email, name: 'Lena Fischer' })
+    await context.close()
+  })
+})

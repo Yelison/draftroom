@@ -24,49 +24,17 @@ const dataSourceFor = (mode: string, variables: Record<string, string>): 'http' 
   return chosen
 }
 
-// Until the session cookie exists (T7.1) the only identity is the `X-Dev-User` header, which a browser cannot put on a
-// WebSocket upgrade. The end-to-end suite against the real server (`playwright.collab.config.ts`) therefore serves `/api`
-// and `/collab` from the origin of the app, through this proxy, which turns the test cookie each browser context holds
-// into that header. It exists only when both targets are named in the environment, and only for the servers of
-// development and preview: it is never part of a build, and a build served without the variables ignores the cookie.
-// docs/decisions/0015-real-stack-e2e-identity.md has the reasoning; T7.1 replaces all of it with the session.
-const identityCookie = 'dr_dev_user'
-const identityHeader = 'x-dev-user'
-
-const identityOf = (cookieHeader: string | undefined): string | undefined => {
-  const pair = cookieHeader?.split(';').find((entry) => entry.trim().startsWith(`${identityCookie}=`))
-  if (pair === undefined) return undefined
-  const value = pair.slice(pair.indexOf('=') + 1).trim()
-  try {
-    return decodeURIComponent(value)
-  } catch {
-    return value
-  }
-}
-
-const testIdentityProxy = (variables: NodeJS.ProcessEnv): { proxy?: Record<string, ProxyOptions> } => {
+// The end-to-end suite against the real server (`playwright.collab.config.ts`) serves `/api` and `/collab` from the origin of
+// the app, through this proxy, as a reverse proxy does in production (plan section 3.3). The browser then sends its session
+// cookie to the API as it will in production, and needs no CORS, which the server does not have until T7.2. The proxy
+// forwards what the browser sends and rewrites nothing: who the browser is, is the session cookie it holds, which the server
+// resolves (docs/decisions/0004-authentication.md). It exists only when both targets are named in the environment, and only
+// for the servers of development and preview: it is never part of a build.
+const realStackProxy = (variables: NodeJS.ProcessEnv): { proxy?: Record<string, ProxyOptions> } => {
   const api = variables.E2E_API_ORIGIN
   const collaboration = variables.E2E_COLLAB_ORIGIN
   if (!api || !collaboration) return {}
-  // Whatever header the browser sent is dropped: the identity is only ever the one the cookie names.
-  const asCookieIdentity: ProxyOptions['configure'] = (proxy) => {
-    const copy = (
-      request: { removeHeader(name: string): void; setHeader(name: string, value: string): void },
-      cookie?: string,
-    ) => {
-      request.removeHeader(identityHeader)
-      const identity = identityOf(cookie)
-      if (identity !== undefined) request.setHeader(identityHeader, identity)
-    }
-    proxy.on('proxyReq', (proxyReq, request) => copy(proxyReq, request.headers.cookie))
-    proxy.on('proxyReqWs', (proxyReq, request) => copy(proxyReq, request.headers.cookie))
-  }
-  return {
-    proxy: {
-      '/api': { target: api, configure: asCookieIdentity },
-      '/collab': { target: collaboration, ws: true, configure: asCookieIdentity },
-    },
-  }
+  return { proxy: { '/api': { target: api }, '/collab': { target: collaboration, ws: true } } }
 }
 
 export default defineConfig(({ command, mode }) => ({
@@ -106,8 +74,8 @@ export default defineConfig(({ command, mode }) => ({
       pseudoLocale: mode === 'pseudo' ? 'en-XA' : undefined,
     }),
   ],
-  server: { ...strictPort('DEV_SERVER_PORT'), ...(command === 'serve' ? testIdentityProxy(process.env) : {}) },
-  preview: { ...strictPort('PLAYWRIGHT_PORT'), ...(command === 'serve' ? testIdentityProxy(process.env) : {}) },
+  server: { ...strictPort('DEV_SERVER_PORT'), ...(command === 'serve' ? realStackProxy(process.env) : {}) },
+  preview: { ...strictPort('PLAYWRIGHT_PORT'), ...(command === 'serve' ? realStackProxy(process.env) : {}) },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
