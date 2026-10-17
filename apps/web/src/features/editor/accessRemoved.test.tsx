@@ -87,6 +87,8 @@ describe('access removed while the person was offline, when the API answers befo
 
       expect(await screen.findByRole('heading', { name: removedHeading })).toBeInTheDocument()
       expect(screen.getByRole('link', { name: 'Go to Documents' })).toHaveAttribute('href', '/documents')
+      // The text that may have had the focus is gone: the focus goes to the headline and not to the page.
+      expect(screen.getByRole('heading', { level: 1 })).toHaveFocus()
       expect(screen.queryByRole('heading', { name: "This document isn't available" })).not.toBeInTheDocument()
       expect(screen.queryByRole('textbox', { name: 'Document content' })).not.toBeInTheDocument()
       await waitFor(async () => expect(await copiesOnDevice()).toEqual([]))
