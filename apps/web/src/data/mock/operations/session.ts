@@ -6,6 +6,9 @@ import { conflict, invalid, unauthenticated } from '../problems.ts'
 import { checkTexts } from '../text.ts'
 import { meView } from '../views.ts'
 
+/** The password as the server keeps it: normalised to NFKC, so the same letters written two ways are one password. */
+const normalised = (password: string): string => password.normalize('NFKC')
+
 type SessionOperations = Pick<DataSource, 'getMe' | 'updateMe' | 'signUp' | 'signIn' | 'signOut'>
 
 /**
@@ -45,7 +48,7 @@ export function sessionOperations(ctx: Context): SessionOperations {
       // Someone invited by email has a row and a `userId` already: signing up claims it, with its memberships and grants.
       const account = existing ?? addPendingPerson(world, body.email)
       account.name = body.name
-      account.password = body.password
+      account.password = normalised(body.password)
       session.userId = account.id
       return { id: account.id, email: account.email, name: body.name }
     },
@@ -53,7 +56,8 @@ export function sessionOperations(ctx: Context): SessionOperations {
     signIn: async ({ body }) => {
       // The same answer for an unknown email and a wrong password, so it never says which accounts exist.
       const account = findPerson(world, body.email)
-      if (account === undefined || account.password !== body.password || account.name === null) throw unauthenticated()
+      if (account === undefined || account.password !== normalised(body.password) || account.name === null)
+        throw unauthenticated()
       session.userId = account.id
       return { id: account.id, email: account.email, name: account.name }
     },

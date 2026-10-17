@@ -127,6 +127,18 @@ export function describeDataSourceContract(name: string, harness: Harness) {
         })
       })
 
+      it('takes a password the same however its letters are written, as NIST SP 800-63B asks', async () => {
+        const { anonymous } = await harness.scenario()
+        const account = { ...newAccount(), password: 'caf\u00e9 au lait, always' }
+        await anonymous.signUp({ body: account })
+
+        const decomposed = await anonymous.signIn({
+          body: { email: account.email, password: 'cafe\u0301 au lait, always' },
+        })
+
+        expect(decomposed.email).toBe(account.email)
+      })
+
       it('claims what an invitation made: the same person, now with a name, and a member of the workspace', async () => {
         const { owner, workspaceId, anonymous } = await harness.scenario()
         const account = newAccount()
