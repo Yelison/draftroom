@@ -10,6 +10,7 @@ import type { CollabSession, CollabSnapshot } from '../../collab/session.ts'
 import { Presence, type PresenceEntry } from '../../components/Presence/Presence.tsx'
 import { SyncStatus } from '../../components/SyncStatus/SyncStatus.tsx'
 import { ShareControl } from '../sharing/ShareControl.tsx'
+import { VersionsLink } from '../versions/VersionsLink.tsx'
 import { useDataSource } from '../../data/useDataSource.ts'
 import type { CollaboratingPerson } from './CollaborationExtensions.ts'
 import { EditorSkeleton } from './EditorSkeleton.tsx'
@@ -286,6 +287,7 @@ function EditorWorkspace({
         {editable && <Toolbar editor={editor} onLinkRequest={requestLink} />}
         {(document.role === 'viewer' || document.role === 'commenter') && <ReadOnlyNotice role={document.role} />}
         <div className={styles.status}>
+          <VersionsLink documentId={document.id} />
           <ShareControl document={document} />
           <Presence people={people} />
           <SyncStatus state={snapshot.state} keepsCopy={snapshot.keepsCopy} />
