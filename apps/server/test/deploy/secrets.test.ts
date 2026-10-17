@@ -68,6 +68,7 @@ describe('what counts as a secret in a file meant to be published', () => {
       'an absolute path in a script',
       'docker cp "$proxy:/data/caddy/pki/authorities/local/root.crt" "$work/caddy-root.crt"',
     ],
+    ['a path given to a variable', 'root_certificate=/data/caddy/pki/authorities/local/root.crt'],
     ['a long path in a comment', '# docs/decisions/0016-production-packaging.md says why the proxy serves the app'],
     ['prose about a secret', '# Signs and checks sessions, at least 32 characters.'],
     ['an ENV with a reference', 'ENV SESSION_SECRET=${SESSION_SECRET}'],

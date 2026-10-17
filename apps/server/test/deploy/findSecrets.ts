@@ -49,7 +49,7 @@ const longRandomRun = /(?<![\w/+-])(?:[A-Za-z0-9+/_]-?){32,}={0,2}(?![\w/+=-])/
 const imageDigest = /sha256:[0-9a-f]{64}/g
 const pinnedCommit = /@[0-9a-f]{40}\b/g
 const marker = /CHANGE_ME\w*/g
-const lowercasePath = /(?<![\w/+=-])\/?(?:[a-z0-9._-]+\/)+[a-z0-9._-]*(?![\w/+=-])/g
+const lowercasePath = /(?<![\w/+-])\/?(?:[a-z0-9._-]+\/)+[a-z0-9._-]*(?![\w/+=-])/g
 
 const isComment = (line: string): boolean => /^\s*(?:#|\/\/)/.test(line)
 // A comment that is a line of an environment file (`# SESSION_SECRET=…`) was a setting before it was commented out, and what

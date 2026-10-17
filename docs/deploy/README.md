@@ -7,6 +7,38 @@ is not done yet. The reasoning behind the layout is in [ADR 0016](../decisions/0
 
 Nothing here deploys anything: it prepares a host that you control.
 
+## Where to run it
+
+Two ways, with their limits. Both are descriptions: no account is created and nothing is deployed from this repository.
+
+**A small virtual private server running this Compose file (the one to choose, and the one this repository tests).** Any virtual
+machine with Docker and the Compose plugin, a gigabyte or two of memory, a host name that points at it, and ports 80 and 443 open
+to the world; follow [With Docker](#with-docker-the-tested-path) below. What it costs you is the machine itself: its operating
+system and Docker need updating, its firewall should open only 80, 443 and the way you log in, its backups have to leave it
+([Backups](#backups-and-restore)), and one machine is no redundancy.
+
+**A free container service with a managed PostgreSQL (a generic option, and much more limited).** Run the `server` image with
+`DATABASE_URL` pointing at the managed database and the variables below (`NODE_ENV=production`, `SESSION_SECRET`,
+`ALLOWED_ORIGINS`); the image migrates the database when it starts. It only works if the service:
+
+- **supports WebSockets** on the address people use: the collaboration connection is one;
+- **gives the app one address for `/api` and `/collab`**, because the web app talks to its own origin. Either the service routes
+  by path to two services (the REST port, 8380, and the collaboration port, 8480), or the `proxy` image sits in front of the server
+  (its Caddyfile reaches the server at the name `server`, so the service has to give the server that name, or the Caddyfile has to
+  change). If the platform ends HTTPS itself, the proxy has to serve plain HTTP behind it: this repository does not test that;
+- **keeps the database** beyond a trial period and has room for it: documents are stored as binary Yjs states and grow with use.
+
+Its limits are the point of choosing it for a demonstration and not for a team:
+
+- **A service that sleeps after a period of inactivity stops the collaboration while it sleeps.** The process is stopped (it stores
+  the documents it holds when told to), every open document loses its connection, and the next visit waits for a **cold start**, from
+  several seconds to about a minute, before anything answers. People who come back find the editor reconnecting.
+- Little memory: signing in hashes with Argon2id, which holds about 19 MiB for each sign-in in progress, and every open document is
+  held in memory by the one process.
+- The limits on sign-in attempts and the per-process state restart with the service ([What is not done yet](#what-is-not-done-yet)).
+- Backups are the managed database's own, or `pg_dump` by hand as in [Backups](#backups-and-restore): `scripts/backup.sh` and
+  `scripts/restore.sh` need the Compose stack.
+
 ## With Docker (the tested path)
 
 You need Docker with the Compose plugin, a host name whose DNS record points at the machine, and ports 80 and 443 free.
@@ -27,10 +59,20 @@ then issues a certificate from its own authority; the browser will not trust it 
 at `/data/caddy/pki/authorities/local/root.crt` in the proxy container (`docker compose cp` brings it out), or you accept the
 warning for that name. With `HTTPS_PORT` set to something other than 443, `PUBLIC_ORIGIN` carries the port.
 
+Every later `docker compose` command for this stack takes the same two options as `up`: the Compose file, and the environment file
+it reads its required variables from. Without `--env-file` Compose stops at the first variable it cannot find; without `-f` it
+acts on the development file at the root of the repository, which is another stack.
+
 Updating is `git pull` and the same `up -d --build --wait`. Migrations only go forward (ADR 0009), so take a
 [backup](#backups-and-restore) first: going back to an older version means restoring one.
 
-Stopping is `docker compose -p draftroom down`; add `--volumes` only to delete the database and the certificates.
+Stopping is the same command with `down` in place of `up -d --build --wait`:
+
+```sh
+docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom down
+```
+
+Add `--volumes` only to delete the database and the certificates.
 
 ## Without Docker
 
@@ -70,6 +112,15 @@ tested.
    this means `proxy_http_version 1.1`, the two headers set explicitly and a long `proxy_read_timeout`.
 4. **Serve `apps/web/dist`** for everything else, answering `index.html` for any path that is not a file (the app is a single page
    and routes in the browser). Hashed files under `/assets/` can be cached for a year; `index.html` must not be.
+
+**Who sets which headers.** The proxy sets the headers of the **document**, because the server never sees `index.html`: with the
+files of the web app it sends `Strict-Transport-Security`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`,
+`Cross-Origin-Opener-Policy` and a Content-Security-Policy that for now holds only `frame-ancestors 'none'`, and it removes `Server`
+(they are in [`deploy/security-headers.caddy`](../../deploy/security-headers.caddy), which the Caddyfile imports for those files only). The
+**server** sets the headers of `/api` and `/collab` (CORS from `ALLOWED_ORIGINS`, caching of personal data, the limits), which is the
+hardening task T7.2; the proxy adds none of the document's headers to those two routes, so the two never contradict each other. The
+full Content-Security-Policy needs the hash of the inline script of the built `index.html`, so T7.2 generates it from the build and
+writes it into that file.
 
 The server checks the `Origin` of every WebSocket upgrade against `ALLOWED_ORIGINS`, so `PUBLIC_ORIGIN` has to be exactly what the
 browser shows in its address bar, port included.
@@ -120,9 +171,12 @@ container directly) and run `pg_dump` and `pg_restore` inside it, so they need D
 - **Try a backup by restoring it into a new database**, and pointing a server at that database (`POSTGRES_DB` of a second stack, or a
   `DATABASE_URL`). A backup that has never been restored is a hope. The optional CI workflow `Backup and restore drill` does exactly
   this on every change to the packaging.
-- **Restoring over the live database** is how you recover from a loss: stop the server first (`docker compose stop server proxy`);
-  the script refuses to drop a database that something is connected to, asks you to type its name unless you pass `--yes`, and
-  restores in one transaction. Start the stack again afterwards.
+- **Restoring over the live database** is how you recover from a loss. Stop the server first
+  (`docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom stop server proxy`). The script reads the
+  whole archive before it touches anything, restores it into a scratch database, and only if that went all the way replaces the
+  database you named: it asks you to type its name unless you pass `--yes`, and refuses while something is connected to it. If
+  anything fails, your database is as it was. Start the stack again afterwards (the same command with `start`). `postgres`,
+  `template0` and `template1` are never accepted as the target.
 - **Keep backups off the machine** that holds the database, and as private as the database itself: they contain everybody's documents.
   Retention and where they go are yours to decide; the scripts only make the archive.
 - **Without Docker,** the same thing by hand: `pg_dump --format=custom --file draftroom.dump "$DATABASE_URL"`, and
@@ -147,7 +201,7 @@ and the broadcast of revocations across processes. That is deferred; this stack 
   what was shared with it, and the sign-up answer tells which addresses have an account. This is a known risk the owner accepted
   (ADR 0004, README); it needs email delivery in both languages before the product is public.
 - **Security headers, a content security policy, CORS, `trustProxy` and the production build guard against the development
-  identity** are T7.2. Until then the only header the deployment sends is `Strict-Transport-Security` (from the proxy), and the server sees the proxy's address, not the visitor's:
+  identity** are T7.2. Until then the proxy sends only the static headers of the document (see [The reverse proxy](#the-reverse-proxy)), the server sends none of its own, and it sees the proxy's address, not the visitor's:
   **every visitor shares the network address of the proxy**, so the per-address limits on sign-in and sign-up (30 failed sign-ins
   per 15 minutes, 10 sign-ups per hour) are counted for everybody together and one person's attempts can use them up. The
   per-account limit (10 failed sign-ins per 15 minutes) is not affected.

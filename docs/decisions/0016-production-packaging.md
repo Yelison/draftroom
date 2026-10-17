@@ -33,6 +33,24 @@ sends `/api/*` to the REST listener and `/collab` to the collaboration listener.
 The web app talks to its own origin (`/api`, and `/collab` as `wss://` on the page's host), so the build needs no address and
 the same image runs on any host name.
 
+**Who sets which headers.** The server never sees `index.html`, so the headers of the document can only come from the proxy; the
+headers of `/api` and `/collab` can only come from the server, which is the one that knows its origins and what is personal. The
+proxy sends the static ones (`Strict-Transport-Security`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`,
+`Cross-Origin-Opener-Policy`, a Content-Security-Policy of `frame-ancestors 'none'` alone, and no `Server`) from
+`deploy/security-headers.caddy`, which the Caddyfile imports **inside the block that serves the web app**, so that they reach those
+files and never `/api` or `/collab`. T7.2 owns the server's headers and writes the full Content-Security-Policy, whose hash is that
+of the inline script of the built `index.html`: it generates the fragment in the `web-build` stage and the proxy stage of the
+`Dockerfile` copies it from there, at the place a comment marks. T7.2 therefore edits the fragment and that one line, and not
+the Caddyfile. HSTS is `max-age` of a year without `includeSubDomains` or `preload`: without it a browser can be sent back to plain
+HTTP, where the `Secure` cookies of ADR 0004 are never sent, and this site cannot speak for the other names under its domain.
+
+**What the images hold.** The server image has the server's production dependencies and nothing else: `npm ci --omit=dev` with
+one workspace still installs what the web workspace needs in production, so a script in the dependency stage removes every package
+the server's production dependencies do not reach and fails the build if a development dependency of the server is left. The runtime
+stage is Node without npm, yarn, corepack and the headers, made one layer by copying the stage into an empty image. The proxy runs
+with every capability dropped but `NET_BIND_SERVICE` and `no-new-privileges`, and redirects HTTP to `PUBLIC_ORIGIN` so the redirect
+keeps the port when HTTPS is published on another one.
+
 ### 2. Migrations run when the container starts, under the lock Kysely already takes
 
 The image's command is `node src/db/run-migrations.ts && exec node src/main.ts`: migrate, then serve. A failed migration ends
@@ -75,7 +93,7 @@ written. A password cannot appear in `ps` if there is none.
 - A host that does not run the stack in Docker takes the same two commands by hand (`docs/deploy/README.md`); the scripts exist for
   the Compose stack, and that is what the tests and the CI drill exercise.
 
-The CI drill (`Backup and restore drill`, optional) is what keeps this honest: it starts the production stack, creates an account and a
+The CI drill (the workflow `Backup and restore drill`, whose one job is `drill`; optional, not a required check) is what keeps this honest: it starts the production stack, creates an account and a
 document with content, takes a backup, restores it into a new database and opens the document from a server pointed at it.
 
 ### 4. Nothing secret is ever in the repository, and a test says so
@@ -91,12 +109,9 @@ unprivileged `node` user with a read-only file system, no capabilities and no wa
 - A host with Docker runs the product with one file of settings and one command; a host with Node 24 and PostgreSQL 17 runs it with
   the two commands of the image's `CMD`.
 - Only Caddy publishes ports. The database and the server are not reachable from outside the Compose network.
-- The proxy sends one header, `Strict-Transport-Security: max-age=31536000`, as ADR 0004 assigns to this task: without HSTS a
-  browser can be sent back to plain HTTP, where the `Secure` session cookie is never sent. It has no `includeSubDomains` and no
-  `preload`: this site cannot speak for the other names under its domain, and a preload list cannot be left.
-- The other security headers, a content security policy, CORS and `trustProxy` are not part of this change (T7.2; headers there are
-  the server's), and neither is a shared store for the sign-in rate limit; both are listed in `docs/deploy/README.md` as what the
-  deployment does not yet have.
+- The proxy sends the static headers of the document, as ADR 0004 assigns HSTS to this task; the full Content-Security-Policy, CORS,
+  `trustProxy` and the server's headers are not part of this change (T7.2), and neither is a shared store for the sign-in rate limit;
+  both are listed in `docs/deploy/README.md` as what the deployment does not yet have.
 - Scaling out is not possible and not attempted: one process serves a document (ADR 0001). The guide says why.
 
 ## Alternatives considered
