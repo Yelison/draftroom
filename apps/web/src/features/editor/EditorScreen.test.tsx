@@ -1,10 +1,30 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import type { DataSource } from '../../data/DataSource.ts'
 import { ApiError, TransportError } from '../../data/errors.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { budget, launchPlan, openEditor, people, renderEditor, ydocOf } from './testing/renderEditor.tsx'
 
 const textArea = () => screen.findByRole('textbox', { name: /Document content|Contenido del documento/ })
+
+/**
+ * A data source whose document is on its way until the test lets it arrive. The screen asks for the document after its
+ * headline is already there, so `arrive` waits for the request instead of trusting that it was made: on a busy runner
+ * the release that came first found nothing to release, and the document never arrived.
+ */
+function heldDocument() {
+  const releases: Array<() => void> = []
+  return {
+    wrap: (dataSource: DataSource): DataSource => ({
+      ...dataSource,
+      getDocument: (request) => new Promise((resolve) => releases.push(() => resolve(dataSource.getDocument(request)))),
+    }),
+    arrive: async () => {
+      await waitFor(() => expect(releases).not.toHaveLength(0))
+      await act(async () => releases.forEach((release) => release()))
+    },
+  }
+}
 
 describe('the document screen', () => {
   it('opens a document for its owner with the title, the toolbar and a text area that can be edited', async () => {
@@ -28,12 +48,9 @@ describe('the document screen', () => {
   })
 
   it('shows a skeleton with a spoken status while the document is on its way, under the headline the page already has', async () => {
-    let arrive: (() => void) | undefined
+    const { wrap, arrive } = heldDocument()
     renderEditor({
-      wrap: (dataSource) => ({
-        ...dataSource,
-        getDocument: (request) => new Promise((resolve) => (arrive = () => resolve(dataSource.getDocument(request)))),
-      }),
+      wrap,
     })
 
     // The headline comes with the screen; the skeleton before it is the router's, while the screen's chunk is on its way.
@@ -41,17 +58,14 @@ describe('the document screen', () => {
     expect(within(screen.getByRole('main')).getByRole('status')).toHaveTextContent('Loading document')
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
 
-    await act(async () => arrive?.())
+    await arrive()
     expect(await textArea()).toBeInTheDocument()
   })
 
   it('draws the skeleton with the same band and sheet as the document, so nothing moves when it arrives', async () => {
-    let arrive: (() => void) | undefined
+    const { wrap, arrive } = heldDocument()
     const { container } = renderEditor({
-      wrap: (dataSource) => ({
-        ...dataSource,
-        getDocument: (request) => new Promise((resolve) => (arrive = () => resolve(dataSource.getDocument(request)))),
-      }),
+      wrap,
     })
     await screen.findByRole('heading', { level: 1, name: 'Document' })
     // The classes of the column's first two children, which carry its measures (the CSS is not loaded in these tests).
@@ -59,7 +73,7 @@ describe('the document screen', () => {
       [...(container.querySelector('.column')?.children ?? [])].slice(0, 2).map((child) => child.className)
 
     const whileLoading = layoutOf()
-    await act(async () => arrive?.())
+    await arrive()
     await textArea()
 
     expect(whileLoading).toEqual(['toolbarBand', 'sheet'])
@@ -67,17 +81,14 @@ describe('the document screen', () => {
   })
 
   it('keeps the same headline element when the document arrives, so the focus that was put on it stays', async () => {
-    let arrive: (() => void) | undefined
+    const { wrap, arrive } = heldDocument()
     renderEditor({
-      wrap: (dataSource) => ({
-        ...dataSource,
-        getDocument: (request) => new Promise((resolve) => (arrive = () => resolve(dataSource.getDocument(request)))),
-      }),
+      wrap,
     })
     const headline = await screen.findByRole('heading', { level: 1 })
     headline.focus()
 
-    await act(async () => arrive?.())
+    await arrive()
     await textArea()
 
     expect(screen.getByRole('heading', { level: 1 })).toBe(headline)
