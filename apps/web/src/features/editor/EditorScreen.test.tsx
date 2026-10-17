@@ -49,9 +49,7 @@ describe('the document screen', () => {
 
   it('shows a skeleton with a spoken status while the document is on its way, under the headline the page already has', async () => {
     const { wrap, arrive } = heldDocument()
-    renderEditor({
-      wrap,
-    })
+    renderEditor({ wrap })
 
     // The headline comes with the screen; the skeleton before it is the router's, while the screen's chunk is on its way.
     expect(await screen.findByRole('heading', { level: 1, name: 'Document' })).toBeInTheDocument()
@@ -64,9 +62,7 @@ describe('the document screen', () => {
 
   it('draws the skeleton with the same band and sheet as the document, so nothing moves when it arrives', async () => {
     const { wrap, arrive } = heldDocument()
-    const { container } = renderEditor({
-      wrap,
-    })
+    const { container } = renderEditor({ wrap })
     await screen.findByRole('heading', { level: 1, name: 'Document' })
     // The classes of the column's first two children, which carry its measures (the CSS is not loaded in these tests).
     const layoutOf = () =>
@@ -82,9 +78,7 @@ describe('the document screen', () => {
 
   it('keeps the same headline element when the document arrives, so the focus that was put on it stays', async () => {
     const { wrap, arrive } = heldDocument()
-    renderEditor({
-      wrap,
-    })
+    renderEditor({ wrap })
     const headline = await screen.findByRole('heading', { level: 1 })
     headline.focus()
 
