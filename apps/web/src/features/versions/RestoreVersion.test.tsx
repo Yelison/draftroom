@@ -17,7 +17,7 @@ const dialog = () => screen.findByRole('dialog')
 
 /** Opens the confirmation for the version that has a name of its own, as its owner does. */
 async function askToRestore(wrap?: (dataSource: DataSource) => DataSource) {
-  const view = await openVersions(launchPlan.id, { wrap })
+  const view = await openVersions(launchPlan.id, wrap === undefined ? {} : { wrap })
   const trigger = restoreButtonOf(rows()[1]!)
   await view.user.click(trigger)
   return { ...view, trigger, confirmation: await dialog() }

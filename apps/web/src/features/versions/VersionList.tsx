@@ -15,7 +15,7 @@ export interface VersionListProps {
   documentId: string
   selectedId: string | null
   onSelect: (version: Schema<'Version'>) => void
-  onRestore?: (version: Schema<'Version'>) => void
+  onRestore?: ((version: Schema<'Version'>) => void) | undefined
 }
 
 /** The versions of a document, newest first and a page at a time: loading, none yet, the list, and a failure to retry. */

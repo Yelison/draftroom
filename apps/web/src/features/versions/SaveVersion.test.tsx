@@ -18,7 +18,7 @@ describe('who is offered to save a version', () => {
     { role: 'an owner', email: undefined },
     { role: 'an editor', email: daniel.email },
   ])('is $role', async ({ email }) => {
-    await openVersions(launchPlan.id, { signedInAs: email })
+    await openVersions(launchPlan.id, email === undefined ? {} : { signedInAs: email })
 
     expect(saveButton()).toBeInTheDocument()
   })

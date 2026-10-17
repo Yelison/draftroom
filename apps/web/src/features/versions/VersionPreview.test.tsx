@@ -44,18 +44,23 @@ describe('the preview of a version', () => {
   it('never connects to the live document, nor opens any connection at all', async () => {
     const sockets: string[] = []
     const { user, server } = await openVersions(launchPlan.id, {
-      wrap: (dataSource: DataSource) => ({
-        ...dataSource,
-        collaboration: {
-          ...dataSource.collaboration,
-          webSocket: class extends dataSource.collaboration.webSocket {
-            constructor(url: string) {
-              sockets.push(url)
-              super(url)
-            }
+      wrap: (dataSource: DataSource) => {
+        const Socket = dataSource.collaboration.webSocket
+        if (Socket === undefined) throw new Error('The mock gives the collaboration connection a socket')
+        return {
+          ...dataSource,
+          collaboration: {
+            ...dataSource.collaboration,
+            // Every socket the data source is asked for is kept, whoever asks.
+            webSocket: new Proxy(Socket, {
+              construct(target, [url]: [string]) {
+                sockets.push(url)
+                return Reflect.construct(target, [url])
+              },
+            }),
           },
-        },
-      }),
+        }
+      },
     })
 
     await user.click(within(rows()[0]!).getByRole('button', { name: launchPlanVersions.newest }))

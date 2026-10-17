@@ -10,7 +10,7 @@ export interface VersionRowProps {
   selected: boolean
   onSelect: (version: Schema<'Version'>) => void
   /** Given only to owners: the server refuses anyone else, and a button that can only fail is not offered. */
-  onRestore?: (version: Schema<'Version'>) => void
+  onRestore?: ((version: Schema<'Version'>) => void) | undefined
 }
 
 /** One version: what it is, who made it and when, to look at it, and for an owner the way to go back to it. */
