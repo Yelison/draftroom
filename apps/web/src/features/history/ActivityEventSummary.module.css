@@ -1,0 +1,20 @@
+.summary {
+  display: flex;
+  gap: var(--space-12);
+  align-items: center;
+  min-width: 0;
+}
+
+.sentence {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: start;
+  font: var(--font-body);
+}
+
+.time {
+  flex: none;
+  color: var(--color-muted);
+  font: var(--font-caption);
+}

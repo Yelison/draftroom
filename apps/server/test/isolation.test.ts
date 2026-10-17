@@ -107,6 +107,8 @@ const routes: readonly (readonly [string, (ids: Ids) => Omit<Call, 'as'>])[] = [
   ],
   ['listPinnedDocuments', ({ workspaceId }) => ({ method: 'GET', url: `/api/workspaces/${workspaceId}/pinned` })],
   ['listSharedDocuments', ({ workspaceId }) => ({ method: 'GET', url: `/api/workspaces/${workspaceId}/shared` })],
+  ['listWorkspaceActivity', ({ workspaceId }) => ({ method: 'GET', url: `/api/workspaces/${workspaceId}/activity` })],
+  ['listDocumentActivity', ({ documentId }) => ({ method: 'GET', url: `/api/documents/${documentId}/activity` })],
   ['getDocument', ({ documentId }) => ({ method: 'GET', url: `/api/documents/${documentId}` })],
   [
     'updateDocument',
@@ -221,14 +223,17 @@ describe.each(routes)('%s', (_operationId, call) => {
 })
 
 describe('a document of her own workspace that Alice cannot read', () => {
-  it.each(routes.filter(([operationId]) => /(Document|Access)$/.test(operationId) && operationId !== 'createDocument'))(
-    'answers %s as an id that does not exist',
-    async (_operationId, call) => {
-      const asked = await api({ as: setting.alice, ...call({ ...setting.foreign, ...setting.hidden }) })
+  it.each(
+    routes.filter(
+      ([operationId]) =>
+        (/(Document|Access)$/.test(operationId) && operationId !== 'createDocument') ||
+        operationId === 'listDocumentActivity',
+    ),
+  )('answers %s as an id that does not exist', async (_operationId, call) => {
+    const asked = await api({ as: setting.alice, ...call({ ...setting.foreign, ...setting.hidden }) })
 
-      expect(asked).toMatchObject({ statusCode: 404, body: notFound })
-    },
-  )
+    expect(asked).toMatchObject({ statusCode: 404, body: notFound })
+  })
 
   // Its threads and comments are hers to know about exactly when the document is: asking by their own ids changes nothing.
   it.each(routes.filter(([operationId]) => /Thread|Comment/.test(operationId)))(

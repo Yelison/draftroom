@@ -1,4 +1,4 @@
-import { sql, type Kysely } from 'kysely'
+import { sql, type ExpressionBuilder, type Kysely, type SelectQueryBuilder } from 'kysely'
 import { effectiveRole } from '../../domain/permissions.ts'
 import type { CursorPosition } from '../../domain/pagination.ts'
 import type { Database, DocumentRole, GeneralAccess, WorkspaceRole } from '../tables.ts'
@@ -32,14 +32,28 @@ export interface DocumentRecord {
 // Written by PostgreSQL, in UTC, so a cursor does not depend on a time zone setting and keeps the microseconds.
 const timestampKey = sql<string>`to_char(d.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
 
-function callerDocuments(db: Kysely<Database>, userId: string) {
-  return db
+/**
+ * The documents of the workspaces a person belongs to, each beside that person's membership (`m`) and their explicit
+ * grant, if any (`g`). Nothing is selected: every read of documents, and of what hangs from them, starts here, so the
+ * person's facts are joined the same way everywhere.
+ */
+export const memberDocuments = (db: Kysely<Database>, userId: string) =>
+  db
     .selectFrom('documents as d')
     .innerJoin('memberships as m', (join) =>
       join.onRef('m.workspace_id', '=', 'd.workspace_id').on('m.user_id', '=', userId),
     )
-    .innerJoin('users as creator', 'creator.id', 'd.created_by')
     .leftJoin('document_access as g', (join) => join.onRef('g.document_id', '=', 'd.id').on('g.user_id', '=', userId))
+
+type MemberDocuments = ReturnType<typeof memberDocuments>
+type FactsBuilder = ExpressionBuilder<
+  MemberDocuments extends SelectQueryBuilder<infer DB, infer _TB, infer _O> ? DB : never,
+  'd' | 'm' | 'g'
+>
+
+function callerDocuments(db: Kysely<Database>, userId: string) {
+  return memberDocuments(db, userId)
+    .innerJoin('users as creator', 'creator.id', 'd.created_by')
     .leftJoin('pins as p', (join) => join.onRef('p.document_id', '=', 'd.id').on('p.user_id', '=', userId))
     .select([
       'd.id',
@@ -72,19 +86,22 @@ function toRecord({ creatorId, creatorName, ...row }: Row): DocumentRecord {
 export const roleOf = (record: DocumentRecord): DocumentRole | null =>
   effectiveRole({ workspaceRole: record.workspaceRole, grant: record.grant, generalAccess: record.general_access })
 
+/** Whether the person owns the document: they own its workspace or hold an `owner` grant on it. */
+export const ownsDocument = (eb: FactsBuilder) => eb.or([eb('m.role', '=', 'owner'), eb('g.role', '=', 'owner')])
+
+/** A person can read a live document when they own the workspace, hold a grant on it, or it is open to the workspace. */
+export const readableDocument = (eb: FactsBuilder) =>
+  eb.and([
+    eb('d.archived_at', 'is', null),
+    eb.or([eb('m.role', '=', 'owner'), eb('g.role', 'is not', null), eb('d.general_access', '<>', 'none')]),
+  ])
+
 /** The documents the person can read, archived ones left out. */
-const readable = (query: CallerDocuments): CallerDocuments =>
-  query
-    .where('d.archived_at', 'is', null)
-    .where((eb) =>
-      eb.or([eb('m.role', '=', 'owner'), eb('g.role', 'is not', null), eb('d.general_access', '<>', 'none')]),
-    )
+const readable = (query: CallerDocuments): CallerDocuments => query.where(readableDocument)
 
 /** The archived documents the person owns: the only ones they can see. */
 const archivedAndOwned = (query: CallerDocuments): CallerDocuments =>
-  query
-    .where('d.archived_at', 'is not', null)
-    .where((eb) => eb.or([eb('m.role', '=', 'owner'), eb('g.role', '=', 'owner')]))
+  query.where('d.archived_at', 'is not', null).where(ownsDocument)
 
 const newestFirst = (query: CallerDocuments): CallerDocuments =>
   query.orderBy('d.updated_at', 'desc').orderBy('d.id', 'desc')

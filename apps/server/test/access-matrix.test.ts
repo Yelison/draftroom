@@ -76,6 +76,11 @@ const documentCases: readonly DocumentCase[] = [
     allowed: 200,
   },
   { operationId: 'deleteDocument', call: (id) => ({ method: 'DELETE', url: `/api/documents/${id}` }), allowed: 409 },
+  {
+    operationId: 'listDocumentActivity',
+    call: (id) => ({ method: 'GET', url: `/api/documents/${id}/activity` }),
+    allowed: 200,
+  },
   { operationId: 'pinDocument', call: (id) => ({ method: 'PUT', url: `/api/documents/${id}/pin` }), allowed: 204 },
   { operationId: 'unpinDocument', call: (id) => ({ method: 'DELETE', url: `/api/documents/${id}/pin` }), allowed: 204 },
 ]
@@ -445,6 +450,11 @@ const workspaceCases: readonly WorkspaceCase[] = [
   {
     operationId: 'listSharedDocuments',
     call: ({ workspaceId }) => ({ method: 'GET', url: `/api/workspaces/${workspaceId}/shared` }),
+    allowed: 200,
+  },
+  {
+    operationId: 'listWorkspaceActivity',
+    call: ({ workspaceId }) => ({ method: 'GET', url: `/api/workspaces/${workspaceId}/activity` }),
     allowed: 200,
   },
 ]

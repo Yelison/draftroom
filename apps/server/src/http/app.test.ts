@@ -107,6 +107,8 @@ const implementedOperations = [
   'listPinnedDocuments',
   'listSharedDocuments',
   'listThreads',
+  'listWorkspaceActivity',
+  'listDocumentActivity',
   'createThread',
   'replyToThread',
   'resolveThread',

@@ -3,6 +3,7 @@ import { PageTitle } from '../components/PageTitle/PageTitle.tsx'
 import { DocumentsScreen } from '../features/documents/DocumentsScreen.tsx'
 import { FolderScreen } from '../features/documents/FolderScreen.tsx'
 import { EditorSkeleton } from '../features/editor/EditorSkeleton.tsx'
+import { HistoryScreen } from '../features/history/HistoryScreen.tsx'
 import { SearchScreen } from '../features/search/SearchScreen.tsx'
 import { TemplateScreen } from '../features/templates/TemplateScreen.tsx'
 import { TrashScreen } from '../features/trash/TrashScreen.tsx'
@@ -42,7 +43,7 @@ export const routes: RouteObject[] = [
             handle: { section: 'documents' } satisfies RouteHandle,
           },
           { path: 'shared', ...screen('nav.shared', 'shared') },
-          { path: 'history', ...screen('nav.history', 'history') },
+          { path: 'history', Component: HistoryScreen, handle: { section: 'history' } satisfies RouteHandle },
           {
             path: 'settings',
             children: [
