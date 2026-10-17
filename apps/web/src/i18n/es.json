@@ -319,7 +319,7 @@
   "sharing.general.commenter": "Pueden comentar",
   "sharing.general.editor": "Pueden editar",
   "sharing.announce.added": "{name} recibió el rol de {role}.",
-  "sharing.announce.changed": "El rol de {name} ahora es {role}.",
+  "sharing.announce.changed": "El rol de {name} ahora es {role, select, viewer {lector} commenter {comentarista} editor {editor} other {propietario}}.",
   "sharing.announce.removed": "{name} ya no tiene acceso.",
   "sharing.announce.general": "Acceso general: {option}.",
   "sharing.error.lastOwner": "Un documento necesita al menos un propietario. Da primero el rol de propietario a otra persona.",
