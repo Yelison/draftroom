@@ -96,6 +96,7 @@ export function createHttpDataSource({
 
   return {
     getMe: () => data(client.GET('/api/me')),
+    updateMe: (request) => data(client.PATCH('/api/me', request)),
     signUp: (request) => data(client.POST('/api/auth/sign-up', request)),
     signIn: (request) => data(client.POST('/api/auth/sign-in', request)),
     signOut: () => empty(client.POST('/api/auth/sign-out')),

@@ -2,10 +2,11 @@ import type { DataSource } from '../../DataSource.ts'
 import { addPendingPerson, checkEmailFormat, findPerson } from '../directory.ts'
 import { caller, type Context } from '../guards.ts'
 import { textLimits } from '../limits.ts'
-import { conflict, unauthenticated } from '../problems.ts'
+import { conflict, invalid, unauthenticated } from '../problems.ts'
 import { checkTexts } from '../text.ts'
+import { meView } from '../views.ts'
 
-type SessionOperations = Pick<DataSource, 'getMe' | 'signUp' | 'signIn' | 'signOut'>
+type SessionOperations = Pick<DataSource, 'getMe' | 'updateMe' | 'signUp' | 'signIn' | 'signOut'>
 
 /**
  * Who is signed in. There is no cookie here: a connection to the mock keeps its own session, which is what `dr_session`
@@ -15,9 +16,19 @@ export function sessionOperations(ctx: Context): SessionOperations {
   const { world, session } = ctx
 
   return {
-    getMe: async () => {
-      const { id, email, name } = caller(ctx)
-      return { id, email, name: name ?? email }
+    getMe: async () => meView(caller(ctx)),
+
+    updateMe: async ({ body }) => {
+      const person = caller(ctx)
+      const { name, locale, editorTextSize } = body
+      if (name === undefined && locale === undefined && editorTextSize === undefined) {
+        throw invalid({ pointer: '/', code: 'required' })
+      }
+      if (name !== undefined) checkTexts(['/name', name, textLimits.personName])
+      if (name !== undefined) person.name = name
+      if (locale !== undefined) person.locale = locale
+      if (editorTextSize !== undefined) person.editorTextSize = editorTextSize
+      return meView(person)
     },
 
     signUp: async ({ body }) => {

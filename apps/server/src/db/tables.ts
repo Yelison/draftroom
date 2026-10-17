@@ -9,6 +9,8 @@ export type DocumentRole = 'viewer' | 'commenter' | 'editor' | 'owner'
 export type GeneralAccess = 'none' | 'viewer' | 'commenter' | 'editor'
 export type ActivityType = Schema<'ActivityType'>
 export type VersionKind = Schema<'VersionKind'>
+export type Locale = Schema<'Locale'>
+export type EditorTextSize = Schema<'EditorTextSize'>
 
 export interface UsersTable {
   id: Generated<string>
@@ -17,6 +19,9 @@ export interface UsersTable {
   name: string | null
   password_hash: string | null
   signed_up_at: Date | null
+  /** `null` until the person chooses a language: the browser's applies. */
+  locale: Locale | null
+  editor_text_size: Generated<EditorTextSize>
   created_at: Generated<Date>
 }
 

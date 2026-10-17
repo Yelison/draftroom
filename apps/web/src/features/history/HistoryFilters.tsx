@@ -5,7 +5,8 @@ import { useIntl } from 'react-intl'
 import { useDataSource } from '../../data/useDataSource.ts'
 import type { MessageId } from '../../i18n/messages.ts'
 import { ranges, type HistoryRange } from './historyFilters.ts'
-import { documentOptionsQuery, peopleOptionsQuery } from './queries.ts'
+import { membersQuery } from '../documents/queries.ts'
+import { documentOptionsQuery } from './queries.ts'
 import type { HistoryFilterState } from './useHistoryFilters.ts'
 import styles from './HistoryFilters.module.css'
 
@@ -105,7 +106,7 @@ export function HistoryFilters({ workspaceId, state }: HistoryFiltersProps) {
   const dataSource = useDataSource()
   const group = useRef<HTMLDivElement>(null)
   const documents = useInfiniteQuery(documentOptionsQuery(dataSource, workspaceId))
-  const people = useQuery(peopleOptionsQuery(dataSource, workspaceId))
+  const people = useQuery(membersQuery(dataSource, workspaceId))
   const { filters, set } = state
 
   /** What a list of options still has to say once it is not there to choose from. */

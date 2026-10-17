@@ -6,6 +6,12 @@ import { EditorSkeleton } from '../features/editor/EditorSkeleton.tsx'
 import { HistoryScreen } from '../features/history/HistoryScreen.tsx'
 import { HomeScreen } from '../features/home/HomeScreen.tsx'
 import { SearchScreen } from '../features/search/SearchScreen.tsx'
+import { AppearanceTab } from '../features/settings/AppearanceTab.tsx'
+import { MembersTab } from '../features/settings/MembersTab.tsx'
+import { ProfileTab } from '../features/settings/ProfileTab.tsx'
+import { SettingsScreen } from '../features/settings/SettingsScreen.tsx'
+import { settingsTabHandle } from '../features/settings/settingsTabs.ts'
+import { WorkspaceTab } from '../features/settings/WorkspaceTab.tsx'
 import { SharedScreen } from '../features/shared/SharedScreen.tsx'
 import { TemplateScreen } from '../features/templates/TemplateScreen.tsx'
 import { TrashScreen } from '../features/trash/TrashScreen.tsx'
@@ -49,13 +55,14 @@ export const routes: RouteObject[] = [
           { path: 'history', Component: HistoryScreen, handle: { section: 'history' } satisfies RouteHandle },
           {
             path: 'settings',
+            Component: SettingsScreen,
             children: [
               // Done by the router before anything renders, so there is no page in between to take the focus.
               { index: true, loader: () => redirect('/settings/profile') },
-              { path: 'profile', ...screen('nav.settings', 'settings') },
-              { path: 'workspace', ...screen('nav.settings', 'settings') },
-              { path: 'members', ...screen('nav.settings', 'settings') },
-              { path: 'appearance', ...screen('nav.settings', 'settings') },
+              { path: 'profile', Component: ProfileTab, handle: settingsTabHandle },
+              { path: 'workspace', Component: WorkspaceTab, handle: settingsTabHandle },
+              { path: 'members', Component: MembersTab, handle: settingsTabHandle },
+              { path: 'appearance', Component: AppearanceTab, handle: settingsTabHandle },
             ],
           },
           { path: 'trash', Component: TrashScreen, handle: { section: 'documents' } satisfies RouteHandle },

@@ -19,7 +19,14 @@ export function joinDocument(
   if (document === undefined) throw new Error(`The mock has no document ${documentId}`)
   const sessions = names.map((name, index) => {
     const id = seedId(9, world.people.length + index + 1)
-    world.people.push({ id, email: `${id}@harborpine.example`, name, password: null })
+    world.people.push({
+      id,
+      email: `${id}@harborpine.example`,
+      name,
+      password: null,
+      locale: null,
+      editorTextSize: 'medium',
+    })
     world.memberships.push({ workspaceId: document.workspaceId, userId: id, role: 'member', createdAt: world.now() })
     const session = createCollabSession({
       documentId,

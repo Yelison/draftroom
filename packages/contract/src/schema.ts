@@ -10,7 +10,7 @@ export interface paths {
         };
         /**
          * Get the signed-in person
-         * @description Any signed-in person.
+         * @description Any signed-in person. Besides who they are, the answer carries the preferences saved on the account.
          */
         get: operations["getMe"];
         put?: never;
@@ -18,7 +18,13 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Change the signed-in person's profile and preferences
+         * @description Changes only the caller's own account: the person is always the one of the session, never named in the request. Send the fields to change; a field that is left out keeps its value, and an empty body is a `400 validation-failed`. `locale` saves the language the app opens in on any browser and takes precedence over the browser's language; `null` clears it, so the browser's language applies again. There is no `revision`: the fields are independent and belong to one person, so the last write wins, as it does for `updateWorkspace`.
+         *
+         *     Any signed-in person.
+         */
+        patch: operations["updateMe"];
         trace?: never;
     };
     "/api/auth/sign-up": {
@@ -808,6 +814,16 @@ export interface components {
         /** Format: email */
         Email: string;
         PersonName: string;
+        /**
+         * @description A language of the product.
+         * @enum {string}
+         */
+        Locale: "en" | "es";
+        /**
+         * @description The size of the text in the editor; `medium` until the person chooses.
+         * @enum {string}
+         */
+        EditorTextSize: "small" | "medium" | "large";
         Password: string;
         WorkspaceName: string;
         FolderName: string;
@@ -890,6 +906,15 @@ export interface components {
             id: components["schemas"]["Id"];
             email: components["schemas"]["Email"];
             name: components["schemas"]["PersonName"];
+        };
+        /** @description The signed-in person with the preferences saved on their account. */
+        Me: {
+            id: components["schemas"]["Id"];
+            email: components["schemas"]["Email"];
+            name: components["schemas"]["PersonName"];
+            /** @description The language the person chose, or `null` while they have not chosen one and the browser's applies. */
+            locale: components["schemas"]["Locale"] | null;
+            editorTextSize: components["schemas"]["EditorTextSize"];
         };
         /** @description Enough of a person to label them. */
         UserRef: {
@@ -1038,6 +1063,11 @@ export interface components {
         UpdateWorkspaceRequest: {
             name: components["schemas"]["WorkspaceName"];
         };
+        UpdateMeRequest: {
+            name?: components["schemas"]["PersonName"];
+            locale?: components["schemas"]["Locale"] | null;
+            editorTextSize?: components["schemas"]["EditorTextSize"];
+        };
         AddMemberRequest: {
             email: components["schemas"]["Email"];
             role: components["schemas"]["WorkspaceRole"];
@@ -1056,11 +1086,8 @@ export interface components {
             title: components["schemas"]["DocumentTitle"];
             folderId?: components["schemas"]["NullableId"];
             templateId?: string;
-            /**
-             * @description The language of the template's content; `en` when omitted. Only valid together with `templateId`.
-             * @enum {string}
-             */
-            locale?: "en" | "es";
+            /** @description The language of the template's content; `en` when omitted. Only valid together with `templateId`. */
+            locale?: components["schemas"]["Locale"];
         };
         UpdateDocumentRequest: {
             title?: components["schemas"]["DocumentTitle"];
@@ -1255,16 +1282,45 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The person behind the session. */
+            /** @description The person behind the session, with their preferences. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["User"];
+                    "application/json": components["schemas"]["Me"];
                 };
             };
             401: components["responses"]["Unauthenticated"];
+            default: components["responses"]["Unexpected"];
+        };
+    };
+    updateMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMeRequest"];
+            };
+        };
+        responses: {
+            /** @description The person with the changes applied. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
             default: components["responses"]["Unexpected"];
         };
     };

@@ -20,6 +20,7 @@ const commentId = threadFixtures[0]?.comments[1]?.id ?? ''
 // `fetch`, so both are held to the same list.
 export const calls: Record<Implemented, (api: DataSource) => Promise<unknown>> = {
   getMe: (api) => api.getMe(),
+  updateMe: (api) => api.updateMe({ body: { name: 'Marta R.', locale: 'es', editorTextSize: 'large' } }),
   signUp: (api) =>
     api.signUp({ body: { email: 'nuria@harborpine.example', password: demoPassword, name: 'Nuria Vega' } }),
   signIn: (api) => api.signIn({ body: { email: daniel.email, password: demoPassword } }),

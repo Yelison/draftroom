@@ -17,6 +17,14 @@ export const workspacesQuery = (dataSource: DataSource) =>
     retry: retryTransportOnce,
   })
 
+/** Everyone who belongs to the workspace, the members who have not signed up yet included (their `name` is `null`). */
+export const membersQuery = (dataSource: DataSource, workspaceId: string) =>
+  queryOptions({
+    queryKey: queryKeys.members(workspaceId),
+    queryFn: () => dataSource.listMembers({ params: { path: { workspaceId } } }),
+    retry: retryTransportOnce,
+  })
+
 export const foldersQuery = (dataSource: DataSource, workspaceId: string) =>
   queryOptions({
     queryKey: queryKeys.folders(workspaceId),

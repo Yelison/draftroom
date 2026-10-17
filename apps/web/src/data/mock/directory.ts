@@ -9,7 +9,14 @@ export function findPerson(world: World, email: string): PersonRecord | undefine
 
 /** A person with no account yet: someone invited by email, who keeps this `userId` when they sign up. */
 export function addPendingPerson(world: World, email: string): PersonRecord {
-  const person: PersonRecord = { id: world.newId(), email, name: null, password: null }
+  const person: PersonRecord = {
+    id: world.newId(),
+    email,
+    name: null,
+    password: null,
+    locale: null,
+    editorTextSize: 'medium',
+  }
   world.people.push(person)
   return person
 }

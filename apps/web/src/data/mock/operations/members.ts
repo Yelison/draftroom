@@ -17,6 +17,11 @@ export function memberOperations(ctx: Context): MemberOperations {
   const ownersOf = (workspaceId: string) =>
     world.memberships.filter((row) => row.workspaceId === workspaceId && row.role === 'owner')
 
+  /** Only an owner who has signed up can act as one: a pending owner does not keep the workspace from losing its last. */
+  const isActive = (userId: string) => world.people.find((person) => person.id === userId)?.password != null
+  const activeOwnersExcept = (workspaceId: string, userId: string) =>
+    ownersOf(workspaceId).filter((row) => row.userId !== userId && isActive(row.userId))
+
   function membershipOf(workspaceId: string, userId: string): MembershipRecord {
     const membership = world.memberships.find((row) => row.workspaceId === workspaceId && row.userId === userId)
     if (membership === undefined) throw notFound()
@@ -26,7 +31,7 @@ export function memberOperations(ctx: Context): MemberOperations {
   /** Who inherits the documents of someone who leaves: the owner who removed them or, when an owner leaves, the owner who has been there longest. */
   function successorOf(workspaceId: string, leaving: string, actorId: string): string | undefined {
     if (leaving !== actorId) return actorId
-    const others = ownersOf(workspaceId).filter((row) => row.userId !== leaving)
+    const others = activeOwnersExcept(workspaceId, leaving)
     return sortRows(others, { key: (row) => row.createdAt, id: (row) => row.userId, direction: 'asc' })[0]?.userId
   }
 
@@ -89,7 +94,9 @@ export function memberOperations(ctx: Context): MemberOperations {
       const { workspace, role } = workspaceOf(ctx, path.workspaceId)
       requireWorkspaceOwner(role)
       const membership = membershipOf(workspace.id, path.userId)
-      if (membership.role === 'owner' && body.role !== 'owner' && ownersOf(workspace.id).length === 1) throw lastOwner()
+      const leavesNoOwner =
+        isActive(membership.userId) && activeOwnersExcept(workspace.id, membership.userId).length === 0
+      if (membership.role === 'owner' && body.role !== 'owner' && leavesNoOwner) throw lastOwner()
       membership.role = body.role
       return memberView(world, membership)
     },
@@ -99,7 +106,7 @@ export function memberOperations(ctx: Context): MemberOperations {
       const { workspace, role } = workspaceOf(ctx, path.workspaceId)
       requireWorkspaceOwner(role)
       const membership = membershipOf(workspace.id, path.userId)
-      // Only an owner removing themselves can leave the workspace without one: anyone else is removed by an owner.
+      // Only an owner removing themselves can leave the workspace without one who can act: anyone else is removed by an owner.
       const successor = successorOf(workspace.id, membership.userId, user.id)
       if (successor === undefined) throw lastOwner()
 

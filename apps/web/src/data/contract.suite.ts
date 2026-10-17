@@ -67,6 +67,82 @@ type Document = Schema<'Document'>
 
 export function describeDataSourceContract(name: string, harness: Harness) {
   describe(`DataSource contract: ${name}`, () => {
+    describe('the account of the person', () => {
+      it('refuses to change the profile with no session', async () => {
+        const { anonymous } = await harness.scenario()
+
+        await expectRefusal(anonymous.updateMe({ body: { name: 'Nobody' } }), 'unauthenticated')
+      })
+
+      it('saves the name, the language and the editor text size, and serves them again', async () => {
+        const { owner } = await harness.scenario()
+
+        const saved = await owner.updateMe({ body: { name: 'Marta R.', locale: 'es', editorTextSize: 'large' } })
+
+        expect(saved).toMatchObject({ name: 'Marta R.', locale: 'es', editorTextSize: 'large' })
+        expect(await owner.getMe()).toEqual(saved)
+      })
+
+      it('keeps what the request leaves out, and clears the language with null', async () => {
+        const { owner } = await harness.scenario()
+        await owner.updateMe({ body: { locale: 'es', editorTextSize: 'small' } })
+
+        const renamed = await owner.updateMe({ body: { name: 'Marta Ruiz Vega' } })
+        const cleared = await owner.updateMe({ body: { locale: null } })
+
+        expect(renamed).toMatchObject({ locale: 'es', editorTextSize: 'small' })
+        expect(cleared).toMatchObject({ name: 'Marta Ruiz Vega', locale: null, editorTextSize: 'small' })
+      })
+
+      it('changes the account of the one who asks and no other', async () => {
+        const { owner, member } = await harness.scenario()
+        const before = await member.getMe()
+
+        await owner.updateMe({ body: { name: 'Changed', locale: 'es', editorTextSize: 'large' } })
+
+        expect(await member.getMe()).toEqual(before)
+      })
+
+      it('refuses an empty request with 400', async () => {
+        const { owner } = await harness.scenario()
+
+        await expectRefusal(owner.updateMe({ body: {} }), 'validation-failed', '/')
+      })
+
+      it('counts the name in code points: 80 emoji are kept, 81 are 413', async () => {
+        const { owner } = await harness.scenario()
+
+        expect((await owner.updateMe({ body: { name: emoji(80) } })).name).toBe(emoji(80))
+        await expectRefusal(owner.updateMe({ body: { name: emoji(81) } }), 'too-large', '/name')
+      })
+
+      it('keeps the only owner who can act in place, even with another owner who has not signed up yet', async () => {
+        const { owner, ownerId, workspaceId } = await harness.scenario()
+        await owner.addMember({
+          ...inWorkspace(workspaceId),
+          body: { email: `pending-${unique()}@contract.example`, role: 'owner' },
+        })
+
+        await expectRefusal(
+          owner.updateMember({ params: { path: { workspaceId, userId: ownerId } }, body: { role: 'member' } }),
+          'last-owner',
+        )
+      })
+
+      it('lets an owner rename the workspace and leaves a member out with 403', async () => {
+        const { owner, member, workspaceId } = await harness.scenario()
+
+        await expectRefusal(
+          member.updateWorkspace({ ...inWorkspace(workspaceId), body: { name: 'Mine' } }),
+          'forbidden',
+        )
+        const renamed = await owner.updateWorkspace({ ...inWorkspace(workspaceId), body: { name: 'Almazara' } })
+
+        expect(renamed.name).toBe('Almazara')
+        expect((await member.getWorkspace(inWorkspace(workspaceId))).name).toBe('Almazara')
+      })
+    })
+
     describe('who is asking', () => {
       it('refuses a request with no session as unauthenticated', async () => {
         const { anonymous, workspaceId } = await harness.scenario()

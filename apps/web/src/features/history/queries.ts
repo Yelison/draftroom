@@ -1,5 +1,5 @@
 import { contractLimits } from '@draftroom/contract'
-import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions } from '@tanstack/react-query'
 import type { DataSource, RequestOf } from '../../data/DataSource.ts'
 import { queryKeys } from '../../data/queryKeys.ts'
 import { documentListQuery, retryTransportOnce } from '../documents/queries.ts'
@@ -53,11 +53,3 @@ export const documentActivityQuery = (dataSource: DataSource, documentId: string
  */
 export const documentOptionsQuery = (dataSource: DataSource, workspaceId: string) =>
   documentListQuery(dataSource, workspaceId, { limit: contractLimits.page.maxSize })
-
-/** The people who can have acted: the members who have signed up. */
-export const peopleOptionsQuery = (dataSource: DataSource, workspaceId: string) =>
-  queryOptions({
-    queryKey: queryKeys.members(workspaceId),
-    queryFn: () => dataSource.listMembers({ params: { path: { workspaceId } } }),
-    retry: retryTransportOnce,
-  })

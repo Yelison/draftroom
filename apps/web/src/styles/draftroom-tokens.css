@@ -17,6 +17,12 @@
   --font-doc-title: 700 38px/48px var(--font-family);
   --font-doc-heading: 700 23px/32px var(--font-family);
   --font-doc-body: 400 16px/24px var(--font-family);
+  --font-doc-title-small: 700 34px/44px var(--font-family);
+  --font-doc-heading-small: 700 21px/30px var(--font-family);
+  --font-doc-body-small: 400 14px/22px var(--font-family);
+  --font-doc-title-large: 700 42px/52px var(--font-family);
+  --font-doc-heading-large: 700 26px/36px var(--font-family);
+  --font-doc-body-large: 400 18px/28px var(--font-family);
 
   --color-nav-selected: #143b70;
 }

@@ -102,9 +102,11 @@ describe('a page whose headline cannot take the focus', () => {
     ]
     const router = createMemoryRouter(routes)
     render(
-      <AppProviders>
-        <RouterProvider router={router} />
-      </AppProviders>,
+      <DataSourceContext value={createMockServer().connect({ signedInAs: marta.email })}>
+        <AppProviders>
+          <RouterProvider router={router} />
+        </AppProviders>
+      </DataSourceContext>,
     )
 
     await act(() => router.navigate('/next'))
@@ -141,9 +143,11 @@ describe('a dialog that is a route over its page', () => {
   const open = async (path: string) => {
     const router = createMemoryRouter(routes, { initialEntries: [path] })
     render(
-      <AppProviders>
-        <RouterProvider router={router} />
-      </AppProviders>,
+      <DataSourceContext value={createMockServer().connect({ signedInAs: marta.email })}>
+        <AppProviders>
+          <RouterProvider router={router} />
+        </AppProviders>
+      </DataSourceContext>,
     )
     await screen.findByRole('button', { name: 'Open' })
     return router
@@ -227,4 +231,72 @@ describe('the order of the Tab key', () => {
       expect(visited).toEqual(expected)
     },
   )
+})
+
+describe('the tabs of a page', () => {
+  const tabHandle = { tab: true }
+  const routes: RouteObject[] = [
+    {
+      Component: AppFrame,
+      children: [
+        {
+          Component: OverviewLayout,
+          children: [
+            {
+              path: 'page',
+              element: (
+                <>
+                  <h1 tabIndex={-1}>Page</h1>
+                  <button type="button">Tab</button>
+                  <Outlet />
+                </>
+              ),
+              children: [
+                { path: 'first', handle: tabHandle, element: <p>First</p> },
+                { path: 'second', handle: tabHandle, element: <p>Second</p> },
+              ],
+            },
+            { path: 'other', element: <h1 tabIndex={-1}>Other</h1> },
+          ],
+        },
+      ],
+    },
+  ]
+  const open = async (path: string) => {
+    const router = createMemoryRouter(routes, { initialEntries: [path] })
+    render(
+      <DataSourceContext value={createMockServer().connect({ signedInAs: marta.email })}>
+        <AppProviders>
+          <RouterProvider router={router} />
+        </AppProviders>
+      </DataSourceContext>,
+    )
+    await screen.findByRole('heading', { level: 1 })
+    return router
+  }
+
+  it('leaves the focus on the tab the person chose when they move to another tab', async () => {
+    const router = await open('/page/first')
+    screen.getByRole('button', { name: 'Tab' }).focus()
+
+    await act(() => router.navigate('/page/second'))
+
+    expect(screen.getByRole('button', { name: 'Tab' })).toHaveFocus()
+  })
+
+  it('moves to the headline of the next page when the person leaves the tabs for another page', async () => {
+    const router = await open('/page/first')
+
+    await act(() => router.navigate('/other'))
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Other' })).toHaveFocus()
+  })
+
+  it('moves to the headline of the page when the person arrives at its tabs from another page', async () => {
+    const router = await open('/other')
+
+    await act(() => router.navigate('/page/first'))
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Page' })).toHaveFocus()
+  })
 })

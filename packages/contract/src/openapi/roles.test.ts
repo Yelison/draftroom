@@ -39,6 +39,7 @@ const websocketOnlyRows = ['write-content']
 // operationId, scope, then the rows it falls under; `row:author` marks a rule that only applies to the author.
 const operationAccess: [string, string, string[]][] = [
   ['getMe', 'session', []],
+  ['updateMe', 'session', []],
   ['signUp', 'public', []],
   ['signIn', 'public', []],
   ['signOut', 'session', []],

@@ -12,6 +12,7 @@ const limited = [
   ['CommentBody', contractLimits.commentBody, 1, 5000],
   ['Quote', contractLimits.quote, 1, 500],
   ['FolderName', contractLimits.folderName, 1, 80],
+  ['PersonName', contractLimits.personName, 1, 80],
   ['WorkspaceName', contractLimits.workspaceName, 1, 80],
   ['VersionLabel', contractLimits.versionLabel, 1, 100],
 ] as const
@@ -23,6 +24,7 @@ const limitedFields = [
   ['CreateFolderRequest', 'name', 'FolderName'],
   ['UpdateFolderRequest', 'name', 'FolderName'],
   ['UpdateWorkspaceRequest', 'name', 'WorkspaceName'],
+  ['UpdateMeRequest', 'name', 'PersonName'],
   ['CreateThreadRequest', 'body', 'CommentBody'],
   ['CreateThreadRequest', 'quote', 'Quote'],
   ['CreateCommentRequest', 'body', 'CommentBody'],
@@ -78,6 +80,7 @@ describe('length limits', () => {
         'updateComment',
         'updateDocument',
         'updateFolder',
+        'updateMe',
         'updateWorkspace',
       ],
       without: [],
@@ -88,6 +91,7 @@ describe('length limits', () => {
   // listed, and the other way round.
   it.each([
     ['User', 'name', ['PersonName']],
+    ['Me', 'name', ['PersonName']],
     ['UserRef', 'name', ['PersonName']],
     ['SignUpRequest', 'name', ['PersonName']],
     ['Member', 'name', ['PersonName', 'null']],

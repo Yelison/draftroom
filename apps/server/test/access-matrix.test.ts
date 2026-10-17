@@ -391,6 +391,11 @@ const workspaceCases: readonly WorkspaceCase[] = [
     allowed: 200,
   },
   {
+    operationId: 'updateWorkspace',
+    call: ({ workspaceId }) => ({ method: 'PATCH', url: `/api/workspaces/${workspaceId}`, body: { name: 'Almazara' } }),
+    allowed: 200,
+  },
+  {
     operationId: 'listFolders',
     call: ({ workspaceId }) => ({ method: 'GET', url: `/api/workspaces/${workspaceId}/folders` }),
     allowed: 200,
@@ -477,11 +482,12 @@ describe.each(workspaceCases.map((row) => ({ ...row, title: [row.operationId, ro
   },
 )
 
-const sessionOperations = [
-  ['getMe', '/api/me'],
-  ['listWorkspaces', '/api/workspaces'],
-  ['listTemplates', '/api/templates'],
-] as const
+const sessionOperations: readonly (readonly [string, Omit<Call, 'as'>])[] = [
+  ['getMe', { method: 'GET', url: '/api/me' }],
+  ['updateMe', { method: 'PATCH', url: '/api/me', body: { editorTextSize: 'large' } }],
+  ['listWorkspaces', { method: 'GET', url: '/api/workspaces' }],
+  ['listTemplates', { method: 'GET', url: '/api/templates' }],
+]
 
 interface MemberCase {
   readonly operationId: string
@@ -547,15 +553,11 @@ describe.each(memberCases)('$operationId in a workspace', ({ operationId, call, 
 })
 
 describe('the operations that need a session and nothing else', () => {
-  it.each(sessionOperations)('%s answers anyone who is signed in', async (operationId, url) => {
+  it.each(sessionOperations)('%s answers anyone who is signed in', async (operationId, call) => {
     const subject = await createPerson(db, 'Someone with no workspace')
     expect(rolesOf(operationId).scope).toBe('session')
 
-    const response = await api({
-      as: subject,
-      method: 'GET',
-      url,
-    })
+    const response = await api({ as: subject, ...call })
 
     expect(response.statusCode).toBe(200)
   })

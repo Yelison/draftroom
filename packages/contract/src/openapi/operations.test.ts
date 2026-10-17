@@ -7,6 +7,7 @@ const { operations, schemas } = document
 // The table of plan §4.1, one entry per operation. A forgotten or invented operation fails here first.
 const planOperations = [
   'GET /api/me',
+  'PATCH /api/me',
   'POST /api/auth/sign-up',
   'POST /api/auth/sign-in',
   'POST /api/auth/sign-out',
@@ -109,12 +110,11 @@ describe('operations', () => {
   // `locale` has no schema default on purpose: a validator that fills defaults would add it to a body without a template.
   it('accept a template language only together with a template', () => {
     const request = asSchema(schemas['CreateDocumentRequest'])
-    const locale = asSchema(request.properties?.['locale'])
+    const property = request.properties?.['locale']
+    const locale = asSchema(schemas[document.referencedName(property) ?? ''])
 
-    expect([locale.enum, 'default' in locale, request['dependentRequired']]).toEqual([
-      ['en', 'es'],
-      false,
-      { locale: ['templateId'] },
-    ])
+    expect([document.referencedName(property), locale.enum, 'default' in locale, request['dependentRequired']]).toEqual(
+      ['Locale', ['en', 'es'], false, { locale: ['templateId'] }],
+    )
   })
 })

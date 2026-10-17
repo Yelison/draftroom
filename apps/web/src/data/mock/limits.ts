@@ -12,7 +12,7 @@ export const textLimits = {
   folderName: contractLimits.folderName,
   workspaceName: contractLimits.workspaceName,
   versionLabel: contractLimits.versionLabel,
-  personName: { min: 1, max: 80 },
+  personName: contractLimits.personName,
   email: { min: 1, max: 254 },
   password: { min: 12, max: 128 },
   search: { min: 1, max: 200 },

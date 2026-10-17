@@ -7,7 +7,7 @@ import { useDataSource } from '../../data/useDataSource.ts'
 import { meQuery } from '../editor/meQuery.ts'
 import { StateMessage } from '../documents/StateMessage.tsx'
 import { AccessEditor } from './AccessEditor.tsx'
-import { peopleOptionsQuery } from '../history/queries.ts'
+import { membersQuery } from '../documents/queries.ts'
 import { accessQuery } from './queries.ts'
 import { ShareSkeleton } from './ShareSkeleton.tsx'
 
@@ -30,7 +30,7 @@ export function ShareBody({
   const access = useQuery(accessQuery(dataSource, document.id, owner))
   // The members of the workspace, read the way the history reads them (the same key and the same list), and only for an
   // owner: nobody else has anything to share.
-  const members = useQuery({ ...peopleOptionsQuery(dataSource, document.workspaceId), enabled: owner })
+  const members = useQuery({ ...membersQuery(dataSource, document.workspaceId), enabled: owner })
   const me = useQuery(meQuery(dataSource))
 
   const refused = access.isError && isApiError(access.error, 'forbidden')

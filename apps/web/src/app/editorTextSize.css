@@ -1,0 +1,15 @@
+/* The size of the text in the editor, chosen in Settings and set by `SavedPreferences` on <html>. It only points the
+ * document tokens of the product layer at their small and large variants: `medium` is what the tokens say by themselves,
+ * and nothing here declares a token of Forma UI or a measure of its own. */
+
+:root[data-editor-text-size='small'] {
+  --font-doc-title: var(--font-doc-title-small);
+  --font-doc-heading: var(--font-doc-heading-small);
+  --font-doc-body: var(--font-doc-body-small);
+}
+
+:root[data-editor-text-size='large'] {
+  --font-doc-title: var(--font-doc-title-large);
+  --font-doc-heading: var(--font-doc-heading-large);
+  --font-doc-body: var(--font-doc-body-large);
+}
