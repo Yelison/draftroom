@@ -1,4 +1,4 @@
-# 0016 · Comment highlights, the key that comments, and the starting text of the demo
+# 0017 · Comment highlights, the key that comments, and the starting text of the demo
 
 Status: accepted (2026-10-17, T3.2)
 
