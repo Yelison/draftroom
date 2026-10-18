@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { fragmentName } from '@draftroom/editor-schema'
+import { editorExtensions, fragmentName } from '@draftroom/editor-schema'
 import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
-import type { Editor } from '@tiptap/core'
+import { Editor } from '@tiptap/core'
 import { ySyncPluginKey } from '@tiptap/y-tiptap'
 import * as Y from 'yjs'
 import { describe, expect, it } from 'vitest'
+import { NewBlockText } from './NewBlockText.ts'
 import { openHeadlessEditor } from './testing/headlessEditor.ts'
 
 const textBlockNames = new Set(['paragraph', 'heading'])
@@ -62,6 +63,23 @@ describe('a text block that the editor creates', () => {
     const blocks = shared(document)
     expect(blocks.length).toBeGreaterThan(0)
     expect(blocks.filter(({ texts }) => texts !== 1)).toEqual([])
+  })
+
+  it('is in the first update that leaves, so nobody can receive the block without it', () => {
+    const document = new Y.Doc()
+    const editor = openHeadlessEditor(document)
+    const sent: Uint8Array[] = []
+    document.on('update', (update: Uint8Array) => sent.push(update))
+
+    editor.commands.enter()
+
+    // What a person who has only the first update, and types before the second arrives, would build on.
+    const received = new Y.Doc()
+    Y.applyUpdate(received, sent[0] ?? new Uint8Array())
+    expect(shared(received)).toEqual([
+      { name: 'paragraph', texts: 1 },
+      { name: 'paragraph', texts: 1 },
+    ])
   })
 
   it('takes the first letter into that same text node, so a second person never gets one of their own', () => {
@@ -130,6 +148,14 @@ describe('what the editor does not write', () => {
 
     expect(written).toEqual([])
     expect(shared(document)).toEqual([{ name: 'paragraph', texts: 0 }])
+  })
+
+  it('nothing, and no failure, in an editor that has no shared document', () => {
+    const editor = new Editor({ extensions: [...editorExtensions(), NewBlockText] })
+
+    editor.commands.enter()
+
+    expect(editor.getJSON().content).toEqual([{ type: 'paragraph' }, { type: 'paragraph' }])
   })
 
   it('nothing when a block that somebody else made reaches it', () => {

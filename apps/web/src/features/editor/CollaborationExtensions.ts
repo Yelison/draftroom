@@ -42,7 +42,7 @@ export function collaborationExtensions({
 }) {
   return [
     Collaboration.configure({ document: ydoc, field: fragmentName }),
-    NewBlockText.configure({ document: ydoc }),
+    NewBlockText,
     CollaborationCaret.configure({
       provider,
       user: person,

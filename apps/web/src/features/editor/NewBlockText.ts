@@ -15,25 +15,25 @@ import * as Y from 'yjs'
  * not at all). With a text node already in the paragraph both write into the same one, and Yjs keeps each person's run
  * whole.
  *
- * Only the creator of a block fills it: two people filling it would be the same race again. A block that someone else
- * made, or that the document had when it was opened, is left as it is, and nothing is written until a person edits (the
- * reason `trailingNode` is off). Blocks stored without a text node stay exposed until someone types in them; see
+ * The fill is synchronous, inside `afterTransaction`, and that is what keeps it from ever being missing: Yjs sends
+ * `update` after that event and encodes up to the end of the store, so the first update of an Enter already has the text
+ * node. Only the creator of a block fills it: two people filling it would be the same race again. A block that someone
+ * else made, or that the document had when it was opened, is left as it is, and nothing is written until a person edits
+ * (the reason `trailingNode` is off). Blocks stored without a text node stay exposed until someone types in them; see
  * docs/decisions/0019-text-node-in-new-blocks.md.
  */
-export const NewBlockText = Extension.create<{ document: Y.Doc }>({
+export const NewBlockText = Extension.create({
   name: 'newBlockText',
 
-  addOptions() {
-    return { document: new Y.Doc() }
-  },
-
   addProseMirrorPlugins() {
-    const { document } = this.options
     return [
       new Plugin({
         key: new PluginKey('newBlockText'),
         // The editor's view exists when the editor does, unlike the extension's `onCreate`, which runs a tick later.
         view: (view) => {
+          // The document is the one `Collaboration` binds the editor to: without it there is nothing shared to fill.
+          const document = ySyncPluginKey.getState(view.state)?.doc
+          if (document === undefined) return {}
           const textBlocks = new Set(
             Object.values(view.state.schema.nodes).flatMap((type) => (type.isTextblock ? [type.name] : [])),
           )
