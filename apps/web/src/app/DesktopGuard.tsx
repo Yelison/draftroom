@@ -1,27 +1,12 @@
 import { Alert, Button } from '@yelison/forma-ui'
-import { useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import styles from './DesktopGuard.module.css'
 import { focusMainContent } from './mainContent.ts'
-
-/** The narrowest window the product is built for. The CSS has no equivalent of this number to share. */
-export const desktopMinWidth = 1280
-
-// A strict "less than", so a window of 1279.5 px (a browser zoom can produce one) is narrow and 1280 is not.
-export const narrowQuery = `(width < ${desktopMinWidth}px)`
+import { desktopMinWidth, useNarrowWindow } from './narrowWindow.ts'
 
 /** Where this tab remembers that the notice was closed: it stays closed until the tab does. */
 const dismissedKey = 'draftroom.desktopNoticeDismissed'
-
-// `matchMedia` tells the app when the window crosses the width, not at every pixel it is dragged through, which is
-// what a `resize` listener that stores the width would do.
-function subscribe(onChange: () => void) {
-  const query = window.matchMedia(narrowQuery)
-  query.addEventListener('change', onChange)
-  return () => query.removeEventListener('change', onChange)
-}
-
-const isNarrow = () => window.matchMedia(narrowQuery).matches
 
 function readDismissed(): boolean {
   try {
@@ -47,7 +32,7 @@ function rememberDismissed(): void {
  * typing; it can be closed, and stays closed for the tab.
  */
 export function DesktopGuard({ children }: { children: ReactNode }) {
-  const narrow = useSyncExternalStore(subscribe, isNarrow)
+  const narrow = useNarrowWindow()
   const [dismissed, setDismissed] = useState(readDismissed)
 
   return (
