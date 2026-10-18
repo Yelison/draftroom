@@ -77,6 +77,25 @@ describe('the carets of the others', () => {
     peer.leave()
   })
 
+  it('keeps the name of a caret out of what a screen reader reads of the sentence it lands in', async () => {
+    const { server, editor, text } = await openEditor()
+    const peer = await joinAsPeer({ server, documentId: launchPlan.id, person: { id: daniel.id, name: 'Daniel' } })
+    act(() => editor.commands.insertContent('Hello world'))
+    await waitFor(() => expect(peer.editor.getText()).toBe('Hello world'))
+
+    act(() => peer.placeCaret(4))
+
+    const label = await waitFor(() => {
+      const found = text.querySelector('.caretLabel')
+      expect(found).not.toBeNull()
+      return found
+    })
+    // Still there to be seen: it is hidden from the accessibility tree, not from the screen.
+    expect(label).toHaveTextContent('Daniel')
+    expect(label?.closest('[aria-hidden="true"]')).not.toBeNull()
+    peer.leave()
+  })
+
   it('draws the name as text, never as markup', async () => {
     const { server, editor, text } = await openEditor()
     const hostile = '<img src=x onerror=alert(1)>'
