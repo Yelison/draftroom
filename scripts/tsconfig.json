@@ -1,0 +1,23 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // These scripts run with Node's type stripping, like the server (ADR 0009), or under Playwright, which strips them itself: tsc only checks them.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": "..",
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "resolveJsonModule": true
+  },
+  // What the tour reads from the real-stack suite (its environment and the server process) and from the server (the
+  // people of the demo seed), besides its own files.
+  "include": [
+    "**/*.ts",
+    "../apps/web/e2e-collab/environment.ts",
+    "../apps/web/e2e-collab/globalSetup.ts",
+    "../apps/web/e2e-collab/serverProcess.ts",
+    "../apps/web/e2e-collab/waitFor.ts",
+    "../apps/server/src/db/demo-seed/content.ts",
+    "../apps/server/src/db/tables.ts"
+  ]
+}

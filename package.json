@@ -17,6 +17,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "docs:links": "node scripts/doc-links/run.ts",
+    "docs:tour": "node scripts/readme-tour/run.ts",
     "api:lint": "redocly lint --config packages/contract/redocly.yaml packages/contract/openapi.yaml",
     "api:types": "node packages/contract/scripts/generate.mjs"
   },
