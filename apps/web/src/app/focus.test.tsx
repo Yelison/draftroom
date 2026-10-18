@@ -201,7 +201,7 @@ describe('the order of the Tab key', () => {
     ''
 
   it.each(layouts)(
-    'goes from the skip link through the rail and the explorer to the page, and then to signing out, in the $layout layout',
+    'goes from the skip link through the rail, signing out and the explorer to the page, in the $layout layout',
     async ({ Component, explorer }) => {
       const user = userEvent.setup()
       const routes: RouteObject[] = [
@@ -220,10 +220,10 @@ describe('the order of the Tab key', () => {
         </StrictMode>,
       )
       if (explorer.length > 0) await screen.findByRole('tree')
-      // Signing out comes last: it is after the page in the order, though it sits at the foot of the rail.
+      // Signing out is the last stop of the rail, where it is seen: the focus passes it before the explorer and the page.
       await screen.findByRole('button', { name: 'Sign out' })
 
-      const expected = [...rail, ...explorer, 'Probe', 'Sign out']
+      const expected = [...rail, 'Sign out', ...explorer, 'Probe']
       const visited: string[] = []
       for (let stop = 0; stop < expected.length; stop++) {
         await user.tab()

@@ -7,12 +7,3 @@
 .main {
   padding: var(--space-48);
 }
-
-/* Signing out sits at the foot of the rail, which is the rail's own (`NavRail`): it is over the rail's bottom, out of the
- * flow of the grid, with the rail's padding on each side. */
-.account {
-  position: fixed;
-  inset-block-end: var(--space-16);
-  inset-inline-start: var(--space-12);
-  inline-size: calc(var(--layout-rail-width) - var(--space-24));
-}

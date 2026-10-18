@@ -91,8 +91,9 @@ describe('the explorer beside a document', () => {
   it('keeps the selection where it is while the keyboard walks to another row', async () => {
     const { user } = renderScreen(openPath)
     await tree()
-    // Tab: skip link, five rail items, search, new document, new folder, then the tree.
-    for (let stop = 0; stop < 10; stop++) await user.tab()
+    await screen.findByRole('button', { name: 'Sign out' })
+    // Tab: skip link, five rail items, signing out, search, new document, new folder, then the tree.
+    for (let stop = 0; stop < 11; stop++) await user.tab()
     const stopRow = document.activeElement as HTMLElement
     expect(stopRow).toHaveAttribute('role', 'treeitem')
 
@@ -107,8 +108,9 @@ describe('the explorer beside a document', () => {
   it('is one stop of the Tab key, and it is the open document', async () => {
     const { user } = renderScreen(openPath)
     await tree()
+    await screen.findByRole('button', { name: 'Sign out' })
 
-    for (let stop = 0; stop < 10; stop++) await user.tab()
+    for (let stop = 0; stop < 11; stop++) await user.tab()
 
     const stopRow = document.activeElement as HTMLElement
     expect(stopRow).toHaveAttribute('aria-selected', 'true')

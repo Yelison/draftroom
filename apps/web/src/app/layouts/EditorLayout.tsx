@@ -9,16 +9,13 @@ import styles from './EditorLayout.module.css'
 export function EditorLayout() {
   return (
     <div className={styles.layout}>
-      <NavRail variant="compact" />
+      <NavRail variant="compact" footer={<AccountControl variant="compact" />} />
       <div className={styles.explorer}>
         <Explorer />
       </div>
       <MainContent className={styles.main}>
         <Outlet />
       </MainContent>
-      <div className={styles.account}>
-        <AccountControl variant="compact" />
-      </div>
     </div>
   )
 }

@@ -8,13 +8,10 @@ import styles from './OverviewLayout.module.css'
 export function OverviewLayout() {
   return (
     <div className={styles.layout}>
-      <NavRail variant="expanded" />
+      <NavRail variant="expanded" footer={<AccountControl variant="expanded" />} />
       <MainContent className={styles.main}>
         <Outlet />
       </MainContent>
-      <div className={styles.account}>
-        <AccountControl variant="expanded" />
-      </div>
     </div>
   )
 }
