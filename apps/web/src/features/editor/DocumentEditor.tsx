@@ -15,7 +15,6 @@ import { useDataSource } from '../../data/useDataSource.ts'
 import { CollaborationPanel } from '../comments/CollaborationPanel.tsx'
 import { CommentsToggle } from '../comments/CommentsToggle.tsx'
 import { useCommentsPanel } from '../comments/commentsPanelState.ts'
-import { useNarrowWindow } from '../../app/narrowWindow.ts'
 import { createCommentRequests } from '../comments/commentRequests.ts'
 import type { CollaboratingPerson } from './CollaborationExtensions.ts'
 import { EditorSkeleton } from './EditorSkeleton.tsx'
@@ -30,17 +29,15 @@ import { canEdit } from './roles.ts'
 import { meQuery } from './meQuery.ts'
 import { useCollabSession } from './useCollabSession.ts'
 import { useDocumentEditor } from './useDocumentEditor.ts'
+import { useFittingLimit } from './useFittingLimit.ts'
 import { duplicateProblemId, useDuplicateDocument } from './useDuplicateDocument.ts'
 import styles from './Sheet.module.css'
 
 type LinkChange = 'added' | 'updated' | 'removed'
 
-// How many people the band draws before it counts the rest. The second row (the people, Share and the sync status) has 520 px
-// at 640 px, a zoom of 200 % on 1280, and 504 beside the comments panel at 1280: in Spanish it holds two avatars and the count
-// there, and four only where the sheet has its 708 px. A row that fits by a few pixels fits with one font and not with another,
-// so two avatars are drawn wherever the room is short, which leaves it a margin of some 50 px.
+// The most people the band draws as avatars before it counts the rest; fewer when the room of the second row is shorter than
+// that (`useFittingLimit`), which depends on the font and not on the width of the window.
 const presenceLimit = 4
-const presenceLimitWhenTight = 2
 
 /**
  * The editor of one document: its title, the toolbar for those who may edit, and the text on a Yjs document that is kept
@@ -198,7 +195,6 @@ function EditorWorkspace({
 }) {
   const intl = useIntl()
   const commentsPanel = useCommentsPanel()
-  const tight = useNarrowWindow() || commentsPanel.open
   // The role says what the screen offers and the connection what the server allows: the text takes edits only when both do.
   const mayEdit = canEdit(document.role)
   const editable = mayEdit && snapshot.editable
@@ -284,6 +280,7 @@ function EditorWorkspace({
       snapshot.peers.map(({ userId, name }) => ({ userId, name, tone: presenceLookOf(userId).tone, status: 'online' })),
     [snapshot.peers],
   )
+  const { zone: peopleZone, limit: fittingLimit } = useFittingLimit(presenceLimit, people.length)
 
   function finishLink(change: LinkChange) {
     setLinkChange(change)
@@ -325,8 +322,8 @@ function EditorWorkspace({
           </div>
         </div>
         <div className={styles.row}>
-          <div className={styles.people}>
-            <Presence people={people} limit={tight ? presenceLimitWhenTight : presenceLimit} />
+          <div ref={peopleZone} className={styles.people}>
+            <Presence people={people} limit={fittingLimit} />
           </div>
           <div className={styles.state}>
             <ShareControl document={document} />

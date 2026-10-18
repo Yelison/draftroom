@@ -801,9 +801,16 @@ test.describe('the band above the sheet', () => {
             const listed = page
               .getByRole('list', { name: /People in this document|Personas en este documento/ })
               .getByRole('listitem')
-            // Two avatars and the count where the second row is tight (beside the panel, or in a window narrower than a desktop);
-            // four and the count when the band has the whole sheet.
-            await expect(listed).toHaveCount(panel === 'open' || width < 1280 ? 3 : 5)
+            // As many avatars as the row has room for, which depends on the font, and the count says how many are left: all five
+            // are there, as an avatar or in the count.
+            await expect(listed.first()).toBeVisible()
+            await expect
+              .poll(async () => {
+                const texts = await listed.allInnerTexts()
+                const counted = Number(/\d+/.exec(texts.at(-1) ?? '')?.[0] ?? 0)
+                return (counted === 0 ? texts.length : texts.length - 1) + counted
+              })
+              .toBe(5)
 
             expect(await topOfText()).toBe(before)
             await expectBandToHold()
@@ -814,43 +821,46 @@ test.describe('the band above the sheet', () => {
   }
 })
 
-// What the band measures depends on the font the machine draws the text in: the one of a runner of the CI is wider than the
-// one of a laptop. Letters spaced by 0.04 em are some 28 px more in the second row in Spanish, more than the difference between
-// the two, so what holds with them holds with any font a machine is likely to fall back to.
+// What the band measures depends on the font the machine draws the text in, and the font of a runner of the CI is wider than the
+// one of a laptop. The second row is built so that its parts never overlap whatever the font is: the people give way to Share
+// and the sync status, and the avatars that do not fit are counted instead. Two amounts of letter-spacing stand for fonts wider
+// than any a machine is likely to fall back to: 0.04 em is some 28 px more in the Spanish row, and 0.1 em some 70.
 test.describe('the second row of the band with a wider font', () => {
-  for (const locale of ['en-US', 'es-ES'] as const) {
-    for (const width of [640, 1280, 1440]) {
-      for (const panel of ['open', 'closed'] as const) {
-        test.describe(`in ${locale} at ${width} px with the comments panel ${panel}`, () => {
-          test.use({ locale, viewport: { width, height: 900 } })
+  for (const spacing of ['0.04em', '0.1em']) {
+    for (const locale of ['en-US', 'es-ES'] as const) {
+      for (const width of [640, 1280, 1440]) {
+        for (const panel of ['open', 'closed'] as const) {
+          test.describe(`in ${locale} at ${width} px with the comments panel ${panel}, letters spaced by ${spacing}`, () => {
+            test.use({ locale, viewport: { width, height: 900 } })
 
-          test('keeps the people apart from Share and inside the band', async ({ page }) => {
-            await page.goto(documentPath)
-            await textArea(page).waitFor()
-            await setPanel(page, panel)
-            await page.addStyleTag({ content: 'body, button, input { letter-spacing: 0.04em !important }' })
-            await page.evaluate(
-              async ([documentId, names]) => {
-                const mock = Reflect.get(window, 'draftroomMock') as {
-                  addPeople(id: string, names: string[]): Promise<unknown>
-                }
-                await mock.addPeople(documentId as string, names as string[])
-              },
-              [launchPlan.id, ['Ines Varga', 'Omar Haddad', 'Lucía Ferrer', 'Tobias Lind', 'Noor Aziz']],
-            )
+            test('keeps the people apart from Share and inside the band', async ({ page }) => {
+              await page.goto(documentPath)
+              await textArea(page).waitFor()
+              await setPanel(page, panel)
+              await page.addStyleTag({ content: `body, button, input { letter-spacing: ${spacing} !important }` })
+              await page.evaluate(
+                async ([documentId, names]) => {
+                  const mock = Reflect.get(window, 'draftroomMock') as {
+                    addPeople(id: string, names: string[]): Promise<unknown>
+                  }
+                  await mock.addPeople(documentId as string, names as string[])
+                },
+                [launchPlan.id, ['Ines Varga', 'Omar Haddad', 'Lucía Ferrer', 'Tobias Lind', 'Noor Aziz']],
+              )
 
-            const people = await page
-              .getByRole('list', { name: /People in this document|Personas en este documento/ })
-              .boundingBox()
-            const group = await page
-              .getByRole('button', { name: /^(Share|Compartir)$/ })
-              .locator('xpath=..')
-              .boundingBox()
-            const band = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
-            expect((people?.x ?? 0) + (people?.width ?? 0)).toBeLessThanOrEqual(group?.x ?? 0)
-            expect((group?.x ?? 0) + (group?.width ?? 0)).toBeLessThanOrEqual((band?.x ?? 0) + (band?.width ?? 0))
+              const list = page.getByRole('list', { name: /People in this document|Personas en este documento/ })
+              await list.waitFor()
+              const people = await list.boundingBox()
+              const group = await page
+                .getByRole('button', { name: /^(Share|Compartir)$/ })
+                .locator('xpath=..')
+                .boundingBox()
+              const band = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
+              expect((people?.x ?? 0) + (people?.width ?? 0)).toBeLessThanOrEqual(group?.x ?? 0)
+              expect((group?.x ?? 0) + (group?.width ?? 0)).toBeLessThanOrEqual((band?.x ?? 0) + (band?.width ?? 0))
+            })
           })
-        })
+        }
       }
     }
   }

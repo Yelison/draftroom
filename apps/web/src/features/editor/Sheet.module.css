@@ -82,16 +82,21 @@
   padding-inline: var(--space-8);
 }
 
+/* The people give way: Share and the sync status keep their width (below), the zone takes what is left and no more, and what does
+ * not fit is not drawn (`useFittingLimit` counts it), so the two never overlap, whatever the font. It has the room it is given
+ * (`flex: 1 1 0`) and not that of its content, or its width would change with the avatars the hook is trying to fit. */
 .people {
   display: flex;
+  flex: 1 1 0;
   align-items: center;
   min-width: 0;
+  overflow: hidden;
   padding-inline: var(--space-12);
 }
 
 .state {
   display: flex;
-  flex-shrink: 0;
+  flex: none;
   align-items: center;
   gap: var(--space-8);
   padding-inline: var(--space-12);
