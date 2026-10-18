@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import type { Page } from '@playwright/test'
+import { launchPlan } from '../src/data/mock/fixtures/documents.ts'
 import { expect, test } from './fixtures.ts'
 import { matrix, routes } from './routes.ts'
 
@@ -132,3 +133,18 @@ for (const { window, zoomed } of [
     }
   })
 }
+
+test.describe('a window that becomes narrow while someone is working', () => {
+  test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
+
+  test('does not leave the focus on the page when it was in the explorer, which is left out', async ({ page }) => {
+    await page.goto(`documents/${launchPlan.id}`)
+    await page.getByRole('tree').waitFor()
+    await page.getByRole('searchbox', { name: 'Search documents' }).focus()
+
+    await page.setViewportSize({ width: 640, height: 360 })
+
+    await expect(page.getByRole('searchbox', { name: 'Search documents' })).toBeHidden()
+    await expect.poll(() => page.evaluate(() => document.activeElement?.tagName)).not.toBe('BODY')
+  })
+})

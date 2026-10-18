@@ -3,11 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
 import { createMemoryRouter, Outlet, type RouteObject } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DataSourceContext } from '../data/DataSourceContext.ts'
 import { createMockServer } from '../data/mock/createMockDataSource.ts'
 import { marta } from '../data/mock/fixtures/index.ts'
 import { renderApp } from '../test/renderApp.tsx'
+import { simulateViewport } from '../test/viewport.ts'
 import { AppFrame } from './AppFrame.tsx'
 import { EditorLayout } from './layouts/EditorLayout.tsx'
 import { OverviewLayout } from './layouts/OverviewLayout.tsx'
@@ -300,5 +301,45 @@ describe('the tabs of a page', () => {
     await act(() => router.navigate('/page/first'))
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Page' })).toHaveFocus()
+  })
+})
+
+describe('the explorer when the window becomes narrower than a desktop', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('gives the focus to the page when the explorer, which is left out, has it taken away', async () => {
+    const user = userEvent.setup()
+    const viewport = simulateViewport(1440)
+    renderApp('/documents/new')
+    await user.click(await screen.findByRole('searchbox', { name: 'Search documents' }))
+    expect(screen.getByRole('searchbox', { name: 'Search documents' })).toHaveFocus()
+
+    // What the browser does to an element that its stylesheet has just hidden: the focus leaves it for no element.
+    act(() => viewport.resizeTo(640))
+    act(() => screen.getByRole('searchbox', { name: 'Search documents' }).blur())
+
+    expect(screen.getByRole('heading', { level: 1, name: 'New document' })).toHaveFocus()
+  })
+
+  it('leaves the focus where it is when it was not in the explorer', async () => {
+    const viewport = simulateViewport(1440)
+    renderApp('/documents/new')
+    const settings = await screen.findByRole('link', { name: 'Settings' })
+    act(() => settings.focus())
+
+    act(() => viewport.resizeTo(640))
+
+    expect(settings).toHaveFocus()
+  })
+
+  it('does not move the focus when it leaves the explorer for another element of a desktop window', async () => {
+    const user = userEvent.setup()
+    simulateViewport(1440)
+    renderApp('/documents/new')
+    await user.click(await screen.findByRole('searchbox', { name: 'Search documents' }))
+
+    await user.tab({ shift: true })
+
+    expect(screen.getByRole('heading', { level: 1, name: 'New document' })).not.toHaveFocus()
   })
 })

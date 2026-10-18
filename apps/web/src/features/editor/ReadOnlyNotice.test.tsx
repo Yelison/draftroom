@@ -33,6 +33,17 @@ describe('the notice a reader of a document sees', () => {
     ).toBeInTheDocument()
   })
 
+  it('shares the first row of the band with the history and the comments, so that row is never empty without a toolbar', async () => {
+    const view = renderEditor({ signedInAs: people.daniel, documentId: budget.id })
+    await textArea()
+
+    const firstRow = view.container.querySelector('.band .row') as HTMLElement
+    expect(within(firstRow).getByText('You can read this document but not change it.')).toBeInTheDocument()
+    expect(within(firstRow).getByRole('button', { name: 'Version history' })).toBeInTheDocument()
+    expect(await within(firstRow).findByRole('button', { name: /^Comments/ })).toBeInTheDocument()
+    expect(within(firstRow).queryByRole('toolbar')).not.toBeInTheDocument()
+  })
+
   it('is not there for an editor, who has the toolbar', async () => {
     const view = renderEditor()
     await textArea()

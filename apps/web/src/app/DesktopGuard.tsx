@@ -8,7 +8,7 @@ import { focusMainContent } from './mainContent.ts'
 export const desktopMinWidth = 1280
 
 // A strict "less than", so a window of 1279.5 px (a browser zoom can produce one) is narrow and 1280 is not.
-const narrowQuery = `(width < ${desktopMinWidth}px)`
+export const narrowQuery = `(width < ${desktopMinWidth}px)`
 
 /** Where this tab remembers that the notice was closed: it stays closed until the tab does. */
 const dismissedKey = 'draftroom.desktopNoticeDismissed'

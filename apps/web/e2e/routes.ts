@@ -96,6 +96,9 @@ async function openWithoutWorkspace(page: Page) {
   await page.getByRole('navigation').locator('a[href$="/documents"]').click()
   await expect(page).toHaveURL(/documents$/)
   await settled(page)
+  // The screen says there is nothing to list, and lists nothing: without this the case could be measuring another screen.
+  await expect(page.getByRole('main').locator('a[href*="/documents/"]')).toHaveCount(0)
+  await expect(page.getByRole('main').locator('li')).toHaveCount(0)
 }
 
 const document = `documents/${launchPlan.id}`

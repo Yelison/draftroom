@@ -731,7 +731,8 @@ async function setPanel(page: Page, state: 'open' | 'closed') {
 
 test.describe('the band above the sheet', () => {
   for (const locale of ['en-US', 'es-ES'] as const) {
-    for (const width of [1280, 1440]) {
+    // 640 px is a window of 1280 px at a zoom of 200 %: the band has 520 px there, with the panel under the sheet.
+    for (const width of [640, 1280, 1440]) {
       for (const panel of ['open', 'closed'] as const) {
         test.describe(`in ${locale} at ${width} px with the comments panel ${panel}`, () => {
           test.use({ locale, viewport: { width, height: 900 } })
@@ -776,6 +777,8 @@ test.describe('the band above the sheet', () => {
                 expect(part?.x).toBeGreaterThanOrEqual(left)
                 expect((part?.x ?? 0) + (part?.width ?? 0)).toBeLessThanOrEqual(right)
               }
+              // The people end before Share starts: the two share the second row and must not run into each other.
+              if (people !== null) expect((people?.x ?? 0) + (people?.width ?? 0)).toBeLessThanOrEqual(group?.x ?? 0)
               // History and comments are in the first row, with the toolbar; Share and the people are in the second, under it.
               expect(history?.y).toBeLessThan((frame?.y ?? 0) + token)
               expect(comments?.y).toBeLessThan((frame?.y ?? 0) + token)
