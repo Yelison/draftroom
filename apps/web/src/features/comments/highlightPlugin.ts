@@ -90,6 +90,16 @@ export function showHighlights(
  * extension coming before this one (it has the higher priority); a test, which types over a range, fails if it did not.
  */
 function highlightPlugin(requests: CommentRequests | null): Plugin<HighlightState> {
+  const commentKey = keydownHandler({
+    [commentShortcut]: (state) => {
+      const { selection } = state
+      // Text that is selected is for a new comment; a caret in a highlight is for its thread.
+      const threadId = selection.empty ? threadAt(state, selection.from, { caret: true }) : null
+      requests?.send(threadId === null ? { type: 'comment' } : { type: 'thread', threadId, focus: true })
+      return true
+    },
+  })
+
   return new Plugin<HighlightState>({
     key: highlightKey,
     state: {
@@ -134,17 +144,14 @@ function highlightPlugin(requests: CommentRequests | null): Plugin<HighlightStat
         return false
       },
       // A DOM handler, not `handleKeyDown`: ProseMirror runs that one only while the text is editable, and a commenter's
-      // is not. This one runs for every role.
+      // is not. This one runs for every role. ProseMirror cancels the event of a key that `handleKeyDown` took, and does
+      // not for this one, so the handler does it: on a Mac the browser would otherwise go on to do what it does with the key.
       handleDOMEvents: {
-        keydown: keydownHandler({
-          [commentShortcut]: (state) => {
-            const { selection } = state
-            // Text that is selected is for a new comment; a caret in a highlight is for its thread.
-            const threadId = selection.empty ? threadAt(state, selection.from, { caret: true }) : null
-            requests?.send(threadId === null ? { type: 'comment' } : { type: 'thread', threadId, focus: true })
-            return true
-          },
-        }),
+        keydown(view, event) {
+          const taken = commentKey(view, event)
+          if (taken) event.preventDefault()
+          return taken
+        },
       },
     },
   })

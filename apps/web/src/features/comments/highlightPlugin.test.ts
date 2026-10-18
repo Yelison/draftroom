@@ -377,4 +377,17 @@ describe('opening a thread from the text', () => {
 
     expect(sent).toEqual([{ type: 'thread', threadId: 'a', focus: true }])
   })
+
+  it('takes the key from the browser, which would do something of its own with it, and leaves every other key alone', () => {
+    const { editor } = withRequests('abcdef')
+    const press = (init: KeyboardEventInit) => {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })
+      editor.view.dom.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+
+    expect(press({ key: 'm', ctrlKey: true, altKey: true })).toBe(true)
+    expect(press({ key: 'm', ctrlKey: true })).toBe(false)
+    expect(press({ key: 'm' })).toBe(false)
+  })
 })
