@@ -1,0 +1,34 @@
+# What a build never needs, and what must never end up in an image: the local environment files first of all.
+**/.env
+**/.env.*
+!**/.env.example
+
+.git
+.github
+**/node_modules
+**/dist
+**/dist-demo
+**/coverage
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+**/.vitest
+
+# Tests, their support code and the end-to-end suites: nothing of them runs in production.
+**/*.test.ts
+**/*.test.tsx
+apps/server/test
+apps/server/scripts
+apps/web/e2e
+apps/web/e2e-collab
+apps/web/e2e-demo
+apps/web/src/test
+
+# The development seed is for development databases only and is never imported by the server.
+apps/server/src/db/demo-seed
+
+# Local instructions and the documentation: they are not part of a running system.
+CLAUDE.md
+CLAUDE.local.md
+docs
+**/*.md

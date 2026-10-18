@@ -1,0 +1,43 @@
+# The only listener the outside world reaches. It terminates TLS, serves the built web app, and sends `/api` and `/collab`
+# to the server. `SITE_ADDRESS` is the public host name: Caddy gets a certificate for it by itself. For a name that is
+# not public (`draftroom.localhost`, an address on a private network) it issues one from its own certificate authority.
+{
+	# Caddy's own redirect from HTTP sends the browser to port 443, which is wrong when HTTPS is published on another port. The
+	# one below goes to `PUBLIC_ORIGIN`, the address people really use.
+	auto_https disable_redirects
+}
+
+http://{$SITE_ADDRESS} {
+	redir {$PUBLIC_ORIGIN}{uri} permanent
+}
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy server:8380
+	}
+
+	# The collaboration WebSocket. Caddy forwards the `Connection: Upgrade` and `Upgrade: websocket` headers of the
+	# handshake by itself, and keeps an idle socket open: the server decides when a connection ends.
+	handle /collab* {
+		reverse_proxy server:8480
+	}
+
+	handle {
+		root * /srv
+
+		# The headers of the document, for the web app's files only (see the file).
+		import /etc/caddy/security-headers.caddy
+
+		# Content-hashed files never change under their name; the page that names them always has to be fetched again.
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		@unhashed not path /assets/*
+		header @unhashed Cache-Control "no-cache"
+
+		# The app is a single page: any path that is not a file is a route of the client.
+		try_files {path} /index.html
+		file_server
+	}
+}

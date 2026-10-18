@@ -1,0 +1,188 @@
+import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { findSecrets } from './findSecrets.ts'
+
+const repository = new URL('../../../../', import.meta.url).pathname
+
+// Built from parts, so that this file holds nothing a scanner of the repository would take for a real token.
+const fake = {
+  githubToken: `ghp_${'a1B2'.repeat(9)}`,
+  awsKey: `AKIA${'Q7'.repeat(8)}`,
+  jwt: `eyJ${'a'.repeat(12)}.eyJ${'b'.repeat(12)}.${'c'.repeat(12)}`,
+  hex32: 'c0ffee'.repeat(11),
+  hex64: '9f86d081'.repeat(8),
+  // The hash of an inline script as a policy writes it: 32 bytes in base64.
+  policyHashes: [`'sha256-${'Zm9vYmFy'.repeat(5)}Zm8='`, `'sha256-${'YmF6cXV4'.repeat(5)}YmE='`],
+  // 22 characters of salt and 31 of hash, with the `.` of their alphabet where it keeps every run of letters and digits short.
+  bcrypt: `$2a$14$${'N9qo8uLOick.x2ZMRZoMye'}${'IjVHCm/XwZ1GV.mdq/9OdUgnwS8iVbi'}`,
+}
+
+const isCode = (path: string): boolean => /\.(?:mjs|js|ts)$/.test(path)
+
+describe('what counts as a secret in a file meant to be published', () => {
+  const secrets: ReadonlyArray<readonly [what: string, line: string]> = [
+    ['a private key', '-----BEGIN OPENSSH PRIVATE KEY-----'],
+    ['a GitHub token', `GITHUB=${fake.githubToken}`],
+    ['an AWS access key id', `  access: ${fake.awsKey}`],
+    ['a JSON web token', `Authorization: Bearer ${fake.jwt}`],
+    ['a password in a connection URL', 'DATABASE_URL=postgres://draftroom:hunter2@db:5432/draftroom'],
+    ['a session secret with a value', `SESSION_SECRET=${fake.hex32}`],
+    ['a short password with a value', 'POSTGRES_PASSWORD: draftroom'],
+    ['a quoted token with a value', `api_token = "abc123"`],
+    ['a long random string under any name', `salt=${fake.hex32}`],
+    ['a long key in base64 with slashes', `salt=Zm9vYmFy/Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFy+Zm9v`],
+    ['a password with a dot, as a variable of code would have', 'POSTGRES_PASSWORD=hunter2.prod'],
+    ['a secret with a parenthesis, as a call would have', 'SESSION_SECRET=pa(ss'],
+    ['a secret left in a comment', `# SESSION_SECRET=${fake.hex32}`],
+    // One for each secret a reviewer planted in the files of this stack and the first version of the scan let through.
+    ['a password left in a commented-out setting', '# POSTGRES_PASSWORD=Draftroom2026'],
+    ['a password with a capital and a dot in a Compose file', 'PGPASSWORD: Summer.2026'],
+    ['a secret given to ENV without an equals sign', 'ENV SESSION_SECRET hunter2hunter2'],
+    ['a password hash in a Caddyfile', `    admin ${fake.bcrypt}`],
+    ['a password in a variable named PASS', 'export DB_PASS=hunter2hunter2'],
+    ['a secret in a commented-out line of an ignore file', '# SESSION_SECRET=my-own-secret-value'],
+    ['a key in a variable named KEY', 'export SSH_KEY=hunter2hunter2'],
+    // The two lines a reviewer put in the Compose file, and the other ways to give a reference a value of its own.
+    ['a password as the default of a Compose reference', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-draftroom2026}'],
+    ['a long secret as the default of a Compose reference', `SESSION_SECRET: \${SESSION_SECRET:-${fake.hex64}}`],
+    ['a long default of a reference whose name says nothing', `SALT: \${SALT:-${fake.hex64}}`],
+    ['a password after a dash with no colon', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD-draftroom2026}'],
+    ['a password assigned by a reference', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:=draftroom2026}'],
+    [
+      'a reference that edits a value, which says nothing of where it comes from',
+      'POSTGRES_PASSWORD: ${DB_PASSWORD#hunter2}',
+    ],
+    ['a password in a camelCase variable', "const dbPass = 'Summer2026'"],
+    ['a key in a camelCase variable', "const sshKey = 'hunter2hunter2'"],
+    ['a password given as a flag with a space', 'docker login --password hunter2hunter2'],
+    ['a password given as a flag with an equals sign', 'mysql --password=hunter2hunter2'],
+  ]
+  it.each(secrets)('finds %s', (_what, line) => {
+    expect(findSecrets(line)).toHaveLength(1)
+  })
+
+  it('finds a quoted password in code, which a variable of the code is not', () => {
+    expect(findSecrets("const adminPassword = 'Correct.Horse.Battery'", { code: true })).toHaveLength(1)
+  })
+
+  const harmless: ReadonlyArray<readonly [what: string, line: string]> = [
+    ['a marker in an example', 'SESSION_SECRET=CHANGE_ME_with_openssl_rand_hex_32'],
+    ['a reference to the environment', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in deploy/.env}'],
+    [
+      'a connection URL built from references',
+      'postgres://${POSTGRES_USER:-draftroom}:${POSTGRES_PASSWORD}@postgres:5432/db',
+    ],
+    ['an empty value', 'POSTGRES_PASSWORD='],
+    ['a password given by name only', 'docker exec -e PGPASSWORD "$container" psql'],
+    ['a commented explanation', '# The password goes inside a connection URL: password=letters-and-digits-only'],
+    ['a pinned image digest', `image: postgres:17.11@sha256:${'ab12'.repeat(16)}`],
+    ['a secret generated by a command', 'SESSION_SECRET=$(openssl rand -hex 32)'],
+    ['a required variable in a script', ': "${POSTGRES_PASSWORD:?}" "${SESSION_SECRET:?}"'],
+    ['a comment in code about a secret', '// Nothing here is a secret: the password is made up for the run.'],
+    [
+      'an absolute path in a script',
+      'docker cp "$proxy:/data/caddy/pki/authorities/local/root.crt" "$work/caddy-root.crt"',
+    ],
+    ['a path given to a variable', 'root_certificate=/data/caddy/pki/authorities/local/root.crt'],
+    ['a long path in a comment', '# docs/decisions/0016-production-packaging.md says why the proxy serves the app'],
+    ['prose about a secret', '# Signs and checks sessions, at least 32 characters.'],
+    ['an ENV with a reference', 'ENV SESSION_SECRET=${SESSION_SECRET}'],
+    ['an ENV that is not a secret', 'ENV NODE_ENV production'],
+    [
+      'an action pinned to a commit',
+      '      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+    ],
+    ['a switch named like a secret', '          persist-credentials: false'],
+    ['a commented-out setting that is not a secret', '# HTTP_PORT=80'],
+    ['a word that only contains PASS', 'COMPASS=north'],
+    ['a lowercase word that ends in pass', 'const bypass = true'],
+    [
+      'a default that is not a secret, in a reference to a name that is not one',
+      'POSTGRES_USER: ${POSTGRES_USER:-draftroom}',
+    ],
+    ['a reference with an empty default', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}'],
+    ['a flag that says where the password is read from', 'docker login --password-stdin < /run/secrets/registry'],
+    ['the flag that says there is no password', 'pg_dump --no-password draftroom'],
+    ['a flag that says which file holds the password', 'docker run --password-file /run/secrets/db image'],
+    ['a build secret named by id, not given', 'docker build --secret id=npm,src=$HOME/.npmrc .'],
+    [
+      'a policy that names two scripts by their hash',
+      `Content-Security-Policy "script-src ${fake.policyHashes.join(' ')}"`,
+    ],
+    ['a flag that takes a reference', 'docker login --password "$REGISTRY_PASSWORD"'],
+    ['a name that only starts with KEY', 'MY_KEYBOARD=azerty'],
+  ]
+  it.each(harmless)('lets through %s', (_what, line) => {
+    expect(findSecrets(line)).toEqual([])
+  })
+})
+
+// What is published for anyone to read or to copy into an image: the deployment directory, the image recipe, the scripts that
+// run with the database's credentials, the workflow that runs the drill and the guide. Asked of git, so that what git ignores (a
+// real `deploy/.env`, the backups) is not read, and a file that is new and not yet staged still is.
+const published = execFileSync(
+  'git',
+  [
+    'ls-files',
+    '--cached',
+    '--others',
+    '--exclude-standard',
+    '--',
+    'deploy',
+    'Dockerfile',
+    '.dockerignore',
+    'scripts/backup.sh',
+    'scripts/restore.sh',
+    '.github/workflows/backup-drill.yml',
+    'docs/deploy/README.md',
+  ],
+  { cwd: repository },
+)
+  .toString()
+  .split('\n')
+  .filter((path) => path !== '')
+
+describe('what only source code may put where a secret goes', () => {
+  const inCode: ReadonlyArray<readonly [what: string, line: string]> = [
+    ['a variable of the code', '  password: account.password,'],
+    ['a call', "  password: randomBytes(18).toString('base64url'),"],
+    ['a keyword', '  token: null,'],
+    ['a variable of the environment, indexed', "  const sshKey = process.env['SSH_KEY']"],
+  ]
+  it.each(inCode)('lets through %s in code', (_what, line) => {
+    expect(findSecrets(line, { code: true })).toEqual([])
+  })
+  it.each(inCode)('finds %s anywhere else', (_what, line) => {
+    expect(findSecrets(line)).toHaveLength(1)
+  })
+})
+
+describe('the deployment files', () => {
+  it('are found, so that the scan below is not an empty one', () => {
+    expect(published).toEqual(
+      expect.arrayContaining([
+        'deploy/Caddyfile',
+        'deploy/docker-compose.prod.yml',
+        'deploy/env.example',
+        'Dockerfile',
+        'scripts/backup.sh',
+        'scripts/restore.sh',
+        '.github/workflows/backup-drill.yml',
+        'docs/deploy/README.md',
+      ]),
+    )
+  })
+
+  it.each(published)('%s holds nothing shaped like a secret', (path) => {
+    expect(findSecrets(readFileSync(join(repository, path), 'utf8'), { code: isCode(path) })).toEqual([])
+  })
+
+  it.each(['deploy/.env', 'deploy/backups/draftroom.dump', 'deploy/anything.dump'])(
+    'are never given the real settings or a backup: git ignores %s',
+    (path) => {
+      expect(() => execFileSync('git', ['check-ignore', '--quiet', path], { cwd: repository })).not.toThrow()
+    },
+  )
+})

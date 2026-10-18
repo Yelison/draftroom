@@ -1,0 +1,4 @@
+# A backup holds everybody's documents, and the scripts write them here by default: they never enter the repository.
+# (The real settings, deploy/.env, are ignored by the .gitignore at the root.)
+backups/
+*.dump
