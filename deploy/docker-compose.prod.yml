@@ -37,6 +37,10 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-draftroom}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-draftroom}
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in deploy/.env}
       ALLOWED_ORIGINS: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in deploy/.env}
+      # The proxy is the only thing on this network that talks to the server for the outside world, so its address (anywhere in
+      # the subnet fixed below) is the one `X-Forwarded-For` is believed from: the limits on requests and on sign-in then count
+      # the person and not the proxy (ADR 0017). It has to be the subnet of `networks.default` below.
+      TRUST_PROXY: 172.28.213.0/24
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,6 +90,15 @@ services:
       timeout: 3s
       retries: 6
       start_period: 10s
+
+networks:
+  default:
+    ipam:
+      config:
+        # Fixed, so that the server can say which address it trusts (`TRUST_PROXY` above): Compose would otherwise pick a subnet
+        # at the first start, and the choice could change. Private space that Docker's own default networks do not use; change
+        # it in both places if it collides with a network of the host.
+        - subnet: 172.28.213.0/24
 
 volumes:
   postgres-data:
