@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { fragmentName } from '@draftroom/editor-schema'
+import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
 import type { Editor } from '@tiptap/core'
 import { ySyncPluginKey } from '@tiptap/y-tiptap'
 import * as Y from 'yjs'
@@ -117,5 +118,77 @@ describe('what the editor does not write', () => {
     expect(danielEditor.getJSON().content).toEqual([{ type: 'paragraph' }])
     expect(writtenByPriya).toEqual([])
     expect(shared(priya)).toEqual([{ name: 'paragraph', texts: 0 }])
+  })
+})
+
+describe('documents that already exist', () => {
+  it('opens an empty one without writing, and the first letters make one paragraph with one text node', () => {
+    // What the server stores for a document nobody has typed in yet (`emptyDocumentState`).
+    const document = new Y.Doc()
+    Y.applyUpdate(document, Uint8Array.of(0, 0))
+    const written = writtenByTheEditor(document)
+
+    const editor = openHeadlessEditor(document)
+    expect(written).toEqual([])
+    editor.commands.insertContent('Hello')
+
+    expect(shared(document)).toEqual([{ name: 'paragraph', texts: 1 }])
+    expect(editor.getText()).toBe('Hello')
+  })
+
+  it('opens one that started from a template without writing, and keeps its content as it is', () => {
+    const template = {
+      type: 'doc' as const,
+      content: [
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Agenda' }] },
+        {
+          type: 'bulletList',
+          content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Dates' }] }] }],
+        },
+      ],
+    }
+    const document = new Y.Doc()
+    Y.applyUpdate(document, jsonToYUpdate(template))
+    const written = writtenByTheEditor(document)
+
+    const editor = openHeadlessEditor(document)
+    expect(written).toEqual([])
+    expect(editor.getJSON().content).toEqual(template.content)
+
+    // At the end of the last item's text, which the end of the document is three positions after.
+    editor.commands.setTextSelection(editor.state.doc.content.size - 3)
+    editor.commands.enter()
+
+    const [heading, list] = editor.getJSON().content ?? []
+    expect(heading).toEqual(template.content[0])
+    expect(list?.content?.[0]).toEqual(template.content[1]?.content?.[0])
+    expect(list?.content).toHaveLength(2)
+    expect(shared(document).filter(({ texts }) => texts !== 1)).toEqual([])
+  })
+
+  it('merges what was written without a connection with what others wrote, and every block keeps its text node', () => {
+    const earlier = new Y.Doc()
+    openHeadlessEditor(earlier).commands.insertContent('Plan')
+    const daniel = new Y.Doc()
+    const priya = new Y.Doc()
+    for (const document of [daniel, priya]) Y.applyUpdate(document, Y.encodeStateAsUpdate(earlier))
+    const danielEditor = openHeadlessEditor(daniel)
+    const priyaEditor = openHeadlessEditor(priya)
+    for (const editor of [danielEditor, priyaEditor])
+      editor.commands.setTextSelection(editor.state.doc.content.size - 1)
+
+    // Priya has no connection: two Enters and a few words in the first of the new paragraphs, while Daniel adds to the first.
+    priyaEditor.commands.enter()
+    priyaEditor.commands.insertContent('Offline')
+    priyaEditor.commands.enter()
+    danielEditor.commands.insertContent(' now')
+    Y.applyUpdate(daniel, Y.encodeStateAsUpdate(priya))
+    Y.applyUpdate(priya, Y.encodeStateAsUpdate(daniel))
+
+    for (const editor of [danielEditor, priyaEditor]) {
+      expect(editor.getText({ blockSeparator: '|' })).toBe('Plan now|Offline|')
+    }
+    expect(shared(daniel).filter(({ texts }) => texts !== 1)).toEqual([])
+    expect(shared(priya)).toEqual(shared(daniel))
   })
 })
