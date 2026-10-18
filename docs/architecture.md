@@ -30,7 +30,7 @@ flowchart LR
 
 - **One process, two listeners.** REST on `API_PORT` and the collaboration WebSocket on `COLLAB_PORT` start together in [`apps/server/src/main.ts`](../apps/server/src/main.ts). They share the database pool and call each other in process: a route that changes who may open a document closes the connections it just made illegal ([ADR 0012](decisions/0012-access-and-revocation.md)), and the collaboration server logs through the REST app.
 - **A document is served by one process.** Hocuspocus keeps the live document in memory, so two server instances would each hold a copy and diverge. The [deployment guide](deploy/README.md) says how that limits scaling.
-- **The proxy** sends `/api/*` and `/collab*` to the server and serves the built web app for everything else ([`deploy/Caddyfile`](../deploy/Caddyfile), [ADR 0016](decisions/0016-production-packaging.md)). In development and in the real-stack tests, `vite preview` plays that part ([`apps/web/vite.config.ts`](../apps/web/vite.config.ts)).
+- **The proxy** sends `/api/*` and `/collab*` to the server and serves the built web app for everything else ([`deploy/Caddyfile`](../deploy/Caddyfile), [ADR 0016](decisions/0016-production-packaging.md)). In development the Vite dev server plays that part, and `vite preview` in the real-stack tests, when `E2E_API_ORIGIN` and `E2E_COLLAB_ORIGIN` are set ([`apps/web/vite.config.ts`](../apps/web/vite.config.ts)).
 - **Two kinds of data, two homes.** Everything relational (workspaces, members, folders, document metadata, access, threads, versions, activity) lives in rows. The content of a document is a binary Yjs state in `document_states`, written only by the collaboration server ([ADR 0005](decisions/0005-data-model-and-permissions.md), [`stateStore.ts`](../apps/server/src/collab/stateStore.ts)). Content is never rebuilt from JSON.
 
 ## What happens when someone types
@@ -113,7 +113,7 @@ A version is a full copy of the Yjs state at a moment, so it can be previewed an
 
 ## The `DataSource` boundary
 
-Screens never call `fetch`. They ask a `DataSource`, an interface with one method per operation of the REST contract, typed from the generated schema, so a change to [`openapi.yaml`](../packages/contract/openapi.yaml) breaks every implementation that no longer fits ([`DataSource.ts`](../apps/web/src/data/DataSource.ts), [`useDataSource.ts`](../apps/web/src/data/useDataSource.ts)).
+Screens never call `fetch`. They ask a `DataSource`, an interface with one method per operation of the REST contract that the client calls, typed from the generated schema, so a change to [`openapi.yaml`](../packages/contract/openapi.yaml) breaks every implementation that no longer fits ([`DataSource.ts`](../apps/web/src/data/DataSource.ts), [`useDataSource.ts`](../apps/web/src/data/useDataSource.ts)).
 
 | Implementation | Used by | Where |
 | --- | --- | --- |
@@ -122,7 +122,7 @@ Screens never call `fetch`. They ask a `DataSource`, an interface with one metho
 
 The choice is made when the app is built ([`select.ts`](../apps/web/src/data/select.ts), `VITE_DATA_SOURCE`), and the branch not chosen is removed from the bundle; a test fails if any trace of the mock is left in a production build ([`production-bundle.spec.ts`](../apps/web/e2e/production-bundle.spec.ts)).
 
-The mock's answers are validated against the OpenAPI schemas, and one behaviour suite runs against both the mock and the real server ([`contract.suite.ts`](../apps/web/src/data/contract.suite.ts)), so the screens that were built on the mock work on the server. Its permission rules are a simulation to give screens believable answers, not proof of anything: authorisation is the server's.
+The mock's answers are validated against the OpenAPI schemas in the tests, and one behaviour suite runs against both the mock and the real server ([`contract.suite.ts`](../apps/web/src/data/contract.suite.ts)), so the screens that were built on the mock work on the server. Its permission rules are a simulation to give screens believable answers, not proof of anything: authorisation is the server's.
 
 In the static demo, collaboration is simulated in the browser: a scripted second person writes, and tabs of the same browser share a document ([`data/mock/collab`](../apps/web/src/data/mock/collab/demo.ts)). No server is involved.
 

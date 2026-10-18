@@ -28,7 +28,7 @@ Estas imágenes y el clip los toma un script del sistema real (`npm run docs:tou
 - **Escribir juntos.** Varias personas editan un documento y los cambios se combinan sin conflictos (Yjs); se ven los cursores y los nombres de las demás.
 - **«Sincronizado» significa guardado.** El editor solo dice que un cambio está sincronizado cuando el servidor confirma que lo escribió en la base de datos, nunca porque haya cambiado la copia local. Cómo funciona, [aquí](docs/architecture.md#synced-means-stored).
 - **Seguir sin conexión.** Un documento que ya abriste guarda una copia en el navegador; los cambios hechos sin conexión se envían al reconectar, y cerrar sesión avisa antes de descartar cambios que el servidor nunca guardó.
-- **Comentar el texto.** Selecciona una frase y coméntala con el ratón o con Ctrl+Alt+M; los hilos siguen unidos a su texto aunque otras personas editen, se pueden responder, resolver y reabrir, y funcionan solo con el teclado.
+- **Comentar el texto.** Selecciona una frase y coméntala con el ratón o con Ctrl+Alt+M (⌘⌥M en un Mac); los hilos siguen unidos a su texto aunque otras personas editen, se pueden responder, resolver y reabrir, y funcionan solo con el teclado.
 - **Organizar.** Un explorador con carpetas, búsqueda, documentos fijados, plantillas, una papelera con restauración y una vista de lo que otras personas compartieron contigo.
 - **Compartir por rol.** Lector, comentarista, editor o propietario, por persona o para todo el espacio de trabajo. El servidor lo aplica tanto en la API como en la conexión en vivo; quitar el acceso cierra la conexión abierta de esa persona.
 - **Historial.** Versiones automáticas y con nombre de cada documento, que se pueden previsualizar y restaurar, y un registro de actividad.
@@ -74,6 +74,7 @@ En desarrollo la aplicación habla con la API en memoria (la misma que usa la de
 
 ```sh
 cp .env.example .env                                # valores de desarrollo; git ignora .env
+sed -i 's|^ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=http://localhost:5173|' .env   # para que el servidor acepte el WebSocket del navegador
 docker compose up -d --wait postgres                # PostgreSQL en 127.0.0.1:5460
 npm run migrate -w @draftroom/server                # crea el esquema
 npm run seed:demo -w @draftroom/server              # los espacios de trabajo y cuentas de demostración (solo desarrollo)
@@ -84,7 +85,7 @@ VITE_DATA_SOURCE=http E2E_API_ORIGIN=http://127.0.0.1:8380 E2E_COLLAB_ORIGIN=htt
   npm run dev -w @draftroom/web
 ```
 
-Pon `ALLOWED_ORIGINS=http://localhost:5173` en `.env` para que el servidor acepte el WebSocket del navegador. (Las dos variables `E2E_` llevan el nombre de la suite de pruebas que las introdujo: con las dos definidas, el servidor de desarrollo reenvía `/api` y `/collab` como lo hace un proxy inverso en producción.) Entra como `daniel.okafor@harborpine.example` con la contraseña `harbor pine rooftop`; las demás cuentas de demostración, todas en [`apps/server/src/db/demo-seed/content.ts`](apps/server/src/db/demo-seed/content.ts), usan la misma. La semilla se niega a ejecutarse fuera de desarrollo y pruebas. Más sobre el servidor y sus scripts, en [CONTRIBUTING](CONTRIBUTING.md).
+(`ALLOWED_ORIGINS` es el origen desde el que el navegador abre la aplicación; sin él, el servidor rechaza el WebSocket y el editor se queda en la pantalla de carga. Las dos variables `E2E_` llevan el nombre de la suite de pruebas que las introdujo: con las dos definidas, el servidor de desarrollo reenvía `/api` y `/collab` como lo hace un proxy inverso en producción.) Entra como `daniel.okafor@harborpine.example` con la contraseña `harbor pine rooftop`; las demás cuentas de demostración, todas en [`apps/server/src/db/demo-seed/content.ts`](apps/server/src/db/demo-seed/content.ts), usan la misma. La semilla se niega a ejecutarse fuera de desarrollo y pruebas. Más sobre el servidor y sus scripts, en [CONTRIBUTING](CONTRIBUTING.md).
 
 ## Ejecutarlo tú mismo
 
@@ -92,11 +93,13 @@ Necesitas Docker con el plugin Compose y un nombre de host que apunte a la máqu
 
 ```sh
 cp deploy/env.example deploy/.env       # luego rellena el nombre de host y los dos secretos (vacíos hasta entonces)
-docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom up -d --build --wait
+docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom-prod up -d --build --wait
 ```
 
+El proyecto de producción se llama `draftroom-prod` y el de desarrollo `draftroom`, para que nunca compartan base de datos ni volumen: con un mismo nombre, la base de producción arrancaría sobre los datos de desarrollo.
+
 Caddy sirve la aplicación por HTTPS, el servidor migra la base de datos al arrancar y solo el proxy publica puertos. Haz una copia de seguridad
-con `scripts/backup.sh` y restáurala con `scripts/restore.sh`. [La guía de despliegue](docs/deploy/README.md) explica cómo ejecutarlo sin
+con `COMPOSE_PROJECT_NAME=draftroom-prod scripts/backup.sh` y restáurala con `scripts/restore.sh` (misma variable). [La guía de despliegue](docs/deploy/README.md) explica cómo ejecutarlo sin
 Docker, el proxy inverso y lo que exige para los WebSocket, cada variable, las copias de seguridad y por qué un proceso sirve cada documento.
 
 ## Cómo se prueba
@@ -109,7 +112,7 @@ Docker, el proxy inverso y lo que exige para los WebSocket, cada variable, las c
 | De extremo a extremo con el sistema real | `npm run test:e2e-collab -w @draftroom/web` | Dos navegadores contra el servidor y la base de datos reales: convergencia, durabilidad cuando se mata el servidor, revocación y la compilación de producción. Necesita PostgreSQL en marcha, como arriba. |
 | Demo estática | `npm run test:e2e-demo -w @draftroom/web` | La compilación de la demo, que no debe llegar a la red. |
 
-La CI ejecuta cuatro comprobaciones obligatorias en cada pull request: **Static checks** (lint, formato, comprobación de tipos, el lint de OpenAPI y los tipos generados, y `npm test`), **Web e2e (mocked API)**, **Server integration (PostgreSQL)** y **Collaboration e2e (real stack)**. También se ejecutan un simulacro de copia y restauración y la compilación de la demo estática, que no son obligatorios.
+La CI ejecuta cuatro comprobaciones obligatorias en cada pull request: **Static checks** (lint, formato, comprobación de tipos, el lint de OpenAPI y los tipos generados, y `npm test`), **Web e2e (mocked API)**, **Server integration (PostgreSQL)** y **Collaboration e2e (real stack)**. Cuando un pull request toca lo que cubren, se ejecutan además un simulacro de copia y restauración y la compilación de la demo estática, y también una auditoría de dependencias. Ninguno es obligatorio.
 
 `npm run docs:links` falla cuando un enlace relativo de los README o del documento de arquitectura apunta a un archivo que no existe.
 
@@ -131,6 +134,7 @@ scripts                copia y restauración, el recorrido del README, la compro
 - **Nada de correo.** No hay correos de invitación, ni recuperación de contraseña, ni forma de cambiarla, ni lista de sesiones: cada cosa necesita el envío de correo o su propia tarea ([ADR 0004](docs/decisions/0004-authentication.md)).
 - **Un espacio de trabajo a la vez.** La aplicación trabaja en el primer espacio de trabajo de la persona, por nombre, y todavía no permite elegir otro.
 - **Un solo proceso de servidor.** Un documento vive en la memoria de un proceso, así que la pila no ejecuta réplicas; los límites de intentos de inicio de sesión viven en la memoria de ese proceso y se reinician con él ([guía de despliegue](docs/deploy/README.md#what-is-not-done-yet)).
+- **Dos personas escribiendo a la vez en el mismo punto de un documento vacío.** Sus textos pueden quedar contiguos en un párrafo, o en dos párrafos en un orden cualquiera. Las dos ven lo mismo y es lo que queda guardado: es lo que ocurre cuando dos personas escriben en el mismo sitio a la vez.
 - **Editar sin conexión exige una primera visita.** Un documento que nunca abriste en este dispositivo no tiene copia local y no se puede editar sin conexión.
 - **Solo escritorio.** Desde 1280 px de ancho; a las ventanas más estrechas se les pide que se ensanchen.
 
