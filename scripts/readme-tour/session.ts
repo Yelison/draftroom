@@ -37,7 +37,9 @@ export class Person {
       viewport: { width: viewing.width, height },
       ...(viewing.recordTo === undefined
         ? {}
-        : { recordVideo: { dir: viewing.recordTo, size: { width: viewing.width / 2, height: height / 2 } } }),
+        : {
+            recordVideo: { dir: viewing.recordTo, size: { width: (viewing.width * 3) / 4, height: (height * 3) / 4 } },
+          }),
     })
     const response = await context.request.post('/api/auth/sign-in', {
       data: { email: person.email, password: demoPassword },
@@ -83,10 +85,12 @@ export class Person {
     await this.page.keyboard.type(text, { delay: 12 })
   }
 
-  /** Closes the browser, after checking that the content security policy refused nothing of what this person did: a picture of a screen the policy broke would show a product that does not exist. */
-  async close(): Promise<void> {
+  /** Closes the browser, keeping the recording where `keepVideoAs` says if there is one, after checking that the content security policy refused nothing of what this person did: a picture of a screen the policy broke would show a product that does not exist. */
+  async close(keepVideoAs?: string): Promise<void> {
     const violations = await this.policyViolations()
+    const video = this.page.video()
     await this.context.close()
+    if (keepVideoAs !== undefined) await video?.saveAs(keepVideoAs)
     expect(violations, `the content security policy refused something while ${this.name} used the app`).toEqual([])
   }
 }

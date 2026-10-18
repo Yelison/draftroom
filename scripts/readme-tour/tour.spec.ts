@@ -1,5 +1,8 @@
+import { statSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
-import { capture } from './capture.ts'
+import { capture, outputDirectory } from './capture.ts'
+import { commentOn, reply, threads } from './comments.ts'
 import { Person } from './session.ts'
 import { documentIdOf, english, makeColleagueEditor, spanish } from './scene.ts'
 
@@ -40,15 +43,25 @@ test('the screens of the app, in light and dark, in English and Spanish', async 
   })
 
   await test.step('editor with two people', async () => {
+    // The second person arrives when there is text: two people who open an empty document together each start it with an empty
+    // paragraph of their own, which is how the document begins and not how it is used.
     await daniel.openDocument(documentId)
+    await daniel.typeAtEnd(meetingNotes[0] ?? '')
     await priya.openDocument(documentId)
     await expect(daniel.presenceOf(colleague.name)).toBeVisible()
-    await daniel.typeAtEnd(meetingNotes[0] ?? '')
     await expect(priya.editor).toContainText(meetingNotes[0] ?? '')
     await priya.typeAtEnd(meetingNotes[1] ?? '', { newParagraph: true })
     await expect(daniel.editor).toContainText(meetingNotes[1] ?? '')
     await expect(daniel.syncedStatus).toBeAttached()
     await capture(daniel.page, 'editor')
+  })
+
+  await test.step('comments', async () => {
+    await commentOn(priya, 'second week of November', 'Can we confirm that date with the press team?')
+    await expect(threads(daniel)).toHaveCount(1)
+    await reply(daniel, "Yes, I'll ask them on Monday.")
+    await expect(threads(priya).first().getByText("Yes, I'll ask them on Monday.")).toBeVisible()
+    await capture(daniel.page, 'comments')
   })
 
   await test.step('sharing', async () => {
@@ -101,9 +114,9 @@ test('the screens of the app, in light and dark, in English and Spanish', async 
     const lucia = await Person.signIn(browser, spanish.owner, { language: 'es', scheme: 'light', width: 1440 })
     const mateo = await Person.signIn(browser, spanish.colleague, { language: 'es', scheme: 'light', width: 1440 })
     await lucia.openDocument(spanishId)
+    await lucia.typeAtEnd(reunion[0] ?? '')
     await mateo.openDocument(spanishId)
     await expect(lucia.presenceOf(spanish.colleague.name)).toBeVisible()
-    await lucia.typeAtEnd(reunion[0] ?? '')
     await expect(mateo.editor).toContainText(reunion[0] ?? '')
     await mateo.typeAtEnd(reunion[1] ?? '', { newParagraph: true })
     await expect(lucia.editor).toContainText(reunion[1] ?? '')
@@ -114,6 +127,37 @@ test('the screens of the app, in light and dark, in English and Spanish', async 
   })
 })
 
-test.fixme('the comments, with a thread anchored to a sentence', () => {
-  // Waits for the comments of the editor (T3.2); the step and the video are written once they are in `main`.
+// The clip is what one of the two browsers shows: the other person's text arrives, and then their comment. Two recordings cannot be
+// joined without a tool the repository does not have, and one browser that shows both people at work says it as well.
+test('a short video of two people writing and one commenting', async ({ browser }, testInfo) => {
+  const { colleague } = english
+  const documentId = await documentIdOf({ ...english, documentTitle: 'Brand voice guidelines' })
+  const watcher = await Person.signIn(browser, english.owner, {
+    language: 'en',
+    scheme: 'light',
+    width: 1280,
+    recordTo: testInfo.outputPath('video'),
+  })
+  const writer = await Person.signIn(browser, colleague, { language: 'en', scheme: 'light', width: 1280 })
+  const started = Date.now()
+  const pause = (milliseconds: number) => watcher.page.waitForTimeout(milliseconds)
+
+  await watcher.openDocument(documentId)
+  await watcher.typeAtEnd('We write the way we talk to a friend.')
+  await writer.openDocument(documentId)
+  await expect(watcher.presenceOf(colleague.name)).toBeVisible()
+  await pause(800)
+  await writer.typeAtEnd('Short sentences, plain words, no jargon.', { newParagraph: true })
+  await expect(watcher.editor).toContainText('no jargon.')
+  await pause(1200)
+  await commentOn(writer, 'plain words', 'Add two examples here?')
+  await expect(threads(watcher)).toHaveCount(1)
+  await pause(2500)
+
+  const seconds = (Date.now() - started) / 1000
+  const video = resolve(outputDirectory, 'tour.webm')
+  await writer.close()
+  await watcher.close(video)
+  expect(seconds, 'the clip is meant to be short').toBeLessThan(28)
+  expect(statSync(video).size, 'the clip is meant to be small').toBeLessThan(5 * 1024 * 1024)
 })
