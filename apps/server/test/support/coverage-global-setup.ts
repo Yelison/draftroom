@@ -5,6 +5,7 @@ import type { TestProject } from 'vitest/node'
 import { createDatabase } from '../../src/db/database.ts'
 import { buildApp } from '../../src/http/app.ts'
 import { createDevIdentity } from '../../src/http/auth/devIdentity.ts'
+import { developmentHardening, unlimitedRequests } from './hardening.ts'
 import { sessionStackFor } from './auth.ts'
 import { noLiveDocuments, silentBroadcaster, silentLiveAccess } from './broadcasters.ts'
 import { ContractCoverage } from './contract-coverage.ts'
@@ -20,15 +21,18 @@ declare module 'vitest' {
 async function implementedOperations(): Promise<ReadonlySet<string>> {
   // Nothing connects: the pool opens its first connection on the first query, and building the app runs none.
   const database = createDatabase(unreachableDatabaseUrl)
-  const { sessions, sessionCookies } = sessionStackFor(database)
+  const { sessions, sessionCookies, devices } = sessionStackFor(database)
   const app = buildApp({
     database,
+    hardening: developmentHardening,
+    requestLimits: unlimitedRequests,
     authProvider: createDevIdentity(database),
     broadcaster: silentBroadcaster,
     liveAccess: silentLiveAccess,
     liveDocuments: noLiveDocuments,
     sessions,
     sessionCookies,
+    devices,
   })
   try {
     await app.ready()

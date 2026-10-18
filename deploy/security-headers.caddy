@@ -5,9 +5,12 @@
 # The shape of this file is a contract (ADR 0016): exactly one `header { … }` block, never a named snippet, with these values; T7.2
 # keeps them all and replaces only the policy. `apps/server/test/deploy/caddy-fragment.test.ts` checks it with Caddy.
 #
-# T7.2 adds the Content-Security-Policy of the page. It needs the hash of the inline script of `index.html`, which exists only
-# after the web build, so it is generated in the `web-build` stage of the Dockerfile and written over this file in the image,
-# with `frame-ancestors 'none'` kept in it (that directive works only as a header, never in a <meta> tag).
+# The Content-Security-Policy of the page needs the hash of every inline script of `index.html`, which exists only after the web
+# build. The `web-build` stage of the Dockerfile runs `apps/web/scripts/security-headers-caddy.ts` on the built page and on this
+# file: the output is this file with the one `Content-Security-Policy` line replaced by the whole policy (the hashes,
+# `frame-ancestors 'none'`, which works only as a header, and `connect-src` narrowed to this host), and the proxy image gets that
+# output in its place. Every other line is kept as it is. The line below is what the file says in the repository, where there
+# is no build to take hashes from.
 header {
 	# A browser that has seen the site over HTTPS keeps using HTTPS for a year, which is what makes the `Secure` session cookie
 	# reliable. No `includeSubDomains` and no `preload`: this site cannot speak for the other names under its domain, and a
@@ -18,7 +21,7 @@ header {
 	# The app needs none of the capabilities a page can ask for.
 	Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 	Cross-Origin-Opener-Policy "same-origin"
-	# The page is never shown in a frame of another site. The rest of the policy comes with T7.2.
+	# The page is never shown in a frame of another site. The generator writes the rest of the policy over this line.
 	Content-Security-Policy "frame-ancestors 'none'"
 	-Server
 }

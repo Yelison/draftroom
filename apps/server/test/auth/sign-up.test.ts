@@ -48,7 +48,7 @@ describe('signing up with an address nobody has used', () => {
       email: account.email,
       name: account.name,
     })
-    expect(Object.keys(setCookiesOf(response)).sort()).toEqual(['dr_csrf', 'dr_session'])
+    expect(Object.keys(setCookiesOf(response)).sort()).toEqual(['dr_csrf', 'dr_device', 'dr_session'])
   })
 
   it('leaves the person signed in: the session cookie is who they are', async () => {

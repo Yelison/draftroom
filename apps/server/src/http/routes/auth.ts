@@ -3,7 +3,8 @@ import { sql } from 'kysely'
 import type { FastifyPluginCallback, FastifyReply } from 'fastify'
 import { giveOwnWorkspaceUnlessMember } from '../../db/workspaces.ts'
 import { principalOf } from '../auth/authenticate.ts'
-import { cookiesOf, sessionCookieName, type SessionCookies } from '../auth/cookies.ts'
+import type { SessionCookies } from '../auth/cookies.ts'
+import type { Devices } from '../auth/devices.ts'
 import { createPasswords, type Passwords } from '../auth/passwords.ts'
 import { createAttemptLimits, defaultRateLimits, type RateLimits } from '../auth/rateLimit.ts'
 import type { Sessions } from '../auth/sessions.ts'
@@ -14,6 +15,7 @@ import type { RouteDependencies } from './dependencies.ts'
 export interface AuthRouteDependencies extends RouteDependencies {
   readonly sessions: Sessions
   readonly sessionCookies: SessionCookies
+  readonly devices: Devices
   readonly passwords?: Passwords
   readonly rateLimits?: RateLimits
 }
@@ -35,13 +37,14 @@ export const authRoutes: FastifyPluginCallback<AuthRouteDependencies> = (
     database,
     sessions,
     sessionCookies,
+    devices,
     liveAccess,
     passwords = createPasswords(),
     rateLimits = defaultRateLimits,
   },
   done,
 ) => {
-  const limits = createAttemptLimits(app, rateLimits)
+  const limits = createAttemptLimits(app, rateLimits, devices)
 
   /**
    * Starts the session of a person in the browser that asked, in place of the one it had, and closes the connections of
@@ -52,7 +55,7 @@ export const authRoutes: FastifyPluginCallback<AuthRouteDependencies> = (
     reply: FastifyReply,
     userId: string,
   ): Promise<void> {
-    const replacing = cookiesOf(request.headers.cookie)[sessionCookieName]
+    const replacing = sessionCookies.sessionTokenOf(request.headers.cookie)
     const session = await sessions.start(userId, replacing === undefined || replacing === '' ? {} : { replacing })
     sessionCookies.issue(reply, session)
     if (session.replacedId !== null) await liveAccess.sessionEnded(session.replacedId)
@@ -100,6 +103,7 @@ export const authRoutes: FastifyPluginCallback<AuthRouteDependencies> = (
       }
 
       await startSession(request, reply, userId)
+      devices.remember(reply, email, null)
       const person = await database
         .selectFrom('users')
         .select(['id', 'email', 'name'])
@@ -133,6 +137,7 @@ export const authRoutes: FastifyPluginCallback<AuthRouteDependencies> = (
         }
 
         await startSession(request, reply, account.id)
+        devices.remember(reply, email, gate.attempt.device)
         return { id: account.id, email: account.email, name: account.name }
       } finally {
         await gate.attempt.finish(failed)

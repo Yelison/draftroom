@@ -13,9 +13,10 @@ The API is described by [`packages/contract/openapi.yaml`](../../packages/contra
 
 | Piece | Where | Purpose |
 | --- | --- | --- |
-| `dr_session` | cookie, `HttpOnly` | The server-side session, set by sign-in and sign-up. |
-| `dr_csrf` | cookie, readable by the client | The CSRF token, set with the session. |
-| `X-CSRF-Token` | request header | Echo of `dr_csrf`. Required on every method that changes state (`POST`, `PUT`, `PATCH`, `DELETE`). |
+| `dr_session` (`__Host-dr_session` in production) | cookie, `HttpOnly` | The server-side session, set by sign-in and sign-up. |
+| `dr_csrf` (`__Host-dr_csrf` in production) | cookie, readable by the client | The CSRF token, set with the session. |
+| `dr_device` (`__Host-dr_device` in production) | cookie, `HttpOnly` | Says this browser has signed in to an account before, so a lockout caused by someone else's wrong passwords does not shut it out. Set by sign-in and sign-up; the client never reads or sends it itself. |
+| `X-CSRF-Token` | request header | Echo of the CSRF cookie. Required on every method that changes state (`POST`, `PUT`, `PATCH`, `DELETE`). |
 
 Each operation states its requirement in `security`. Reads need `session`; methods that change state need `session` **and** `csrf` in a single requirement (AND), so the token cannot be skipped. Four operations need neither: `signUp`, `signIn`, `getLiveness` and `getReadiness`. `signOut` needs both.
 

@@ -184,6 +184,21 @@ describe('wrong passwords from one network address', () => {
   })
 })
 
+describe('wrong passwords from one IPv6 network', () => {
+  // A home connection is given a whole /64: counting each address alone would give one household 2^64 allowances.
+  it('count the addresses of one /64 as one, and the next /64 as another', async () => {
+    const server = appWith()
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await signIn(server, `guess-${attempt}@harborpine.example`, wrong, `2001:db8:1:2::${attempt + 1}`)
+    }
+
+    const sameNetwork = await signIn(server, account.email, account.password, '2001:db8:1:2:aaaa:bbbb:cccc:dddd')
+    const nextNetwork = await signIn(server, account.email, account.password, '2001:db8:1:3::1')
+
+    expect([sameNetwork.statusCode, nextNetwork.statusCode]).toEqual([429, 200])
+  })
+})
+
 describe('accounts created from one network address', () => {
   it('are limited, and each one counts whatever came of it', async () => {
     const server = appWith()

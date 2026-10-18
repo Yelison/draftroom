@@ -100,9 +100,11 @@ Any proxy works if it does these four things. [`deploy/Caddyfile`](../../deploy/
 tested.
 
 1. **Terminate TLS.** The server speaks plain HTTP and plain WebSocket; the browser must reach it over HTTPS and WSS. In production
-   the server marks both cookies `Secure` ([ADR 0004](../decisions/0004-authentication.md)), and a browser never sends a `Secure`
-   cookie over plain HTTP, so nobody could stay signed in; a page served over HTTPS also cannot open an unencrypted WebSocket.
-   The proxy needs to add nothing about cookies: it passes `Set-Cookie` and `Cookie` as they are. It should send
+   the server's three cookies (`__Host-dr_session`, `__Host-dr_csrf` and `__Host-dr_device`) are `Secure` `__Host-` cookies, with
+   `Path=/` and no `Domain`, so that a page on another subdomain cannot plant one
+   ([ADR 0004](../decisions/0004-authentication.md)), and a browser never sends a `Secure` cookie over plain HTTP, so nobody could
+   stay signed in; a page served over HTTPS also cannot open an unencrypted WebSocket. The proxy needs to add nothing about
+   cookies: it passes `Set-Cookie` and `Cookie` as they are, and must not rewrite their names, paths or domains. It should send
    `Strict-Transport-Security: max-age=31536000`, so that a browser which has seen the site over HTTPS never goes back to HTTP
    (the reference Caddyfile does; leave out `includeSubDomains` and `preload` unless you own every name under the domain).
 2. **Send `/api/*` to `API_PORT`** (8380) and keep the path as it is.
@@ -115,12 +117,17 @@ tested.
 
 **Who sets which headers.** The proxy sets the headers of the **document**, because the server never sees `index.html`: with the
 files of the web app it sends `Strict-Transport-Security`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`,
-`Cross-Origin-Opener-Policy` and a Content-Security-Policy that for now holds only `frame-ancestors 'none'`, and it removes `Server`
-(they are in [`deploy/security-headers.caddy`](../../deploy/security-headers.caddy), which the Caddyfile imports for those files only). The
-**server** sets the headers of `/api` and `/collab` (CORS from `ALLOWED_ORIGINS`, caching of personal data, the limits), which is the
-hardening task T7.2; the proxy adds none of the document's headers to those two routes, so the two never contradict each other. The
-full Content-Security-Policy needs the hash of the inline script of the built `index.html`, so T7.2 generates it from the build and
-writes it into that file.
+`Cross-Origin-Opener-Policy` and the Content-Security-Policy of the page, and it removes `Server` (they are in
+[`deploy/security-headers.caddy`](../../deploy/security-headers.caddy), which the Caddyfile imports for those files only). The policy
+names the hash of every inline script of the built `index.html`, so it is generated from the build: the `web-build` stage of the
+`Dockerfile` runs `apps/web/scripts/security-headers-caddy.ts` on `dist/index.html` and on that file, and the proxy image carries the
+result, which is the same file with its one `Content-Security-Policy` line replaced (the hashes, `frame-ancestors 'none'` and
+`connect-src 'self' wss://{hostport}`, which keeps the page's connections to its own host). A deployment with another proxy
+generates the same lines with the same command. The **server** sets the headers of `/api` and `/collab`: a policy of its own that
+loads nothing, `nosniff`, `Cache-Control: no-store`, a referrer and a permissions policy and, in production, HSTS; CORS from
+`ALLOWED_ORIGINS`; the limits on requests. A request to the collaboration port that is not a WebSocket upgrade is a `404` with the same
+headers. The proxy adds none of the document's headers to those two routes, so the two never contradict each other
+([ADR 0017](../decisions/0017-http-hardening.md) has the whole division).
 
 The server checks the `Origin` of every WebSocket upgrade against `ALLOWED_ORIGINS`, so `PUBLIC_ORIGIN` has to be exactly what the
 browser shows in its address bar, port included.
@@ -145,7 +152,8 @@ The server reads these and nothing else from its environment; it refuses to star
 | `NODE_ENV`        | yes, set to `production`    | Anything else may enable the development identity. Only an explicit `development` or `test` does.         |
 | `DATABASE_URL`    | yes                         | `postgres://<user>:<password>@<host>:5432/<database>`. The password must be URL-safe.                             |
 | `SESSION_SECRET`  | in production               | At least 32 characters, different per environment. It keys the CSRF tokens. Changing it or restarting without it makes every CSRF cookie fail until the person signs in again; the sessions themselves live in the database and survive. |
-| `ALLOWED_ORIGINS` | in production               | Comma-separated origins (scheme, host, port; no path) the browser may use. The Compose file sets it from `PUBLIC_ORIGIN`. |
+| `ALLOWED_ORIGINS` | in production               | Comma-separated origins (scheme, host, port; no path) the browser may use. They are the only ones whose pages may read the API with their cookies (CORS) and open the collaboration socket; there is no wildcard. The Compose file sets it from `PUBLIC_ORIGIN`. |
+| `TRUST_PROXY`     | behind a proxy              | The addresses or ranges of the proxies in front of the server (`172.28.213.0/24`), or `loopback`, `linklocal`, `uniquelocal`. A request from one of them is believed when it says `X-Forwarded-For`; any other caller's address is the one it connects from. `true`, a number of proxies and a `/0` are refused. The Compose file sets it to the subnet it fixes for its network, `172.28.213.0/24`. Leave it empty when nothing is in front of the server. |
 | `API_PORT`        | no, 8380                    | The REST listener. Must differ from `COLLAB_PORT`.                                                        |
 | `COLLAB_PORT`     | no, 8480                    | The collaboration WebSocket listener.                                                                     |
 
@@ -202,11 +210,12 @@ and the broadcast of revocations across processes. That is deferred; this stack 
 - **Email addresses are not verified at sign-up.** Whoever signs up first with an address that has a pending invitation inherits
   what was shared with it, and the sign-up answer tells which addresses have an account. This is a known risk the owner accepted
   (ADR 0004, README); it needs email delivery in both languages before the product is public.
-- **Security headers, a content security policy, CORS, `trustProxy` and the production build guard against the development
-  identity** are T7.2. Until then the proxy sends only the static headers of the document (see [The reverse proxy](#the-reverse-proxy)), the server sends none of its own, and it sees the proxy's address, not the visitor's:
-  **every visitor shares the network address of the proxy**, so the per-address limits on sign-in and sign-up (30 failed sign-ins
-  per 15 minutes, 10 sign-ups per hour) are counted for everybody together and one person's attempts can use them up. The
-  per-account limit (10 failed sign-ins per 15 minutes) is not affected.
+- **The limits per address need `TRUST_PROXY` behind any proxy but the one in the Compose file.** The Compose file fixes the subnet
+  of its network (`172.28.213.0/24`; change it in the `networks` block and in `TRUST_PROXY` together if it collides with a network of
+  the host) and trusts it, so the limits on requests and on sign-in and sign-up count the visitor. A proxy that is not named in
+  `TRUST_PROXY` is the only address the server sees, and **every visitor then shares it**: the per-address limits (a bucket of 500
+  requests refilled at 50 a second, 30 failed sign-ins per 15 minutes, 10 sign-ups per hour) are counted for everybody together and
+  one person's traffic can use them up. IPv6 visitors are counted by their /64. The per-account limit is not affected.
 - **The limits on attempts live in the memory of the process.** They reset on restart and forget the oldest keys under pressure
   (5000 keys), which is right for the one process this stack runs. A shared store is needed only if there is ever more than one
   process (see Scaling), and is not built.

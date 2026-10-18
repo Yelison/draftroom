@@ -59,7 +59,7 @@ describe('signing in with the right address and password', () => {
       email: account.email,
       name: account.name,
     })
-    expect(Object.keys(setCookiesOf(response)).sort()).toEqual(['dr_csrf', 'dr_session'])
+    expect(Object.keys(setCookiesOf(response)).sort()).toEqual(['dr_csrf', 'dr_device', 'dr_session'])
     expect((await browser.request({ method: 'GET', url: '/api/me' })).statusCode).toBe(200)
   })
 

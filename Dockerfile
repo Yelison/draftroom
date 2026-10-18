@@ -34,6 +34,11 @@ COPY tsconfig.base.json ./
 COPY apps/web apps/web
 COPY packages packages
 RUN npm run build --workspace @draftroom/web
+# The headers of the document: the fixed ones of the deployment with the full Content-Security-Policy of the page just built,
+# whose hash is that of its inline scripts, so it cannot be written before this stage (ADR 0017). The proxy takes this file.
+COPY deploy/security-headers.caddy deploy/security-headers.caddy
+RUN node apps/web/scripts/security-headers-caddy.ts apps/web/dist/index.html deploy/security-headers.caddy \
+  > /app/security-headers.caddy
 
 # Node without what installs packages. The base image carries npm, yarn and corepack (some 25 MB), which a running server never
 # uses and somebody with a shell in the container would. Copying the root of this stage into an empty image makes one layer
@@ -70,8 +75,7 @@ CMD ["sh", "-c", "node src/db/run-migrations.ts && exec node src/main.ts"]
 
 FROM ${CADDY_IMAGE} AS proxy
 COPY deploy/Caddyfile /etc/caddy/Caddyfile
-# The headers of the document, imported by the Caddyfile for the web app's files only. T7.2 adds the full Content-Security-Policy:
-# its hash is that of the inline script of index.html, so it is generated in the `web-build` stage from dist/index.html, and the
-# line below is where this stage takes the generated file from that stage instead of from the repository.
-COPY deploy/security-headers.caddy /etc/caddy/security-headers.caddy
+# The headers of the document, imported by the Caddyfile for the web app's files only. The file of the repository holds the fixed
+# ones; the one generated in the `web-build` stage from dist/index.html is the same with the full Content-Security-Policy.
+COPY --from=web-build /app/security-headers.caddy /etc/caddy/security-headers.caddy
 COPY --from=web-build /app/apps/web/dist /srv

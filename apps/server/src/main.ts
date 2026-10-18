@@ -6,7 +6,7 @@ import { createDatabase } from './db/database.ts'
 import { buildApp } from './http/app.ts'
 import { createSessions } from './http/auth/sessions.ts'
 import { sessionSweepIntervalMs, startSessionSweep } from './http/auth/sessionSweep.ts'
-import { authProviderFor, sessionCookiesFor } from './http/auth/select.ts'
+import { authProviderFor, devicesFor, sessionCookiesFor } from './http/auth/select.ts'
 import type { DocumentBroadcaster } from './http/document-broadcaster.ts'
 
 // The entry point of the server: `npm start`, or `npm run dev` with a watcher. Run by Node itself, with no build step.
@@ -34,9 +34,11 @@ const broadcaster: DocumentBroadcaster = {
 }
 const app = buildApp({
   database,
+  hardening: { production: config.nodeEnv === 'production', ...config },
   authProvider,
   sessions,
   sessionCookies: sessionCookiesFor(config),
+  devices: devicesFor(config),
   logger: { level: 'info' },
   broadcaster,
   liveDocuments: {

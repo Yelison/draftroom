@@ -6,6 +6,8 @@ import './styles/draftroom-tokens.css'
 import '@yelison/forma-ui/styles.css'
 import '@yelison/forma-ui/base.css'
 import './styles/global.css'
+// Before any schema is built, which is before any module that has one.
+import './zodJitless.ts'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

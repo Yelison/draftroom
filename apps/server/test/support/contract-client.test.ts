@@ -7,6 +7,7 @@ import { createContractClient, findOperation, ContractError } from './contract-c
 import { ContractCoverage } from './contract-coverage.ts'
 import { createDatabase } from '../../src/db/database.ts'
 import type { AuthProvider } from '../../src/http/auth/auth-provider.ts'
+import { developmentHardening } from './hardening.ts'
 import { sessionStackFor } from './auth.ts'
 import { noLiveDocuments, silentBroadcaster, silentLiveAccess } from './broadcasters.ts'
 import {
@@ -53,12 +54,14 @@ describe('the contract client', () => {
   it('returns a response that follows the contract and records the operation as exercised', async () => {
     const coverage = new ContractCoverage()
     const database = unusedDatabase()
-    const { sessions, sessionCookies } = sessionStackFor(database)
+    const { sessions, sessionCookies, devices } = sessionStackFor(database)
     app = buildApp({
       database,
+      hardening: developmentHardening,
       authProvider,
       sessions,
       sessionCookies,
+      devices,
       broadcaster: silentBroadcaster,
       liveAccess: silentLiveAccess,
       liveDocuments: noLiveDocuments,
@@ -87,12 +90,14 @@ describe('the contract client', () => {
   it('fails the test when the server replaced a response, whose 500 would pass the contract by itself', async () => {
     const violations: ContractViolation[] = []
     const database = unusedDatabase()
-    const { sessions, sessionCookies } = sessionStackFor(database)
+    const { sessions, sessionCookies, devices } = sessionStackFor(database)
     app = buildApp({
       database,
+      hardening: developmentHardening,
       authProvider,
       sessions,
       sessionCookies,
+      devices,
       broadcaster: silentBroadcaster,
       liveAccess: silentLiveAccess,
       liveDocuments: noLiveDocuments,

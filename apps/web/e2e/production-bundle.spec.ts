@@ -3,6 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { inlineScripts, scriptSource } from '../scripts/content-security-policy.ts'
 import { collaboratorScripts } from '../src/data/mock/fixtures/collaboratorScripts.ts'
 import { demoContent } from '../src/data/mock/fixtures/demoContent.ts'
 import { demoFixtures } from '../src/data/mock/fixtures/demoSeed.ts'
@@ -81,6 +82,13 @@ const forbiddenMarkers = [
   // The name of the channel the tabs of the demo share the documents on, and the prefix of the lock that picks which tab
   // plays a person in a document: the mock's own words, and in the build with the mock.
   'draftroom-demo',
+  // The development identity: the header the server accepts in development only, and the cookie the end-to-end suite of
+  // the real stack once used to say who a browser was. Neither is in any build, with or without the mock, so there is no
+  // positive control for them (like `VITE_DATA_SOURCE`): the build of the real API must simply never name them. The names
+  // are searched in lower case too, since a header is read case-insensitively.
+  'X-Dev-User',
+  'x-dev-user',
+  'dr_dev_user',
 ]
 
 /** What the provider and Yjs write into the chunk that holds them, and the app's own session over them. */
@@ -178,6 +186,19 @@ test.describe('the production bundle', () => {
         marker,
       ).toBe(true)
     }
+  })
+
+  // The policy of the page is written from the page by the build. A hash that is not the script's, or a script that has none,
+  // is a first paint that the browser refuses (or, with `unsafe-inline`, a policy that protects nothing).
+  test('has a content security policy that names exactly the inline scripts of its page, by hash', () => {
+    const html = productionBundle().find(({ name }) => name === 'index.html')?.content ?? ''
+    const policy = /http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(html)?.[1] ?? ''
+    const scriptSources = /script-src ([^;]*)/.exec(policy)?.[1]?.split(' ') ?? []
+
+    expect(inlineScripts(html).length, 'the first-paint scripts are in the page').toBeGreaterThan(0)
+    expect(scriptSources).toEqual(["'self'", ...inlineScripts(html).map(scriptSource)])
+    expect(policy).not.toMatch(/script-src[^;]*'unsafe-(inline|eval)'/)
+    expect(policy).toContain("default-src 'none'")
   })
 
   test('is searched with texts that the build with the mock does contain', () => {

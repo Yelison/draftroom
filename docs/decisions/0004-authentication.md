@@ -29,10 +29,13 @@ The mistakes that matter here are the ones that let someone in who should not be
 
 | Cookie | `HttpOnly` | `SameSite` | `Secure` | Holds |
 | --- | --- | --- | --- | --- |
-| `dr_session` | yes | `Lax` | in production | the session token |
-| `dr_csrf` | no, the page reads it | `Lax` | in production | the CSRF token |
+| `dr_session` (`__Host-dr_session` in production) | yes | `Lax` | in production | the session token |
+| `dr_csrf` (`__Host-dr_csrf` in production) | no, the page reads it | `Lax` | in production | the CSRF token |
+| `dr_device` (`__Host-dr_device` in production) | yes | `Strict` | in production | a signed id of this browser for one account (below) |
 
-Both on path `/`, ending with the session's absolute lifetime. `Secure` is set when `NODE_ENV` is `production` and not otherwise: a development server is plain HTTP, and a browser would never send a `Secure` cookie back to it. Clearing them at sign-out repeats the attributes, which a browser needs to match them. `@fastify/cookie` sets them; the `Cookie` header is **read by the server's own parser** (`cookies.ts`), because `@fastify/cookie` only parses once its plugin is registered and the collaboration server calls the provider with the headers of a WebSocket upgrade that no Fastify plugin has seen. The first of two cookies with the same name wins, and the parser has no prototype, so a cookie named `__proto__` is just a cookie.
+All on path `/`; the first two end with the session's absolute lifetime. `Secure` is set when `NODE_ENV` is `production` and not otherwise: a development server is plain HTTP, and a browser would never send a `Secure` cookie back to it. Clearing them at sign-out repeats the attributes, which a browser needs to match them. `@fastify/cookie` sets them; the `Cookie` header is **read by the server's own parser** (`cookies.ts`), because `@fastify/cookie` only parses once its plugin is registered and the collaboration server calls the provider with the headers of a WebSocket upgrade that no Fastify plugin has seen. The first of two cookies with the same name wins, and the parser has no prototype, so a cookie named `__proto__` is just a cookie.
+
+**`__Host-` in production (T7.2).** A browser accepts a `__Host-` cookie only if it is `Secure`, has `Path=/` and has no `Domain`, so a page on a sibling subdomain cannot plant one (cookie tossing). The server sets and reads only the name of its own mode: a plain `dr_session` sent to a production server is no session, and a planted `dr_csrf` is not the cookie the check reads (tests: `test/security/cookies.test.ts`). In development the prefix cannot be used, since the server is plain HTTP and a browser refuses `Secure` cookies there, so development and the tests keep the plain names; `cookieNamesFor(secure)` is the one place that decides. The web client reads `__Host-dr_csrf` first and `dr_csrf` after it.
 
 ### CSRF: double submit, signed to the session
 
@@ -57,7 +60,8 @@ Why these figures: ten wrong passwords for one account in a quarter of an hour i
 - **An address with no account counts as one that has**, so the limit says nothing about who has an account, and the refusal is the same `429` with `Retry-After`.
 - **What it costs.** Whoever can send ten wrong passwords for an address can keep its owner out for a quarter of an hour (a lockout is a denial of service that is cheap). Per email *and* IP would stop that and let a botnet with many addresses guess freely. The window is short and the owner is not locked out for good.
 - **The store forgets under pressure.** The in-memory store of the plugin is an LRU of 5000 keys, shared by the three limits: a burst with many distinct keys (a botnet, or one machine that names thousands of addresses of email) can push out the counter of a victim. A shared store with its own expiry (T8.1) is the answer; nothing here pretends otherwise.
-- **Single instance.** The store is the process's memory: the counts are right for one instance and each of several behind a balancer would count alone. A shared store is a change of the plugin's `store` option and nothing else here. Behind a reverse proxy the address is the proxy's until `trustProxy` is set: **that, and the shared store, are for T7.2 and T8.1**.
+- **The targeted lockout (T7.2): a device cookie.** Ten wrong passwords for an address, from anywhere, used to shut its owner out for a quarter of an hour. Now a sign-up or a sign-in that is right leaves `dr_device`: `<random id>.<HMAC of the id and the address under SESSION_SECRET>` (OWASP's device cookie; no table, no migration). A browser that presents a valid one for the address being signed in to is counted under its own key, with the same ten-in-fifteen-minutes allowance as an address, so the guesses of a stranger no longer use it up and the owner gets in from the browser they already use; a browser without it, with a forged one or with one made for another address is counted under the address as before. A stolen cookie is worth ten guesses a quarter of an hour, no more. The id stays the same for a browser however often it signs in; signing out does not delete it; rotating `SESSION_SECRET` forgets every device. Cost: a person signing in from a new browser during a lockout still waits it out, and a progressive delay, the other option, would punish them as well. Tests: `test/security/targeted-lockout.test.ts`.
+- **Single instance.** The store is the process's memory: the counts are right for one instance and each of several behind a balancer would count alone. A shared store is a change of the plugin's `store` option and nothing else here. Behind a reverse proxy the address is the proxy's until `TRUST_PROXY` names it (T7.2: addresses or ranges, never `true` or a number of hops, which Fastify 5 treats as trusting nothing; ADR 0017). The shared store is for T8.1.
 - The check comes after the shape of the request (ADR 0010: the shape is checked before anything about a resource), so a request that is not valid is a `400` and is not counted.
 
 ### Sign-up and invitations
@@ -77,7 +81,7 @@ The upgrade of the WebSocket resolves the session from the **`Cookie` header of 
 1. **`409` on sign-up reveals which emails have an account: accepted.** The contract fixes the answer, and the alternative (always `201` and a message to the inbox) needs email delivery, which the MVP does not have. What limits it is the sign-up limit above (ten attempts an hour from an address). Sign-in, where guessing is the point, never says. Revisit with email verification.
 2. **Password normalisation: NFKC**, above.
 3. **Email verification: none, and that is a known gap.** Without it, whoever signs up first with an address that has a pending invitation inherits its grants, and anyone can sign up as an address they do not own. The invitation is made by a member, so the exposure is bounded to the documents shared with that address, but it is real. It needs email delivery. The owner has decided to ship it as a **known risk**, written below.
-4. **The CSRF exemption of sign-in (login CSRF): kept, and made safe by the content type.** A cross-site form can post to the address, but it can only send `application/x-www-form-urlencoded`, `multipart/form-data` or `text/plain`, none of which the server reads as JSON (a test sends the first and the last and gets `400`); sending JSON needs a preflight the server never grants (T7.2 sets CORS by `ALLOWED_ORIGINS` and **must not** allow credentials from any other). `SameSite=Lax` does not help here, since the attack sends no cookie of its own.
+4. **The CSRF exemption of sign-in (login CSRF): kept, and made safe by the content type.** A cross-site form can post to the address, but it can only send `application/x-www-form-urlencoded`, `multipart/form-data` or `text/plain`, none of which the server reads as JSON (a test sends the first and the last and gets `400`); sending JSON needs a preflight the server never grants to another origin (T7.2: CORS by `ALLOWED_ORIGINS`, credentials only for those, never `*`, ADR 0017). `SameSite=Lax` does not help here, since the attack sends no cookie of its own.
 
 ## Threats covered
 
@@ -94,8 +98,10 @@ The upgrade of the WebSocket resolves the session from the **`Cookie` header of 
 | Session that expires with a socket open | The sweep | `sessionSweep.test.ts`, `collab/session-auth.test.ts` |
 | Token in the address or a header of the WebSocket | Only the cookie is read | `collab/session-auth.test.ts` |
 | Cookie theft by a script, or sent in the clear | `HttpOnly`, `Secure` in production, `SameSite=Lax` | `auth/session.test.ts` |
+| Cookie tossing from a sibling subdomain | `__Host-` names in production, no other name read | `security/cookies.test.ts` |
+| Targeted lockout of an account | A signed device cookie, counted on its own | `security/targeted-lockout.test.ts` |
 | Secrets in logs | Nothing logs a body or a token; a test searches the output | `auth/logs.test.ts` |
-| Development identity in production | The cookie provider alone in `production` and when `NODE_ENV` is not set | `session.test.ts`, `select.test.ts` |
+| Development identity in production | The cookie provider alone in `production` and when `NODE_ENV` is not set; the server refuses to start unsafe | `session.test.ts`, `select.test.ts`, `main.test.ts`, `security/production-start.test.ts` |
 | The whole thing in a browser, against the real server | Sign-in, gate, sign-up and sign-out with a live socket in another tab | `e2e-collab/auth.spec.ts`, `identity.spec.ts` |
 
 ## Known risk: no email verification
@@ -121,9 +127,9 @@ What stays of the proxy of the Vite servers is **routing and nothing else**: it 
 
 ## What is left, and for whom
 
-- **T7.2:** the production build guard against `X-Dev-User`, security headers and CSP, CORS by `ALLOWED_ORIGINS` (never with credentials for another origin), body and message limits, rate limits for the rest of REST and for WebSocket messages, `trustProxy`.
+- **T7.2, done:** the production guard (the server refuses to start with an unsafe configuration; the build has no trace of `X-Dev-User`), headers and CSP, CORS, body and message limits, request limits, `TRUST_PROXY`, `__Host-` cookies and the device cookie, all in ADR 0017 and its tests (§9.3 of the plan).
 - **T8.1:** a shared rate-limit store if there is more than one instance; HTTPS and HSTS at the proxy, without which `Secure` cookies are never sent.
-- **Not in the contract, so not here:** changing a password, signing out everywhere, listing sessions, recovering an account, verifying an email, throttling by device. Each is its own task and, but for the first, needs email delivery.
+- **Not in the contract, so not here:** changing a password, signing out everywhere, listing sessions, recovering an account, verifying an email. Each is its own task and, but for the first, needs email delivery.
 - **Rehashing** when the Argon2id parameters are raised.
 
 ## Consequences

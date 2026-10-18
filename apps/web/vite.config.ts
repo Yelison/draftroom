@@ -2,6 +2,7 @@
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
+import { contentSecurityPolicyMeta } from './scripts/content-security-policy.ts'
 import { firstPaintScripts } from './scripts/first-paint.ts'
 import { headScripts } from './scripts/head-scripts.ts'
 import { messagesAst } from './scripts/messages-ast.ts'
@@ -67,6 +68,7 @@ export default defineConfig(({ command, mode }) => ({
   plugins: [
     react(),
     firstPaintScripts(headScripts),
+    contentSecurityPolicyMeta(),
     messagesAst({
       directory: resolve(import.meta.dirname, 'src/i18n'),
       // `npm run build:pseudo` builds the app with accented, longer text in place of the messages, to check that no

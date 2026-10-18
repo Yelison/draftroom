@@ -1,5 +1,5 @@
 /* The editor in the production build, with a real browser: typing, the keyboard, the clipboard, the focus and the layout. */
-import type { Locator, Page } from '@playwright/test'
+import { test as unwatched, type Locator, type Page } from '@playwright/test'
 import { launchPlan } from '../src/data/mock/fixtures/documents.ts'
 import { googleDocs, word } from '../src/features/editor/testing/wordProcessorHtml.ts'
 import { expect, test } from './fixtures.ts'
@@ -219,7 +219,17 @@ test.describe('pasting', () => {
   ] as const
 
   for (const { name, html, text: expected } of cases) {
-    test(`keeps only the text of ${name}, with nothing that runs and no link`, async ({ page }) => {
+    // The page of this suite fails a test for any console error. Here the browser may report one thing: Chromium's
+    // `script-src-attr` violation ("Executing inline event handler violates..."), which it raises when it creates the
+    // handler in the inert document ProseMirror reads the pasted HTML into. Nothing runs (`pwned` stays false below). Any
+    // other report still fails the test, a refused inline script among them: that would mean markup reached the live page.
+    unwatched(`keeps only the text of ${name}, with nothing that runs and no link`, async ({ page }) => {
+      const problems: string[] = []
+      page.on('pageerror', (error) => problems.push(`uncaught: ${error.message}`))
+      page.on('console', (message) => {
+        if (message.type() === 'error' && !/Executing inline event handler violates/.test(message.text()))
+          problems.push(`console.error: ${message.text()}`)
+      })
       const text = await open(page)
 
       await paste(text, html)
@@ -230,6 +240,7 @@ test.describe('pasting', () => {
       )
       await expect(text.locator('a')).toHaveCount(0)
       expect(await page.evaluate(() => 'pwned' in window)).toBe(false)
+      expect(problems, 'errors the browser reported while the test ran').toEqual([])
     })
   }
 

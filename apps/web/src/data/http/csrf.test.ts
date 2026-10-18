@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { changesState, cookieValue } from './csrf.ts'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { changesState, cookieValue, csrfTokenFromCookie } from './csrf.ts'
 
 describe('cookieValue', () => {
   it.each([
@@ -25,5 +25,35 @@ describe('changesState', () => {
 
   it.each(['GET', 'HEAD', 'OPTIONS'])('is false for %s', (method) => {
     expect(changesState(method)).toBe(false)
+  })
+})
+
+describe('csrfTokenFromCookie', () => {
+  // jsdom refuses to set a `__Host-` cookie on an address that is not HTTPS, so the cookie string is what is stubbed.
+  const cookiesAre = (cookies: string) => vi.spyOn(document, 'cookie', 'get').mockReturnValue(cookies)
+  afterEach(() => vi.restoreAllMocks())
+
+  it('reads the cookie a server behind HTTPS sets, with the __Host- prefix', () => {
+    cookiesAre('theme=dark; __Host-dr_csrf=prefixed')
+
+    expect(csrfTokenFromCookie()).toBe('prefixed')
+  })
+
+  it('reads the cookie a development server sets, with no prefix', () => {
+    cookiesAre('dr_csrf=plain')
+
+    expect(csrfTokenFromCookie()).toBe('plain')
+  })
+
+  it('prefers the prefixed one when a plain one has been planted beside it', () => {
+    cookiesAre('dr_csrf=planted; __Host-dr_csrf=real')
+
+    expect(csrfTokenFromCookie()).toBe('real')
+  })
+
+  it('finds nothing when there is no session', () => {
+    cookiesAre('theme=dark')
+
+    expect(csrfTokenFromCookie()).toBeUndefined()
   })
 })

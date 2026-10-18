@@ -7,6 +7,7 @@ import type { Database } from '../db/tables.ts'
 import { buildApp, type ContractViolation } from './app.ts'
 import type { AuthProvider } from './auth/auth-provider.ts'
 import { sessionStackFor } from '../../test/support/auth.ts'
+import { developmentHardening } from '../../test/support/hardening.ts'
 import { noLiveDocuments, silentBroadcaster, silentLiveAccess } from '../../test/support/broadcasters.ts'
 import {
   contractWithSyntheticOperation,
@@ -60,12 +61,14 @@ function appWithoutDatabase(
   authProvider: AuthProvider = signedInAsMarta,
 ): FastifyInstance {
   database = createDatabase(unreachableDatabaseUrl)
-  const { sessions, sessionCookies } = sessionStackFor(database)
+  const { sessions, sessionCookies, devices } = sessionStackFor(database)
   app = buildApp({
     database,
+    hardening: developmentHardening,
     authProvider,
     sessions,
     sessionCookies,
+    devices,
     broadcaster: silentBroadcaster,
     liveAccess: silentLiveAccess,
     liveDocuments: noLiveDocuments,
@@ -385,7 +388,8 @@ describe('a response that breaks the contract', () => {
     expect(response.headers).not.toHaveProperty('etag')
     expect(response.headers).not.toHaveProperty('location')
     expect(response.headers).not.toHaveProperty('retry-after')
-    expect(response.headers).not.toHaveProperty('cache-control')
+    // The handler's `max-age=60` is gone; what is there is the server's own policy for every answer.
+    expect(response.headers['cache-control']).toBe('no-store')
     expect(response.headers['content-type']).toContain(problemType)
   })
 

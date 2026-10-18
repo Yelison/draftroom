@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
+import { trustProxy, type TrustProxy } from './http/trust-proxy.ts'
 
 const nodeEnvironments = ['development', 'test', 'production'] as const
 export type NodeEnvironment = (typeof nodeEnvironments)[number]
@@ -29,6 +30,7 @@ const environmentSchema = z.object({
   DATABASE_URL: databaseUrl,
   SESSION_SECRET: z.string().min(32, 'must have at least 32 characters').optional(),
   ALLOWED_ORIGINS: z.string().default('').transform(splitList).pipe(z.array(origin)),
+  TRUST_PROXY: trustProxy,
 })
 
 export interface Config {
@@ -46,6 +48,8 @@ export interface Config {
   readonly databaseUrl: string
   readonly sessionSecret: string
   readonly allowedOrigins: readonly string[]
+  /** Who may say what the caller's address is: nobody, unless the deployment names its proxies. */
+  readonly trustProxy: TrustProxy
 }
 
 export class ConfigError extends Error {
@@ -123,6 +127,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config
     // No secret literal in the sources: outside production a missing secret is a random one for this process.
     sessionSecret: env.SESSION_SECRET ?? randomBytes(32).toString('hex'),
     allowedOrigins: env.ALLOWED_ORIGINS,
+    trustProxy: env.TRUST_PROXY,
   }
 }
 

@@ -5,13 +5,14 @@
 //   2. sign up with a real account and read the session cookies' flags,
 //   3. create a document and write into it over the collaboration WebSocket, until the server says it stored the change,
 //   4. take a backup and restore it into a database that did not exist,
-//   5. start a second server on the restored database, sign in again with the same password and open the document.
+//   5. start a second server on the restored database, sign in again with the same password and open the document,
+//   6. check that two people behind the proxy do not share a limit on requests (TRUST_PROXY, ADR 0017).
 //
 // It needs NODE_EXTRA_CA_CERTS to trust the proxy's certificate authority. Nothing here is a secret: the account is made up
 // for the run, and the password is generated for it.
 
-import { execFileSync } from 'node:child_process'
-import { randomBytes, randomUUID } from 'node:crypto'
+import { execFile, execFileSync } from 'node:child_process'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { documentName, parseStatelessEvent } from '@draftroom/contract/collab'
 import { fragmentName } from '@draftroom/editor-schema'
 import { yUpdateToJson } from '@draftroom/editor-schema/convert'
@@ -28,6 +29,8 @@ const required = (name: string): string => {
 
 const origin = required('DRILL_ORIGIN')
 const plainHttpOrigin = required('DRILL_HTTP_ORIGIN')
+// Behind HTTPS the cookies are `__Host-` cookies (ADR 0004), which is what a production server sets.
+const cookieNames = { session: '__Host-dr_session', csrf: '__Host-dr_csrf' } as const
 const restored = { api: required('DRILL_RESTORED_API'), collab: required('DRILL_RESTORED_COLLAB') }
 const scripts = new URL('../../scripts/', import.meta.url).pathname
 const drillDirectory = new URL('./', import.meta.url).pathname
@@ -81,7 +84,7 @@ class Session {
     return [...this.cookies].map(([name, { value }]) => `${name}=${value}`).join('; ')
   }
   async request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<Response> {
-    const csrf = this.cookies.get('dr_csrf')?.value
+    const csrf = this.cookies.get(cookieNames.csrf)?.value
     const response = await fetch(`${this.base}${path}`, {
       method,
       headers: {
@@ -181,6 +184,23 @@ async function until<Value>(
   }
 }
 
+/**
+ * The statuses the API gives `/api/me` to twenty-five requests, ten a second, made from inside the proxy's container with
+ * nothing in it but a wget. The container reaches the proxy from its own loopback, which is another address than the one this
+ * process reaches it from.
+ */
+function proxyContainerStatuses(): Promise<number[]> {
+  const container = required('DRILL_PROXY_CONTAINER')
+  const script =
+    'for i in $(seq 1 25); do wget --no-check-certificate --server-response --output-document=/dev/null https://localhost/api/me 2>&1 | grep -m1 -o "HTTP/[0-9.]* [0-9]*"; sleep 0.1; done'
+  return new Promise((resolve, reject) => {
+    execFile('docker', ['exec', container, 'sh', '-c', script], { encoding: 'utf8' }, (error, stdout) => {
+      if (error !== null) return reject(error)
+      resolve([...stdout.matchAll(/HTTP\/[0-9.]+ (\d{3})/g)].map(([, status = '0']) => Number(status)))
+    })
+  })
+}
+
 // ---- The drill ---------------------------------------------------------------------------------------------------------
 
 const collabOf = (base: string): string => `${base.replace(/^http/, 'ws')}/collab`
@@ -206,6 +226,22 @@ check(
   `the page's Content-Security-Policy does not forbid frames: ${page.headers.get('content-security-policy') ?? 'nothing'}`,
 )
 check(!page.headers.has('server'), `the page names its server: ${page.headers.get('server') ?? ''}`)
+// The policy is generated from the page the proxy serves, so the hash of each inline script of that page is in it, and the
+// connections it allows are to the host the browser used (the page's own <meta> allows `wss:` and the header narrows it).
+const policy = page.headers.get('content-security-policy') ?? ''
+const inlineScripts = [...(await page.text()).matchAll(/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(
+  ([, text]) => text ?? '',
+)
+check(inlineScripts.length > 0, 'the page has no inline script to take a hash of')
+for (const text of inlineScripts) {
+  const hash = `'sha256-${createHash('sha256').update(text, 'utf8').digest('base64')}'`
+  check(policy.includes(hash), `the page's policy does not name its inline script ${hash}`)
+}
+check(!/script-src[^;]*'unsafe-/.test(policy), `the page's policy lets scripts run inline or by eval: ${policy}`)
+check(
+  policy.includes(`connect-src 'self' wss://${new URL(origin).host};`),
+  `the page's policy does not limit connections to ${new URL(origin).host}: ${policy}`,
+)
 const api = await fetch(`${origin}/api/health/live`)
 check(api.ok, `the API's liveness answered ${api.status}`)
 // Not that the API carries none of these headers: the server sets its own there (a policy, `nosniff`, a referrer policy, HSTS),
@@ -235,12 +271,16 @@ step('the person signs up, and the session cookie is HttpOnly and Secure')
 const session = new Session(origin)
 const signUp = await session.request('POST', '/api/auth/sign-up', account)
 check(signUp.status === 201, `sign-up answered ${signUp.status}`)
-const sessionCookie = session.cookies.get('dr_session')
-check(sessionCookie !== undefined, 'sign-up set no dr_session cookie')
+const sessionCookie = session.cookies.get(cookieNames.session)
+check(sessionCookie !== undefined, `sign-up set no ${cookieNames.session} cookie`)
+check(
+  sessionCookie.flags.includes('path=/') && !sessionCookie.flags.some((flag) => flag.startsWith('domain=')),
+  'the session cookie is not a __Host- cookie: it needs Path=/ and no Domain',
+)
 check(sessionCookie.flags.includes('httponly'), 'the session cookie is not HttpOnly')
 check(sessionCookie.flags.includes('secure'), 'the session cookie is not Secure')
-const csrfCookie = session.cookies.get('dr_csrf')
-check(csrfCookie !== undefined, 'sign-up set no dr_csrf cookie')
+const csrfCookie = session.cookies.get(cookieNames.csrf)
+check(csrfCookie !== undefined, `sign-up set no ${cookieNames.csrf} cookie`)
 check(csrfCookie.flags.includes('secure'), 'the CSRF cookie is not Secure')
 
 step('the person creates a document and writes into it over WSS, until the server says it stored it')
@@ -296,6 +336,35 @@ check(
   `the restored document holds ${JSON.stringify(paragraphsOf(reader.doc))}`,
 )
 reader.close()
+
+step('two people behind the proxy do not share a limit: a burst from one slows only that one down')
+// The proxy tells the server who the caller is, and the server believes it because the proxy is in `TRUST_PROXY`. Were it not,
+// every request would come from the proxy and the limit of one address would be everybody's. The first person is this process,
+// reaching the proxy from outside; the second is the proxy's own container, which reaches itself from 127.0.0.1.
+// The first person keeps the limit empty while the second asks, over three seconds: a bucket refills at 50 a second, so a burst
+// followed by one slow call into the container would leave tokens for anybody, shared limit or not. Forty workers ask one after
+// another, so there is always a request waiting for the next token, and a second person who shared the bucket would be refused.
+let flooding = true
+let refused = 0
+const flood = Promise.all(
+  Array.from({ length: 40 }, async () => {
+    while (flooding) refused += (await fetch(`${origin}/api/me`)).status === 429 ? 1 : 0
+  }),
+)
+await until('the first person to be limited', () => (refused > 0 ? true : undefined))
+const refusedBefore = refused
+const second = await proxyContainerStatuses()
+flooding = false
+await flood
+console.log(
+  `     the first person was refused ${refused} requests; the second, from another address, got ${second.length}: ${[...new Set(second)].join(', ')}`,
+)
+check(second.length >= 20, `the second person's requests were not all answered: ${second.length} of 25`)
+check(refused > refusedBefore, 'the first person stopped being limited while the second asked, so nothing was shown')
+check(
+  second.every((status) => status === 401),
+  `a second person, from another address, was answered ${second.join(' ')} while the first was limited; 401 each was expected`,
+)
 
 console.log(
   '\nThe drill passed: a backup of the production stack restored into a new database and opened with its content.',

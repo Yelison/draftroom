@@ -59,6 +59,7 @@ for _ in $(seq 1 60); do
 done
 docker cp "$proxy:$root_certificate" "$work/caddy-root.crt" || { echo "the proxy never wrote $root_certificate" >&2; exit 1; }
 
+export DRILL_PROXY_CONTAINER="$proxy"
 export DRILL_ORIGIN="https://localhost:${HTTPS_PORT}" DRILL_HTTP_ORIGIN="http://localhost:${HTTP_PORT}"
 export NODE_EXTRA_CA_CERTS="$work/caddy-root.crt"
 node "$repository/deploy/drill/drill.ts"

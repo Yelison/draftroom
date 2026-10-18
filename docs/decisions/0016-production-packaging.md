@@ -37,9 +37,11 @@ the same image runs on any host name.
 headers of `/api` and `/collab` can only come from the server, which is the one that knows its origins and what is personal. The
 proxy sends the static ones from `deploy/security-headers.caddy`, which the Caddyfile imports **inside the block that serves the web
 app**, so that they reach those files and never `/api` or `/collab`. T7.2 owns the server's headers and writes the full
-Content-Security-Policy, whose hash is that of the inline script of the built `index.html`, so it can only exist after the web build:
-T7.2 generates the fragment in the `web-build` stage and the proxy stage of the `Dockerfile` copies it from there, at the place a
-comment marks. It edits the fragment and that one line, and not the Caddyfile.
+Content-Security-Policy, whose hash is that of the inline scripts of the built `index.html`, so it can only exist after the web build:
+T7.2 generates the fragment in the `web-build` stage and the proxy stage of the `Dockerfile` copies it from there. It replaces that one
+line of the fragment and not the Caddyfile. *Updated by [ADR 0017](0017-http-hardening.md): this is now done. The server sends its own
+headers on `/api` and on any plain request to `/collab`, the generator is `apps/web/scripts/security-headers-caddy.ts`, and the policy
+also narrows `connect-src` to the host.*
 
 **The contract of the headers fragment.** One shape and one list of values, so that the two tasks never have to agree again:
 
@@ -119,8 +121,10 @@ unprivileged `node` user with a read-only file system, no capabilities and no wa
   the two commands of the image's `CMD`.
 - Only Caddy publishes ports. The database and the server are not reachable from outside the Compose network.
 - The proxy sends the static headers of the document, as ADR 0004 assigns HSTS to this task; the full Content-Security-Policy, CORS,
-  `trustProxy` and the server's headers are not part of this change (T7.2), and neither is a shared store for the sign-in rate limit;
-  both are listed in `docs/deploy/README.md` as what the deployment does not yet have.
+  `trustProxy` and the server's headers were not part of this change (T7.2), and neither is a shared store for the sign-in rate limit.
+  *Updated by [ADR 0017](0017-http-hardening.md): the policy, CORS and the server's headers exist, and the Compose file fixes its
+  subnet and sets `TRUST_PROXY` to it. Only the shared store is still listed in `docs/deploy/README.md` as what the deployment does
+  not have.*
 - Scaling out is not possible and not attempted: one process serves a document (ADR 0001). The guide says why.
 
 ## Alternatives considered

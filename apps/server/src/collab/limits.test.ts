@@ -1,43 +1,7 @@
 import { MAX_DOCUMENT_STATE_BYTES } from '@draftroom/contract/collab'
 import * as Y from 'yjs'
 import { describe, expect, it } from 'vitest'
-import { createTokenBucket, refusesOversizedWrite } from './limits.ts'
-
-describe('the token bucket', () => {
-  const bucketAt = (clock: { now: number }) => createTokenBucket({ perSecond: 100, burst: 200, now: () => clock.now })
-
-  it('lets the burst through and refuses the next message', () => {
-    const bucket = bucketAt({ now: 0 })
-
-    const taken = Array.from({ length: 201 }, () => bucket.take())
-
-    expect(taken.slice(0, 200).every(Boolean)).toBe(true)
-    expect(taken[200]).toBe(false)
-  })
-
-  it('refills at the rate, a token every ten milliseconds', () => {
-    const clock = { now: 0 }
-    const bucket = bucketAt(clock)
-    for (let index = 0; index < 200; index += 1) bucket.take()
-
-    expect(bucket.take()).toBe(false)
-    clock.now = 10
-    expect(bucket.take()).toBe(true)
-    expect(bucket.take()).toBe(false)
-    clock.now = 30
-    expect([bucket.take(), bucket.take(), bucket.take()]).toEqual([true, true, false])
-  })
-
-  it('never holds more than the burst, however long the connection was quiet', () => {
-    const clock = { now: 0 }
-    const bucket = bucketAt(clock)
-    clock.now = 3_600_000
-
-    const taken = Array.from({ length: 201 }, () => bucket.take())
-
-    expect(taken.filter(Boolean)).toHaveLength(200)
-  })
-})
+import { refusesOversizedWrite } from './limits.ts'
 
 describe('refusing a write to a document that is too large', () => {
   const SYNC_STEP_1 = 0

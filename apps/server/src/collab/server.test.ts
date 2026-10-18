@@ -17,6 +17,7 @@ describe('the collaboration server as production configures it', () => {
       host: '127.0.0.1',
       allowedOrigins: [],
       devIdentity: false,
+      nodeEnv: 'production',
       sessionSecret: 'a-secret-that-is-long-enough-for-a-hash',
     },
     database,
