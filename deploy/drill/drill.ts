@@ -11,7 +11,7 @@
 // It needs NODE_EXTRA_CA_CERTS to trust the proxy's certificate authority. Nothing here is a secret: the account is made up
 // for the run, and the password is generated for it.
 
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { documentName, parseStatelessEvent } from '@draftroom/contract/collab'
 import { fragmentName } from '@draftroom/editor-schema'
@@ -184,25 +184,21 @@ async function until<Value>(
   }
 }
 
-/** The status the API gives `/api/me` to a request made from inside the proxy's container, with nothing in it but a wget. */
-function proxyContainerStatus(): number {
+/**
+ * The statuses the API gives `/api/me` to twenty-five requests, ten a second, made from inside the proxy's container with
+ * nothing in it but a wget. The container reaches the proxy from its own loopback, which is another address than the one this
+ * process reaches it from.
+ */
+function proxyContainerStatuses(): Promise<number[]> {
   const container = required('DRILL_PROXY_CONTAINER')
-  const outcome = spawnSync(
-    'docker',
-    [
-      'exec',
-      container,
-      'wget',
-      '--no-check-certificate',
-      '--server-response',
-      '--output-document=/dev/null',
-      'https://localhost/api/me',
-    ],
-    { encoding: 'utf8' },
-  )
-  const status = /HTTP\/\d(?:\.\d)? (\d{3})/.exec(outcome.stderr)?.[1]
-  check(status !== undefined, `could not read the status of a request from inside the proxy: ${outcome.stderr}`)
-  return Number(status)
+  const script =
+    'for i in $(seq 1 25); do wget --no-check-certificate --server-response --output-document=/dev/null https://localhost/api/me 2>&1 | grep -m1 -o "HTTP/[0-9.]* [0-9]*"; sleep 0.1; done'
+  return new Promise((resolve, reject) => {
+    execFile('docker', ['exec', container, 'sh', '-c', script], { encoding: 'utf8' }, (error, stdout) => {
+      if (error !== null) return reject(error)
+      resolve([...stdout.matchAll(/HTTP\/[0-9.]+ (\d{3})/g)].map(([, status = '0']) => Number(status)))
+    })
+  })
 }
 
 // ---- The drill ---------------------------------------------------------------------------------------------------------
@@ -345,15 +341,29 @@ step('two people behind the proxy do not share a limit: a burst from one slows o
 // The proxy tells the server who the caller is, and the server believes it because the proxy is in `TRUST_PROXY`. Were it not,
 // every request would come from the proxy and the limit of one address would be everybody's. The first person is this process,
 // reaching the proxy from outside; the second is the proxy's own container, which reaches itself from 127.0.0.1.
-const burst = await Promise.all(
-  Array.from({ length: 700 }, () => fetch(`${origin}/api/me`).then(({ status }) => status)),
+// The first person keeps the limit empty while the second asks, over three seconds: a bucket refills at 50 a second, so a burst
+// followed by one slow call into the container would leave tokens for anybody, shared limit or not. Forty workers ask one after
+// another, so there is always a request waiting for the next token, and a second person who shared the bucket would be refused.
+let flooding = true
+let refused = 0
+const flood = Promise.all(
+  Array.from({ length: 40 }, async () => {
+    while (flooding) refused += (await fetch(`${origin}/api/me`)).status === 429 ? 1 : 0
+  }),
 )
-const refused = burst.filter((status) => status === 429).length
-check(refused > 0, `700 requests at once from one address were not limited (${refused} refused)`)
-const second = proxyContainerStatus()
+await until('the first person to be limited', () => (refused > 0 ? true : undefined))
+const refusedBefore = refused
+const second = await proxyContainerStatuses()
+flooding = false
+await flood
+console.log(
+  `     the first person was refused ${refused} requests; the second, from another address, got ${second.length}: ${[...new Set(second)].join(', ')}`,
+)
+check(second.length >= 20, `the second person's requests were not all answered: ${second.length} of 25`)
+check(refused > refusedBefore, 'the first person stopped being limited while the second asked, so nothing was shown')
 check(
-  second === 401,
-  `a second person, from another address, got ${second} after the first one's burst; 401 was expected`,
+  second.every((status) => status === 401),
+  `a second person, from another address, was answered ${second.join(' ')} while the first was limited; 401 each was expected`,
 )
 
 console.log(
