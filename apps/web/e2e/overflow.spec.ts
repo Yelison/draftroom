@@ -115,6 +115,11 @@ for (const { window, zoomed } of [
         expect(await problemsOf(page)).toEqual([])
         // The notice of the narrow window does not take the place of the page: the page is there, and the notice can be closed.
         await expect(page.getByRole('main')).toBeVisible()
+        // The page starts on the first screen and has most of the width: nothing is stacked above it, and the rail is the
+        // compact one, not a column the page has to make room beside.
+        const main = await page.getByRole('main').boundingBox()
+        expect(main?.y).toBeLessThan(zoomed.height)
+        expect(main?.width).toBeGreaterThanOrEqual(zoomed.width * 0.75)
         const dismiss = page.getByRole('button', { name: 'Dismiss' })
         await expect(dismiss).toBeVisible()
         // A dialog is modal, and what is behind it cannot be reached until it is closed.
