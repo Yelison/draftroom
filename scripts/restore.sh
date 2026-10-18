@@ -8,7 +8,8 @@
 # created. One that already holds data is replaced only when you type its name at the prompt or pass --yes, and only once nothing
 # is connected to it: stop the server first. Restoring into a new database and pointing a server at it is the safe way to try a
 # backup; restoring over the live one recovers from a loss. `postgres`, `template0` and `template1` are never targets.
-# Environment: POSTGRES_USER (default `draftroom`), COMPOSE_PROJECT_NAME or POSTGRES_CONTAINER to say which server.
+# Environment: POSTGRES_USER (default `draftroom`), COMPOSE_PROJECT_NAME (default `draftroom-prod`) or
+# POSTGRES_CONTAINER to say which server.
 set -euo pipefail
 # shellcheck source=../deploy/lib/postgres-container.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../deploy/lib/postgres-container.sh"

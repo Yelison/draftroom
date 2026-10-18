@@ -168,12 +168,11 @@ command line or the repository.
 readable by its owner only, and prints its path. `scripts/restore.sh` restores one into a database you name.
 
 ```sh
-export COMPOSE_PROJECT_NAME=draftroom-prod        # the production project, not the development one
 scripts/backup.sh                                  # -> deploy/backups/draftroom-<database>-<time>.dump
 scripts/restore.sh deploy/backups/<file>.dump draftroom_restored
 ```
 
-Both find the database through the Compose project (`COMPOSE_PROJECT_NAME`, which the scripts default to `draftroom`, the development project: set it to `draftroom-prod` for this stack; `POSTGRES_CONTAINER` names a
+Both find the database through the Compose project (`COMPOSE_PROJECT_NAME`, default `draftroom-prod`, the production stack's project; `POSTGRES_CONTAINER` names a
 container directly) and run `pg_dump` and `pg_restore` inside it, so they need Docker and no password. `POSTGRES_USER` and
 `POSTGRES_DB` default to the Compose defaults.
 

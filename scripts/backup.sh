@@ -4,8 +4,8 @@
 #   scripts/backup.sh [OUTPUT_DIR]
 #
 # OUTPUT_DIR defaults to $BACKUP_DIR, then to deploy/backups (which git ignores). The path of the archive is the only thing
-# printed on standard output. Environment: POSTGRES_USER and POSTGRES_DB (default `draftroom`), COMPOSE_PROJECT_NAME or
-# POSTGRES_CONTAINER to say which database. A backup holds everybody's documents: keep it as private as the database.
+# printed on standard output. Environment: POSTGRES_USER and POSTGRES_DB (default `draftroom`), COMPOSE_PROJECT_NAME (default `draftroom-prod`)
+# or POSTGRES_CONTAINER to say which database. A backup holds everybody's documents: keep it as private as the database.
 set -euo pipefail
 # shellcheck source=../deploy/lib/postgres-container.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../deploy/lib/postgres-container.sh"

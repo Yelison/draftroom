@@ -99,7 +99,7 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draft
 El proyecto de producción se llama `draftroom-prod` y el de desarrollo `draftroom`, para que nunca compartan base de datos ni volumen: con un mismo nombre, la base de producción arrancaría sobre los datos de desarrollo.
 
 Caddy sirve la aplicación por HTTPS, el servidor migra la base de datos al arrancar y solo el proxy publica puertos. Haz una copia de seguridad
-con `COMPOSE_PROJECT_NAME=draftroom-prod scripts/backup.sh` y restáurala con `scripts/restore.sh` (misma variable). [La guía de despliegue](docs/deploy/README.md) explica cómo ejecutarlo sin
+con `scripts/backup.sh` y restáurala con `scripts/restore.sh`. [La guía de despliegue](docs/deploy/README.md) explica cómo ejecutarlo sin
 Docker, el proxy inverso y lo que exige para los WebSocket, cada variable, las copias de seguridad y por qué un proceso sirve cada documento.
 
 ## Cómo se prueba
