@@ -580,9 +580,11 @@ test.describe('the keyboard and the focus', () => {
     await textArea(page).waitFor()
     await page.getByRole('textbox', { name: 'Document title' }).focus()
 
-    // The link to the history and the Share button of an owner sit between the toolbar and the title.
+    // The history, the comments and the Share button of an owner sit between the toolbar and the title.
     await page.keyboard.press('Shift+Tab')
     await expect(page.getByRole('button', { name: 'Share' })).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(commentsToggle(page)).toBeFocused()
     await page.keyboard.press('Shift+Tab')
     await expect(page.getByRole('button', { name: 'Version history' })).toBeFocused()
     await page.keyboard.press('Shift+Tab')
@@ -595,6 +597,8 @@ test.describe('the keyboard and the focus', () => {
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Version history' })).toBeFocused()
     await page.keyboard.press('Tab')
+    await expect(commentsToggle(page)).toBeFocused()
+    await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Share' })).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(page.getByRole('textbox', { name: 'Document title' })).toBeFocused()
@@ -605,9 +609,7 @@ test.describe('the keyboard and the focus', () => {
     await textArea(page).waitFor()
     await page.getByRole('textbox', { name: 'Document title' }).focus()
 
-    await page.keyboard.press('Shift+Tab')
-    await page.keyboard.press('Shift+Tab')
-    await page.keyboard.press('Shift+Tab')
+    for (let stop = 0; stop < 4; stop++) await page.keyboard.press('Shift+Tab')
 
     await expect(page.getByRole('tooltip')).toHaveText(/^Bold \((Ctrl|⌘)\+?B\)$/)
     await page.keyboard.press('Escape')
@@ -619,9 +621,11 @@ test.describe('the keyboard and the focus', () => {
     await textArea(page).waitFor()
     // The explorer's rows arrive with its data; the Tab key finds the tree where it will be.
     await page.getByRole('tree').waitFor()
+    // The count of open threads is in the name of the button once the threads have arrived.
+    await expect(page.getByRole('button', { name: 'Comments, 1 open' })).toBeVisible()
 
     const stops: (string | null)[] = []
-    for (let press = 0; press < 15; press++) {
+    for (let press = 0; press < 17; press++) {
       await page.keyboard.press('Tab')
       stops.push(
         await page.evaluate(() => {
@@ -644,6 +648,7 @@ test.describe('the keyboard and the focus', () => {
       'Shared',
       'History',
       'Settings',
+      'Sign out',
       // The explorer: its search, its two buttons and one stop for the whole tree, which is the open document.
       'Search documents',
       'New document',
@@ -651,6 +656,7 @@ test.describe('the keyboard and the focus', () => {
       'Autumn launch plan',
       'Bold',
       'Version history',
+      'Comments, 1 open',
       'Share',
       'Document title',
       'Document content',

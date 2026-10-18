@@ -7,9 +7,9 @@ test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, heigh
 
 const explorer = (page: Page) => page.getByRole('complementary', { name: 'Explorer' })
 
-/** Tabs to the search of the explorer: the skip link, the five items of the rail and then the field. */
+/** Tabs to the search of the explorer: the skip link, the five items of the rail, signing out and then the field. */
 async function tabToExplorerSearch(page: Page) {
-  for (let stop = 0; stop < 7; stop++) await page.keyboard.press('Tab')
+  for (let stop = 0; stop < 8; stop++) await page.keyboard.press('Tab')
 }
 
 test('searches from the explorer, opens the results and opens a document, with the keyboard', async ({ page }) => {
