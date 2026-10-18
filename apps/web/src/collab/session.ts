@@ -44,6 +44,11 @@ export interface CollabSnapshot {
   readonly loaded: boolean
   /** Whether this device keeps a copy of the document: what is written offline is on the device, and not only in the tab. */
   readonly keepsCopy: boolean
+  /**
+   * Whether, when the access was removed, the person had changes the server was not shown to have stored. It is read before
+   * the changes are dropped with the copy, and is `false` until then: it is what the screen of removed access says about them.
+   */
+  readonly hadUnstoredChanges: boolean
   readonly peers: readonly Peer[]
   readonly notice: SessionNotice | null
   /** Changes when the document and the provider are made again, which is when an editor bound to them must be too. */
@@ -115,6 +120,7 @@ const sameSnapshot = (a: CollabSnapshot, b: CollabSnapshot): boolean =>
   a.editable === b.editable &&
   a.loaded === b.loaded &&
   a.keepsCopy === b.keepsCopy &&
+  a.hadUnstoredChanges === b.hadUnstoredChanges &&
   a.notice === b.notice &&
   a.generation === b.generation &&
   a.peers.length === b.peers.length &&
@@ -129,6 +135,7 @@ class ProviderSession implements CollabSession {
   private readonly pending = new PendingChanges()
   private lastStored: Y.Snapshot | null = null
   private overBudget = false
+  private hadUnstoredChanges = false
   private loaded = false
   private notice: SessionNotice | null = null
   private peers: Peer[] = []
@@ -246,7 +253,9 @@ class ProviderSession implements CollabSession {
         this.reconnectAfter(null)
         break
       case 'purge-local-copy':
-        // Nothing is uploaded after access was removed, and nothing of it stays on the device.
+        // Nothing is uploaded after access was removed, and nothing of it stays on the device. What was not stored is
+        // counted first: once it is dropped the screen could not say that anything was lost.
+        this.hadUnstoredChanges = !this.pending.isEmpty
         this.pending.clear()
         this.purgeCopy()
         break
@@ -537,6 +546,7 @@ class ProviderSession implements CollabSession {
       editable: isEditable(this.model) && !this.overBudget,
       loaded: this.loaded,
       keepsCopy: link.copy !== null,
+      hadUnstoredChanges: this.hadUnstoredChanges,
       peers: this.peers,
       notice: this.notice,
       generation: this.generation,

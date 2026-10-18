@@ -14,9 +14,14 @@ export interface CollaboratingPerson {
   color: string
 }
 
-/** The caret of someone else: a bar in their colour with their name over it. The name is text, never markup. */
+/**
+ * The caret of someone else: a bar in their colour with their name over it. The name is text, never markup. The caret sits
+ * inside the text, so a screen reader would read the name as part of the sentence it lands in; it is for the eyes, and who
+ * is in the document is told by the presence list.
+ */
 function renderCaret(user: Record<string, unknown>): HTMLElement {
   const caret = document.createElement('span')
+  caret.setAttribute('aria-hidden', 'true')
   caret.className = styles.caret ?? ''
   if (isPresenceColor(user['color'])) caret.style.setProperty('--caret-color', user['color'])
   const label = document.createElement('span')

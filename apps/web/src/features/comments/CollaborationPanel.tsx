@@ -9,6 +9,7 @@ import { useDataSource } from '../../data/useDataSource.ts'
 import { DocumentActivity } from '../history/DocumentActivity.tsx'
 import { boundDocumentOf, createAnchor, quoteOf } from './anchors.ts'
 import type { CommentRequest, CommentRequests } from './commentRequests.ts'
+import { commentsPanelId, useCommentsPanel } from './commentsPanelState.ts'
 import { CommentsTab, type Reveal } from './CommentsTab.tsx'
 import { highlightedThreads, showHighlights } from './highlightPlugin.ts'
 import type { Draft } from './NewThreadComposer.tsx'
@@ -32,11 +33,13 @@ export interface CollaborationPanelProps {
 /**
  * The panel beside the text, with the document's comments and its activity. It also owns what ties the comments to the
  * text: the highlights of the open threads, the comment being written, the thread the person is on, and what the text
- * asks of it (to start a comment, to show a thread).
+ * asks of it (to start a comment, to show a thread). Closed, it is hidden and not taken out: the highlights follow the
+ * threads and a comment being written is not lost, and a request from the text opens it.
  */
 export function CollaborationPanel({ editor, provider, document, personId, requests }: CollaborationPanelProps) {
   const intl = useIntl()
   const dataSource = useDataSource()
+  const { open, show: showPanel } = useCommentsPanel()
   const threads = useQuery(threadsQuery(dataSource, document.id))
   const handshaken = useFirstHandshake(provider)
   const placements = usePlacements(editor)
@@ -73,6 +76,8 @@ export function CollaborationPanel({ editor, provider, document, personId, reque
   // What the text asks of the panel. It reads the draft and the editor as they are when it is asked, which the effect
   // that listens must not depend on: it would listen again, and miss a request in between, with every keystroke.
   const answer = useEffectEvent((request: CommentRequest) => {
+    // Opened in the same render that asks for the focus of the form or the thread, so what is to take it is on screen.
+    showPanel()
     if (request.type === 'comment') return startDraft()
     setTab('comments')
     setActiveThreadId(request.threadId)
@@ -85,7 +90,12 @@ export function CollaborationPanel({ editor, provider, document, personId, reque
   useEffect(() => requests.subscribe(answer), [requests])
 
   return (
-    <aside className={styles.panel} aria-label={intl.formatMessage({ id: 'comments.panel.label' })}>
+    <aside
+      id={commentsPanelId}
+      hidden={!open}
+      className={styles.panel}
+      aria-label={intl.formatMessage({ id: 'comments.panel.label' })}
+    >
       <Tabs
         label={intl.formatMessage({ id: 'comments.panel.tabs' })}
         value={tab}

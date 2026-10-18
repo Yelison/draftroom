@@ -4,6 +4,13 @@ import { launchPlan } from '../data/mock/fixtures/documents.ts'
 import { localeStorageKey } from '../i18n/locale.ts'
 import { renderApp } from '../test/renderApp.tsx'
 
+/** The compact rail is the base of the stylesheet, so it is the one with no class of its own; the expanded one has `expanded`. */
+function expectRail(rail: 'expanded' | 'compact') {
+  const navigation = screen.getByRole('navigation', { name: 'Main navigation' })
+  if (rail === 'expanded') expect(navigation).toHaveClass('expanded')
+  else expect(navigation).not.toHaveClass('expanded')
+}
+
 /** The rail item that is current on each route, the headline of the page and the rail of the layout it opens in. */
 const routeCases = [
   { path: '/', active: 'Home', heading: 'Home', rail: 'expanded' },
@@ -29,7 +36,7 @@ describe('the route table', () => {
     renderApp(path)
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveAccessibleName(heading)
-    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass(rail)
+    expectRail(rail)
     const current = screen.queryAllByRole('link', { current: 'page' }).map((link) => link.textContent)
     expect(current).toEqual(active === undefined ? [] : [active])
   })
@@ -69,7 +76,7 @@ describe('the share route', () => {
       renderApp(shareOf)
 
       expect(await screen.findByRole('dialog', { name: 'Share “Autumn launch plan”' }, arrival)).toBeInTheDocument()
-      expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass('compact')
+      expectRail('compact')
       expect(screen.queryAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual(['Documents'])
       expect(screen.getByRole('heading', { level: 1, hidden: true })).toHaveTextContent('Autumn launch plan')
     },

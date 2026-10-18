@@ -1,11 +1,18 @@
 .rail {
+  display: flex;
+  flex-direction: column;
   position: sticky;
   top: 0;
   height: 100vh;
-  padding: var(--space-16) var(--space-12);
+  padding: var(--space-16) var(--space-2);
   background: var(--color-nav);
   color: var(--color-nav-text);
   overflow-y: auto;
+}
+
+.footer {
+  margin-block-start: auto;
+  padding-block-start: var(--space-16);
 }
 
 .items {
@@ -19,13 +26,15 @@
 
 .item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-12);
+  gap: var(--space-4);
   min-height: var(--button-height);
-  padding: var(--space-8) var(--space-12);
+  padding: var(--space-8) var(--space-0);
   border-radius: var(--radius-control);
   color: inherit;
   font: var(--font-label);
+  text-align: center;
   text-decoration: none;
 }
 
@@ -52,19 +61,29 @@
  * in a fallback font that is wider than Inter. A longer word (the pseudo-locale builds them) is hyphenated at a syllable
  * of the page's language when it can be, and cut only when it cannot: `anywhere`, unlike `break-word`, lets the label
  * shrink below the width of its longest word, so a word never spills out of the rail. */
-.compact {
-  padding-inline: var(--space-2);
-}
-
-.compact .item {
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-8) var(--space-0);
-  text-align: center;
-}
-
-.compact .label {
+.label {
   font: var(--font-caption);
   hyphens: auto;
   overflow-wrap: anywhere;
+}
+
+/* The compact rail is the one of every window: the editor's always, and the others' when the window is narrower than a
+ * desktop (a browser zoom of 200 % is one), where the 224 px of a rail with the labels beside the icons is most of it. */
+@media (width >= 1280px) {
+  .expanded {
+    padding-inline: var(--space-12);
+  }
+
+  .expanded .item {
+    flex-direction: row;
+    gap: var(--space-12);
+    padding: var(--space-8) var(--space-12);
+    text-align: start;
+  }
+
+  .expanded .label {
+    font: inherit;
+    hyphens: manual;
+    overflow-wrap: normal;
+  }
 }

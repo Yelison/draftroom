@@ -128,6 +128,8 @@ describe('access removed while the person was offline, when the API answers befo
 
     expect(await screen.findByRole('heading', { name: removedHeading })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Go to Documents' })).toHaveAttribute('href', '/documents')
+    // What was written offline was never stored, and the screen says it was not sent.
+    expect(screen.getByText("Changes that weren't stored were not sent.")).toBeInTheDocument()
     // The text that may have had the focus is gone: the focus goes to the headline and not to the page.
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus()
     expect(screen.queryByRole('heading', { name: "This document isn't available" })).not.toBeInTheDocument()
@@ -187,5 +189,15 @@ describe('access removed while the document is open, when the connection answers
     expect(screen.getByRole('heading', { name: removedHeading })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: "This document isn't available" })).not.toBeInTheDocument()
     expect(await copiesOnDevice()).toEqual([])
+  })
+
+  it('does not say that changes were not sent when the person had nothing the server had not stored', async () => {
+    const { server } = await openEditor()
+    await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument())
+
+    act(() => server.collaboration.closeConnections(4403, 'access-revoked'))
+
+    expect(await screen.findByRole('heading', { name: removedHeading })).toBeInTheDocument()
+    expect(screen.queryByText("Changes that weren't stored were not sent.")).not.toBeInTheDocument()
   })
 })

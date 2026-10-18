@@ -7,7 +7,7 @@ import styles from './AccountControl.module.css'
 import { useSignOut } from './useSignOut.ts'
 
 export interface AccountControlProps {
-  /** `expanded` puts the label beside the icon; `compact` puts it under it, as the rail of the editor does. */
+  /** `expanded` puts the label beside the icon in a desktop window; `compact` puts it under it, as the rail of the editor does. */
   variant: 'expanded' | 'compact'
 }
 
@@ -20,7 +20,7 @@ export function AccountControl({ variant }: AccountControlProps) {
   const person = me.data
 
   return (
-    <div className={`${styles.account} ${styles[variant]}`}>
+    <div className={variant === 'expanded' ? `${styles.account} ${styles.expanded}` : styles.account}>
       <button
         type="button"
         className={styles.button}

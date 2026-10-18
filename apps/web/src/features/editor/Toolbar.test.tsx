@@ -191,13 +191,17 @@ describe('moving along the toolbar with the keyboard', () => {
     const title = screen.getByRole('textbox', { name: 'Document title' })
     await user.click(title)
 
-    // The link to the history and the Share button of an owner sit between the toolbar and the title.
+    // The history, the comments and the Share button of an owner sit between the toolbar and the title, in the order of
+    // the two rows of the band.
     await user.tab({ shift: true })
     expect(screen.getByRole('button', { name: 'Share' })).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(await screen.findByRole('button', { name: 'Comments, 1 open' })).toHaveFocus()
     await user.tab({ shift: true })
     expect(screen.getByRole('button', { name: 'Version history' })).toHaveFocus()
     await user.tab({ shift: true })
     expect(screen.getByRole('button', { name: 'Bold' })).toHaveFocus()
+    await user.tab()
     await user.tab()
     await user.tab()
     await user.tab()

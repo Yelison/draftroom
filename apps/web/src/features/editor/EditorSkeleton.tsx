@@ -1,4 +1,5 @@
 import { useIntl } from 'react-intl'
+import { useCommentsPanel } from '../comments/commentsPanelState.ts'
 import sheet from './Sheet.module.css'
 import styles from './EditorSkeleton.module.css'
 
@@ -9,11 +10,12 @@ import styles from './EditorSkeleton.module.css'
  */
 export function EditorSkeleton() {
   const intl = useIntl()
+  const { open } = useCommentsPanel()
 
   return (
-    <div className={sheet.workspace} aria-busy="true">
+    <div className={open ? sheet.workspace : `${sheet.workspace} ${sheet.withoutPanel}`} aria-busy="true">
       <div className={sheet.column}>
-        <div className={sheet.toolbarBand} />
+        <div className={sheet.band} />
         <div className={sheet.sheet}>
           <div className={styles.title} />
           <div className={styles.text}>
@@ -27,7 +29,7 @@ export function EditorSkeleton() {
         </p>
       </div>
       {/* The place of the panel, so the sheet does not move when the document arrives. */}
-      <div className={styles.panel} />
+      {open && <div className={styles.panel} />}
     </div>
   )
 }

@@ -58,7 +58,7 @@ export function Toolbar({ editor, onLinkRequest }: ToolbarProps) {
             name={name}
             tooltip={intl.formatMessage(
               { id: 'editor.toolbar.tooltip' },
-              { name, shortcut: shortcutLabel(action.shortcut) },
+              { action: action.id, shortcut: shortcutLabel(action.shortcut) },
             )}
             keyShortcuts={ariaKeyShortcuts(action.shortcut)}
             pressed={pressed[index] ?? false}

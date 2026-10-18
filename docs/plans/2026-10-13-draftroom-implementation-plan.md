@@ -143,7 +143,7 @@ Every screen is accepted in light and dark, in English and Spanish, at 1280 and 
 | Workspace history | loading; empty; filtered empty; paginated list; event of a document no longer accessible (hidden) |
 | Version history | loading; no versions; list; preview; restore confirmation; restore in progress; restore failed; not allowed (non-owner sees list and preview without restore) |
 | Settings | each tab with save success, validation error and server error; members: invite, role change, removal, last-owner protection |
-| Below 1280 px | desktop requirement screen with the content still reachable by zooming out |
+| Below 1280 px | a notice that can be closed and layouts that reflow (compact rail, no explorer beside a document, the comments panel under the sheet), so the screens stay usable at a zoom of 200 % |
 
 ## 3. Architecture
 

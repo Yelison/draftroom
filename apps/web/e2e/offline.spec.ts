@@ -87,7 +87,7 @@ for (const { locale, colorScheme, notice } of [
   { locale: 'en-US', colorScheme: 'light', notice: /stays on this device until the connection is back/ },
   { locale: 'es-ES', colorScheme: 'dark', notice: /se queda en este dispositivo hasta que vuelva la conexión/ },
 ] as const) {
-  for (const width of [1280, 1440]) {
+  for (const width of [640, 1280, 1440]) {
     test.describe(`the notice about working offline, in ${locale} at ${width} px`, () => {
       test.use({ locale, colorScheme, viewport: { width, height: 900 } })
 
@@ -109,8 +109,9 @@ for (const { locale, colorScheme, notice } of [
         expect(await positionsOf(page)).toEqual(before)
         const box = await shown.boundingBox()
         expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(before.title?.y ?? 0)
-        // One line, or two where the sheet is narrow: at 1280 px it shares the work area with the comments panel.
-        expect(box?.height).toBeLessThanOrEqual(width === 1440 ? 34 : 42)
+        // One line at a desktop width: the panel is closed at 1280 px, so the sheet is not narrow there. At 640 px, a zoom of
+        // 200 % on 1280, the sheet is 520 px wide and the text takes two lines, in the 48 px of room above the title.
+        expect(box?.height).toBeLessThanOrEqual(width === 640 ? 48 : 34)
         const overflow = await page.evaluate(
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
         )

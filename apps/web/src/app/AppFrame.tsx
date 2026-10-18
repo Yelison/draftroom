@@ -5,17 +5,20 @@ import { SkipLink } from './SkipLink.tsx'
 import { useFocusOnNavigation } from './useFocusOnNavigation.ts'
 
 /**
- * What every page shares, whatever its layout: the desktop requirement, the skip link, the focus on navigating and the
- * preferences saved on the account.
+ * What every page shares, whatever its layout: the skip link, the notice of a narrow window, the focus on navigating and
+ * the preferences saved on the account.
  */
 export function AppFrame() {
   useFocusOnNavigation()
 
   return (
-    <DesktopGuard>
-      <SavedPreferences />
+    <>
+      {/* The first stop of the keyboard, ahead of the notice of the desktop guard. */}
       <SkipLink />
-      <Outlet />
-    </DesktopGuard>
+      <DesktopGuard>
+        <SavedPreferences />
+        <Outlet />
+      </DesktopGuard>
+    </>
   )
 }

@@ -13,6 +13,8 @@ import { ShareControl } from '../sharing/ShareControl.tsx'
 import { VersionsButton } from '../versions/VersionsButton.tsx'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { CollaborationPanel } from '../comments/CollaborationPanel.tsx'
+import { CommentsToggle } from '../comments/CommentsToggle.tsx'
+import { useCommentsPanel } from '../comments/commentsPanelState.ts'
 import { createCommentRequests } from '../comments/commentRequests.ts'
 import type { CollaboratingPerson } from './CollaborationExtensions.ts'
 import { EditorSkeleton } from './EditorSkeleton.tsx'
@@ -27,10 +29,15 @@ import { canEdit } from './roles.ts'
 import { meQuery } from './meQuery.ts'
 import { useCollabSession } from './useCollabSession.ts'
 import { useDocumentEditor } from './useDocumentEditor.ts'
+import { useFittingLimit } from './useFittingLimit.ts'
 import { duplicateProblemId, useDuplicateDocument } from './useDuplicateDocument.ts'
 import styles from './Sheet.module.css'
 
 type LinkChange = 'added' | 'updated' | 'removed'
+
+// The most people the band draws as avatars before it counts the rest; fewer when the room of the second row is shorter than
+// that (`useFittingLimit`), which depends on the font and not on the width of the window.
+const presenceLimit = 4
 
 /**
  * The editor of one document: its title, the toolbar for those who may edit, and the text on a Yjs document that is kept
@@ -128,7 +135,11 @@ function Shown({
     return (
       <EditorStatePanel
         title={intl.formatMessage({ id: 'sync.revoked.title' })}
-        description={intl.formatMessage({ id: 'sync.revoked.description' })}
+        // Said only when something was lost, as it is for a document that was closed (EditorScreen): the person who had
+        // nothing unstored is not told of changes that never existed.
+        {...(snapshot.hadUnstoredChanges
+          ? { description: intl.formatMessage({ id: 'sync.revoked.description' }) }
+          : {})}
       >
         <Link to="/documents" className={buttonClassName()}>
           {intl.formatMessage({ id: 'sync.revoked.action' })}
@@ -183,6 +194,7 @@ function EditorWorkspace({
   focusHeadline: () => void
 }) {
   const intl = useIntl()
+  const commentsPanel = useCommentsPanel()
   // The role says what the screen offers and the connection what the server allows: the text takes edits only when both do.
   const mayEdit = canEdit(document.role)
   const editable = mayEdit && snapshot.editable
@@ -268,6 +280,7 @@ function EditorWorkspace({
       snapshot.peers.map(({ userId, name }) => ({ userId, name, tone: presenceLookOf(userId).tone, status: 'online' })),
     [snapshot.peers],
   )
+  const { zone: peopleZone, limit: fittingLimit } = useFittingLimit(presenceLimit, people.length)
 
   function finishLink(change: LinkChange) {
     setLinkChange(change)
@@ -297,14 +310,25 @@ function EditorWorkspace({
 
   const column = (
     <div className={styles.column}>
-      <div className={styles.toolbarBand}>
-        {editable && <Toolbar editor={editor} onLinkRequest={requestLink} />}
-        {(document.role === 'viewer' || document.role === 'commenter') && <ReadOnlyNotice role={document.role} />}
-        <div className={styles.status}>
-          <VersionsButton documentId={document.id} />
-          <ShareControl document={document} />
-          <Presence people={people} />
-          <SyncStatus state={snapshot.state} keepsCopy={snapshot.keepsCopy} />
+      <div className={styles.band}>
+        <div className={styles.row}>
+          <div className={styles.tools}>
+            {editable && <Toolbar editor={editor} onLinkRequest={requestLink} />}
+            {(document.role === 'viewer' || document.role === 'commenter') && <ReadOnlyNotice role={document.role} />}
+          </div>
+          <div className={styles.documentTools}>
+            <VersionsButton documentId={document.id} />
+            <CommentsToggle documentId={document.id} />
+          </div>
+        </div>
+        <div className={styles.row}>
+          <div ref={peopleZone} className={styles.people}>
+            <Presence people={people} limit={fittingLimit} />
+          </div>
+          <div className={styles.state}>
+            <ShareControl document={document} />
+            <SyncStatus state={snapshot.state} keepsCopy={snapshot.keepsCopy} />
+          </div>
         </div>
       </div>
       <SyncAlerts
@@ -341,7 +365,7 @@ function EditorWorkspace({
   )
 
   return (
-    <div className={styles.workspace}>
+    <div className={commentsPanel.open ? styles.workspace : `${styles.workspace} ${styles.withoutPanel}`}>
       {column}
       <CollaborationPanel
         editor={editor}

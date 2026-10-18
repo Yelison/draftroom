@@ -580,9 +580,11 @@ test.describe('the keyboard and the focus', () => {
     await textArea(page).waitFor()
     await page.getByRole('textbox', { name: 'Document title' }).focus()
 
-    // The link to the history and the Share button of an owner sit between the toolbar and the title.
+    // The history, the comments and the Share button of an owner sit between the toolbar and the title.
     await page.keyboard.press('Shift+Tab')
     await expect(page.getByRole('button', { name: 'Share' })).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(commentsToggle(page)).toBeFocused()
     await page.keyboard.press('Shift+Tab')
     await expect(page.getByRole('button', { name: 'Version history' })).toBeFocused()
     await page.keyboard.press('Shift+Tab')
@@ -595,6 +597,8 @@ test.describe('the keyboard and the focus', () => {
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Version history' })).toBeFocused()
     await page.keyboard.press('Tab')
+    await expect(commentsToggle(page)).toBeFocused()
+    await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Share' })).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(page.getByRole('textbox', { name: 'Document title' })).toBeFocused()
@@ -605,9 +609,7 @@ test.describe('the keyboard and the focus', () => {
     await textArea(page).waitFor()
     await page.getByRole('textbox', { name: 'Document title' }).focus()
 
-    await page.keyboard.press('Shift+Tab')
-    await page.keyboard.press('Shift+Tab')
-    await page.keyboard.press('Shift+Tab')
+    for (let stop = 0; stop < 4; stop++) await page.keyboard.press('Shift+Tab')
 
     await expect(page.getByRole('tooltip')).toHaveText(/^Bold \((Ctrl|⌘)\+?B\)$/)
     await page.keyboard.press('Escape')
@@ -619,9 +621,11 @@ test.describe('the keyboard and the focus', () => {
     await textArea(page).waitFor()
     // The explorer's rows arrive with its data; the Tab key finds the tree where it will be.
     await page.getByRole('tree').waitFor()
+    // The count of open threads is in the name of the button once the threads have arrived.
+    await expect(page.getByRole('button', { name: 'Comments, 1 open' })).toBeVisible()
 
     const stops: (string | null)[] = []
-    for (let press = 0; press < 15; press++) {
+    for (let press = 0; press < 17; press++) {
       await page.keyboard.press('Tab')
       stops.push(
         await page.evaluate(() => {
@@ -644,6 +648,7 @@ test.describe('the keyboard and the focus', () => {
       'Shared',
       'History',
       'Settings',
+      'Sign out',
       // The explorer: its search, its two buttons and one stop for the whole tree, which is the open document.
       'Search documents',
       'New document',
@@ -651,6 +656,7 @@ test.describe('the keyboard and the focus', () => {
       'Autumn launch plan',
       'Bold',
       'Version history',
+      'Comments, 1 open',
       'Share',
       'Document title',
       'Document content',
@@ -710,66 +716,152 @@ test.describe('the code mark', () => {
   })
 })
 
-// The band above the sheet is 708 px and has two rows, always: the toolbar in the first and, at the end of the second, the
-// versions, Share, who is in the document and the sync status. Nothing about the text moves when someone comes or goes.
+// The band above the sheet has two rows, always. In the first, the toolbar and, at its end, the history and the comments; in
+// the second, the people and, at its end, Share and the sync status. Nothing about the text moves when someone comes or goes.
+const commentsToggle = (page: Page) => page.getByRole('button', { name: /^(Comments|Comentarios)/ })
+const commentsPanel = (page: Page) =>
+  page.getByRole('complementary', { name: /Comments and activity|Comentarios y actividad/ })
+
+/** Puts the panel as the test needs it: the person's own choice, which the page remembers. */
+async function setPanel(page: Page, state: 'open' | 'closed') {
+  const toggle = commentsToggle(page)
+  if ((await toggle.getAttribute('aria-expanded')) !== String(state === 'open')) await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', String(state === 'open'))
+}
+
 test.describe('the band above the sheet', () => {
   for (const locale of ['en-US', 'es-ES'] as const) {
-    for (const width of [1280, 1440]) {
-      test.describe(`in ${locale} at ${width} px`, () => {
-        test.use({ locale, viewport: { width, height: 900 } })
+    // 640 px is a window of 1280 px at a zoom of 200 %: the band has 520 px there, with the panel under the sheet.
+    for (const width of [640, 1280, 1440]) {
+      for (const panel of ['open', 'closed'] as const) {
+        test.describe(`in ${locale} at ${width} px with the comments panel ${panel}`, () => {
+          test.use({ locale, viewport: { width, height: 900 } })
 
-        test('holds two rows of the toolbar height, keeps its group inside and does not move the text when people come', async ({
-          page,
-        }) => {
-          await page.goto(documentPath)
-          await textArea(page).waitFor()
-          const token = await page.evaluate(() =>
-            Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--layout-toolbar-height')),
-          )
-          const topOfText = async () => (await textArea(page).boundingBox())?.y ?? Number.NaN
-          const toolbar = page.getByRole('toolbar')
+          test('holds two rows of the toolbar height, keeps every part inside and does not move the text when people come', async ({
+            page,
+          }) => {
+            await page.goto(documentPath)
+            await textArea(page).waitFor()
+            await setPanel(page, panel)
+            const token = await page.evaluate(() =>
+              Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--layout-toolbar-height')),
+            )
+            const topOfText = async () => (await textArea(page).boundingBox())?.y ?? Number.NaN
+            const toolbar = page.getByRole('toolbar')
+            // The toolbar sits in the zone of the first row, which sits in the row, which sits in the band.
+            const band = toolbar.locator('xpath=../../..')
 
-          async function expectBandToHold() {
-            const band = await toolbar.locator('xpath=..').boundingBox()
-            const tools = await toolbar.boundingBox()
-            // The status group is the one the Share button is in; it ends with the sync status.
-            const status = await page
-              .getByRole('button', { name: /^(Share|Compartir)$/ })
-              .locator('xpath=..')
-              .boundingBox()
-            const bandRight = (band?.x ?? 0) + (band?.width ?? 0)
-            // Two rows of exactly the token, and the line of the band is drawn inside them, so there is nothing to add.
-            expect(band?.height).toBe(2 * token)
-            expect(tools?.height).toBeLessThanOrEqual(token)
-            expect(tools?.width).toBeGreaterThanOrEqual(396)
-            expect((status?.x ?? 0) + (status?.width ?? 0)).toBeLessThanOrEqual(bandRight)
-            // The group is in the second row, under the toolbar.
-            expect(status?.y).toBeGreaterThanOrEqual((band?.y ?? 0) + token)
-            expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-          }
-
-          const before = await topOfText()
-          await expectBandToHold()
-
-          await page.evaluate(
-            async ([documentId, names]) => {
-              const mock = Reflect.get(window, 'draftroomMock') as {
-                addPeople(id: string, names: string[]): Promise<unknown>
+            async function expectBandToHold() {
+              const frame = await band.boundingBox()
+              const tools = await toolbar.boundingBox()
+              const history = await page
+                .getByRole('button', { name: /^(Version history|Historial de versiones)$/ })
+                .boundingBox()
+              const comments = await commentsToggle(page).boundingBox()
+              const group = await page
+                .getByRole('button', { name: /^(Share|Compartir)$/ })
+                .locator('xpath=..')
+                .boundingBox()
+              // Nobody else is in the document at first, and the list is not drawn for no one.
+              const peopleList = page.getByRole('list', { name: /People in this document|Personas en este documento/ })
+              const people = (await peopleList.count()) === 0 ? null : await peopleList.boundingBox()
+              const left = frame?.x ?? 0
+              const right = left + (frame?.width ?? 0)
+              // Two rows of exactly the token, and the line of the band is drawn inside them, so there is nothing to add.
+              expect(frame?.height).toBe(2 * token)
+              expect(tools?.height).toBeLessThanOrEqual(token)
+              expect(tools?.width).toBeGreaterThanOrEqual(396)
+              // Every part is inside the band on both sides: a group wider than its room overflows towards its start.
+              for (const part of [tools, history, comments, group, people]) {
+                if (part === null) continue
+                expect(part?.x).toBeGreaterThanOrEqual(left)
+                expect((part?.x ?? 0) + (part?.width ?? 0)).toBeLessThanOrEqual(right)
               }
-              await mock.addPeople(documentId as string, names as string[])
-            },
-            [launchPlan.id, ['Ines Varga', 'Omar Haddad', 'Lucía Ferrer', 'Tobias Lind', 'Noor Aziz']],
-          )
-          await expect(
-            page
-              .getByRole('list', { name: /People in this document|Personas en este documento/ })
-              .getByRole('listitem'),
-          ).toHaveCount(5)
+              // The people end before Share starts: the two share the second row and must not run into each other.
+              if (people !== null) expect((people?.x ?? 0) + (people?.width ?? 0)).toBeLessThanOrEqual(group?.x ?? 0)
+              // History and comments are in the first row, with the toolbar; Share and the people are in the second, under it.
+              expect(history?.y).toBeLessThan((frame?.y ?? 0) + token)
+              expect(comments?.y).toBeLessThan((frame?.y ?? 0) + token)
+              expect(group?.y).toBeGreaterThanOrEqual((frame?.y ?? 0) + token)
+              expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+            }
 
-          expect(await topOfText()).toBe(before)
-          await expectBandToHold()
+            const before = await topOfText()
+            await expectBandToHold()
+
+            await page.evaluate(
+              async ([documentId, names]) => {
+                const mock = Reflect.get(window, 'draftroomMock') as {
+                  addPeople(id: string, names: string[]): Promise<unknown>
+                }
+                await mock.addPeople(documentId as string, names as string[])
+              },
+              [launchPlan.id, ['Ines Varga', 'Omar Haddad', 'Lucía Ferrer', 'Tobias Lind', 'Noor Aziz']],
+            )
+            const listed = page
+              .getByRole('list', { name: /People in this document|Personas en este documento/ })
+              .getByRole('listitem')
+            // As many avatars as the row has room for, which depends on the font, and the count says how many are left: all five
+            // are there, as an avatar or in the count.
+            await expect(listed.first()).toBeVisible()
+            await expect
+              .poll(async () => {
+                const texts = await listed.allInnerTexts()
+                const counted = Number(/\d+/.exec(texts.at(-1) ?? '')?.[0] ?? 0)
+                return (counted === 0 ? texts.length : texts.length - 1) + counted
+              })
+              .toBe(5)
+
+            expect(await topOfText()).toBe(before)
+            await expectBandToHold()
+          })
         })
-      })
+      }
+    }
+  }
+})
+
+// What the band measures depends on the font the machine draws the text in, and the font of a runner of the CI is wider than the
+// one of a laptop. The second row is built so that its parts never overlap whatever the font is: the people give way to Share
+// and the sync status, and the avatars that do not fit are counted instead. Two amounts of letter-spacing stand for fonts wider
+// than any a machine is likely to fall back to: 0.04 em is some 28 px more in the Spanish row, and 0.1 em some 70.
+test.describe('the second row of the band with a wider font', () => {
+  for (const spacing of ['0.04em', '0.1em']) {
+    for (const locale of ['en-US', 'es-ES'] as const) {
+      for (const width of [640, 1280, 1440]) {
+        for (const panel of ['open', 'closed'] as const) {
+          test.describe(`in ${locale} at ${width} px with the comments panel ${panel}, letters spaced by ${spacing}`, () => {
+            test.use({ locale, viewport: { width, height: 900 } })
+
+            test('keeps the people apart from Share and inside the band', async ({ page }) => {
+              await page.goto(documentPath)
+              await textArea(page).waitFor()
+              await setPanel(page, panel)
+              await page.addStyleTag({ content: `body, button, input { letter-spacing: ${spacing} !important }` })
+              await page.evaluate(
+                async ([documentId, names]) => {
+                  const mock = Reflect.get(window, 'draftroomMock') as {
+                    addPeople(id: string, names: string[]): Promise<unknown>
+                  }
+                  await mock.addPeople(documentId as string, names as string[])
+                },
+                [launchPlan.id, ['Ines Varga', 'Omar Haddad', 'Lucía Ferrer', 'Tobias Lind', 'Noor Aziz']],
+              )
+
+              const list = page.getByRole('list', { name: /People in this document|Personas en este documento/ })
+              await list.waitFor()
+              const people = await list.boundingBox()
+              const group = await page
+                .getByRole('button', { name: /^(Share|Compartir)$/ })
+                .locator('xpath=..')
+                .boundingBox()
+              const band = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
+              expect((people?.x ?? 0) + (people?.width ?? 0)).toBeLessThanOrEqual(group?.x ?? 0)
+              expect((group?.x ?? 0) + (group?.width ?? 0)).toBeLessThanOrEqual((band?.x ?? 0) + (band?.width ?? 0))
+            })
+          })
+        }
+      }
     }
   }
 })
@@ -779,21 +871,91 @@ test.describe('the layout', () => {
     test.describe(`at ${width} px`, () => {
       test.use({ viewport: { width, height: 900 } })
 
-      test('keeps the sheet at its width, with no horizontal scroll', async ({ page }) => {
+      test('starts as the width allows: the comments panel open from 1440 px, closed below, and the sheet in its width either way', async ({
+        page,
+      }) => {
         await open(page)
 
-        const sheet = await page.getByRole('toolbar').locator('xpath=..').boundingBox()
+        const sheet = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
         expect(sheet?.width).toBeLessThanOrEqual(708)
-        // Beside the comments panel (328 px) the sheet gives way first: 504 px at 1280 and 664 px at 1440. How the two share
-        // the work area is decided with the layout of 1280 to 1440 px; what holds here is that both fit.
+        expect(sheet?.width).toBeGreaterThan(600)
+        await expect(commentsToggle(page)).toHaveAttribute('aria-expanded', String(width >= 1440))
+        if (width >= 1440) {
+          const panel = await commentsPanel(page).boundingBox()
+          expect((panel?.x ?? 0) + (panel?.width ?? 0)).toBeLessThanOrEqual(width)
+        } else {
+          await expect(commentsPanel(page)).toBeHidden()
+        }
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+      })
+
+      test('gives the sheet what the panel leaves when it is opened, and both fit', async ({ page }) => {
+        await open(page)
+        await setPanel(page, 'open')
+
+        // Beside the panel (328 px) the sheet gives way first: 504 px at 1280 and 664 px at 1440.
+        const sheet = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
         expect(sheet?.width).toBeGreaterThan(480)
-        const panel = await page.getByRole('complementary', { name: 'Comments and activity' }).boundingBox()
+        expect(sheet?.width).toBeLessThanOrEqual(708)
+        const panel = await commentsPanel(page).boundingBox()
         expect((panel?.x ?? 0) + (panel?.width ?? 0)).toBeLessThanOrEqual(width)
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
       })
 
+      test('gives the sheet its 708 px when the panel is closed, and the panel comes back as it was left', async ({
+        page,
+      }) => {
+        await open(page)
+        await setPanel(page, 'closed')
+
+        const sheet = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
+        expect(sheet?.width).toBe(708)
+        await expect(commentsPanel(page)).toBeHidden()
+
+        await page.reload()
+        await textArea(page).waitFor()
+        await expect(commentsToggle(page)).toHaveAttribute('aria-expanded', 'false')
+      })
+
+      // The layout-shift score cannot see this: it counts what moves after the page has painted, and the skeleton is painted
+      // before the screen's chunk has arrived. What it shows has to be where the document will put the sheet.
+      test('shows the skeleton with the band where the document will have it, so the sheet does not jump', async ({
+        page,
+      }) => {
+        let release: () => void = () => {}
+        const held = new Promise<void>((resolve) => {
+          release = resolve
+        })
+        await page.route(/\/assets\/EditorScreen-[^/]*\.js$/, async (route) => {
+          await held
+          await route.continue()
+        })
+        await page.goto(documentPath, { waitUntil: 'commit' })
+        const skeleton = page.locator('[aria-busy="true"]')
+        const skeletonBand = skeleton.locator(':scope > div > div').first()
+        await skeletonBand.waitFor()
+        const waiting = await skeletonBand.boundingBox()
+
+        release()
+        await textArea(page).waitFor()
+        const loaded = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
+
+        // The sheet starts where the band ends, so the band of the skeleton must end where the one of the document does.
+        expect((waiting?.y ?? 0) + (waiting?.height ?? 0)).toBe((loaded?.y ?? 0) + (loaded?.height ?? 0))
+      })
+
       test('does not shift while the document arrives', async ({ page }) => {
         await page.goto(documentPath)
+        await textArea(page).waitFor()
+
+        expect(await shifts(page)).toBeLessThan(0.01)
+      })
+
+      test('does not shift while the document arrives with the panel closed', async ({ page }) => {
+        await page.goto(documentPath)
+        await textArea(page).waitFor()
+        await setPanel(page, 'closed')
+        await page.reload()
         await textArea(page).waitFor()
 
         expect(await shifts(page)).toBeLessThan(0.01)
