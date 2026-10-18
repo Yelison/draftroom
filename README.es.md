@@ -6,11 +6,29 @@ Un editor de documentos colaborativo. Varias personas escriben a la vez en el mi
 
 Es un proyecto de portafolio, hecho para leerse tanto como para usarse: un servidor y una base de datos reales, un editor en tiempo real y las decisiones que hay detrás, por escrito ([arquitectura](docs/architecture.md), [registros de decisión](docs/decisions/)). La documentación técnica está en inglés.
 
+## Recorrido
+
+![El editor con dos personas escribiendo en el mismo documento y un hilo de comentarios anclado a una frase](docs/assets/comments.png)
+
+<video src="docs/assets/tour.webm" controls muted width="720"></video>
+
+[Un clip breve](docs/assets/tour.webm): dos personas escriben en el mismo documento y una comenta una frase; la otra ve llegar el comentario. Grabado desde uno de los dos navegadores, contra el servidor real.
+
+| | |
+| --- | --- |
+| ![Inicio](docs/assets/home.png) **Inicio**: documentos fijados y actividad reciente. | ![Documentos](docs/assets/explorer.png) **Documentos**: carpetas y lo que cambió. |
+| ![El editor](docs/assets/editor.png) **Editor**: el cursor de la otra persona, y «Sincronizado» solo cuando está guardado. | ![Compartir](docs/assets/share.png) **Compartir**: roles por persona y para el espacio de trabajo. |
+| ![Historial de versiones](docs/assets/versions.png) **Historial**: previsualiza una versión antes de restaurarla. | ![Configuración](docs/assets/settings.png) **Configuración**: perfil, espacio de trabajo, miembros, apariencia. |
+| ![El editor en tema oscuro](docs/assets/editor-dark.png) **Tema oscuro.** | ![El editor en español](docs/assets/editor-es.png) **Español**, en otro espacio de trabajo. |
+
+Estas imágenes y el clip los toma un script del sistema real (`npm run docs:tour`, véase [`scripts/readme-tour`](scripts/readme-tour/run.ts)), con las cuentas de la semilla de demostración. Las capturas muestran la interfaz en inglés salvo la marcada como español.
+
 ## Qué hace
 
 - **Escribir juntos.** Varias personas editan un documento y los cambios se combinan sin conflictos (Yjs); se ven los cursores y los nombres de las demás.
 - **«Sincronizado» significa guardado.** El editor solo dice que un cambio está sincronizado cuando el servidor confirma que lo escribió en la base de datos, nunca porque haya cambiado la copia local. Cómo funciona, [aquí](docs/architecture.md#synced-means-stored).
 - **Seguir sin conexión.** Un documento que ya abriste guarda una copia en el navegador; los cambios hechos sin conexión se envían al reconectar, y cerrar sesión avisa antes de descartar cambios que el servidor nunca guardó.
+- **Comentar el texto.** Selecciona una frase y coméntala con el ratón o con Ctrl+Alt+M; los hilos siguen unidos a su texto aunque otras personas editen, se pueden responder, resolver y reabrir, y funcionan solo con el teclado.
 - **Organizar.** Un explorador con carpetas, búsqueda, documentos fijados, plantillas, una papelera con restauración y una vista de lo que otras personas compartieron contigo.
 - **Compartir por rol.** Lector, comentarista, editor o propietario, por persona o para todo el espacio de trabajo. El servidor lo aplica tanto en la API como en la conexión en vivo; quitar el acceso cierra la conexión abierta de esa persona.
 - **Historial.** Versiones automáticas y con nombre de cada documento, que se pueden previsualizar y restaurar, y un registro de actividad.

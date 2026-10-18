@@ -6,11 +6,29 @@ A collaborative document editor. People write in the same document at once and s
 
 It is a portfolio project, built to be read as much as it is used: a real server and database, a real-time editor, and the decisions behind them written down ([architecture](docs/architecture.md), [decision records](docs/decisions/)).
 
+## Tour
+
+![The editor with two people writing in the same document and a comment thread anchored to a sentence](docs/assets/comments.png)
+
+<video src="docs/assets/tour.webm" controls muted width="720"></video>
+
+[A short clip](docs/assets/tour.webm): two people write in the same document and one comments on a sentence; the other sees the comment arrive. Recorded from one of the two browsers, against the real server.
+
+| | |
+| --- | --- |
+| ![Home](docs/assets/home.png) **Home**: pinned documents and recent activity. | ![Documents](docs/assets/explorer.png) **Documents**: folders and what changed. |
+| ![The editor](docs/assets/editor.png) **Editor**: the other person's cursor, and "Synced" only once stored. | ![Sharing](docs/assets/share.png) **Sharing**: roles per person and for the workspace. |
+| ![Version history](docs/assets/versions.png) **History**: preview a version before restoring it. | ![Settings](docs/assets/settings.png) **Settings**: profile, workspace, members, appearance. |
+| ![The editor in the dark theme](docs/assets/editor-dark.png) **Dark theme.** | ![The editor in Spanish](docs/assets/editor-es.png) **Spanish**, in another workspace. |
+
+These pictures and the clip are taken from the real stack by a script (`npm run docs:tour`, see [`scripts/readme-tour`](scripts/readme-tour/run.ts)), with the accounts of the demo seed.
+
 ## What it does
 
 - **Write together.** Several people edit one document; changes merge without conflicts (Yjs), and the others' cursors and names are shown.
 - **"Synced" means stored.** The editor says a change is synced only after the server confirms it wrote it to the database, never because the local copy changed. See [how that works](docs/architecture.md#synced-means-stored).
 - **Keep working offline.** A document you have opened keeps a copy in the browser; edits made offline are sent when you reconnect, and signing out warns you before it would throw away changes the server never stored.
+- **Comment on the text.** Select a sentence and comment on it with the mouse or with Ctrl+Alt+M; threads stay attached to their text as others edit, can be answered, resolved and reopened, and work from the keyboard alone.
 - **Organise.** An explorer with folders, search, pinned documents, templates, a trash with restore, and a view of what others shared with you.
 - **Share by role.** Viewer, commenter, editor or owner, per person or for the whole workspace. The server enforces it for the API and for the live connection alike; taking access away closes the person's open connection.
 - **History.** Automatic and named versions of every document that you can preview and restore, and an activity feed.
