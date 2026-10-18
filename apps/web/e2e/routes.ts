@@ -86,6 +86,8 @@ async function openWithoutWorkspace(page: Page) {
   await signOut(page)
   await page.locator('a[href$="sign-up"]').click()
   await expect(page).toHaveURL(/sign-up$/)
+  // The app puts the focus on the headline of a page it has opened; what is typed before that is lost with the form.
+  await expect(headline(page)).toBeFocused()
   await page.getByRole('textbox').nth(0).fill('Lena Fischer')
   await page.getByRole('textbox').nth(1).fill('lena@harborpine.example')
   await page.locator('input[type="password"]').fill('a phrase of several words')
