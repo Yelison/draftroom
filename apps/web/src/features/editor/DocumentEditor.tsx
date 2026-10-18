@@ -12,6 +12,8 @@ import { SyncStatus } from '../../components/SyncStatus/SyncStatus.tsx'
 import { ShareControl } from '../sharing/ShareControl.tsx'
 import { VersionsButton } from '../versions/VersionsButton.tsx'
 import { useDataSource } from '../../data/useDataSource.ts'
+import { CollaborationPanel } from '../comments/CollaborationPanel.tsx'
+import { createCommentRequests } from '../comments/commentRequests.ts'
 import type { CollaboratingPerson } from './CollaborationExtensions.ts'
 import { EditorSkeleton } from './EditorSkeleton.tsx'
 import { EditorStatePanel } from './EditorStatePanel.tsx'
@@ -188,6 +190,8 @@ function EditorWorkspace({
   const [linkChange, setLinkChange] = useState<LinkChange | null>(null)
   // Counted, so a second refusal is a new message in the live region and is announced again.
   const [refusals, setRefusals] = useState(0)
+  // What the text asks of the comments panel, which is made after the editor: one for as long as the editor.
+  const [commentRequests] = useState(createCommentRequests)
 
   // A dialog that is open when the text stops taking edits is closed for good, not hidden: what it would apply is not the person's
   // to make, and a dialog that was only hidden would open again, empty, when the text takes edits again. The button that opened
@@ -217,6 +221,7 @@ function EditorWorkspace({
     onTooLarge: () => setRefusals((count) => count + 1),
     contentLabel: intl.formatMessage({ id: 'editor.content.label' }),
     onLinkRequest: requestLink,
+    commentRequests,
   })
 
   // The button that was pressed is gone when what it answered is, and the focus must not fall to the page. It goes to the text
@@ -290,7 +295,7 @@ function EditorWorkspace({
     finishLink('removed')
   }
 
-  return (
+  const column = (
     <div className={styles.column}>
       <div className={styles.toolbarBand}>
         {editable && <Toolbar editor={editor} onLinkRequest={requestLink} />}
@@ -332,6 +337,19 @@ function EditorWorkspace({
       <p role="status" className="forma-visually-hidden">
         {refusals > 0 && <span key={refusals}>{intl.formatMessage({ id: 'editor.paste.tooLarge' })}</span>}
       </p>
+    </div>
+  )
+
+  return (
+    <div className={styles.workspace}>
+      {column}
+      <CollaborationPanel
+        editor={editor}
+        provider={snapshot.provider}
+        document={document}
+        personId={person.id}
+        requests={commentRequests}
+      />
     </div>
   )
 }

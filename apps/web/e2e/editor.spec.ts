@@ -784,7 +784,11 @@ test.describe('the layout', () => {
 
         const sheet = await page.getByRole('toolbar').locator('xpath=..').boundingBox()
         expect(sheet?.width).toBeLessThanOrEqual(708)
-        expect(sheet?.width).toBeGreaterThan(600)
+        // Beside the comments panel (328 px) the sheet gives way first: 504 px at 1280 and 664 px at 1440. How the two share
+        // the work area is decided with the layout of 1280 to 1440 px; what holds here is that both fit.
+        expect(sheet?.width).toBeGreaterThan(480)
+        const panel = await page.getByRole('complementary', { name: 'Comments and activity' }).boundingBox()
+        expect((panel?.x ?? 0) + (panel?.width ?? 0)).toBeLessThanOrEqual(width)
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
       })
 

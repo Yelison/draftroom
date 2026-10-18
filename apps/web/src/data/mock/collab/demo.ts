@@ -1,10 +1,7 @@
 import { parseDocumentName } from '@draftroom/contract/collab'
-// The mock plays the server, which writes the starting content of a document from JSON and never the client.
-// oxlint-disable-next-line no-restricted-imports
-import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
 import type { Locale } from '../../../i18n/locale.ts'
 import { collaboratorScripts, type CollaboratorScript } from '../fixtures/collaboratorScripts.ts'
-import { demoContent } from '../fixtures/demoContent.ts'
+import { demoDocument } from './demoDocuments.ts'
 import { browserPage, type PageEnvironment } from './browserPage.ts'
 import { seatCollaborators } from './collaborators.ts'
 import type { SimulatedCollabServer } from './SimulatedCollabServer.ts'
@@ -44,8 +41,8 @@ export function createDemo({
   let link: TabLink | undefined
   const startingContent = (documentName: string) => {
     const documentId = parseDocumentName(documentName)
-    const content = documentId === null ? undefined : demoContent[locale][documentId]
-    return content === undefined ? undefined : jsonToYUpdate({ type: 'doc', content: [...content] })
+    // The same bytes in every tab: the comments of the demo are anchored in this text (`seededContent.ts`).
+    return documentId === null ? undefined : demoDocument(locale, documentId)?.update
   }
   return {
     initialContent(documentName) {

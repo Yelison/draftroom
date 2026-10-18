@@ -91,7 +91,7 @@ for (const { locale, colorScheme, notice } of [
     test.describe(`the notice about working offline, in ${locale} at ${width} px`, () => {
       test.use({ locale, colorScheme, viewport: { width, height: 900 } })
 
-      test('is laid over the top of the sheet, on one line above the title, and moves nothing when the network goes or comes back', async ({
+      test('is laid over the top of the sheet, above the title, and moves nothing when the network goes or comes back', async ({
         page,
         context,
       }) => {
@@ -105,11 +105,12 @@ for (const { locale, colorScheme, notice } of [
         await expect(shown).toBeVisible()
         await page.keyboard.type('Written offline')
 
-        // Nothing under it moved, it does not cover the title, and it fits the sheet on one line.
+        // Nothing under it moved, it does not cover the title, and it fits the room above the title.
         expect(await positionsOf(page)).toEqual(before)
         const box = await shown.boundingBox()
         expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(before.title?.y ?? 0)
-        expect(box?.height).toBeLessThanOrEqual(34)
+        // One line, or two where the sheet is narrow: at 1280 px it shares the work area with the comments panel.
+        expect(box?.height).toBeLessThanOrEqual(width === 1440 ? 34 : 42)
         const overflow = await page.evaluate(
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
         )

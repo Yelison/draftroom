@@ -3,6 +3,18 @@
  * toolbar's band above the sheet. The band is there for everyone, so a reader's screen is laid out like an editor's and
  * nothing moves when the document arrives and says which one this person is.
  */
+/*
+ * The sheet and the collaboration panel beside it, the pair kept in the middle of the work area. The sheet gives way first:
+ * at 1280 px it is narrower than at 1440, and how the two share the width is T6.5's to decide.
+ */
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, var(--layout-sheet-width)) var(--layout-panel-width);
+  gap: var(--space-24);
+  justify-content: center;
+  align-items: start;
+}
+
 .column {
   display: flex;
   flex-direction: column;

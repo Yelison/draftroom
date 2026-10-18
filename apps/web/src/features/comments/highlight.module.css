@@ -1,0 +1,17 @@
+/*
+ * The text of an open comment thread. It is drawn with a background and an underline, so it does not depend on seeing a
+ * colour, and the one the person is on has a thicker underline. A <mark> is what a screen reader calls highlighted text.
+ */
+.highlight {
+  border-radius: var(--radius-small);
+  background: var(--color-amber-bg);
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--color-amber-ink);
+  text-decoration-thickness: 1px;
+  text-underline-offset: var(--space-2);
+}
+
+.highlight[data-active] {
+  text-decoration-thickness: 3px;
+}
