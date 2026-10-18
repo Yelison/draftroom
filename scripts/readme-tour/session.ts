@@ -96,10 +96,30 @@ export class Person {
       .toEqual(expected)
   }
 
-  /** Types after the last character, in a new paragraph when `newParagraph` says so, as a person who writes on does. */
+  /**
+   * Types after the last character, in a new paragraph when `newParagraph` says so, as a person who writes on does. The caret
+   * is put at the end and checked to be there before a key is typed: an update of someone else that lands right after the
+   * click can move it, and text typed from the wrong place ends up inside another person's paragraph.
+   */
   async typeAtEnd(text: string, { newParagraph = false } = {}): Promise<void> {
-    await this.editor.click()
-    await this.page.keyboard.press('Control+End')
+    await expect(async () => {
+      await this.editor.click()
+      await this.page.keyboard.press('Control+End')
+      // Let an update that is on its way land before looking at where the caret is.
+      await this.page.waitForTimeout(150)
+      const atEnd = await this.editor.evaluate((root) => {
+        const selection = window.getSelection()
+        const last = Array.from(root.querySelectorAll('p')).at(-1)
+        return (
+          selection !== null &&
+          selection.isCollapsed &&
+          last !== undefined &&
+          selection.focusNode !== null &&
+          last.contains(selection.focusNode)
+        )
+      })
+      expect(atEnd, `${this.name}'s caret is not at the end of the text`).toBe(true)
+    }, `${this.name} could not put the caret at the end of the text`).toPass()
     if (newParagraph) await this.page.keyboard.press('Enter')
     await this.page.keyboard.type(text, { delay: 12 })
   }
