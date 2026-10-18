@@ -112,3 +112,88 @@ test.describe('a comment while the other person writes around it', () => {
     await expect(card(daniel).getByText('Then it is gone.')).toBeVisible()
   })
 })
+
+test.describe('a comment while the person who sees it writes on it', () => {
+  test('is an orphan for her as for the other person when she types over exactly its text', async ({ join }) => {
+    const documentId = await createDocument('daniel', ['priya'])
+    const daniel = await join('daniel')
+    const priya = await join('priya')
+    await daniel.open(documentId)
+    await priya.open(documentId)
+    await daniel.typeAtEnd(base)
+    await expect.poll(() => priya.text()).toBe(base)
+    await select(priya, 4, commented)
+    await priya.page.keyboard.press('Control+Alt+m')
+    await priya.page.keyboard.type('Is this still the name?')
+    await priya.page.keyboard.press('Control+Enter')
+    await expect(card(daniel)).toHaveAttribute('data-state', 'open')
+
+    // "Show in text" selects exactly the commented words, and she types the new name over them.
+    await card(priya).getByRole('button', { name: 'Show in text' }).click()
+    await settled(priya.page, (text) => text === commented)
+    await priya.page.keyboard.type('roadmap')
+    await expect.poll(() => daniel.text()).toBe('The roadmap starts with the harbour.')
+    for (const person of [daniel, priya]) await expect(person.syncStatus).toHaveText('Sync status: Synced')
+
+    // What she sees is what Yjs says, which is what he sees: no highlight on "roadmap", and the thread is orphaned.
+    for (const person of [daniel, priya]) {
+      await expect(card(person)).toHaveAttribute('data-state', 'orphaned')
+      expect(await highlighted(person.page)).toEqual([])
+    }
+  })
+
+  test('has the text she types where a range that starts at the end of a paragraph begins, as the other person has it', async ({
+    join,
+  }) => {
+    const documentId = await createDocument('daniel', ['priya'])
+    const daniel = await join('daniel')
+    const priya = await join('priya')
+    await daniel.open(documentId)
+    await priya.open(documentId)
+    await daniel.typeAtEnd('abc')
+    await daniel.page.keyboard.press('Enter')
+    await daniel.page.keyboard.type('def ghi')
+    await expect.poll(() => priya.text()).toBe('abc\ndef ghi')
+
+    // From the end of "abc" to after "de": the range cannot be tied to a character of the first paragraph (protocol 10.2).
+    const selected = () => priya.page.evaluate(() => window.getSelection()?.toString().replace(/\s/g, '') ?? '')
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await priya.editor.focus()
+      await priya.page.keyboard.press('Control+Home')
+      await priya.page.keyboard.press('End')
+      for (let count = 0; count < 3; count++) await priya.page.keyboard.press('Shift+ArrowRight')
+      if ((await selected()) === 'de') break
+    }
+    await settled(priya.page, (text) => text.replace(/\s/g, '') === 'de')
+    await priya.page.keyboard.press('Control+Alt+m')
+    await priya.page.keyboard.type('Fallback start')
+    await priya.page.keyboard.press('Control+Enter')
+    await expect(card(priya)).toHaveAttribute('data-state', 'open')
+    await expect.poll(() => highlighted(daniel.page)).toEqual(['de'])
+
+    // She types at the end of "abc": the text joins the range, for her as for him.
+    await priya.editor.focus()
+    await priya.page.keyboard.press('Control+Home')
+    await priya.page.keyboard.press('End')
+    // The editor gives back the selection it had when the focus returns; typing before the caret has moved would replace it.
+    await expect
+      .poll(() =>
+        priya.page.evaluate(() => {
+          const selection = window.getSelection()
+          return (
+            selection?.isCollapsed === true &&
+            selection.anchorNode?.textContent === 'abc' &&
+            selection.anchorOffset === 3
+          )
+        }),
+      )
+      .toBe(true)
+    // And a frame more, for the editor to take the caret in: the letter goes where the editor has the caret.
+    await settled(priya.page, () => true)
+    await priya.page.keyboard.type('Z')
+    await expect.poll(() => daniel.text()).toBe('abcZ\ndef ghi')
+    for (const person of [daniel, priya]) await expect(person.syncStatus).toHaveText('Sync status: Synced')
+    await expect.poll(() => highlighted(daniel.page)).toEqual(['Zde'])
+    await expect.poll(() => highlighted(priya.page)).toEqual(['Zde'])
+  })
+})
