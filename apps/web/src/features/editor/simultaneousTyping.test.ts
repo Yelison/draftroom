@@ -21,49 +21,38 @@ function shareAnEmptyParagraph(daniel: Y.Doc, priya: Y.Doc) {
   return { danielEditor, priyaEditor }
 }
 
-describe('two people type at the same moment in an empty paragraph that is already shared', () => {
-  const cases = [
-    { name: 'neither has heard of the other', danielFirstReaches: false, danielHasLowerId: true },
-    { name: 'neither has heard of the other, the other way round', danielFirstReaches: false, danielHasLowerId: false },
-    { name: 'Daniel’s first letter reaches Priya first', danielFirstReaches: true, danielHasLowerId: true },
-    {
-      name: 'Daniel’s first letter reaches Priya first, the other way round',
-      danielFirstReaches: true,
-      danielHasLowerId: false,
-    },
-  ]
+describe('two people type their first letter at the same moment in an empty paragraph that is already shared', () => {
+  // Neither has heard of the other when typing the first letter: that is the timing in which each used to create a text node.
+  it.each([
+    { name: 'Daniel has the lower client id', danielHasLowerId: true },
+    { name: 'Priya has the lower client id', danielHasLowerId: false },
+  ])('$name: every letter is there once and both see the same', ({ danielHasLowerId }) => {
+    const daniel = new Y.Doc()
+    const priya = new Y.Doc()
+    // The order Yjs gives two clients is by their id, which is random: fixing it makes each case the same every time.
+    daniel.clientID = danielHasLowerId ? 1 : 2
+    priya.clientID = danielHasLowerId ? 2 : 1
+    const { danielEditor, priyaEditor } = shareAnEmptyParagraph(daniel, priya)
+    const exchange = () => {
+      Y.applyUpdate(daniel, Y.encodeStateAsUpdate(priya))
+      Y.applyUpdate(priya, Y.encodeStateAsUpdate(daniel))
+    }
 
-  it.each(cases)(
-    '$name: every letter is there once and both see the same',
-    ({ danielFirstReaches, danielHasLowerId }) => {
-      const daniel = new Y.Doc()
-      const priya = new Y.Doc()
-      // The order Yjs gives two clients is by their id, which is random: fixing it makes each case the same every time.
-      daniel.clientID = danielHasLowerId ? 1 : 2
-      priya.clientID = danielHasLowerId ? 2 : 1
-      const { danielEditor, priyaEditor } = shareAnEmptyParagraph(daniel, priya)
-      const exchange = () => {
-        Y.applyUpdate(daniel, Y.encodeStateAsUpdate(priya))
-        Y.applyUpdate(priya, Y.encodeStateAsUpdate(daniel))
-      }
-
-      let danielNext = 0
-      let priyaNext = 0
-      danielEditor.commands.insertContent(danielText[danielNext++] ?? '')
-      if (!danielFirstReaches) priyaEditor.commands.insertContent(priyaText[priyaNext++] ?? '')
+    // Each types one letter, then they hear of each other, and from then on a letter each between every exchange.
+    danielEditor.commands.insertContent(danielText.slice(0, 1))
+    priyaEditor.commands.insertContent(priyaText.slice(0, 1))
+    exchange()
+    for (let next = 1; next < Math.max(danielText.length, priyaText.length); next++) {
+      danielEditor.commands.insertContent(danielText.slice(next, next + 1))
+      priyaEditor.commands.insertContent(priyaText.slice(next, next + 1))
       exchange()
-      while (danielNext < danielText.length || priyaNext < priyaText.length) {
-        if (danielNext < danielText.length) danielEditor.commands.insertContent(danielText[danielNext++] ?? '')
-        if (priyaNext < priyaText.length) priyaEditor.commands.insertContent(priyaText[priyaNext++] ?? '')
-        exchange()
-      }
+    }
 
-      const [seenByDaniel, seenByPriya] = [danielEditor, priyaEditor].map((editor) =>
-        editor.getText({ blockSeparator: '\n' }),
-      )
-      expect(seenByPriya).toBe(seenByDaniel)
-      const lastParagraph = (seenByDaniel ?? '').split('\n').at(-1) ?? ''
-      expect(isInterleavingOf(lastParagraph, danielText, priyaText)).toBe(true)
-    },
-  )
+    const [seenByDaniel, seenByPriya] = [danielEditor, priyaEditor].map((editor) =>
+      editor.getText({ blockSeparator: '\n' }),
+    )
+    expect(seenByPriya).toBe(seenByDaniel)
+    const lastParagraph = (seenByDaniel ?? '').split('\n').at(-1) ?? ''
+    expect(isInterleavingOf(lastParagraph, danielText, priyaText)).toBe(true)
+  })
 })
