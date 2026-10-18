@@ -5,6 +5,7 @@ describe('isInterleavingOf', () => {
   it.each([
     ['one run after the other', 'abcxyz', true],
     ['one inside the other', 'abxyzc', true],
+    ['a letter twice and another gone, so the length is right', 'abxxyz', false],
     ['a letter twice', 'abxxyzc', false],
     ['a letter lost', 'abxyc', false],
     ['the order of a person changed', 'bacxyz', false],
