@@ -109,8 +109,8 @@ for (const { locale, colorScheme, notice } of [
         expect(await positionsOf(page)).toEqual(before)
         const box = await shown.boundingBox()
         expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(before.title?.y ?? 0)
-        // One line, or two where the sheet is narrow: at 1280 px it shares the work area with the comments panel.
-        expect(box?.height).toBeLessThanOrEqual(width === 1440 ? 34 : 42)
+        // One line, at either width: the panel is closed at 1280 px, so the sheet is not narrow there.
+        expect(box?.height).toBeLessThanOrEqual(34)
         const overflow = await page.evaluate(
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
         )

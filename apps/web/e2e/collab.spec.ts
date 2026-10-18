@@ -112,7 +112,7 @@ test.describe('in English', () => {
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       )
       expect(overflow).toBeLessThanOrEqual(0)
-      const band = await page.getByRole('toolbar', { name: 'Formatting' }).locator('xpath=..').boundingBox()
+      const band = await page.getByRole('toolbar', { name: 'Formatting' }).locator('xpath=../../..').boundingBox()
       const status = await visibleLabel(page, 'Synced').boundingBox()
       expect((status?.x ?? 0) + (status?.width ?? 0)).toBeLessThanOrEqual((band?.x ?? 0) + (band?.width ?? 0))
     })

@@ -72,7 +72,7 @@ describe('the document screen', () => {
     await arrive()
     await textArea()
 
-    expect(whileLoading).toEqual(['toolbarBand', 'sheet'])
+    expect(whileLoading).toEqual(['band', 'sheet'])
     expect(layoutOf()).toEqual(whileLoading)
   })
 
@@ -247,15 +247,15 @@ describe('who may edit', () => {
     expect(screen.getByRole('textbox', { name: 'Document title' })).toHaveAttribute('readonly')
   })
 
-  it('keeps the reader in the same layout as the editor: the toolbar band is there, empty', async () => {
+  it('keeps the reader in the same layout as the editor: the band is there, without the toolbar', async () => {
     const editor = renderEditor()
     await textArea()
-    const editorBand = editor.container.querySelector('.toolbarBand')
+    const editorBand = editor.container.querySelector('.band')
     editor.unmount()
 
     const reader = renderEditor({ signedInAs: people.sofia })
     await textArea()
-    const readerBand = reader.container.querySelector('.toolbarBand')
+    const readerBand = reader.container.querySelector('.band')
 
     expect(readerBand).not.toBeNull()
     expect(editorBand).not.toBeNull()

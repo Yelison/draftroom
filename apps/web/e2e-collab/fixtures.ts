@@ -171,7 +171,13 @@ async function signIn(context: BrowserContext, person: DemoPerson): Promise<void
 }
 
 async function join(browser: Browser, person: DemoPerson): Promise<Participant> {
-  const context = await browser.newContext({ baseURL: environment.appOrigin, locale: 'en-US', colorScheme: 'light' })
+  // 1440 px wide, where the comments panel is open when the person has not chosen: the tests read the other person's threads.
+  const context = await browser.newContext({
+    baseURL: environment.appOrigin,
+    locale: 'en-US',
+    colorScheme: 'light',
+    viewport: { width: 1440, height: 900 },
+  })
   await signIn(context, person)
   return new Participant(person, context, await context.newPage())
 }

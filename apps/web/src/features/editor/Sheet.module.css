@@ -1,11 +1,12 @@
 /*
- * The work area of a document: a column the width of the sheet (708 px at 1440, narrower when the area is), with the
+ * The work area of a document: a column the width of the sheet (708 px, narrower when the area is), with the
  * toolbar's band above the sheet. The band is there for everyone, so a reader's screen is laid out like an editor's and
  * nothing moves when the document arrives and says which one this person is.
  */
 /*
- * The sheet and the collaboration panel beside it, the pair kept in the middle of the work area. The sheet gives way first:
- * at 1280 px it is narrower than at 1440, and how the two share the width is T6.5's to decide.
+ * The sheet and the collaboration panel beside it, the pair kept in the middle of the work area. The sheet gives way first
+ * (664 px at 1440 beside the panel, 504 at 1280), which is why the panel opens by itself only from 1440 and can be closed:
+ * without it the sheet has its 708 px at either width.
  */
 .workspace {
   display: grid;
@@ -15,6 +16,11 @@
   align-items: start;
 }
 
+/* With the panel closed the sheet has the work area to itself. */
+.workspace.withoutPanel {
+  grid-template-columns: minmax(0, var(--layout-sheet-width));
+}
+
 .column {
   display: flex;
   flex-direction: column;
@@ -22,20 +28,18 @@
   margin-inline: auto;
 }
 
-.toolbarBand {
+.band {
   /*
-   * Two rows, always, whatever the language and whoever is in the document: the formatting toolbar in the first and, in the
-   * second, aligned to the end, the group of what is about the document (its versions, Share, who is in it and the sync
-   * status). It is provisional. The band is 708 px and the two do not fit side by side once people are in the document, in
-   * Spanish; letting the group wrap only when it did not fit made the text move when someone came or went. Where the
-   * presence lives is T6.5's to decide, and this goes with that.
+   * Two rows of the toolbar's height, always, whatever the language and whoever is in the document, so nothing under the band
+   * moves when the document arrives or when someone comes or goes. The first row is what is done to the document: the toolbar
+   * (or, for those who cannot edit, the notice that says so), and at its end the history and the comments. The second is who
+   * is in it and where it stands: the people at the start and, at the end, Share and the sync status. The toolbar is 396 px and
+   * Share with the sync status is 298 px in Spanish: they do not share one row in the 708 px of the sheet, let alone in the
+   * 504 px it has beside the comments panel, so the band is two rows by design and not for want of a better layout.
    *
    * Each row is exactly the toolbar's height. The band's own line is drawn inside it (an inset shadow) so that it takes no
    * room: with a border the two rows would be two pixels taller than twice the token.
    */
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: repeat(2, var(--layout-toolbar-height));
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
@@ -45,6 +49,45 @@
   box-shadow: inset 0 0 0 1px var(--color-line);
 }
 
+/* A row owns its widths: the end of one never takes room the start of the other needs, which a grid of two columns would. */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  block-size: var(--layout-toolbar-height);
+}
+
+/* The toolbar, or the notice that stands where it would be. */
+.tools {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  block-size: 100%;
+}
+
+.documentTools {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-4);
+  padding-inline: var(--space-8);
+}
+
+.people {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding-inline: var(--space-12);
+}
+
+.state {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-8);
+  padding-inline: var(--space-12);
+}
+
 .sheet {
   position: relative;
   padding: var(--space-48);
@@ -52,14 +95,4 @@
   border-block-start: 0;
   border-radius: 0 0 var(--radius-panel) var(--radius-panel);
   background: var(--color-surface);
-}
-
-/* The second row of the band, at its end: the group stays in it even when there is no toolbar in the first. */
-.status {
-  display: flex;
-  grid-row: 2;
-  align-items: center;
-  justify-self: end;
-  gap: var(--space-12);
-  padding-inline: var(--space-12);
 }

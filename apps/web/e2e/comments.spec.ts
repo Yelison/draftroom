@@ -208,6 +208,9 @@ for (const [language, said] of Object.entries(words)) {
       await page.goto(documentPath)
       await textArea(page, said.text).waitFor()
       const panel = page.getByRole('complementary', { name: said.panel })
+      // Below 1440 px the panel starts closed, to leave the sheet its width; here it is opened, the narrowest the layout gets.
+      await expect(panel).toBeHidden()
+      await page.getByRole('button', { name: /^(Comments|Comentarios)/ }).click()
       await expect(panel).toBeVisible()
 
       const overflow = await page.evaluate(

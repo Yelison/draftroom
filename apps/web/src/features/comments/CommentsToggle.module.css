@@ -1,0 +1,26 @@
+.toggle {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Pressed looks as it does in the toolbar of the band: the panel is shown. */
+.button[aria-expanded='true'] {
+  background: var(--color-blue-bg);
+  color: var(--color-blue-ink);
+}
+
+/* Over the corner of the button, out of the flow: a count that arrives moves nothing. */
+.count {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-end: var(--space-2);
+  min-inline-size: var(--space-16);
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-round);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  font: var(--font-caption);
+  line-height: var(--space-16);
+  text-align: center;
+  pointer-events: none;
+}

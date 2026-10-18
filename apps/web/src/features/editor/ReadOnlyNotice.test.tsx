@@ -4,7 +4,7 @@ import { localeStorageKey } from '../../i18n/locale.ts'
 import { budget, people, renderEditor } from './testing/renderEditor.tsx'
 
 const textArea = () => screen.findByRole('textbox', { name: /Document content|Contenido del documento/ })
-const band = (container: HTMLElement) => container.querySelector('.toolbarBand') as HTMLElement
+const band = (container: HTMLElement) => container.querySelector('.band') as HTMLElement
 
 describe('the notice a reader of a document sees', () => {
   it('tells a viewer, where an editor has the toolbar, that they can read and not change', async () => {

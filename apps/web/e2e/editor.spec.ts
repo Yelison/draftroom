@@ -710,66 +710,96 @@ test.describe('the code mark', () => {
   })
 })
 
-// The band above the sheet is 708 px and has two rows, always: the toolbar in the first and, at the end of the second, the
-// versions, Share, who is in the document and the sync status. Nothing about the text moves when someone comes or goes.
+// The band above the sheet has two rows, always. In the first, the toolbar and, at its end, the history and the comments; in
+// the second, the people and, at its end, Share and the sync status. Nothing about the text moves when someone comes or goes.
+const commentsToggle = (page: Page) => page.getByRole('button', { name: /^(Comments|Comentarios)/ })
+const commentsPanel = (page: Page) =>
+  page.getByRole('complementary', { name: /Comments and activity|Comentarios y actividad/ })
+
+/** Puts the panel as the test needs it: the person's own choice, which the page remembers. */
+async function setPanel(page: Page, state: 'open' | 'closed') {
+  const toggle = commentsToggle(page)
+  if ((await toggle.getAttribute('aria-expanded')) !== String(state === 'open')) await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', String(state === 'open'))
+}
+
 test.describe('the band above the sheet', () => {
   for (const locale of ['en-US', 'es-ES'] as const) {
     for (const width of [1280, 1440]) {
-      test.describe(`in ${locale} at ${width} px`, () => {
-        test.use({ locale, viewport: { width, height: 900 } })
+      for (const panel of ['open', 'closed'] as const) {
+        test.describe(`in ${locale} at ${width} px with the comments panel ${panel}`, () => {
+          test.use({ locale, viewport: { width, height: 900 } })
 
-        test('holds two rows of the toolbar height, keeps its group inside and does not move the text when people come', async ({
-          page,
-        }) => {
-          await page.goto(documentPath)
-          await textArea(page).waitFor()
-          const token = await page.evaluate(() =>
-            Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--layout-toolbar-height')),
-          )
-          const topOfText = async () => (await textArea(page).boundingBox())?.y ?? Number.NaN
-          const toolbar = page.getByRole('toolbar')
+          test('holds two rows of the toolbar height, keeps every part inside and does not move the text when people come', async ({
+            page,
+          }) => {
+            await page.goto(documentPath)
+            await textArea(page).waitFor()
+            await setPanel(page, panel)
+            const token = await page.evaluate(() =>
+              Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--layout-toolbar-height')),
+            )
+            const topOfText = async () => (await textArea(page).boundingBox())?.y ?? Number.NaN
+            const toolbar = page.getByRole('toolbar')
+            // The toolbar sits in the zone of the first row, which sits in the row, which sits in the band.
+            const band = toolbar.locator('xpath=../../..')
 
-          async function expectBandToHold() {
-            const band = await toolbar.locator('xpath=..').boundingBox()
-            const tools = await toolbar.boundingBox()
-            // The status group is the one the Share button is in; it ends with the sync status.
-            const status = await page
-              .getByRole('button', { name: /^(Share|Compartir)$/ })
-              .locator('xpath=..')
-              .boundingBox()
-            const bandRight = (band?.x ?? 0) + (band?.width ?? 0)
-            // Two rows of exactly the token, and the line of the band is drawn inside them, so there is nothing to add.
-            expect(band?.height).toBe(2 * token)
-            expect(tools?.height).toBeLessThanOrEqual(token)
-            expect(tools?.width).toBeGreaterThanOrEqual(396)
-            expect((status?.x ?? 0) + (status?.width ?? 0)).toBeLessThanOrEqual(bandRight)
-            // The group is in the second row, under the toolbar.
-            expect(status?.y).toBeGreaterThanOrEqual((band?.y ?? 0) + token)
-            expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-          }
-
-          const before = await topOfText()
-          await expectBandToHold()
-
-          await page.evaluate(
-            async ([documentId, names]) => {
-              const mock = Reflect.get(window, 'draftroomMock') as {
-                addPeople(id: string, names: string[]): Promise<unknown>
+            async function expectBandToHold() {
+              const frame = await band.boundingBox()
+              const tools = await toolbar.boundingBox()
+              const history = await page
+                .getByRole('button', { name: /^(Version history|Historial de versiones)$/ })
+                .boundingBox()
+              const comments = await commentsToggle(page).boundingBox()
+              const group = await page
+                .getByRole('button', { name: /^(Share|Compartir)$/ })
+                .locator('xpath=..')
+                .boundingBox()
+              // Nobody else is in the document at first, and the list is not drawn for no one.
+              const peopleList = page.getByRole('list', { name: /People in this document|Personas en este documento/ })
+              const people = (await peopleList.count()) === 0 ? null : await peopleList.boundingBox()
+              const left = frame?.x ?? 0
+              const right = left + (frame?.width ?? 0)
+              // Two rows of exactly the token, and the line of the band is drawn inside them, so there is nothing to add.
+              expect(frame?.height).toBe(2 * token)
+              expect(tools?.height).toBeLessThanOrEqual(token)
+              expect(tools?.width).toBeGreaterThanOrEqual(396)
+              // Every part is inside the band on both sides: a group wider than its room overflows towards its start.
+              for (const part of [tools, history, comments, group, people]) {
+                if (part === null) continue
+                expect(part?.x).toBeGreaterThanOrEqual(left)
+                expect((part?.x ?? 0) + (part?.width ?? 0)).toBeLessThanOrEqual(right)
               }
-              await mock.addPeople(documentId as string, names as string[])
-            },
-            [launchPlan.id, ['Ines Varga', 'Omar Haddad', 'Lucía Ferrer', 'Tobias Lind', 'Noor Aziz']],
-          )
-          await expect(
-            page
-              .getByRole('list', { name: /People in this document|Personas en este documento/ })
-              .getByRole('listitem'),
-          ).toHaveCount(5)
+              // History and comments are in the first row, with the toolbar; Share and the people are in the second, under it.
+              expect(history?.y).toBeLessThan((frame?.y ?? 0) + token)
+              expect(comments?.y).toBeLessThan((frame?.y ?? 0) + token)
+              expect(group?.y).toBeGreaterThanOrEqual((frame?.y ?? 0) + token)
+              expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+            }
 
-          expect(await topOfText()).toBe(before)
-          await expectBandToHold()
+            const before = await topOfText()
+            await expectBandToHold()
+
+            await page.evaluate(
+              async ([documentId, names]) => {
+                const mock = Reflect.get(window, 'draftroomMock') as {
+                  addPeople(id: string, names: string[]): Promise<unknown>
+                }
+                await mock.addPeople(documentId as string, names as string[])
+              },
+              [launchPlan.id, ['Ines Varga', 'Omar Haddad', 'Lucía Ferrer', 'Tobias Lind', 'Noor Aziz']],
+            )
+            const listed = page
+              .getByRole('list', { name: /People in this document|Personas en este documento/ })
+              .getByRole('listitem')
+            // Two avatars and the count beside the panel; four and the count when the band has the whole sheet.
+            await expect(listed).toHaveCount(panel === 'open' ? 3 : 5)
+
+            expect(await topOfText()).toBe(before)
+            await expectBandToHold()
+          })
         })
-      })
+      }
     }
   }
 })
@@ -779,21 +809,64 @@ test.describe('the layout', () => {
     test.describe(`at ${width} px`, () => {
       test.use({ viewport: { width, height: 900 } })
 
-      test('keeps the sheet at its width, with no horizontal scroll', async ({ page }) => {
+      test('starts as the width allows: the comments panel open from 1440 px, closed below, and the sheet in its width either way', async ({
+        page,
+      }) => {
         await open(page)
 
-        const sheet = await page.getByRole('toolbar').locator('xpath=..').boundingBox()
+        const sheet = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
         expect(sheet?.width).toBeLessThanOrEqual(708)
-        // Beside the comments panel (328 px) the sheet gives way first: 504 px at 1280 and 664 px at 1440. How the two share
-        // the work area is decided with the layout of 1280 to 1440 px; what holds here is that both fit.
+        expect(sheet?.width).toBeGreaterThan(600)
+        await expect(commentsToggle(page)).toHaveAttribute('aria-expanded', String(width >= 1440))
+        if (width >= 1440) {
+          const panel = await commentsPanel(page).boundingBox()
+          expect((panel?.x ?? 0) + (panel?.width ?? 0)).toBeLessThanOrEqual(width)
+        } else {
+          await expect(commentsPanel(page)).toBeHidden()
+        }
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+      })
+
+      test('gives the sheet what the panel leaves when it is opened, and both fit', async ({ page }) => {
+        await open(page)
+        await setPanel(page, 'open')
+
+        // Beside the panel (328 px) the sheet gives way first: 504 px at 1280 and 664 px at 1440.
+        const sheet = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
         expect(sheet?.width).toBeGreaterThan(480)
-        const panel = await page.getByRole('complementary', { name: 'Comments and activity' }).boundingBox()
+        expect(sheet?.width).toBeLessThanOrEqual(708)
+        const panel = await commentsPanel(page).boundingBox()
         expect((panel?.x ?? 0) + (panel?.width ?? 0)).toBeLessThanOrEqual(width)
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
       })
 
+      test('gives the sheet its 708 px when the panel is closed, and the panel comes back as it was left', async ({
+        page,
+      }) => {
+        await open(page)
+        await setPanel(page, 'closed')
+
+        const sheet = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
+        expect(sheet?.width).toBe(708)
+        await expect(commentsPanel(page)).toBeHidden()
+
+        await page.reload()
+        await textArea(page).waitFor()
+        await expect(commentsToggle(page)).toHaveAttribute('aria-expanded', 'false')
+      })
+
       test('does not shift while the document arrives', async ({ page }) => {
         await page.goto(documentPath)
+        await textArea(page).waitFor()
+
+        expect(await shifts(page)).toBeLessThan(0.01)
+      })
+
+      test('does not shift while the document arrives with the panel closed', async ({ page }) => {
+        await page.goto(documentPath)
+        await textArea(page).waitFor()
+        await setPanel(page, 'closed')
+        await page.reload()
         await textArea(page).waitFor()
 
         expect(await shifts(page)).toBeLessThan(0.01)
