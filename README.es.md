@@ -70,7 +70,7 @@ npm ci
 npm run dev -w @draftroom/web      # http://localhost:5173, con una API en memoria: no hace falta servidor
 ```
 
-En desarrollo la aplicación habla con la API en memoria (la misma que usa la demo estática), de modo que el front end se puede trabajar solo. Para ejecutarla contra el servidor real y una base de datos:
+En desarrollo la aplicación habla con la API en memoria (la misma que usa la demo estática), de modo que la interfaz se puede trabajar sola. Para ejecutarla contra el servidor real y una base de datos:
 
 ```sh
 cp .env.example .env                                # valores de desarrollo; git ignora .env
@@ -92,7 +92,7 @@ VITE_DATA_SOURCE=http E2E_API_ORIGIN=http://127.0.0.1:8380 E2E_COLLAB_ORIGIN=htt
 Necesitas Docker con el plugin Compose y un nombre de host que apunte a la máquina (o `draftroom.localhost` para probarlo en una sola máquina).
 
 ```sh
-cp deploy/env.example deploy/.env       # luego rellena el nombre de host y los dos secretos (vacíos hasta entonces)
+cp deploy/env.example deploy/.env       # luego rellena el nombre de host (`SITE_ADDRESS` y `PUBLIC_ORIGIN`) y los dos secretos (vacíos hasta entonces)
 docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom-prod up -d --build --wait
 ```
 
@@ -133,7 +133,7 @@ scripts                copia y restauración, el recorrido del README, la compro
 - **Las direcciones de correo no se verifican al registrarse.** Quien se registre primero con una dirección que tenga una invitación pendiente hereda lo que se compartió con ella, y la respuesta del registro revela qué direcciones ya tienen cuenta. Cerrarlo exige un enlace de verificación y el envío de correo en los dos idiomas; véase el [ADR 0004](docs/decisions/0004-authentication.md#known-risk-no-email-verification).
 - **Nada de correo.** No hay correos de invitación, ni recuperación de contraseña, ni forma de cambiarla, ni lista de sesiones: cada cosa necesita el envío de correo o su propia tarea ([ADR 0004](docs/decisions/0004-authentication.md)).
 - **Un espacio de trabajo a la vez.** La aplicación trabaja en el primer espacio de trabajo de la persona, por nombre, y todavía no permite elegir otro.
-- **Un solo proceso de servidor.** Un documento vive en la memoria de un proceso, así que la pila no ejecuta réplicas; los límites de intentos de inicio de sesión viven en la memoria de ese proceso y se reinician con él ([guía de despliegue](docs/deploy/README.md#what-is-not-done-yet)).
+- **Un solo proceso de servidor.** Un documento vive en la memoria de un proceso, así que este montaje no ejecuta réplicas; los límites de intentos de inicio de sesión viven en la memoria de ese proceso y se reinician con él ([guía de despliegue](docs/deploy/README.md#what-is-not-done-yet)).
 - **Dos personas escribiendo a la vez en el mismo punto de un documento vacío.** Sus textos pueden quedar contiguos en un párrafo, o en dos párrafos en un orden cualquiera. Las dos ven lo mismo y es lo que queda guardado: es lo que ocurre cuando dos personas escriben en el mismo sitio a la vez.
 - **Editar sin conexión exige una primera visita.** Un documento que nunca abriste en este dispositivo no tiene copia local y no se puede editar sin conexión.
 - **Solo escritorio.** Desde 1280 px de ancho; a las ventanas más estrechas se les pide que se ensanchen.

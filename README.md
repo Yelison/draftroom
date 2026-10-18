@@ -92,7 +92,7 @@ VITE_DATA_SOURCE=http E2E_API_ORIGIN=http://127.0.0.1:8380 E2E_COLLAB_ORIGIN=htt
 You need Docker with the Compose plugin and a host name that points at the machine (or `draftroom.localhost` to try it on one machine).
 
 ```sh
-cp deploy/env.example deploy/.env       # then fill in the host name and the two secrets (empty until you do)
+cp deploy/env.example deploy/.env       # then fill in the host name (`SITE_ADDRESS` and `PUBLIC_ORIGIN`) and the two secrets (empty until you do)
 docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom-prod up -d --build --wait
 ```
 
