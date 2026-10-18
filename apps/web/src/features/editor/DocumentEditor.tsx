@@ -135,7 +135,11 @@ function Shown({
     return (
       <EditorStatePanel
         title={intl.formatMessage({ id: 'sync.revoked.title' })}
-        description={intl.formatMessage({ id: 'sync.revoked.description' })}
+        // Said only when something was lost, as it is for a document that was closed (EditorScreen): the person who had
+        // nothing unstored is not told of changes that never existed.
+        {...(snapshot.hadUnstoredChanges
+          ? { description: intl.formatMessage({ id: 'sync.revoked.description' }) }
+          : {})}
       >
         <Link to="/documents" className={buttonClassName()}>
           {intl.formatMessage({ id: 'sync.revoked.action' })}

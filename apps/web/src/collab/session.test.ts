@@ -283,6 +283,31 @@ describe('when the server ends the connection', () => {
     expect(textOf(world.server.document(wireName))).toBe('')
   })
 
+  it.each([
+    { case: 'changes the server was not shown to have stored', stored: false, expected: true },
+    { case: 'nothing the server had not stored', stored: true, expected: false },
+  ])('says, when access is removed, whether there were $case', async ({ stored, expected }) => {
+    world = createWorld()
+    const opening = await opened()
+    if (stored) await typeAndStore(opening, 'safe on the server')
+    else typeInto(opening.doc, 'not stored yet')
+    world.setAccess(editor, { denied: 'not-found' })
+
+    world.server.closeConnections(4403, 'access-revoked')
+    await advance(RECONNECT_STABLE_MS)
+
+    expect(opening.session.getSnapshot()).toMatchObject({ state: 'revoked', hadUnstoredChanges: expected })
+  })
+
+  it('does not say there were unstored changes before access is removed', async () => {
+    world = createWorld()
+    const opening = await opened()
+
+    typeInto(opening.doc, 'not stored yet')
+
+    expect(opening.session.getSnapshot().hadUnstoredChanges).toBe(false)
+  })
+
   it('asks the person to sign in again after the session ended (4401)', async () => {
     world = createWorld()
     const opening = await opened()
