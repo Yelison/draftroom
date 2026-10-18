@@ -22,68 +22,94 @@ function renderGuarded() {
   )
 }
 
-describe('the desktop requirement', () => {
-  afterEach(() => vi.restoreAllMocks())
+const notice = () => screen.queryByText('Draftroom is made for wider windows')
+
+describe('the notice of a window narrower than the desktop requirement', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    sessionStorage.clear()
+  })
 
   it.each([
-    { width: 1279, notice: true },
-    { width: 1279.5, notice: true },
-    { width: 1280, notice: false },
-    { width: 1440, notice: false },
-  ])('at $width px the notice is shown: $notice', ({ width, notice }) => {
+    { width: 1279, shown: true },
+    { width: 1279.5, shown: true },
+    { width: 1280, shown: false },
+    { width: 1440, shown: false },
+  ])('at $width px it is shown: $shown, and the app is there either way', ({ width, shown }) => {
     simulateViewport(width)
 
     renderGuarded()
 
-    expect(screen.queryByRole('heading', { name: 'Draftroom needs a larger window' }) !== null).toBe(notice)
-    expect(screen.queryByRole('heading', { name: 'Work area' }) === null).toBe(notice)
+    expect(notice() !== null).toBe(shown)
+    expect(screen.getByRole('heading', { name: 'Work area' })).toBeVisible()
   })
 
   it.each([
     {
       locale: 'en',
-      title: 'Draftroom needs a larger window',
-      text: 'Open Draftroom in a desktop window at least 1,280 px wide.',
+      title: 'Draftroom is made for wider windows',
+      text: 'It works best in a window at least 1,280 px wide.',
+      dismiss: 'Dismiss',
     },
     {
       locale: 'es',
-      title: 'Draftroom necesita una ventana más grande',
-      text: 'Abre Draftroom en una ventana de escritorio de al menos 1280 px de ancho.',
+      title: 'Draftroom está pensado para ventanas más anchas',
+      text: 'Funciona mejor en una ventana de al menos 1280 px de ancho.',
+      dismiss: 'Descartar',
     },
-  ])('explains it in $locale, with the width', ({ locale, title, text }) => {
+  ])('explains it in $locale, with the width', ({ locale, title, text, dismiss }) => {
     localStorage.setItem(localeStorageKey, locale)
     simulateViewport(1279)
 
     renderGuarded()
 
-    expect(screen.getByRole('heading', { level: 1, name: title })).toHaveFocus()
+    expect(screen.getByText(title)).toBeInTheDocument()
     expect(screen.getByText(new RegExp(text))).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: dismiss })).toBeInTheDocument()
   })
 
-  it('keeps the app and its state while the window is narrow, and gives the focus back to where it was', async () => {
+  it('leaves the app, what is typed in it and the focus where they were while the window narrows', async () => {
     const user = userEvent.setup()
     const viewport = simulateViewport(1440)
     renderGuarded()
     await user.type(screen.getByRole('textbox', { name: 'Draft' }), 'Quarterly plan')
 
-    act(() => viewport.resizeTo(1000))
-    expect(screen.queryByRole('textbox', { name: 'Draft' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Draftroom needs a larger window' })).toHaveFocus()
+    act(() => viewport.resizeTo(640))
 
-    act(() => viewport.resizeTo(1280))
+    expect(notice()).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Draft' })).toHaveValue('Quarterly plan')
     expect(screen.getByRole('textbox', { name: 'Draft' })).toHaveFocus()
-    expect(screen.queryByRole('heading', { name: 'Draftroom needs a larger window' })).not.toBeInTheDocument()
   })
 
-  it('gives the focus to the heading of the page when nothing had it before the notice', () => {
-    const viewport = simulateViewport(1440)
+  it('goes away when the window is wide again, and comes back when it narrows', () => {
+    const viewport = simulateViewport(1000)
+    renderGuarded()
+    expect(notice()).toBeInTheDocument()
+
+    act(() => viewport.resizeTo(1280))
+    expect(notice()).not.toBeInTheDocument()
+
+    act(() => viewport.resizeTo(900))
+    expect(notice()).toBeInTheDocument()
+  })
+
+  it('can be closed, takes the focus to the headline of the page when it is, and stays closed for the tab', async () => {
+    const user = userEvent.setup()
+    const viewport = simulateViewport(640)
+    const first = renderGuarded()
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    expect(notice()).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Work area' })).toHaveFocus()
+    act(() => viewport.resizeTo(1440))
+    act(() => viewport.resizeTo(640))
+    expect(notice()).not.toBeInTheDocument()
+    first.unmount()
+
     renderGuarded()
 
-    act(() => viewport.resizeTo(1000))
-    act(() => viewport.resizeTo(1280))
-
-    expect(screen.getByRole('heading', { name: 'Work area' })).toHaveFocus()
+    expect(notice()).not.toBeInTheDocument()
   })
 
   it('asks the browser to tell it about the crossing, not about every pixel', () => {

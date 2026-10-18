@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
+import { Alert, Button } from '@yelison/forma-ui'
+import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import styles from './DesktopGuard.module.css'
 import { focusMainContent } from './mainContent.ts'
@@ -8,6 +9,9 @@ export const desktopMinWidth = 1280
 
 // A strict "less than", so a window of 1279.5 px (a browser zoom can produce one) is narrow and 1280 is not.
 const narrowQuery = `(width < ${desktopMinWidth}px)`
+
+/** Where this tab remembers that the notice was closed: it stays closed until the tab does. */
+const dismissedKey = 'draftroom.desktopNoticeDismissed'
 
 // `matchMedia` tells the app when the window crosses the width, not at every pixel it is dragged through, which is
 // what a `resize` listener that stores the width would do.
@@ -19,55 +23,61 @@ function subscribe(onChange: () => void) {
 
 const isNarrow = () => window.matchMedia(narrowQuery).matches
 
+function readDismissed(): boolean {
+  try {
+    return sessionStorage.getItem(dismissedKey) === 'true'
+  } catch {
+    return false
+  }
+}
+
+function rememberDismissed(): void {
+  try {
+    sessionStorage.setItem(dismissedKey, 'true')
+  } catch {
+    // Storage blocked: the notice stays closed for as long as the page does.
+  }
+}
+
 /**
- * Shows the requirement of a desktop window instead of the app when the window is narrower than `desktopMinWidth`.
- * The app stays mounted and only hidden, so crossing the width and coming back loses nothing: an open document keeps
- * its session and the person keeps their place.
+ * Tells the person that the window is narrower than `desktopMinWidth`, and leaves the app where it is. A browser zoom of
+ * 200 % on a 1280 px window is a 640 px window, which WCAG 1.4.10 asks the content to survive: the layouts reflow below
+ * this width (their own CSS), so covering the app with a screen that says "make it larger" would take away what the
+ * reflow keeps. The notice is not modal and never takes the focus, so someone who zooms in while they type goes on
+ * typing; it can be closed, and stays closed for the tab.
  */
 export function DesktopGuard({ children }: { children: ReactNode }) {
   const narrow = useSyncExternalStore(subscribe, isNarrow)
+  const [dismissed, setDismissed] = useState(readDismissed)
 
   return (
     <>
-      {narrow && <DesktopNotice />}
-      <div hidden={narrow}>{children}</div>
+      {narrow && !dismissed && (
+        <DesktopNotice
+          onDismiss={() => {
+            rememberDismissed()
+            setDismissed(true)
+            // The button that had the focus is gone with the notice.
+            focusMainContent()
+          }}
+        />
+      )}
+      {children}
     </>
   )
 }
 
-function DesktopNotice() {
+function DesktopNotice({ onDismiss }: { onDismiss: () => void }) {
   const intl = useIntl()
-  const heading = useRef<HTMLHeadingElement>(null)
-
-  const previous = useRef<Element | null>(null)
-
-  // The notice takes the focus when it appears, because the app it hides held it, and gives it back to the element
-  // that had it when it goes away, so the place where the person was typing is not lost. The element is read in a
-  // layout effect: by the time a passive one runs, the browser has already dropped the focus of what was hidden. It is
-  // given back in the cleanup of a passive effect, which runs once the app is on screen again; a layout cleanup runs
-  // while it is still hidden. If the element is gone, the focus goes to the page's heading. StrictMode runs the layout
-  // effect twice, so the first element read is kept.
-  useLayoutEffect(() => {
-    previous.current ??= document.activeElement
-    heading.current?.focus()
-  }, [])
-  useEffect(
-    () => () => {
-      const element = previous.current
-      if (element instanceof HTMLElement && element !== document.body && element.isConnected) element.focus()
-      else focusMainContent()
-    },
-    [],
-  )
 
   return (
-    <main className={styles.notice}>
-      <h1 ref={heading} tabIndex={-1} className={styles.title}>
-        {intl.formatMessage({ id: 'desktopGuard.title' })}
-      </h1>
+    <Alert className={styles.notice} title={intl.formatMessage({ id: 'desktopGuard.title' })}>
       <p className={styles.description}>
         {intl.formatMessage({ id: 'desktopGuard.description' }, { width: desktopMinWidth })}
       </p>
-    </main>
+      <Button variant="secondary" size="compact" onClick={onDismiss}>
+        {intl.formatMessage({ id: 'desktopGuard.dismiss' })}
+      </Button>
+    </Alert>
   )
 }

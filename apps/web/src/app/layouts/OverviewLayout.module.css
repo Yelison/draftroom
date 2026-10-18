@@ -1,9 +1,20 @@
+/* The rail is the compact one in a window narrower than a desktop, and the page has less room around it. */
 .layout {
   display: grid;
-  grid-template-columns: var(--layout-rail-width) minmax(0, 1fr);
+  grid-template-columns: var(--layout-rail-compact-width) minmax(0, 1fr);
   min-height: 100vh;
 }
 
 .main {
-  padding: var(--space-48);
+  padding: var(--space-24);
+}
+
+@media (width >= 1280px) {
+  .layout {
+    grid-template-columns: var(--layout-rail-width) minmax(0, 1fr);
+  }
+
+  .main {
+    padding: var(--space-48);
+  }
 }

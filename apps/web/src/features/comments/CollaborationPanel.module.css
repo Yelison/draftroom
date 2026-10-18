@@ -3,16 +3,22 @@
  * inside itself when there are more threads than fit, so it never stretches the page.
  */
 .panel {
-  position: sticky;
-  top: var(--space-16);
   box-sizing: border-box;
-  inline-size: var(--layout-panel-width);
-  max-block-size: calc(100vh - var(--space-32));
-  overflow-y: auto;
   padding: var(--space-16);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-panel);
   background: var(--color-surface);
+}
+
+/* Beside the sheet it keeps its width; in a window narrower than a desktop there is no beside, and it follows the sheet. */
+@media (width >= 1280px) {
+  .panel {
+    position: sticky;
+    top: var(--space-16);
+    inline-size: var(--layout-panel-width);
+    max-block-size: calc(100vh - var(--space-32));
+    overflow-y: auto;
+  }
 }
 
 .activity {

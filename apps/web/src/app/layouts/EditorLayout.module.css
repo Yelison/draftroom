@@ -1,10 +1,13 @@
+/* In a window narrower than a desktop (a browser zoom of 200 % is one) the explorer is left out: the page is the document,
+ * and the Documents screen lists the same things from the rail. */
 .layout {
   display: grid;
-  grid-template-columns: var(--layout-rail-compact-width) var(--layout-explorer-width) minmax(0, 1fr);
+  grid-template-columns: var(--layout-rail-compact-width) minmax(0, 1fr);
   min-height: 100vh;
 }
 
 .explorer {
+  display: none;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -15,5 +18,19 @@
 }
 
 .main {
-  padding: var(--space-32);
+  padding: var(--space-16);
+}
+
+@media (width >= 1280px) {
+  .layout {
+    grid-template-columns: var(--layout-rail-compact-width) var(--layout-explorer-width) minmax(0, 1fr);
+  }
+
+  .explorer {
+    display: block;
+  }
+
+  .main {
+    padding: var(--space-32);
+  }
 }
