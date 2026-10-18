@@ -335,3 +335,40 @@ describe('resolving a thread that the server refuses', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('We could not reach the server.')
   })
 })
+
+describe('sending with the keyboard twice before the server answers', () => {
+  const pending = () => new Promise<Outcome>(() => undefined)
+
+  it('sends a reply once', async () => {
+    const reply = vi.fn(pending)
+    const { user } = renderCard({}, { ...actionsThat(), reply })
+
+    await user.type(screen.getByRole('textbox', { name: 'Reply to this thread' }), 'Thursday works')
+    await user.keyboard('{Control>}{Enter}{Enter}{/Control}')
+
+    expect(reply).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves an edit once', async () => {
+    const edit = vi.fn(pending)
+    const { user } = renderCard({}, { ...actionsThat(), edit })
+
+    await user.click(screen.getByRole('button', { name: 'Edit the comment by Marta Ruiz' }))
+    await user.type(screen.getByRole('textbox', { name: 'Edit the comment by Marta Ruiz' }), ' Really.')
+    await user.keyboard('{Control>}{Enter}{Enter}{/Control}')
+
+    expect(edit).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends again once the first request has ended in a failure', async () => {
+    const reply = vi.fn().mockResolvedValueOnce(failed).mockResolvedValueOnce(succeeded)
+    const { user } = renderCard({}, { ...actionsThat(), reply })
+
+    await user.type(screen.getByRole('textbox', { name: 'Reply to this thread' }), 'Thursday works')
+    await user.keyboard('{Control>}{Enter}{/Control}')
+    await screen.findByRole('alert')
+    await user.keyboard('{Control>}{Enter}{/Control}')
+
+    expect(reply).toHaveBeenCalledTimes(2)
+  })
+})
