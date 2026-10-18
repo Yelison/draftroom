@@ -7,6 +7,7 @@
 import type { Locator, Page } from '@playwright/test'
 import { onboardingChecklist } from '../src/data/mock/fixtures/documents.ts'
 import { expect, test } from './fixtures.ts'
+import { watchPolicyViolations } from './policyViolations.ts'
 
 const documentPath = `/documents/${onboardingChecklist.id}`
 const line = 'Ask your buddy anything: no question is too small.'
@@ -172,6 +173,34 @@ for (const [language, said] of Object.entries(words)) {
       await page.keyboard.press('ControlOrMeta+Alt+m')
       await expect(panel.getByRole('article')).toBeFocused()
       await expect(panel.getByRole('article')).toHaveAttribute('aria-current', 'true')
+    })
+
+    test('is refused nothing by the content security policy while a person comments', async ({ page }) => {
+      const violations = await watchPolicyViolations(page)
+      await page.goto(documentPath)
+      const text = textArea(page, said.text)
+      await text.waitFor()
+      const panel = page.getByRole('complementary', { name: said.panel })
+      await text.focus()
+      await page.keyboard.type(line)
+      await selectLastWord(page, text)
+
+      // Every part of the panel that is drawn: the form, the card and its highlight, a reply, the other tab, and the filter.
+      await page.keyboard.press('ControlOrMeta+Alt+m')
+      await page.keyboard.type('Is that the right word?')
+      await page.keyboard.press('Control+Enter')
+      await expect(marks(page)).toHaveText('small')
+      await panel.getByRole('textbox', { name: said.replyField }).fill('Yes.')
+      await page.keyboard.press('Control+Enter')
+      await expect(panel.getByRole('article').getByText('Yes.')).toBeVisible()
+      await panel.getByRole('tab', { name: /^(Activity|Actividad)$/ }).click()
+      await expect(panel.getByRole('heading', { level: 3 }).first()).toBeVisible()
+      await panel.getByRole('tab', { name: /^(Comments|Comentarios)$/ }).click()
+      await panel.getByRole('button', { name: said.resolve, exact: true }).click()
+      await panel.getByRole('button', { name: said.resolvedFilter }).click()
+      await expect(panel.getByRole('article')).toHaveAttribute('data-state', 'resolved')
+
+      expect(await violations()).toEqual([])
     })
 
     test('keeps the layout whole at 1280 px, with no horizontal scroll', async ({ page }) => {
