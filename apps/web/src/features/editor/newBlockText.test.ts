@@ -41,6 +41,14 @@ describe('a text block that the editor creates', () => {
         editor.commands.enter()
       },
     },
+    {
+      when: 'Enter in an empty list item',
+      make: (editor) => {
+        editor.commands.setContent('<ul><li><p></p></li></ul>')
+        editor.commands.setTextSelection(3)
+        editor.commands.enter()
+      },
+    },
     { when: 'a paragraph made a heading', make: (editor) => editor.commands.setHeading({ level: 2 }) },
     { when: 'a paragraph made a list', make: (editor) => editor.commands.toggleBulletList() },
   ]
@@ -86,6 +94,26 @@ describe('a text block that the editor creates', () => {
 
     expect(editor.getJSON()).toEqual(before)
     expect(shared(document)).toEqual([{ name: 'paragraph', texts: 1 }])
+  })
+
+  it('comes back with its text node when the Enter is redone', () => {
+    const earlier = new Y.Doc()
+    openHeadlessEditor(earlier).commands.insertContent('Hello')
+    const document = new Y.Doc()
+    Y.applyUpdate(document, Y.encodeStateAsUpdate(earlier))
+    const editor = openHeadlessEditor(document)
+    editor.commands.setTextSelection(editor.state.doc.content.size - 1)
+    editor.commands.enter()
+    const afterEnter = editor.getJSON()
+
+    editor.commands.undo()
+    editor.commands.redo()
+
+    expect(editor.getJSON()).toEqual(afterEnter)
+    expect(shared(document)).toEqual([
+      { name: 'paragraph', texts: 1 },
+      { name: 'paragraph', texts: 1 },
+    ])
   })
 })
 

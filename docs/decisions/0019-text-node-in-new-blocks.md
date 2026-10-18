@@ -1,6 +1,6 @@
 # 0019 · A text block the editor creates gets its text node at once
 
-Status: accepted (2026-10-17, coordinator, in answer to the investigation of this fault)
+Status: proposed (2026-10-17, c07)
 
 ## Context
 
@@ -41,7 +41,7 @@ The smallest case, with fixed client ids and the paragraph without a text node: 
 
 - Blocks already stored without a text node (an empty paragraph from before this decision) stay exposed until someone types in them. Filling them when a document is opened would be a second party writing, which is what decision 2 rules out, and doing it on the server would write an update on every load.
 - Content written by `replaceFragmentContent` (restoring a version) and by `jsonToYUpdate` (templates) goes through `prosemirrorToYXmlFragment`, which also leaves an empty block without a text node. The built-in templates have no empty blocks. A restored version that has one is exposed in the same way.
-- The scripted collaborator of the demo writes into the text node of its own paragraph, not through the editor, and is not affected.
+- The scripted collaborator of the demo writes into the text node of the last paragraph, not through the editor. After an Enter at the end of the document she found no text node in the new paragraph and waited; now she finds an empty one and waits because the person's cursor is in it. In both cases, with her script running for 30 simulated seconds, the new paragraph stays empty and she writes nothing in it, so the demo behaves as before.
 - The library should handle sibling text nodes in `updateYFragment` itself. The minimal case above is ready to be sent to `@tiptap/y-tiptap`; when a release fixes it, `NewBlockText` can be removed together with its tests.
 
 ## Alternatives considered
