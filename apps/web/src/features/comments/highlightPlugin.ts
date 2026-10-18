@@ -39,6 +39,9 @@ interface HighlightState extends HighlightInput {
 
 const highlightKey = new PluginKey<HighlightState>('comment-highlights')
 
+/** The meta that asks the plugin to read every thread from Yjs again. */
+const resolveAgainKey = new PluginKey<true>('comment-highlights-resolve-again')
+
 const unresolved: Placement = { status: 'unresolved' }
 
 /** The open threads among these: a resolved thread has no highlight. */
@@ -75,11 +78,16 @@ export function showHighlights(
  * The highlights of the comment threads, as decorations of the editor and never as marks of the shared document: a
  * commenter, who may not change the content, sees and makes them all the same (protocol section 10.4).
  *
- * The Yjs document is where a thread is. It is read when the threads change and when the document changed because of
- * someone else (or an undo), which is a transaction of the sync plugin. For the person's own typing the editor's document
- * is ahead of the Yjs one while the transaction is applied (the binding writes it afterwards), so those ranges follow the
- * editor's own mapping, which treats the ends the way the anchor does: text typed at the start or at the end of a range
- * falls outside it.
+ * The Yjs document is where a thread is, and what the highlight and the card end up as is always what Yjs says. It is read
+ * when the threads change, when the document changed because of someone else (or an undo), which is a transaction of the
+ * sync plugin, and once the editor has written the person's own typing into Yjs. Until then the editor's own mapping
+ * paints the range, so the highlight does not lag a keystroke: it treats the ends the way the anchor does, but where a
+ * replaced range meets an end it cannot tell (text typed over a range, or at a start that is tied to no character), so
+ * it is only a first drawing.
+ *
+ * "Once the editor has written" is the next microtask after the transaction: the sync plugin writes in the `update` of
+ * its view, which runs inside `dispatch`, before this plugin's own view update. That relies on the collaboration
+ * extension coming before this one (it has the higher priority); a test, which types over a range, fails if it did not.
  */
 function highlightPlugin(requests: CommentRequests | null): Plugin<HighlightState> {
   return new Plugin<HighlightState>({
@@ -96,7 +104,8 @@ function highlightPlugin(requests: CommentRequests | null): Plugin<HighlightStat
         const told = transaction.getMeta(highlightKey) as HighlightInput | undefined
         const input = told ?? previous
         const byAnotherPerson = transaction.docChanged && ySyncPluginKey.getState(state)?.isChangeOrigin === true
-        if (told !== undefined || byAnotherPerson) {
+        const asked = transaction.getMeta(resolveAgainKey) === true
+        if (told !== undefined || byAnotherPerson || asked) {
           return updated(previous, state, input, resolveFromYjs(state, input))
         }
         if (transaction.docChanged)
@@ -104,6 +113,18 @@ function highlightPlugin(requests: CommentRequests | null): Plugin<HighlightStat
         return previous
       },
     },
+    view: () => ({
+      update(view, previousState) {
+        const own = view.state.doc !== previousState.doc && ySyncPluginKey.getState(view.state)?.isChangeOrigin !== true
+        if (!own) return
+        // The sync plugin has written the typing into Yjs by the time this runs; the dispatch waits for the end of the
+        // update that is under way, since a view cannot take a transaction while it is being updated.
+        queueMicrotask(() => {
+          if (!view.isDestroyed)
+            view.dispatch(view.state.tr.setMeta(resolveAgainKey, true).setMeta('addToHistory', false))
+        })
+      },
+    }),
     props: {
       decorations: (state) => highlightKey.getState(state)?.decorations ?? DecorationSet.empty,
       // A click on highlighted text shows its thread. The text keeps the focus and the caret: the click is also an edit.

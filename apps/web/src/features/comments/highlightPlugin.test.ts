@@ -168,6 +168,84 @@ describe('a thread whose text the person who sees it types around', () => {
   })
 })
 
+/** Lets the highlight settle: it is read from Yjs once the editor has written the person's own typing there. */
+const settle = () => new Promise<void>((resolve) => setTimeout(resolve))
+
+/** What the highlight of a thread covers for this person, or the word `orphaned`. */
+function shownBy(editor: Editor, id: string): string {
+  const placement = placementOf(editor.state, id)
+  return placement.status === 'placed'
+    ? editor.state.doc.textBetween(placement.from, placement.to, ' ')
+    : placement.status
+}
+
+/** What Yjs says the anchor covers in this editor's document: the truth, which the highlight has to end up as. */
+function yjsSays(editor: Editor, anchor: HighlightedThread['anchor']): string {
+  const bound = boundDocumentOf(editor.state)
+  if (bound === null) throw new Error('not bound')
+  const range = resolveAnchor(bound, anchor)
+  return range === null ? 'orphaned' : editor.state.doc.textBetween(range.from, range.to, ' ')
+}
+
+describe('a thread whose text the person who sees it replaces or types at the edge of', () => {
+  // The editor's own mapping gives the edge of a replaced range the side it likes, whatever the association of the end:
+  // Yjs does not, and what the person ends up with has to be what everyone else sees.
+  const replacements = [
+    { what: 'the exact range, as after "Show in text"', from: 0, to: 0 },
+    { what: 'the range and a character before it', from: -1, to: 0 },
+    { what: 'the range and a character after it', from: 0, to: 1 },
+    { what: 'the range and a character on each side', from: -1, to: 1 },
+    { what: 'the start of the range and what is before it', from: -1, to: -1 },
+    { what: 'the end of the range and what is after it', from: 1, to: 1 },
+  ]
+
+  it.each(replacements)('ends as Yjs says when they type over $what', async ({ from, to }) => {
+    open = withHighlights('abcdefgh')
+    const { editor } = open.local
+    const thread = threadOn(editor, 'a', 'cdef')
+    showHighlights(editor, [thread], { handshaken: true })
+    const range = rangeOf(editor, 'cdef')
+
+    editor.commands.insertContentAt({ from: range.from + from, to: range.to + to }, 'XY')
+    await settle()
+
+    expect(shownBy(editor, 'a')).toBe(yjsSays(editor, thread.anchor))
+    expect(shownBy(editor, 'a')).toBe(yjsSays(open.remote.editor, thread.anchor))
+  })
+
+  it('is orphaned, for the person who typed as for the others, when they type over exactly the commented text', async () => {
+    open = withHighlights('abcdef')
+    const { editor } = open.local
+    const thread = threadOn(editor, 'a', 'cd')
+    showHighlights(editor, [thread], { handshaken: true })
+
+    editor.commands.setTextSelection(rangeOf(editor, 'cd'))
+    editor.view.dispatch(editor.state.tr.insertText('X'))
+    editor.view.dispatch(editor.state.tr.insertText('Y'))
+    await settle()
+
+    expect(placementOf(editor.state, 'a')).toEqual({ status: 'orphaned' })
+    expect(yjsSays(open.remote.editor, thread.anchor)).toBe('orphaned')
+  })
+
+  it('covers what Yjs covers when they type where a range that cannot be tied to a character begins', async () => {
+    // Protocol section 10.2: a range that starts at the end of a paragraph takes the text typed there.
+    open = withHighlights('abc', 'def')
+    const { editor } = open.local
+    const bound = boundDocumentOf(editor.state)
+    if (bound === null) throw new Error('not bound')
+    const from = rangeOf(editor, 'abc').to
+    const anchor = createAnchor(bound, from, rangeOf(editor, 'de').to)
+    showHighlights(editor, [{ id: 'a', anchor }], { handshaken: true })
+
+    editor.commands.insertContentAt(from, 'Z')
+    await settle()
+
+    expect(shownBy(editor, 'a')).toBe('Z de')
+    expect(shownBy(editor, 'a')).toBe(yjsSays(open.remote.editor, anchor))
+  })
+})
+
 describe('the threads that are shown', () => {
   it('are the open ones: a resolved thread has no highlight', () => {
     open = withHighlights('abcdef')
