@@ -155,3 +155,37 @@ jobs:
       # Optional: it is not one of the required checks of the ruleset, because a new advisory in a dependency must not stop an
       # unrelated pull request. It reads the lockfile and installs nothing; it fails for a vulnerability of high severity or worse.
       - run: npm audit --audit-level=high
+
+  accessibility-matrix:
+    name: Accessibility matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      PLAYWRIGHT_PORT: '4173'
+      # Every route in both themes, both languages and both widths. The required web job runs one theme and one language.
+      E2E_MATRIX: full
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # Optional: it is not one of the required checks of the ruleset, because the whole matrix takes minutes and the pull
+      # request is already checked with a theme and a language. It runs axe, the pseudo-locale overflow and the zoom on each route.
+      - run: npm run test:e2e -w @draftroom/web -- e2e/a11y.spec.ts e2e/overflow.spec.ts
+      # Only a failure leaves something to read: the traces Playwright keeps for the tests that failed.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: accessibility-matrix-traces
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
