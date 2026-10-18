@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
 // The README and the architecture document are read by people who follow their links, and a file that moved leaves a link
@@ -13,10 +13,17 @@ export interface BrokenLink {
 
 // `[text](target)` and `![alt](target)`; a target may be wrapped in <>, and may be followed by a title.
 const inlineLink = /!?\[[^\]]*\]\(\s*(<[^>]*>|[^)\s]*)[^)]*\)/g
+// `<video src="target">`, `<img src="target">` and `<a href="target">`: the README embeds its clip with HTML.
+const htmlAttribute = /\b(?:src|href)=["']([^"']*)["']/g
 // `[label]: target`
 const referenceDefinition = /^\s{0,3}\[[^\]]+\]:\s*(<[^>]*>|\S+)/
 
 const outside = /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i
+
+/** The Markdown that introduces the project, from the root of the repository: the READMEs and the architecture document. */
+export function introductoryDocuments(root: string): string[] {
+  return [...readdirSync(root).filter((name) => /^README(\.[a-z]{2})?\.md$/.test(name)), 'docs/architecture.md']
+}
 
 /** The file a link points to, or `null` when the link is not one to a file of the repository. */
 export function fileOf(target: string): string | null {
@@ -37,6 +44,7 @@ function* targetsIn(markdown: string): Generator<{ line: number; target: string 
     // Code spans hold examples, not links.
     const prose = text.replace(/`[^`]*`/g, '')
     for (const match of prose.matchAll(inlineLink)) yield { line: index + 1, target: match[1] ?? '' }
+    for (const match of prose.matchAll(htmlAttribute)) yield { line: index + 1, target: match[1] ?? '' }
     const definition = referenceDefinition.exec(prose)
     if (definition !== null) yield { line: index + 1, target: definition[1] ?? '' }
   }

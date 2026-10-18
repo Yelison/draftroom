@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { fileOf, findBrokenLinks } from './checkLinks.ts'
+import { resolve } from 'node:path'
+import { fileOf, findBrokenLinks, introductoryDocuments } from './checkLinks.ts'
 
 describe('a relative link', () => {
   let root: string
@@ -52,6 +53,17 @@ describe('a relative link', () => {
     )
   })
 
+  it('in an HTML tag is checked as well as one in Markdown', () => {
+    expect(
+      check(
+        '<video src="docs/assets/missing.webm" controls></video>\n<a href="LICENSE">fine</a> <img src=\'gone.png\'>',
+      ),
+    ).toEqual([
+      { file: 'README.md', line: 1, target: 'docs/assets/missing.webm' },
+      { file: 'README.md', line: 2, target: 'gone.png' },
+    ])
+  })
+
   it('inside a code fence or a code span is an example, not a link', () => {
     expect(check('`[x](nowhere.md)`\n\n```md\n[y](nowhere.md)\n```\n')).toEqual([])
   })
@@ -70,5 +82,15 @@ describe('the file of a target', () => {
     ['https://example.com', null],
   ])('%s is %s', (target, file) => {
     expect(fileOf(target)).toBe(file)
+  })
+})
+
+describe('the documents that introduce the project', () => {
+  // What the CI runs, since it runs `npm test` and not `npm run docs:links`: a link that breaks in a README fails here.
+  it('link only to files that exist', () => {
+    const root = resolve(import.meta.dirname, '../..')
+    const documents = introductoryDocuments(root)
+    expect(documents).toEqual(expect.arrayContaining(['README.md', 'README.es.md', 'docs/architecture.md']))
+    expect(findBrokenLinks(root, documents)).toEqual([])
   })
 })
