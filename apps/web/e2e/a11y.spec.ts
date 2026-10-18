@@ -104,3 +104,22 @@ test.describe('with reduced motion', () => {
     })
   }
 })
+
+test.describe('the markup', () => {
+  test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 900 } })
+
+  for (const route of routes) {
+    // A class that a stylesheet does not define is read as `undefined` by the template that builds the list of classes.
+    test(`${route.name} has no class named after a value that is missing`, async ({ page }) => {
+      await route.open(page)
+
+      const named = await page.evaluate(() =>
+        [...document.querySelectorAll('[class]')]
+          .filter((element) => /(^|\s)(undefined|null|false)(\s|$)/.test(element.getAttribute('class') ?? ''))
+          .map((element) => `${element.tagName.toLowerCase()}.${element.getAttribute('class')}`),
+      )
+
+      expect(named).toEqual([])
+    })
+  }
+})

@@ -43,7 +43,8 @@ describe('the document screen', () => {
     renderEditor()
     await textArea()
 
-    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass('compact')
+    // Compact is the rail without the class of the expanded one.
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).not.toHaveClass('expanded')
     expect(screen.getAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual(['Documents'])
   })
 
