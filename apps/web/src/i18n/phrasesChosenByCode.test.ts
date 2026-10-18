@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { formatActions } from '../features/editor/formatActions.ts'
 import { kindSelector } from '../features/versions/kinds.ts'
 import type { Locale } from './locale.ts'
-import { messages } from './messages.ts'
+import { messages, type MessageId } from './messages.ts'
 
 /**
  * Phrases whose wording depends on a code, such as the role someone was given, are written whole for each code, so a
@@ -158,5 +158,42 @@ describe('the sync status, announced', () => {
     locales.flatMap((locale) => Object.entries(sentences[locale]).map(([status, text]) => ({ locale, status, text }))),
   )('says $status in $locale', ({ locale, status, text }) => {
     expect(intlFor(locale).formatMessage({ id: 'sync.announcement' }, { status })).toBe(text)
+  })
+})
+
+describe('the words a phrase chooses by code', () => {
+  // The branches repeat words that are also in a message of their own (the visible name of a button, the label of the pill),
+  // so the two can drift apart. What a sighted person reads and what is announced or shown in the tooltip must be the same.
+  const syncLabels = {
+    connecting: 'connecting',
+    synchronising: 'synchronising',
+    synced: 'synced',
+    offlineLocal: 'offline-local',
+    offlineTab: 'offline-tab',
+    reconnecting: 'reconnecting',
+    error: 'error',
+    revoked: 'revoked',
+    readOnly: 'read-only',
+  } as const
+
+  it.each(locales.flatMap((locale) => formatActions.map(({ id, name }) => ({ locale, id, name }))))(
+    'names $id in the tooltip as the button does, in $locale',
+    ({ locale, id, name }) => {
+      const intl = intlFor(locale)
+
+      const tooltip = intl.formatMessage({ id: 'editor.toolbar.tooltip' }, { action: id, shortcut: 'Ctrl+B' })
+
+      expect(tooltip).toBe(`${intl.formatMessage({ id: name })} (Ctrl+B)`)
+    },
+  )
+
+  it.each(
+    locales.flatMap((locale) => Object.entries(syncLabels).map(([selector, label]) => ({ locale, selector, label }))),
+  )('announces $selector with the words of the pill, in $locale', ({ locale, selector, label }) => {
+    const intl = intlFor(locale)
+
+    const announcement = intl.formatMessage({ id: 'sync.announcement' }, { status: selector })
+
+    expect(announcement.endsWith(`: ${intl.formatMessage({ id: `sync.state.${label}` as MessageId })}`)).toBe(true)
   })
 })
