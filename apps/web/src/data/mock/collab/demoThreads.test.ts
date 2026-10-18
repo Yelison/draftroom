@@ -13,6 +13,7 @@ import { seedId } from '../ids.ts'
 import { createMockServer } from '../createMockDataSource.ts'
 import { fakePage } from './fakePage.ts'
 import { demoDocument } from './demoDocuments.ts'
+import { bold, paragraph } from '../fixtures/blocks.ts'
 import { seedContent } from './seededContent.ts'
 
 const locales = ['en', 'es'] as const
@@ -112,5 +113,70 @@ describe('the starting content of a document', () => {
     expect(text).toContain('The launch moves')
     expect(text).toContain('El lanzamiento pasa')
     ydoc.destroy()
+  })
+})
+
+/** The first writer of an update: the client of its first struct. */
+const writerOf = (update: Uint8Array) => Y.decodeUpdate(update).structs[0]?.id.client
+
+/** What an anchor covers in the document that this update starts, as a client that opened it would read it. */
+function covers(update: Uint8Array, anchor: Parameters<typeof resolveAnchor>[1]): string | null {
+  const ydoc = new Y.Doc()
+  Y.applyUpdate(ydoc, update)
+  const editor = new Editor({
+    extensions: [...editorExtensions(), Collaboration.configure({ document: ydoc, field: fragmentName })],
+  })
+  try {
+    const bound = boundDocumentOf(editor.state)
+    if (bound === null) throw new Error('The editor is not bound to the document')
+    const range = resolveAnchor(bound, anchor)
+    return range === null ? null : editor.state.doc.textBetween(range.from, range.to, ' ')
+  } finally {
+    editor.destroy()
+    ydoc.destroy()
+  }
+}
+
+describe('the writer of the starting text', () => {
+  const plan = [paragraph('The launch moves to November.')]
+  const edited = [paragraph('The launch moves to the second week of November.')]
+
+  it('is the same for the same text, so every tab and every reload holds the same items', () => {
+    const first = seedContent(plan, { writtenBy: 'en:plan', anchoredOn: [] })
+    const again = seedContent(plan, { writtenBy: 'en:plan', anchoredOn: [] })
+
+    expect(writerOf(again.update)).toBe(writerOf(first.update))
+  })
+
+  it('is another for a text that was edited, so a copy kept of the old one is not mixed with the new', () => {
+    const before = seedContent(plan, { writtenBy: 'en:plan', anchoredOn: [] })
+    const after = seedContent(edited, { writtenBy: 'en:plan', anchoredOn: [] })
+
+    expect(writerOf(after.update)).not.toBe(writerOf(before.update))
+    // The copy of the old text and the new text, put together, hold both: neither overwrites the other.
+    const ydoc = new Y.Doc()
+    Y.applyUpdate(ydoc, before.update)
+    Y.applyUpdate(ydoc, after.update)
+    expect(ydoc.getXmlFragment(fragmentName).toString()).toContain('the second week of November')
+    expect(ydoc.getXmlFragment(fragmentName).toString()).toContain('moves to November')
+  })
+})
+
+describe('the anchors of a quote that comes after other characters', () => {
+  // Yjs counts in UTF-16 units and the text of a node carries the tags of its formatting: an index taken any other way
+  // is a few characters off.
+  const blocks = [paragraph('😀 and ', bold('bold'), ' then the quote here, with 😀 in it.')]
+  const quotes = [
+    { where: 'after an emoji and a bold run', quote: 'the quote here' },
+    { where: 'with an emoji in it', quote: '😀 in it' },
+    { where: 'at the bold run itself', quote: 'bold' },
+  ]
+
+  it.each(quotes)('covers the quote $where', ({ quote }) => {
+    const { update, anchors } = seedContent(blocks, { writtenBy: 'en:marks', anchoredOn: [quote] })
+
+    const anchor = anchors.get(quote)
+    if (anchor === undefined) throw new Error('No anchor was made')
+    expect(covers(update, anchor)).toBe(quote)
   })
 })

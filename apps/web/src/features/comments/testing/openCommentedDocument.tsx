@@ -1,4 +1,4 @@
-import { toBase64 } from '../../../collab/base64.ts'
+import { anchorOnText } from '../../../data/mock/collab/seededContent.ts'
 // The test plays the server, which is what writes the starting content of a document from JSON; the client never does.
 // oxlint-disable-next-line no-restricted-imports
 import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
@@ -14,28 +14,6 @@ export interface StartedThread {
   body: string
   /** Who wrote it; Marta, who owns the launch plan, unless said. */
   by?: string
-}
-
-/** The anchor of `quote` in the text of a document, made the way a client does it: the start with `assoc` 0, the end with -1. */
-export function anchorOnText(shared: Y.Doc, quote: string) {
-  const find = (node: Y.XmlFragment | Y.XmlElement): Y.XmlText | null => {
-    for (const child of node.toArray()) {
-      if (child instanceof Y.XmlText && child.toString().includes(quote)) return child
-      if (child instanceof Y.XmlElement) {
-        const inside = find(child)
-        if (inside !== null) return inside
-      }
-    }
-    return null
-  }
-  const text = find(shared.getXmlFragment('default'))
-  if (text === null) throw new Error(`"${quote}" is not in the document`)
-  const index = text.toString().indexOf(quote)
-  const encode = (position: Y.RelativePosition) => toBase64(Y.encodeRelativePosition(position))
-  return {
-    start: encode(Y.createRelativePositionFromTypeIndex(text, index, 0)),
-    end: encode(Y.createRelativePositionFromTypeIndex(text, index + [...quote].length, -1)),
-  }
 }
 
 export interface OpenCommentedOptions extends Omit<RenderEditorOptions, 'content' | 'before'> {
