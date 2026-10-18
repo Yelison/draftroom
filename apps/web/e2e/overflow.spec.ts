@@ -89,7 +89,7 @@ test.describe('in the pseudo-locale', () => {
             await route.open(page)
 
             // The words are the pseudo-locale's: in brackets, accented and longer. Without them this would measure the English build.
-            expect(await page.locator('body').innerText()).toMatch(/\[[^\]]*[^\x00-\x7F][^\]]*\]/)
+            expect(await page.locator('body').innerText()).toMatch(/\[[^\]]*[^\p{ASCII}][^\]]*\]/u)
             expect(await problemsOf(page)).toEqual([])
           })
         }
