@@ -24,11 +24,11 @@ test.describe('two people who start typing in the same new paragraph at the same
       .poll(async () => (await daniel.text()) === (await priya.text()), { message: 'both show the same text' })
       .toBe(true)
     const merged = await daniel.text()
-    const [empty, typed] = merged.split('\n')
-    expect(empty).toBe('')
-    // Their words may follow each other or be one inside the other, since both wrote at the same point; what cannot be
-    // is a letter that was typed once and is there twice, or one that is gone.
-    expect(isInterleavingOf(typed ?? '', danielText, priyaText)).toBe(true)
+    // The words may follow each other or be one inside the other, since both wrote at the same point, and may end up in
+    // the same paragraph or each in one of the two, since where a caret lands depends on when the other's update arrives.
+    // What cannot be is a letter that was typed once and is there twice, or one that is gone.
+    expect(isInterleavingOf(merged.replaceAll('\n', ''), danielText, priyaText)).toBe(true)
+    expect(merged.split('\n')).toHaveLength(2)
     await expect.poll(() => storedText(documentId)).toBe(merged)
   })
 })
