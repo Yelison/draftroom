@@ -11,9 +11,13 @@ const catalogue = (language: Language): Record<string, string> =>
 
 const catalogues = { en: catalogue('en'), es: catalogue('es') }
 
-/** A message without parameters, in the language. */
-export function message(language: Language, id: string): string {
+/** A message in the language, with its plain `{name}` arguments filled in (the tour needs no plural or select). */
+export function message(language: Language, id: string, values: Readonly<Record<string, string>> = {}): string {
   const text = catalogues[language][id]
   if (text === undefined) throw new Error(`The ${language} catalogue has no message "${id}": did it change?`)
-  return text
+  return text.replace(/\{(\w+)\}/g, (_, name: string) => {
+    const value = values[name]
+    if (value === undefined) throw new Error(`The message "${id}" needs a value for {${name}}`)
+    return value
+  })
 }

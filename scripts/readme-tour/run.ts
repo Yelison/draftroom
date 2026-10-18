@@ -1,5 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { resolve } from 'node:path'
+import { cpSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 
 // Regenerates the pictures and the short video of the README (`docs/assets/`) from the real stack:
 //
@@ -11,14 +13,19 @@ import { resolve } from 'node:path'
 // (`npx playwright install chromium`).
 //
 // Everything it touches can be moved with the environment: PLAYWRIGHT_PORT, API_PORT, COLLAB_PORT and POSTGRES_PORT for the
-// ports, COMPOSE_PROJECT_NAME and POSTGRES_DB for the project and the database. TOUR_OUTPUT is the directory the files are
-// written to (`docs/assets` by default).
+// ports, COMPOSE_PROJECT_NAME and POSTGRES_DB for the project and the database. TOUR_OUTPUT is the directory the files end up
+// in (`docs/assets` by default).
 
 const root = resolve(import.meta.dirname, '../..')
+// The files are written to a directory of their own and only moved to their place when the whole run passed, so a run that
+// fails never leaves the repository with some pictures new and the rest old.
+const destination = resolve(root, process.env.TOUR_OUTPUT ?? 'docs/assets')
+const staging = mkdtempSync(join(tmpdir(), 'readme-tour-'))
 const project = process.env.COMPOSE_PROJECT_NAME ?? 'draftroom-readme-tour'
 const environment = {
   ...process.env,
   COMPOSE_PROJECT_NAME: project,
+  TOUR_OUTPUT: staging,
   POSTGRES_DB: process.env.POSTGRES_DB ?? 'draftroom_readme_tour',
   POSTGRES_PORT: process.env.POSTGRES_PORT ?? '5470',
   PLAYWRIGHT_PORT: process.env.PLAYWRIGHT_PORT ?? '4370',
@@ -40,7 +47,9 @@ try {
     )
     playwright.once('exit', (code) => done(code ?? 1))
   })
+  if (status === 0) cpSync(staging, destination, { recursive: true })
 } finally {
+  rmSync(staging, { recursive: true, force: true })
   // `-v` takes the volume with it: the next run starts from a database that only the seed has touched.
   compose('down', '-v')
 }

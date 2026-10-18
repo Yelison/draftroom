@@ -50,8 +50,8 @@ export class Person {
   }
 
   /** The words of the app, in this person's language. */
-  say(id: string): string {
-    return message(this.language, id)
+  say(id: string, values?: Readonly<Record<string, string>>): string {
+    return message(this.language, id, values)
   }
 
   get editor() {
@@ -60,7 +60,7 @@ export class Person {
 
   /** The live region once it says "Synced": what the server stored is what the person sees, which is what a picture should show. */
   get syncedStatus() {
-    const synced = this.say('sync.announcement').replace('{status}', this.say('sync.state.synced'))
+    const synced = this.say('sync.announcement', { status: this.say('sync.state.synced') })
     return this.page.getByRole('status').filter({ hasText: synced })
   }
 
@@ -77,6 +77,25 @@ export class Person {
     await expect(this.syncedStatus, `${this.name}'s document never said it was synced`).toBeAttached()
   }
 
+  /** The paragraphs of the document, one string each, without the names that the carets of other people put in the text. */
+  async paragraphs(): Promise<string[]> {
+    return this.editor.evaluate((root) => {
+      const copy = root.cloneNode(true) as HTMLElement
+      for (const caret of copy.querySelectorAll('[class*="_caret"]')) caret.remove()
+      return Array.from(copy.querySelectorAll('p'), (paragraph) => paragraph.textContent ?? '')
+    })
+  }
+
+  /**
+   * Waits until this person's document is exactly these paragraphs. Two people writing in one place can leave their texts in
+   * either order or in one paragraph, and a picture of that would show a product that does not work as it does.
+   */
+  async expectParagraphs(expected: readonly string[]): Promise<void> {
+    await expect
+      .poll(() => this.paragraphs(), { message: `the document ${this.name} sees is not the text that was written` })
+      .toEqual(expected)
+  }
+
   /** Types after the last character, in a new paragraph when `newParagraph` says so, as a person who writes on does. */
   async typeAtEnd(text: string, { newParagraph = false } = {}): Promise<void> {
     await this.editor.click()
@@ -85,12 +104,19 @@ export class Person {
     await this.page.keyboard.type(text, { delay: 12 })
   }
 
-  /** Closes the browser, keeping the recording where `keepVideoAs` says if there is one, after checking that the content security policy refused nothing of what this person did: a picture of a screen the policy broke would show a product that does not exist. */
+  /** Fails when the content security policy has refused something of what this person has done: a picture of a screen the policy broke would show a product that does not exist. */
+  async expectNoPolicyViolations(): Promise<void> {
+    expect(
+      await this.policyViolations(),
+      `the content security policy refused something while ${this.name} used the app`,
+    ).toEqual([])
+  }
+
+  /** Closes the browser, keeping the recording where `keepVideoAs` says if there is one. */
   async close(keepVideoAs?: string): Promise<void> {
-    const violations = await this.policyViolations()
+    await this.expectNoPolicyViolations()
     const video = this.page.video()
     await this.context.close()
     if (keepVideoAs !== undefined) await video?.saveAs(keepVideoAs)
-    expect(violations, `the content security policy refused something while ${this.name} used the app`).toEqual([])
   }
 }
