@@ -91,6 +91,8 @@ A read-only screen is not a barrier: every path to data decides on the server, w
 - **A change of access reaches open connections.** Once a change is committed, the connections it affects are re-checked and closed or switched to the new mode ([`revocation.ts`](../apps/server/src/collab/revocation.ts), [ADR 0012](decisions/0012-access-and-revocation.md)).
 - **Who a person is** comes from a session cookie, with Argon2id passwords, a signed CSRF token and a limit on sign-in attempts ([ADR 0004](decisions/0004-authentication.md)). The collaboration socket reads the same cookie from the upgrade request, never a token in the address.
 
+- **Hardening at the edges.** Each response has one owner for its security headers: the server for `/api` and the collaboration port, the proxy for the page and its files, and the build for a content security policy written into the page itself. CORS and the WebSocket upgrade accept only the origins in `ALLOWED_ORIGINS`, requests are limited per address and per session, and `TRUST_PROXY` tells the server which proxy's word to take for a visitor's address ([ADR 0017](decisions/0017-http-hardening.md)). In production the session cookies carry the `__Host-` prefix ([ADR 0004](decisions/0004-authentication.md)).
+
 ## Comments anchored to text
 
 A thread belongs to a range of the text, and the range has to follow the text as other people edit around it.
@@ -141,3 +143,4 @@ In the static demo, collaboration is simulated in the browser: a scripted second
 | [0014](decisions/0014-versions-and-restore-implementation.md) | How versions and restore were built on the server, and what they can still lose. |
 | [0015](decisions/0015-real-stack-e2e-identity.md) | Who a browser was in the real-stack suite before sessions (superseded by 0004). |
 | [0016](decisions/0016-production-packaging.md) | Who serves the web app, how the database is migrated and how it is backed up. |
+| [0017](decisions/0017-http-hardening.md) | Who sets which header, CORS, request limits and the trusted proxy. |

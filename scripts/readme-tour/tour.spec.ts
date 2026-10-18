@@ -82,7 +82,7 @@ test('the screens of the app, in light and dark, in English and Spanish', async 
     await expect(dark.presenceOf(colleague.name)).toBeVisible()
     await expect(dark.editor).toContainText(meetingNotes[1] ?? '')
     await capture(dark.page, 'editor-dark')
-    await dark.context.close()
+    await dark.close()
   })
 
   await test.step('settings', async () => {
@@ -90,11 +90,11 @@ test('the screens of the app, in light and dark, in English and Spanish', async 
     await narrow.page.goto('/settings/appearance')
     await expect(narrow.page.getByRole('heading', { name: narrow.say('settings.appearance.title') })).toBeVisible()
     await capture(narrow.page, 'settings')
-    await narrow.context.close()
+    await narrow.close()
   })
 
-  await priya.context.close()
-  await daniel.context.close()
+  await priya.close()
+  await daniel.close()
 
   await test.step('the same screen in Spanish', async () => {
     const spanishId = await documentIdOf(spanish)
@@ -109,8 +109,8 @@ test('the screens of the app, in light and dark, in English and Spanish', async 
     await expect(lucia.editor).toContainText(reunion[1] ?? '')
     await expect(lucia.syncedStatus).toBeAttached()
     await capture(lucia.page, 'editor-es')
-    await mateo.context.close()
-    await lucia.context.close()
+    await mateo.close()
+    await lucia.close()
   })
 })
 

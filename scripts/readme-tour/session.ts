@@ -1,5 +1,6 @@
 import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { environment } from '../../apps/web/e2e-collab/environment.ts'
+import { watchPolicyViolations } from '../../apps/web/e2e/policyViolations.ts'
 import { message, type Language } from './messages.ts'
 import { demoPassword } from './scene.ts'
 
@@ -20,6 +21,7 @@ export class Person {
     readonly language: Language,
     readonly context: BrowserContext,
     readonly page: Page,
+    private readonly policyViolations: () => Promise<string[]>,
   ) {}
 
   static async signIn(
@@ -41,7 +43,8 @@ export class Person {
       data: { email: person.email, password: demoPassword },
     })
     expect(response.status(), `${person.name} could not sign in: was the demo seed run?`).toBe(200)
-    return new Person(person.name, viewing.language, context, await context.newPage())
+    const page = await context.newPage()
+    return new Person(person.name, viewing.language, context, page, await watchPolicyViolations(page))
   }
 
   /** The words of the app, in this person's language. */
@@ -78,5 +81,12 @@ export class Person {
     await this.page.keyboard.press('Control+End')
     if (newParagraph) await this.page.keyboard.press('Enter')
     await this.page.keyboard.type(text, { delay: 12 })
+  }
+
+  /** Closes the browser, after checking that the content security policy refused nothing of what this person did: a picture of a screen the policy broke would show a product that does not exist. */
+  async close(): Promise<void> {
+    const violations = await this.policyViolations()
+    await this.context.close()
+    expect(violations, `the content security policy refused something while ${this.name} used the app`).toEqual([])
   }
 }

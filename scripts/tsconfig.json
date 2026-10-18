@@ -13,6 +13,7 @@
   // people of the demo seed), besides its own files.
   "include": [
     "**/*.ts",
+    "../apps/web/e2e/policyViolations.ts",
     "../apps/web/e2e-collab/environment.ts",
     "../apps/web/e2e-collab/globalSetup.ts",
     "../apps/web/e2e-collab/serverProcess.ts",
