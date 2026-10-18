@@ -2,9 +2,8 @@ import type { Schema } from '@draftroom/contract'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useIntl } from 'react-intl'
 import { AddPerson } from './AddPerson.tsx'
-import { generalAccessLabelId, GeneralAccess } from './GeneralAccess.tsx'
+import { GeneralAccess } from './GeneralAccess.tsx'
 import { PeopleList } from './PeopleList.tsx'
-import { permissionLabelId } from '../../components/Permission/Permission.tsx'
 import { sharingProblemId } from './sharingProblem.ts'
 import { useAccessChanges, type AccessChange } from './useAccessChanges.ts'
 import styles from './Sharing.module.css'
@@ -42,19 +41,13 @@ export function AccessEditor({ document, access, members, meId, announce }: Acce
   const textOf = (change: AccessChange) => {
     switch (change.kind) {
       case 'added':
-        return intl.formatMessage(
-          { id: 'sharing.announce.added' },
-          { name: change.name, role: intl.formatMessage({ id: permissionLabelId(change.role) }) },
-        )
+        return intl.formatMessage({ id: 'sharing.announce.added' }, { name: change.name, role: change.role })
       case 'changed':
         return intl.formatMessage({ id: 'sharing.announce.changed' }, { name: change.name, role: change.role })
       case 'removed':
         return intl.formatMessage({ id: 'sharing.announce.removed' }, { name: change.name })
       case 'general':
-        return intl.formatMessage(
-          { id: 'sharing.announce.general' },
-          { option: intl.formatMessage({ id: generalAccessLabelId(change.access) }) },
-        )
+        return intl.formatMessage({ id: 'sharing.announce.general' }, { access: change.access })
     }
   }
 

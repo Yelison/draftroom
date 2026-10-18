@@ -25,6 +25,19 @@ const labels = Object.keys(tones) as Label[]
 
 const labelOf = (label: Label): MessageId => `sync.state.${label}`
 
+/** The word the announcement chooses a label by: a selector of ICU cannot hold a hyphen. */
+const selectorOf: Record<Label, string> = {
+  connecting: 'connecting',
+  synchronising: 'synchronising',
+  synced: 'synced',
+  'offline-local': 'offlineLocal',
+  'offline-tab': 'offlineTab',
+  reconnecting: 'reconnecting',
+  error: 'error',
+  revoked: 'revoked',
+  'read-only': 'readOnly',
+}
+
 /** Offline where the device keeps no copy says so: "with local copy" would tell the person what is not true. */
 const labelFor = (state: SyncState, keepsCopy: boolean): Label =>
   state === 'offline-local' && !keepsCopy ? 'offline-tab' : state
@@ -50,7 +63,7 @@ export function SyncStatus({ state, keepsCopy }: { state: SyncState; keepsCopy: 
         ))}
       </span>
       <span role="status" className="forma-visually-hidden">
-        {intl.formatMessage({ id: 'sync.announcement' }, { status: intl.formatMessage({ id: labelOf(shown) }) })}
+        {intl.formatMessage({ id: 'sync.announcement' }, { status: selectorOf[shown] })}
       </span>
     </Badge>
   )

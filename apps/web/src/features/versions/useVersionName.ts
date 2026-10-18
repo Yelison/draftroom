@@ -1,6 +1,6 @@
 import type { Schema } from '@draftroom/contract'
 import { useIntl } from 'react-intl'
-import { kindMessageId } from './kinds.ts'
+import { kindSelector } from './kinds.ts'
 
 /** When a version was made, in the person's language: a date and a time, which is what tells two of the same day apart. */
 export function useVersionDate() {
@@ -19,9 +19,6 @@ export function useVersionName() {
   const dateOf = useVersionDate()
   return (version: Schema<'Version'>) =>
     version.label === null
-      ? intl.formatMessage(
-          { id: 'versions.unnamed' },
-          { kind: intl.formatMessage({ id: kindMessageId[version.kind] }), date: dateOf(version) },
-        )
+      ? intl.formatMessage({ id: 'versions.unnamed' }, { kind: kindSelector[version.kind], date: dateOf(version) })
       : intl.formatMessage({ id: 'versions.named' }, { label: version.label, date: dateOf(version) })
 }

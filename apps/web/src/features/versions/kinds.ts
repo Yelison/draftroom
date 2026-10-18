@@ -8,3 +8,11 @@ export const kindMessageId = {
   'pre-restore': 'versions.kind.preRestore',
   restore: 'versions.kind.restore',
 } as const satisfies Record<Schema<'VersionKind'>, MessageId>
+
+/** The word the messages choose a kind by: a selector of ICU cannot hold the hyphen of `pre-restore`. */
+export const kindSelector = {
+  auto: 'auto',
+  manual: 'manual',
+  'pre-restore': 'preRestore',
+  restore: 'restore',
+} as const satisfies Record<Schema<'VersionKind'>, string>
