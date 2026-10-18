@@ -110,13 +110,16 @@ export class Person {
       const atEnd = await this.editor.evaluate((root) => {
         const selection = window.getSelection()
         const last = Array.from(root.querySelectorAll('p')).at(-1)
-        return (
-          selection !== null &&
-          selection.isCollapsed &&
-          last !== undefined &&
-          selection.focusNode !== null &&
-          last.contains(selection.focusNode)
-        )
+        if (selection === null || !selection.isCollapsed || last === undefined || selection.focusNode === null)
+          return false
+        if (!last.contains(selection.focusNode)) return false
+        // At the end means nothing but the carets of other people between here and the end of the paragraph.
+        const rest = document.createRange()
+        rest.setStart(selection.focusNode, selection.focusOffset)
+        rest.setEnd(last, last.childNodes.length)
+        const fragment = rest.cloneContents()
+        for (const caret of fragment.querySelectorAll('[class*="_caret"]')) caret.remove()
+        return fragment.textContent === ''
       })
       expect(atEnd, `${this.name}'s caret is not at the end of the text`).toBe(true)
     }, `${this.name} could not put the caret at the end of the text`).toPass()

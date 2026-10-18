@@ -112,7 +112,7 @@ Docker, el proxy inverso y lo que exige para los WebSocket, cada variable, las c
 | De extremo a extremo con el sistema real | `npm run test:e2e-collab -w @draftroom/web` | Dos navegadores contra el servidor y la base de datos reales: convergencia, durabilidad cuando se mata el servidor, revocación y la compilación de producción. Necesita PostgreSQL en marcha, como arriba. |
 | Demo estática | `npm run test:e2e-demo -w @draftroom/web` | La compilación de la demo, que no debe llegar a la red. |
 
-La CI ejecuta cuatro comprobaciones obligatorias en cada pull request: **Static checks** (lint, formato, comprobación de tipos, el lint de OpenAPI y los tipos generados, y `npm test`), **Web e2e (mocked API)**, **Server integration (PostgreSQL)** y **Collaboration e2e (real stack)**. Cuando un pull request toca lo que cubren, se ejecutan además un simulacro de copia y restauración y la compilación de la demo estática, y también una auditoría de dependencias. Ninguno es obligatorio.
+La CI ejecuta cuatro comprobaciones obligatorias en cada pull request: **Static checks** (lint, formato, comprobación de tipos, el lint de OpenAPI y los tipos generados, y `npm test`), **Web e2e (mocked API)**, **Server integration (PostgreSQL)** y **Collaboration e2e (real stack)**. También se ejecuta una auditoría de dependencias en cada pull request; un simulacro de copia y restauración y la compilación de la demo estática solo se ejecutan cuando el pull request toca lo que cubren. Ninguno es obligatorio.
 
 `npm run docs:links` falla cuando un enlace relativo de los README o del documento de arquitectura apunta a un archivo que no existe.
 

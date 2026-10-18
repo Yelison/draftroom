@@ -112,7 +112,7 @@ Docker, the reverse proxy and its WebSocket requirements, every variable, backup
 | Real stack end to end | `npm run test:e2e-collab -w @draftroom/web` | Two browsers against the real server and database: convergence, durability when the server is killed, revocation, the production build. Needs PostgreSQL running, as above. |
 | Static demo | `npm run test:e2e-demo -w @draftroom/web` | The demo build, which must not reach the network. |
 
-The CI runs four required checks on every pull request: **Static checks** (lint, format, type check, the OpenAPI lint and generated types, and `npm test`), **Web e2e (mocked API)**, **Server integration (PostgreSQL)** and **Collaboration e2e (real stack)**. When a pull request touches what they cover, a backup-and-restore drill and a build of the static demo run too, and a dependency audit runs as well. None of these is required.
+The CI runs four required checks on every pull request: **Static checks** (lint, format, type check, the OpenAPI lint and generated types, and `npm test`), **Web e2e (mocked API)**, **Server integration (PostgreSQL)** and **Collaboration e2e (real stack)**. A dependency audit runs on every pull request too; a backup-and-restore drill and a build of the static demo run only when the pull request touches what they cover. None of these is required.
 
 `npm run docs:links` fails when a relative link in the READMEs or the architecture document points at a file that does not exist.
 
