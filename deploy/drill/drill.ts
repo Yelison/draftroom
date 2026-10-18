@@ -1,7 +1,7 @@
 // The checks of the backup and restore drill (deploy/drill/drill.sh starts the stack and calls this). It is a person's first
 // day on the production stack, then a disaster and a recovery, driven over HTTPS and WSS like a browser would:
 //
-//   1. read what the proxy sends: the headers of the document on the web app's files and not on the API, and the redirect from HTTP,
+//   1. read what the proxy sends: the headers of the document on the web app's files and not their values on the API, and the redirect from HTTP,
 //   2. sign up with a real account and read the session cookies' flags,
 //   3. create a document and write into it over the collaboration WebSocket, until the server says it stored the change,
 //   4. take a backup and restore it into a database that did not exist,
@@ -188,7 +188,7 @@ const collabOf = (base: string): string => `${base.replace(/^http/, 'ws')}/colla
 step(`the stack answers on ${origin}`)
 await waitUntilReady(origin)
 
-step('the proxy sends the headers of the document with the web app, and none of them with the API')
+step("the proxy sends the headers of the document with the web app, and its values never with the API's")
 const documentHeaders = {
   'strict-transport-security': 'max-age=31536000',
   'x-content-type-options': 'nosniff',
@@ -208,9 +208,20 @@ check(
 check(!page.headers.has('server'), `the page names its server: ${page.headers.get('server') ?? ''}`)
 const api = await fetch(`${origin}/api/health/live`)
 check(api.ok, `the API's liveness answered ${api.status}`)
-for (const name of [...Object.keys(documentHeaders), 'permissions-policy', 'content-security-policy']) {
-  check(!api.headers.has(name), `the API answer carries ${name}, which belongs to the server's own headers`)
-}
+// Not that the API carries none of these headers: the server sets its own there (a policy, `nosniff`, a referrer policy, HSTS),
+// and the proxy must not add its own over them. So what is checked is that the proxy's values are not what the API says.
+check(
+  api.headers.get('referrer-policy') !== documentHeaders['referrer-policy'],
+  `the API answer has the proxy's Referrer-Policy, ${documentHeaders['referrer-policy']}`,
+)
+check(
+  api.headers.get('content-security-policy') !== "frame-ancestors 'none'",
+  "the API answer has the proxy's Content-Security-Policy, frame-ancestors 'none' and nothing else",
+)
+check(
+  !api.headers.has('cross-origin-opener-policy'),
+  'the API answer has a Cross-Origin-Opener-Policy, which only the proxy sets, and only on the web app',
+)
 
 step('plain HTTP is sent to the address people use, port included')
 const redirect = await fetch(`${plainHttpOrigin}/documents/abc?tab=1`, { redirect: 'manual' })

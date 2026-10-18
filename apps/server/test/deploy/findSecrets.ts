@@ -24,7 +24,8 @@ const valuesOfReferences = /\$\{\w+:?[-=+]([^}]*)\}/g
  * In source code only, and only unquoted (a quoted value is a literal, whatever it looks like): a keyword, a variable of the
  * code (a path of identifiers, none starting with a digit) or a call.
  */
-const codePlaceholder = /^(?:(?:null|undefined|true|false)|[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+|[A-Za-z_][\w.]*\(.*)$/
+const codePlaceholder =
+  /^(?:(?:null|undefined|true|false)|[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+|[A-Za-z_][\w.]*\(.*|[A-Za-z_][\w.]*\[[^\]]*\])$/
 
 const tokenShapes: ReadonlyArray<readonly [rule: string, shape: RegExp]> = [
   ['private key', /-----BEGIN [A-Z ]*PRIVATE KEY-----/],
@@ -43,12 +44,14 @@ const secretName =
 // The name, then a value. The value is a reference to the environment or a command (which may hold spaces), or runs to a
 // quote, a space, a comma or a semicolon. Group 1 is the quote the value opens with, group 2 the value.
 const secretAssignment = new RegExp(
-  `(?<![\\w\${])${secretName}["']?\\s*[=:]\\s*(["']?)(\\$\\{[^}]*\\}|\\$\\([^)]*\\)|[^\\s"',;]*)`,
+  `(?<![\\w\${])${secretName}["']?\\s*[=:]\\s*(["']?)(\\$\\{[^}]*\\}|\\$\\([^)]*\\)|[\\w.]+\\[[^\\]]*\\]|[^\\s"',;]*)`,
   'gi',
 )
-// The same name given as a command-line flag with a space or an equals sign: `docker login --password value`.
+// The same name given as a command-line flag with a space or an equals sign: `docker login --password value`. Not the flags that
+// say there is none (`--no-password`) or where it is read from (`--password-file`, `--password-stdin`), and not the value that is
+// another flag or a `id=…` of `docker build --secret`.
 const secretFlag =
-  /--[\w-]*(?:password|passwd|pass|token|secret|api-?key)[\w-]*[= ]\s*(["']?)(\$\{[^}]*\}|\$\([^)]*\)|[^\s"',;|<>&]*)/gi
+  /--(?!no-)(?![\w-]*-(?:file|stdin)\b)[\w-]*(?:password|passwd|pass|token|secret|api-?key)[\w-]*[= ]\s*(["']?)(?!-|id=)(\$\{[^}]*\}|\$\([^)]*\)|[^\s"',;|<>&]*)/gi
 const urlPassword = /\b[a-z][a-z0-9+.-]*:\/\/(?:\$\{[^}]*\}|[^\s:/@$]+):(\$\{[^}]*\}|[^\s@/]+)@/i
 // A long run of the characters of hexadecimal and base64: a key or a hash of one.
 const longRandomRun = /(?<![\w/+-])(?:[A-Za-z0-9+/_]-?){32,}={0,2}(?![\w/+=-])/
@@ -57,6 +60,8 @@ const longRandomRun = /(?<![\w/+-])(?:[A-Za-z0-9+/_]-?){32,}={0,2}(?![\w/+=-])/
 // capitals).
 const imageDigest = /sha256:[0-9a-f]{64}/g
 const pinnedCommit = /@[0-9a-f]{40}\b/g
+// A Content-Security-Policy names a script by the hash of it: `'sha256-…'` is a source, not a key.
+const policyHash = /'sha(?:256|384|512)-[A-Za-z0-9+/_-]+={0,2}'/g
 const marker = /CHANGE_ME\w*/g
 const lowercasePath = /(?<![\w/+-])\/?(?:[a-z0-9._-]+\/)+[a-z0-9._-]*(?![\w/+=-])/g
 
@@ -79,6 +84,7 @@ export function findSecrets(text: string, { code = false }: ScanOptions = {}): F
     const line = rawLine
       .replace(imageDigest, 'sha256:DIGEST')
       .replace(pinnedCommit, '@COMMIT')
+      .replace(policyHash, "'sha-HASH'")
       .replace(marker, 'CHANGE_ME')
       .replace(lowercasePath, 'PATH')
       .replace(instructionWithoutEquals, '$1 $2=$3')

@@ -13,6 +13,8 @@ const fake = {
   jwt: `eyJ${'a'.repeat(12)}.eyJ${'b'.repeat(12)}.${'c'.repeat(12)}`,
   hex32: 'c0ffee'.repeat(11),
   hex64: '9f86d081'.repeat(8),
+  // The hash of an inline script as a policy writes it: 32 bytes in base64.
+  policyHashes: [`'sha256-${'Zm9vYmFy'.repeat(5)}Zm8='`, `'sha256-${'YmF6cXV4'.repeat(5)}YmE='`],
   // 22 characters of salt and 31 of hash, with the `.` of their alphabet where it keeps every run of letters and digits short.
   bcrypt: `$2a$14$${'N9qo8uLOick.x2ZMRZoMye'}${'IjVHCm/XwZ1GV.mdq/9OdUgnwS8iVbi'}`,
 }
@@ -102,6 +104,13 @@ describe('what counts as a secret in a file meant to be published', () => {
     ],
     ['a reference with an empty default', 'POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}'],
     ['a flag that says where the password is read from', 'docker login --password-stdin < /run/secrets/registry'],
+    ['the flag that says there is no password', 'pg_dump --no-password draftroom'],
+    ['a flag that says which file holds the password', 'docker run --password-file /run/secrets/db image'],
+    ['a build secret named by id, not given', 'docker build --secret id=npm,src=$HOME/.npmrc .'],
+    [
+      'a policy that names two scripts by their hash',
+      `Content-Security-Policy "script-src ${fake.policyHashes.join(' ')}"`,
+    ],
     ['a flag that takes a reference', 'docker login --password "$REGISTRY_PASSWORD"'],
     ['a name that only starts with KEY', 'MY_KEYBOARD=azerty'],
   ]
@@ -140,6 +149,7 @@ describe('what only source code may put where a secret goes', () => {
     ['a variable of the code', '  password: account.password,'],
     ['a call', "  password: randomBytes(18).toString('base64url'),"],
     ['a keyword', '  token: null,'],
+    ['a variable of the environment, indexed', "  const sshKey = process.env['SSH_KEY']"],
   ]
   it.each(inCode)('lets through %s in code', (_what, line) => {
     expect(findSecrets(line, { code: true })).toEqual([])
