@@ -864,6 +864,33 @@ test.describe('the layout', () => {
         await expect(commentsToggle(page)).toHaveAttribute('aria-expanded', 'false')
       })
 
+      // The layout-shift score cannot see this: it counts what moves after the page has painted, and the skeleton is painted
+      // before the screen's chunk has arrived. What it shows has to be where the document will put the sheet.
+      test('shows the skeleton with the band where the document will have it, so the sheet does not jump', async ({
+        page,
+      }) => {
+        let release: () => void = () => {}
+        const held = new Promise<void>((resolve) => {
+          release = resolve
+        })
+        await page.route(/\/assets\/EditorScreen-[^/]*\.js$/, async (route) => {
+          await held
+          await route.continue()
+        })
+        await page.goto(documentPath, { waitUntil: 'commit' })
+        const skeleton = page.locator('[aria-busy="true"]')
+        const skeletonBand = skeleton.locator(':scope > div > div').first()
+        await skeletonBand.waitFor()
+        const waiting = await skeletonBand.boundingBox()
+
+        release()
+        await textArea(page).waitFor()
+        const loaded = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
+
+        // The sheet starts where the band ends, so the band of the skeleton must end where the one of the document does.
+        expect((waiting?.y ?? 0) + (waiting?.height ?? 0)).toBe((loaded?.y ?? 0) + (loaded?.height ?? 0))
+      })
+
       test('does not shift while the document arrives', async ({ page }) => {
         await page.goto(documentPath)
         await textArea(page).waitFor()

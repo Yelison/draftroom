@@ -50,6 +50,9 @@
   top: 0;
   z-index: var(--z-sticky);
   flex-shrink: 0;
+  /* The two rows are what fill it once the document is there, and the skeleton has none: the height is the band's own, so the
+   * sheet is where it will be before the document arrives and not 112 px higher. */
+  min-block-size: calc(2 * var(--layout-toolbar-height));
   border-radius: var(--radius-panel) var(--radius-panel) 0 0;
   background: var(--color-surface);
   box-shadow: inset 0 0 0 1px var(--color-line);
