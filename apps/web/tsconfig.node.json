@@ -14,7 +14,8 @@
   //  - the few modules of `src` that the Vite configuration reads (`i18n/locale.ts`, `i18n/localeScript.ts`, the
   //    catalogues, `theme.ts`);
   //  - the fixtures that the bundle guard searches the production build for (`data/mock/fixtures`, `data/mock/ids.ts`);
-  //  - the clipboard HTML that the editor spec pastes (`features/editor/testing/wordProcessorHtml.ts`);
+  //  - the clipboard HTML that the editor spec pastes (`features/editor/testing/wordProcessorHtml.ts`) and the check that two
+  //    people's words were woven together without a letter added or lost (`features/editor/testing/interleaving.ts`);
   //  - the HTTP client and the shared contract suite, which the real-stack suite talks to the server with and runs
   //    (`data/DataSource.ts`, `data/errors.ts`, `data/http`, `data/contract.suite.ts`, `data/testing/contract.ts`, `ordering.ts`).
   "include": [
@@ -31,6 +32,7 @@
     "src/data/mock/fixtures",
     "src/data/mock/ids.ts",
     "src/features/editor/testing/wordProcessorHtml.ts",
+    "src/features/editor/testing/interleaving.ts",
     "src/data/DataSource.ts",
     "src/data/errors.ts",
     "src/data/http",

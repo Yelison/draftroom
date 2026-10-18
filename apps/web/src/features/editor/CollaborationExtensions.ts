@@ -4,6 +4,7 @@ import { Collaboration } from '@tiptap/extension-collaboration'
 import { CollaborationCaret } from '@tiptap/extension-collaboration-caret'
 import type * as Y from 'yjs'
 import { isPresenceColor } from '../../collab/awareness.ts'
+import { NewBlockText } from './NewBlockText.ts'
 import styles from './Prose.module.css'
 
 /** Who this person is to the others: the id is what the server checks, and it replaces the name with its own. */
@@ -26,8 +27,9 @@ function renderCaret(user: Record<string, unknown>): HTMLElement {
 }
 
 /**
- * The shared content and the carets of the others, over a Yjs document and the provider that carries it. The name on a
- * caret is whatever the server relays for that person (protocol section 5.3), never what a client wrote.
+ * The shared content and the carets of the others, over a Yjs document and the provider that carries it. The new blocks
+ * of the content get their text node at once, so that two people typing in one never create one each (`NewBlockText`).
+ * The name on a caret is whatever the server relays for that person (protocol section 5.3), never what a client wrote.
  */
 export function collaborationExtensions({
   ydoc,
@@ -40,6 +42,7 @@ export function collaborationExtensions({
 }) {
   return [
     Collaboration.configure({ document: ydoc, field: fragmentName }),
+    NewBlockText,
     CollaborationCaret.configure({
       provider,
       user: person,

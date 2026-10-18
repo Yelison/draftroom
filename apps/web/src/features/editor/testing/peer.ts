@@ -1,13 +1,10 @@
-import { editorExtensions } from '@draftroom/editor-schema'
-import { fragmentName } from '@draftroom/editor-schema'
-import { Editor } from '@tiptap/core'
-import { Collaboration } from '@tiptap/extension-collaboration'
 import { absolutePositionToRelativePosition, ySyncPluginKey } from '@tiptap/y-tiptap'
 import * as Y from 'yjs'
 import { expect, vi } from 'vitest'
 import { presenceLookOf } from '../../../collab/presenceColor.ts'
 import { createCollabSession } from '../../../collab/session.ts'
 import type { MockServer } from '../../../data/mock/createMockDataSource.ts'
+import { openHeadlessEditor } from './headlessEditor.ts'
 
 /**
  * Someone else in the document, made of the same parts as the person at the screen: a session on the same collaboration
@@ -35,9 +32,7 @@ export async function joinAsPeer({
   const { ydoc, provider } = session.getSnapshot()
   // Without the caret extension: its plugin publishes the caret only while its view has focus, and a headless editor has
   // none, so it would take the caret back as fast as `placeCaret` puts it. The person is published by hand.
-  const editor = new Editor({
-    extensions: [...editorExtensions(), Collaboration.configure({ document: ydoc, field: fragmentName })],
-  })
+  const editor = openHeadlessEditor(ydoc)
   provider.setAwarenessField('user', { ...person, color: presenceLookOf(person.id).color })
   await vi.waitFor(() => expect(session.getSnapshot().state).toMatch(/synced|synchronising/))
   return {
