@@ -5,6 +5,7 @@
     { "path": "apps/server" },
     { "path": "packages/contract" },
     { "path": "packages/editor-schema" },
-    { "path": "deploy" }
+    { "path": "deploy" },
+    { "path": "scripts" }
   ]
 }

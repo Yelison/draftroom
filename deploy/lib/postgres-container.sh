@@ -10,14 +10,14 @@ die() {
 }
 
 # Prints the id of the running container of the stack's database. `POSTGRES_CONTAINER` names it directly; otherwise it is
-# the `postgres` service of the Compose project `COMPOSE_PROJECT_NAME` (default `draftroom`), found by label so that no
-# Compose file has to be read, and with it no variable of it.
+# the `postgres` service of the Compose project `COMPOSE_PROJECT_NAME` (default `draftroom-prod`, the production stack's:
+# `draftroom` is the development one), found by label so that no Compose file has to be read, and with it no variable of it.
 find_postgres_container() {
   if [[ -n "${POSTGRES_CONTAINER:-}" ]]; then
     docker inspect --format '{{.Id}}' "$POSTGRES_CONTAINER" 2>/dev/null || die "no container named '$POSTGRES_CONTAINER'"
     return
   fi
-  local project="${COMPOSE_PROJECT_NAME:-draftroom}" matches
+  local project="${COMPOSE_PROJECT_NAME:-draftroom-prod}" matches
   matches="$(docker ps --quiet --no-trunc \
     --filter "label=com.docker.compose.project=$project" \
     --filter 'label=com.docker.compose.service=postgres')"

@@ -46,7 +46,7 @@ You need Docker with the Compose plugin, a host name whose DNS record points at 
 ```sh
 cp deploy/env.example deploy/.env
 # Edit deploy/.env: SITE_ADDRESS, PUBLIC_ORIGIN, and the two secrets (the file says how to generate them).
-docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom up -d --build --wait
+docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom-prod up -d --build --wait
 ```
 
 `--wait` returns when PostgreSQL, the server and the proxy report healthy. The server migrates the database before it listens,
@@ -69,7 +69,7 @@ Updating is `git pull` and the same `up -d --build --wait`. Migrations only go f
 Stopping is the same command with `down` in place of `up -d --build --wait`:
 
 ```sh
-docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom down
+docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom-prod down
 ```
 
 Add `--volumes` only to delete the database and the certificates.
@@ -172,7 +172,7 @@ scripts/backup.sh                                  # -> deploy/backups/draftroom
 scripts/restore.sh deploy/backups/<file>.dump draftroom_restored
 ```
 
-Both find the database through the Compose project (`COMPOSE_PROJECT_NAME`, default `draftroom`; `POSTGRES_CONTAINER` names a
+Both find the database through the Compose project (`COMPOSE_PROJECT_NAME`, default `draftroom-prod`, the production stack's project; `POSTGRES_CONTAINER` names a
 container directly) and run `pg_dump` and `pg_restore` inside it, so they need Docker and no password. `POSTGRES_USER` and
 `POSTGRES_DB` default to the Compose defaults.
 
@@ -180,7 +180,7 @@ container directly) and run `pg_dump` and `pg_restore` inside it, so they need D
   `DATABASE_URL`). A backup that has never been restored is a hope. The optional CI workflow `Backup and restore drill` does exactly
   this on every change to the packaging.
 - **Restoring over the live database** is how you recover from a loss. Stop the server first
-  (`docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom stop server proxy`). The script reads the
+  (`docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom-prod stop server proxy`). The script reads the
   whole archive before it touches anything, restores it into a scratch database, and only if that went all the way replaces the
   database you named: it asks you to type its name unless you pass `--yes`, and refuses while something is connected to it. If
   anything fails, your database is as it was. Start the stack again afterwards (the same command with `start`). `postgres`,

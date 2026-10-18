@@ -1,11 +1,13 @@
 # Draftroom in production: Caddy in front, the server behind it, PostgreSQL 17 behind that.
 #
 #   cp deploy/env.example deploy/.env      # then fill in the host name and the two secrets (they are empty until you do)
-#   docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom up -d --build --wait
+#   docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml -p draftroom-prod up -d --build --wait
 #
 # Only the proxy publishes ports. The server and the database are reachable on the Compose network and nowhere else, so
 # the database is never exposed to the host's network. docs/deploy/README.md covers the rest: variables, backups, scaling.
-name: draftroom
+# A project of its own: the development Compose file is `draftroom`, and two projects of one name share the `postgres`
+# service and its volume, so this stack would start on the development database.
+name: draftroom-prod
 
 services:
   postgres:
