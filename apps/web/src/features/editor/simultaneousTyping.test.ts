@@ -2,6 +2,7 @@
 import * as Y from 'yjs'
 import { describe, expect, it } from 'vitest'
 import { openHeadlessEditor } from './testing/headlessEditor.ts'
+import { isInterleavingOf } from './testing/interleaving.ts'
 
 // Two people in the same empty paragraph who type at the same moment end up with their words in one paragraph, one run
 // after the other or one inside the other, because both write at the same point. What they must never get is a letter
@@ -9,34 +10,6 @@ import { openHeadlessEditor } from './testing/headlessEditor.ts'
 
 const danielText = 'Before then, the kit is the plan.'
 const priyaText = 'Decision: we ship on Friday.'
-
-/** Whether `merged` is `first` and `second` woven together, each in its own order, with no letter added or lost. */
-function isInterleavingOf(merged: string, first: string, second: string): boolean {
-  if (merged.length !== first.length + second.length) return false
-  // `reachable[i][j]`: the first `i + j` letters of `merged` are made of the first `i` of `first` and the first `j` of `second`.
-  const reachable = Array.from({ length: first.length + 1 }, () => new Array<boolean>(second.length + 1).fill(false))
-  reachable[0]![0] = true
-  for (let i = 0; i <= first.length; i++) {
-    for (let j = 0; j <= second.length; j++) {
-      const letter = merged[i + j - 1]
-      if (i > 0 && reachable[i - 1]![j] && first[i - 1] === letter) reachable[i]![j] = true
-      if (j > 0 && reachable[i]![j - 1] && second[j - 1] === letter) reachable[i]![j] = true
-    }
-  }
-  return reachable[first.length]![second.length]!
-}
-
-describe('isInterleavingOf', () => {
-  it.each([
-    ['one run after the other', 'abcxyz', true],
-    ['one inside the other', 'abxyzc', true],
-    ['a letter twice', 'abxxyzc', false],
-    ['a letter lost', 'abxyc', false],
-    ['the order of a person changed', 'bacxyz', false],
-  ])('%s', (_name, merged, expected) => {
-    expect(isInterleavingOf(merged, 'abc', 'xyz')).toBe(expected)
-  })
-})
 
 function shareAnEmptyParagraph(daniel: Y.Doc, priya: Y.Doc) {
   const danielEditor = openHeadlessEditor(daniel)
