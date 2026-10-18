@@ -86,8 +86,10 @@ export function showHighlights(
  * it is only a first drawing.
  *
  * "Once the editor has written" is the next microtask after the transaction: the sync plugin writes in the `update` of
- * its view, which runs inside `dispatch`, before this plugin's own view update. That relies on the collaboration
- * extension coming before this one (it has the higher priority); a test, which types over a range, fails if it did not.
+ * its view, which runs inside `dispatch`, so a microtask queued from any view update runs after it, whatever the order of
+ * the views. What does depend on the order of the extensions is the `apply` of this plugin, which reads the state of the
+ * sync plugin from the new editor state (`isChangeOrigin`, and the document to resolve in): that field is there only if the
+ * collaboration extension, which has the higher priority, comes first. The tests of this plugin fail if it did not.
  */
 function highlightPlugin(requests: CommentRequests | null): Plugin<HighlightState> {
   const commentKey = keydownHandler({

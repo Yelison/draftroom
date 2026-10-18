@@ -209,6 +209,47 @@ describe('commenting on a selection', () => {
     expect(await within(panel).findByText('The comment now refers to the new selection.')).toBeInTheDocument()
   })
 
+  it('says the selection changed when only the end of it is another', async () => {
+    const user = userEvent.setup()
+    renderCommentedDocument({ paragraphs })
+    const editor = await editorOf()
+    const panel = await findPanel()
+    const text = await textArea()
+    text.focus()
+    await select(editor, 'second week')
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+    await within(panel).findByRole('textbox', { name: 'Your comment' })
+
+    // Same start, fewer words: "second week" becomes "second".
+    text.focus()
+    await select(editor, 'second')
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+
+    expect(await within(panel).findByText('The comment now refers to the new selection.')).toBeInTheDocument()
+  })
+
+  it('does not say the selection changed when the person asks again for the same one', async () => {
+    const user = userEvent.setup()
+    renderCommentedDocument({ paragraphs })
+    const editor = await editorOf()
+    const panel = await findPanel()
+    const text = await textArea()
+    text.focus()
+    await select(editor, 'second week')
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+    const field = await within(panel).findByRole('textbox', { name: 'Your comment' })
+    await user.type(field, 'Still the same words')
+
+    text.focus()
+    await select(editor, 'second week')
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+
+    // The form takes the focus again and keeps the text, and there is nothing to announce: the quote is the same.
+    await waitFor(() => expect(field).toHaveFocus())
+    expect(field).toHaveValue('Still the same words')
+    expect(within(panel).queryByText('The comment now refers to the new selection.')).not.toBeInTheDocument()
+  })
+
   it('does not say the selection changed when the form was not open', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs })

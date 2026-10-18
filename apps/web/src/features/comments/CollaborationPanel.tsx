@@ -60,9 +60,12 @@ export function CollaborationPanel({ editor, provider, document, personId, reque
     if (empty || bound === null || !canComment(document.role)) return
     const quote = quoteOf(editor.state.doc, from, to)
     if (quote.trim() === '') return
+    const anchor = createAnchor(bound, from, to)
     // What was already written belongs to the person, not to the selection: it stays, and the comment is about the new one.
-    setDraft((current) => ({ anchor: createAnchor(bound, from, to), quote, body: current?.body ?? '' }))
-    if (draft !== null) announce('quoteChanged')
+    setDraft((current) => ({ anchor, quote, body: current?.body ?? '' }))
+    // Said only when it is about something else: asking again for the same selection changes nothing to announce.
+    if (draft !== null && (draft.anchor.start !== anchor.start || draft.anchor.end !== anchor.end))
+      announce('quoteChanged')
     setComposerFocus((count) => count + 1)
     setTab('comments')
   }

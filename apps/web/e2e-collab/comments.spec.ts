@@ -58,6 +58,32 @@ async function settled(page: Page, complete: (selected: string) => boolean): Pro
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
 }
 
+/**
+ * Puts the caret at the end of the first line, with the keyboard, and does not return before the caret is there. When the
+ * focus comes back to the text, ProseMirror puts the selection of its own state back in the page a moment later if the page's
+ * is not the same: the keys that arrive before it are undone, and the caret is left at the start. So the caret is read back
+ * after a frame, which is where the editor has taken it, and the keys are pressed again when it is not.
+ */
+async function putCaretAfter(person: Participant, line: string): Promise<void> {
+  const caretIsAtTheEnd = () =>
+    person.page.evaluate((text) => {
+      const selection = window.getSelection()
+      return (
+        selection?.isCollapsed === true &&
+        selection.anchorNode?.textContent === text &&
+        selection.anchorOffset === text.length
+      )
+    }, line)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await person.editor.focus()
+    await person.page.keyboard.press('Control+Home')
+    await person.page.keyboard.press('End')
+    await settled(person.page, () => true)
+    if (await caretIsAtTheEnd()) break
+  }
+  await expect.poll(caretIsAtTheEnd).toBe(true)
+}
+
 const card = (person: Participant) =>
   person.page.getByRole('complementary', { name: 'Comments and activity' }).getByRole('article')
 
@@ -172,24 +198,7 @@ test.describe('a comment while the person who sees it writes on it', () => {
     await expect.poll(() => highlighted(daniel.page)).toEqual(['de'])
 
     // She types at the end of "abc": the text joins the range, for her as for him.
-    await priya.editor.focus()
-    await priya.page.keyboard.press('Control+Home')
-    await priya.page.keyboard.press('End')
-    // The editor gives back the selection it had when the focus returns; typing before the caret has moved would replace it.
-    await expect
-      .poll(() =>
-        priya.page.evaluate(() => {
-          const selection = window.getSelection()
-          return (
-            selection?.isCollapsed === true &&
-            selection.anchorNode?.textContent === 'abc' &&
-            selection.anchorOffset === 3
-          )
-        }),
-      )
-      .toBe(true)
-    // And a frame more, for the editor to take the caret in: the letter goes where the editor has the caret.
-    await settled(priya.page, () => true)
+    await putCaretAfter(priya, 'abc')
     await priya.page.keyboard.type('Z')
     await expect.poll(() => daniel.text()).toBe('abcZ\ndef ghi')
     for (const person of [daniel, priya]) await expect(person.syncStatus).toHaveText('Sync status: Synced')
