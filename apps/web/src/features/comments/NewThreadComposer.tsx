@@ -17,6 +17,8 @@ export interface Draft {
 
 export interface NewThreadComposerProps {
   draft: Draft
+  /** Changes when the person asks again for a comment while the form is open, which puts the focus in the field again. */
+  focusRequest: number
   onChange: (body: string) => void
   /** Sends the thread; the draft is kept for as long as it does not work. */
   onSubmit: (draft: Draft) => Promise<Outcome>
@@ -24,17 +26,17 @@ export interface NewThreadComposerProps {
 }
 
 /**
- * The form of a new thread, on top of the list. It takes the focus when it opens, because the person has just asked for
- * it, and Escape closes it and gives the focus back to the text. The anchor was made when the person asked, so what they
+ * The form of a new thread, on top of the list. It takes the focus when it opens and each time the person asks for a
+ * comment again, because they have just asked for it, and Escape closes it and gives the focus back to the text. The anchor was made when the person asked, so what they
  * type in the document meanwhile does not move it.
  */
-export function NewThreadComposer({ draft, onChange, onSubmit, onCancel }: NewThreadComposerProps) {
+export function NewThreadComposer({ draft, focusRequest, onChange, onSubmit, onCancel }: NewThreadComposerProps) {
   const intl = useIntl()
   const send = useAction()
   const [problem, setProblem] = useState<BodyProblem | null>(null)
   const field = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => field.current?.focus(), [])
+  useEffect(() => field.current?.focus(), [focusRequest])
 
   async function submit() {
     const found = bodyProblem(draft.body)

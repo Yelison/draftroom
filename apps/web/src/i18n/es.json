@@ -307,6 +307,7 @@
   "comments.announce.reopened": "Hilo reabierto.",
   "comments.announce.edited": "Comentario guardado.",
   "comments.announce.deleted": "Comentario eliminado.",
+  "comments.announce.quoteChanged": "El comentario ahora se refiere a la nueva selección.",
   "templates.pick": "Desde una plantilla",
   "templates.picker.title": "Elige una plantilla",
   "templates.loading": "Cargando plantillas",

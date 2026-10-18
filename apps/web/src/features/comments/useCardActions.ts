@@ -12,7 +12,7 @@ export const failedOutcome = (intl: IntlShape, error: unknown): Outcome => ({
 })
 
 /** What the panel says after an action worked: the message of the live region. */
-export type Announcement = 'created' | 'replied' | 'resolved' | 'reopened' | 'edited' | 'deleted'
+export type Announcement = 'created' | 'replied' | 'resolved' | 'reopened' | 'edited' | 'deleted' | 'quoteChanged'
 
 /**
  * The actions of a card over the mutations of the panel. A request that fails is not thrown at the card: it is told in the

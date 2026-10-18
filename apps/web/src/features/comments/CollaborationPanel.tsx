@@ -3,12 +3,12 @@ import type { HocuspocusProvider } from '@hocuspocus/provider'
 import { useQuery } from '@tanstack/react-query'
 import type { Editor } from '@tiptap/core'
 import { Tabs } from '@yelison/forma-ui'
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { useIntl } from 'react-intl'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { DocumentActivity } from '../history/DocumentActivity.tsx'
 import { boundDocumentOf, createAnchor, quoteOf } from './anchors.ts'
-import type { CommentRequests } from './commentRequests.ts'
+import type { CommentRequest, CommentRequests } from './commentRequests.ts'
 import { CommentsTab, type Reveal } from './CommentsTab.tsx'
 import { highlightedThreads, showHighlights } from './highlightPlugin.ts'
 import type { Draft } from './NewThreadComposer.tsx'
@@ -45,6 +45,9 @@ export function CollaborationPanel({ editor, provider, document, personId, reque
   const [draft, setDraft] = useState<Draft | null>(null)
   const [reveal, setReveal] = useState<Reveal | null>(null)
   const [announcement, setAnnouncement] = useState<{ id: Announcement; count: number } | null>(null)
+  // Counted, so each request puts the focus in the form again, also when it was already open.
+  const [composerFocus, setComposerFocus] = useState(0)
+  const announce = (id: Announcement) => setAnnouncement((previous) => ({ id, count: (previous?.count ?? 0) + 1 }))
 
   // The highlights follow the open threads: a resolved thread has none, and one the server no longer has goes with it.
   useEffect(() => {
@@ -57,26 +60,26 @@ export function CollaborationPanel({ editor, provider, document, personId, reque
     if (empty || bound === null || !canComment(document.role)) return
     const quote = quoteOf(editor.state.doc, from, to)
     if (quote.trim() === '') return
-    setDraft({ anchor: createAnchor(bound, from, to), quote, body: '' })
+    // What was already written belongs to the person, not to the selection: it stays, and the comment is about the new one.
+    setDraft((current) => ({ anchor: createAnchor(bound, from, to), quote, body: current?.body ?? '' }))
+    if (draft !== null) announce('quoteChanged')
+    setComposerFocus((count) => count + 1)
     setTab('comments')
   }
 
-  useEffect(
-    () =>
-      requests.subscribe((request) => {
-        if (request.type === 'comment') return startDraft()
-        setTab('comments')
-        setActiveThreadId(request.threadId)
-        setReveal((previous) => ({
-          threadId: request.threadId,
-          focus: request.focus,
-          count: (previous?.count ?? 0) + 1,
-        }))
-      }),
-    // `startDraft` reads the editor and the role, both of which this effect already depends on.
-    // oxlint-disable-next-line react/exhaustive-deps
-    [requests, editor, document.role],
-  )
+  // What the text asks of the panel. It reads the draft and the editor as they are when it is asked, which the effect
+  // that listens must not depend on: it would listen again, and miss a request in between, with every keystroke.
+  const answer = useEffectEvent((request: CommentRequest) => {
+    if (request.type === 'comment') return startDraft()
+    setTab('comments')
+    setActiveThreadId(request.threadId)
+    setReveal((previous) => ({
+      threadId: request.threadId,
+      focus: request.focus,
+      count: (previous?.count ?? 0) + 1,
+    }))
+  })
+  useEffect(() => requests.subscribe(answer), [requests])
 
   return (
     <aside className={styles.panel} aria-label={intl.formatMessage({ id: 'comments.panel.label' })}>
@@ -97,11 +100,12 @@ export function CollaborationPanel({ editor, provider, document, personId, reque
                 activeThreadId={activeThreadId}
                 onActivate={setActiveThreadId}
                 draft={draft}
+                composerFocus={composerFocus}
                 onDraftChange={(body) => setDraft((current) => (current === null ? null : { ...current, body }))}
                 onDraftEnd={() => setDraft(null)}
                 onStartDraft={startDraft}
                 reveal={reveal}
-                onAnnounce={(id) => setAnnouncement((previous) => ({ id, count: (previous?.count ?? 0) + 1 }))}
+                onAnnounce={announce}
               />
             ),
           },

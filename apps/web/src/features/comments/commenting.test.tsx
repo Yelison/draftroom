@@ -185,6 +185,45 @@ describe('commenting on a selection', () => {
     await waitFor(() => expect(document.querySelector('mark')?.textContent).toBe('second week'))
   })
 
+  it('keeps what was written when the person comments on another selection, and puts the focus in the form', async () => {
+    const user = userEvent.setup()
+    renderCommentedDocument({ paragraphs })
+    const editor = await editorOf()
+    const panel = await findPanel()
+    const text = await textArea()
+    text.focus()
+    await select(editor, 'second week')
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+    const field = await within(panel).findByRole('textbox', { name: 'Your comment' })
+    await waitFor(() => expect(field).toHaveFocus())
+    await user.type(field, 'A long thought about the date')
+
+    text.focus()
+    await select(editor, 'announcement')
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+
+    const composer = within(panel).getByRole('region', { name: 'New comment' })
+    await waitFor(() => expect(composer).toHaveTextContent('announcement'))
+    expect(within(composer).getByRole('textbox', { name: 'Your comment' })).toHaveValue('A long thought about the date')
+    await waitFor(() => expect(within(composer).getByRole('textbox', { name: 'Your comment' })).toHaveFocus())
+    expect(await within(panel).findByText('The comment now refers to the new selection.')).toBeInTheDocument()
+  })
+
+  it('does not say the selection changed when the form was not open', async () => {
+    const user = userEvent.setup()
+    renderCommentedDocument({ paragraphs })
+    const editor = await editorOf()
+    const panel = await findPanel()
+    const text = await textArea()
+    text.focus()
+    await select(editor, 'second week')
+
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+
+    await within(panel).findByRole('region', { name: 'New comment' })
+    expect(within(panel).queryByText('The comment now refers to the new selection.')).not.toBeInTheDocument()
+  })
+
   it('asks for something to send, and gives the focus back to the text when the person cancels', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs })

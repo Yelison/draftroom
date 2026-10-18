@@ -307,6 +307,7 @@
   "comments.announce.reopened": "Thread reopened.",
   "comments.announce.edited": "Comment saved.",
   "comments.announce.deleted": "Comment deleted.",
+  "comments.announce.quoteChanged": "The comment now refers to the new selection.",
   "templates.pick": "From a template",
   "templates.picker.title": "Choose a template",
   "templates.loading": "Loading templates",

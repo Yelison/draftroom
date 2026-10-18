@@ -38,6 +38,8 @@ export interface CommentsTabProps {
   activeThreadId: string | null
   onActivate: (threadId: string | null) => void
   draft: Draft | null
+  /** Changes with every request for a comment, so the form takes the focus each time. */
+  composerFocus: number
   onDraftChange: (body: string) => void
   onDraftEnd: () => void
   onStartDraft: () => void
@@ -61,6 +63,7 @@ export function CommentsTab({
   activeThreadId,
   onActivate,
   draft,
+  composerFocus,
   onDraftChange,
   onDraftEnd,
   onStartDraft,
@@ -156,6 +159,7 @@ export function CommentsTab({
       {draft !== null && (
         <NewThreadComposer
           draft={draft}
+          focusRequest={composerFocus}
           onChange={onDraftChange}
           onSubmit={createThread}
           onCancel={() => {
