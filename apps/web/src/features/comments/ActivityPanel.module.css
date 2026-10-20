@@ -1,7 +1,7 @@
-/* At the edge of the window, under the band and the bar, which stay in sight. */
+/* At the edge of the window, under the band and the bar, which stay in sight (under 1280 px they do not, and it has the height). */
 .panel {
   position: fixed;
-  inset-block: calc(var(--layout-header-height) + var(--layout-toolbar-height)) 0;
+  inset-block: 0;
   inset-inline-end: 0;
   z-index: var(--z-overlay);
   display: flex;
@@ -11,6 +11,12 @@
   border-inline-start: 1px solid var(--color-line);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
+}
+
+@media (width >= 1280px) {
+  .panel {
+    inset-block-start: calc(var(--layout-header-height) + var(--layout-toolbar-height));
+  }
 }
 
 .head {

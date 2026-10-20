@@ -1,9 +1,33 @@
+/*
+ * Beside the toolbar, in one row: the filter, then the tabs and the button of the margin. Under the width of a desktop (a zoom
+ * of 200 % is one) there is no room for them in one row, so each is a row of its own, of the height of the toolbar's, and
+ * nothing is cut: the rows are what the skeleton has too.
+ */
 .controls {
   display: flex;
   flex: none;
   gap: var(--space-12);
   align-items: center;
-  padding-inline: var(--space-12);
+  padding-inline: var(--space-8);
+}
+
+.row {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+}
+
+@media (width < 1280px) {
+  .controls {
+    flex-wrap: wrap;
+    flex: 1 1 100%;
+    gap: 0;
+  }
+
+  .row {
+    flex: 1 1 100%;
+    block-size: var(--layout-toolbar-height);
+  }
 }
 
 /* The panels of the tabs are the margin and the activity at the edge of the window, so the ones the tabs bring have no place. */

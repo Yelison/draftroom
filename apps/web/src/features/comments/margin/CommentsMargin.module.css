@@ -41,7 +41,7 @@
 }
 
 .label {
-  margin: 0;
+  padding-inline: var(--space-4);
   color: var(--color-muted);
   font: var(--font-caption);
 }
@@ -49,7 +49,7 @@
 @media (width >= 1280px) {
   .label {
     position: absolute;
-    inset-inline: var(--space-4);
+    inset-inline: 0;
   }
 }
 

@@ -27,19 +27,23 @@ export function CommentsControls({ documentId }: { documentId: string }) {
 
   return (
     <div className={styles.controls}>
-      <ThreadFilter value={filter} counts={counts} onChange={setFilter} />
-      {/* The panels of the tabs are not here: the margin is the one of Comments and the activity opens at the edge of the window. */}
-      <Tabs
-        className={styles.tabs ?? ''}
-        label={intl.formatMessage({ id: 'comments.panel.tabs' })}
-        value={tab}
-        onChange={(id) => setTab(id === 'activity' ? 'activity' : 'comments')}
-        items={[
-          { id: 'comments', label: intl.formatMessage({ id: 'comments.tab.comments' }), content: null },
-          { id: 'activity', label: intl.formatMessage({ id: 'comments.tab.activity' }), content: null },
-        ]}
-      />
-      <CommentsToggle documentId={documentId} />
+      <div className={styles.row}>
+        <ThreadFilter value={filter} counts={counts} onChange={setFilter} />
+      </div>
+      <div className={styles.row}>
+        {/* The panels of the tabs are not here: the margin is the one of Comments and the activity opens at the edge of the window. */}
+        <Tabs
+          className={styles.tabs ?? ''}
+          label={intl.formatMessage({ id: 'comments.panel.tabs' })}
+          value={tab}
+          onChange={(id) => setTab(id === 'activity' ? 'activity' : 'comments')}
+          items={[
+            { id: 'comments', label: intl.formatMessage({ id: 'comments.tab.comments' }), content: null },
+            { id: 'activity', label: intl.formatMessage({ id: 'comments.tab.activity' }), content: null },
+          ]}
+        />
+        <CommentsToggle documentId={documentId} />
+      </div>
       {tab === 'activity' && <ActivityPanel documentId={documentId} onClose={() => setTab('comments')} />}
     </div>
   )

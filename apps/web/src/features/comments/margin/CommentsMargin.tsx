@@ -42,6 +42,9 @@ interface Reveal {
 /** The comment being written has no thread yet, and takes the place its text has. */
 const draftId = 'new-comment'
 
+/** The label of the threads whose text is gone, which is an item of the list but not a card. */
+const labelId = 'removed-text'
+
 export interface CommentsMarginProps {
   editor: Editor
   provider: HocuspocusProvider
@@ -190,9 +193,9 @@ export function CommentsMargin({ editor, provider, document, personId, requests 
   async function createThread({ anchor, quote, body }: Draft): Promise<Outcome> {
     try {
       const created = await mutations.createThread.mutateAsync({ anchor, quote, body })
-      focusPlan.focusWhenItArrives(created.id)
       setFilter('open')
-      activate(created.id, { focus: false })
+      // The card is shown and given the focus once the text has placed the thread, as it is for one the text asks for.
+      activate(created.id, { focus: true })
       setDraft(null)
       announce('created')
       return succeeded
@@ -208,6 +211,10 @@ export function CommentsMargin({ editor, provider, document, personId, requests 
     if (reveal === null || revealed.current === reveal) return
     const thread = threads.find((row) => row.id === reveal.threadId)
     if (thread === undefined) return
+    // A thread moves from the end of the margin to its place on the text when the text places it, and that is another element:
+    // whatever has the focus goes with the one that was there. The card is asked for once the thread has its place.
+    const placement = placements.get(thread.id)
+    if (handshaken && (placement === undefined || placement.status === 'unresolved')) return
     if (filter !== 'all' && thread.status !== filter) {
       // A request from the text is the one reason to leave the filter the person chose.
       // oxlint-disable-next-line react/set-state-in-effect
@@ -222,15 +229,16 @@ export function CommentsMargin({ editor, provider, document, personId, requests 
     requestAnimationFrame(() => card.scrollIntoView({ block: 'nearest' }))
     // A request is acted on once; the threads and the filter it waits for re-run it until the card is there.
     // oxlint-disable-next-line react/exhaustive-deps
-  }, [reveal, threads, filter])
+  }, [reveal, threads, filter, placements, handshaken])
 
   const selectionTop = useEditorState({
     editor,
     selector: ({ editor: current }) => {
-      const origin = margin.current?.getBoundingClientRect().top
+      // Asked after every transaction, typing included: the page is measured only when there is a selection to put a button by.
       const { from, empty } = current.state.selection
-      const top = empty ? null : anchorTop(current, from)
-      return origin === undefined || top === null ? null : Math.round(top - origin)
+      if (empty || margin.current === null) return null
+      const top = anchorTop(current, from)
+      return top === null ? null : Math.round(top - margin.current.getBoundingClientRect().top)
     },
   })
 
@@ -286,7 +294,11 @@ export function CommentsMargin({ editor, provider, document, personId, requests 
       thread,
     ]),
   )
-  const order = [...placed.map(({ id }) => id), ...trailing]
+  const cardAt = (id: string) => {
+    if (id === draftId) return itemOf(id, composer)
+    const thread = threadById.get(id)
+    return thread === undefined ? null : itemOf(id, cardOf(thread))
+  }
 
   return (
     <aside
@@ -338,22 +350,25 @@ export function CommentsMargin({ editor, provider, document, personId, requests 
           showInText(card.dataset['threadId'] ?? '')
         }}
       >
-        {order.flatMap((id) => {
-          if (id === draftId) return [itemOf(id, composer)]
-          const thread = threadById.get(id)
-          return thread === undefined ? [] : [itemOf(id, cardOf(thread))]
-        })}
+        {/* One list, in the order of the page, so that a thread that changes place is moved and not made again, which would
+            take with it what the person was writing in it. */}
+        {[...placed.map(({ id }) => id), ...(hasOrphans ? [labelId] : []), ...trailing].map((id) =>
+          id === labelId ? (
+            // Between the threads on the text and those without: where the label is under the text, and where `placeMargin` says.
+            <li
+              key={id}
+              ref={registerLabel}
+              aria-hidden="true"
+              className={styles.label}
+              style={beside && plan?.labelTop != null ? { insetBlockStart: plan.labelTop } : undefined}
+            >
+              {intl.formatMessage({ id: 'comments.margin.orphans' })}
+            </li>
+          ) : (
+            cardAt(id)
+          ),
+        )}
       </ul>
-      {hasOrphans && (
-        <p
-          ref={registerLabel}
-          aria-hidden="true"
-          className={styles.label}
-          style={beside && plan?.labelTop != null ? { insetBlockStart: plan.labelTop } : undefined}
-        >
-          {intl.formatMessage({ id: 'comments.margin.orphans' })}
-        </p>
-      )}
 
       {/* Heard, not seen. In the page before anything is said in it: a region that arrives with its text is not announced. */}
       <p role="status" className="forma-visually-hidden">

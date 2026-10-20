@@ -99,37 +99,35 @@ describe('the comments margin showing and hiding', () => {
 describe('where the margin starts', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  it.each([
-    { width: 1280, open: false },
-    { width: 1439, open: false },
-    { width: 1440, open: true },
-  ])('is open: $open in a window of $width px, when the person has not chosen', async ({ width, open }) => {
-    simulateViewport(width)
-    renderCommentedDocument({ paragraphs })
+  it.each([1280, 1439, 1440])(
+    'is shown in a window of %i px, when the person has not chosen: the comments are what the page is for',
+    async (width) => {
+      simulateViewport(width)
+      renderCommentedDocument({ paragraphs })
 
-    const button = await toggle()
-
-    expect(button).toHaveAttribute('aria-expanded', String(open))
-    expect(margin() !== null).toBe(open)
-  })
+      expect(await toggle()).toHaveAttribute('aria-expanded', 'true')
+      expect(margin()).toBeInTheDocument()
+    },
+  )
 
   it('goes with the choice of the person, at any width, and the next document opens as the last was left', async () => {
     const user = userEvent.setup()
     simulateViewport(1280)
     const first = renderCommentedDocument({ paragraphs })
     await user.click(await toggle())
-    expect(await screen.findByRole('complementary', { name: 'Comments in the margin' })).toBeInTheDocument()
+    expect(margin()).not.toBeInTheDocument()
     first.unmount()
 
     renderCommentedDocument({ paragraphs })
 
-    expect(await toggle()).toHaveAttribute('aria-expanded', 'true')
+    expect(await toggle()).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('is not changed by a request from the text: opening it for a thread is not a choice of layout', async () => {
+  it('is not changed by a request from the text: showing it for a thread is not a choice of layout', async () => {
     const user = userEvent.setup()
     simulateViewport(1280)
     const first = renderCommentedDocument({ paragraphs })
+    await user.click(await toggle())
     const text = (await textArea()) as HTMLElement & { editor: Editor }
     act(() => void text.editor.commands.setTextSelection(rangeOf(text.editor, 'second week')))
     text.focus()

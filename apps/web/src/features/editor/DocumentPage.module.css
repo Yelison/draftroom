@@ -9,11 +9,18 @@
   min-width: 0;
 }
 
-/* Both stay in sight, one under the other, and the page goes by under them. */
+/* Both stay in sight, one under the other, and the page goes by under them. Under the width of a desktop they are five rows of
+ * the toolbar's height, which is more than a window of 640 × 360 has to spare, so there they go by with the page. */
 .chrome {
-  position: sticky;
-  inset-block-start: 0;
-  z-index: var(--z-sticky);
+  background: var(--color-surface);
+}
+
+@media (width >= 1280px) {
+  .chrome {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: var(--z-sticky);
+  }
 }
 
 /*

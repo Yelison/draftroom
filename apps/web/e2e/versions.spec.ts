@@ -258,14 +258,12 @@ test.describe('the layout', () => {
   })
 })
 
-test('keeps the comments panel that a thread opened when the person goes to the history and comes back', async ({
-  page,
-}) => {
+test('keeps the thread the person is on, and the tab, when they go to the history and come back', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto(`/documents/${onboardingChecklist.id}`)
-  expect(await page.evaluate(() => localStorage.getItem('draftroom.commentsPanel'))).toBeNull()
+  expect(await page.evaluate(() => localStorage.getItem('draftroom.commentsMargin'))).toBeNull()
   const text = page.getByRole('textbox', { name: 'Document content' })
-  const panel = page.getByRole('complementary', { name: 'Comments and activity' })
+  const margin = page.getByRole('complementary', { name: 'Comments in the margin' })
   await text.focus()
   await page.keyboard.type('Ask your buddy anything: no question is too small.')
   await page.keyboard.press('ArrowLeft')
@@ -276,16 +274,24 @@ test('keeps the comments panel that a thread opened when the person goes to the 
   await page.keyboard.press('ControlOrMeta+Alt+m')
   await page.keyboard.type('Is that the right word?')
   await page.keyboard.press('Control+Enter')
-  // Below 1440 px the panel starts closed: it is the thread that opens it, which is not a choice the browser remembers.
-  await expect(panel).toBeVisible()
-  expect(await page.evaluate(() => localStorage.getItem('draftroom.commentsPanel'))).toBeNull()
+  // The thread that was made is the one the person is on, whole; and the activity is open at the edge of the window.
+  await expect(margin.getByRole('article')).toHaveAttribute('aria-current', 'true')
+  await page.getByRole('tab', { name: 'Activity' }).click()
+  await expect(page.getByRole('complementary', { name: 'Activity' })).toBeVisible()
+  // Showing the margin for a thread is not a choice about the layout, so the browser remembers nothing.
+  expect(await page.evaluate(() => localStorage.getItem('draftroom.commentsMargin'))).toBeNull()
 
   await page.getByRole('button', { name: 'Version history' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Version history' })).toBeVisible()
   await page.getByRole('link', { name: /^Back to the document/ }).click()
 
+  // The layout of the editor was not taken down on the way, and holds what it held.
   await expect(page.getByRole('textbox', { name: 'Document content' })).toBeVisible()
-  await expect(panel).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('complementary', { name: 'Activity' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Comments' }).click()
+  await expect(margin.getByRole('article')).toHaveAttribute('aria-current', 'true')
+  await expect(margin.getByRole('article')).toContainText('Is that the right word?')
 })
 
 test.describe('a history as long as a real one', () => {
@@ -301,7 +307,9 @@ test.describe('a history as long as a real one', () => {
     await page.keyboard.press('Control+End')
     for (let paragraph = 1; paragraph <= 60; paragraph++) {
       await page.keyboard.press('Enter')
-      await page.keyboard.type(`Paragraph ${paragraph} of a text that is long enough to need its own scroll.`)
+      // One input for the whole line, not a key for each letter: the text is only there to be long, and sixty lines typed
+      // letter by letter take most of the time the test has.
+      await page.keyboard.insertText(`Paragraph ${paragraph} of a text that is long enough to need its own scroll.`)
     }
     await page.getByRole('button', { name: 'Version history' }).click()
     for (let version = 1; version <= 14; version++) {

@@ -24,13 +24,8 @@ export interface CommentsView {
 /** What the button that shows and hides the margin controls: there is one margin in a page. */
 export const commentsMarginId = 'comments-margin'
 
-/** Where this browser remembers the choice. */
+/** Where this browser remembers the choice. The margin is shown until the person hides it. */
 const storageKey = 'draftroom.commentsMargin'
-
-// With the margin beside it the text is 566 px wide at 1280 and 708 at 1440: below 1440 it starts hidden, so that the text
-// is the page's subject and a person who wants the comments there shows them. Deciding it from the threads that exist would
-// move the text when they arrive; the width of the window is known on the first render.
-const narrowWindow = '(width < 1440px)'
 
 function readChoice(): boolean | null {
   try {
@@ -58,7 +53,7 @@ export function useCommentsViewState(): CommentsView {
   const [filter, setFilter] = useState<ThreadFilterValue>('open')
   const [tab, setTab] = useState<CommentsTab>('comments')
   const [active, setActive] = useState<{ documentId: string; threadId: string | null } | null>(null)
-  const [marginShown, setMarginShown] = useState(() => readChoice() ?? !window.matchMedia(narrowWindow).matches)
+  const [marginShown, setMarginShown] = useState(() => readChoice() ?? true)
 
   const activeThreadId = useCallback(
     (documentId: string) => (active?.documentId === documentId ? active.threadId : null),

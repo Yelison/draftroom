@@ -1,19 +1,20 @@
 .toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-2);
   height: 100%;
-  padding-inline: var(--space-8);
+  padding-inline: var(--space-4);
 }
 
-/* One look for the icon buttons of Forma UI and the buttons of text next to them. */
+/* One look for the icon buttons of Forma UI and the buttons of text next to them. The height of a compact button, which is the
+ * touch target for a pointer that needs one: the bar is shared with the controls of the comments and the Spanish ones need the room. */
 .button {
   display: inline-grid;
   flex-shrink: 0;
   place-items: center;
   box-sizing: border-box;
-  width: var(--touch-target);
-  height: var(--touch-target);
+  width: var(--button-height-compact);
+  height: var(--button-height-compact);
   padding: 0;
   border: 0;
   border-radius: var(--radius-control);
