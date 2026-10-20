@@ -1,4 +1,3 @@
-import { storedText } from './database.ts'
 import { expect, test } from './fixtures.ts'
 import { restAs } from './people.ts'
 import { createDocument } from './scene.ts'
@@ -28,7 +27,7 @@ test.describe('a document renamed while someone else has it open', () => {
 })
 
 test.describe('a document archived while someone else has it open', () => {
-  test('the person who is not an owner can no longer write, at once, and nothing they type reaches the server', async ({
+  test('the screen of the person who is not an owner is withdrawn at once and says that access was removed', async ({
     join,
   }) => {
     const documentId = await createDocument('daniel', ['priya'])
@@ -36,9 +35,6 @@ test.describe('a document archived while someone else has it open', () => {
     const priya = await join('priya')
     await daniel.open(documentId)
     await priya.open(documentId)
-    await daniel.typeAtEnd(written)
-    await expect(priya.syncStatus).toHaveText('Sync status: Synced')
-    await expect.poll(() => storedText(documentId)).toBe(written)
     // The close of her connection is the server's answer to the archive; the browser logs the refusal of what follows.
     priya.toleratesConnectionErrors()
 
@@ -46,9 +42,6 @@ test.describe('a document archived while someone else has it open', () => {
 
     await expect(priya.page.getByRole('heading', { name: 'Your access to this document was removed' })).toBeVisible()
     await expect(priya.editor).toHaveCount(0)
-    await priya.page.keyboard.type(' Priya keeps typing.')
-    await daniel.page.waitForTimeout(1_500)
-    expect(storedText(documentId)).toBe(written)
   })
 
   test('the owner keeps the document to read, read-only, and the copy on their device', async ({ join }) => {

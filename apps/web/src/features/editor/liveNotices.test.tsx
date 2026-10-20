@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { copiesOf } from '../../collab/offlineCache.ts'
 import type { DataSource } from '../../data/DataSource.ts'
 import { daniel, marta } from '../../data/mock/fixtures/index.ts'
+import { researchFolder } from '../../data/mock/fixtures/workspaces.ts'
 import { launchPlan, openEditor, people } from './testing/renderEditor.tsx'
 
 afterEach(() => vi.restoreAllMocks())
@@ -81,6 +82,36 @@ describe('a document renamed by someone else', () => {
     // Nothing was replaced: the title the other person gave it is the one the server still has.
     const stored = await other.getDocument({ params: { path: { documentId: launchPlan.id } } })
     expect(stored.title).toBe('Renamed by Marta')
+  })
+
+  it('saves what the person typed without a conflict when the other person only moved the document', async () => {
+    const { server, user } = await openEditor({ signedInAs: people.daniel })
+    const other = server.connect({ signedInAs: people.marta })
+    await user.clear(title())
+    await user.type(title(), 'My own title')
+
+    const moved = await other.updateDocument({
+      params: { path: { documentId: launchPlan.id } },
+      body: { folderId: researchFolder.id, revision: launchPlan.revision },
+    })
+    act(() =>
+      server.collaboration.broadcast(wireName, {
+        type: 'metadata-changed',
+        title: moved.title,
+        revision: moved.revision,
+      }),
+    )
+    await user.tab()
+
+    // Nobody changed the title, so there is nothing to tell: it is saved and the document stays where it was moved to.
+    await waitFor(async () =>
+      expect(await other.getDocument({ params: { path: { documentId: launchPlan.id } } })).toMatchObject({
+        title: 'My own title',
+        folderId: researchFolder.id,
+      }),
+    )
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(title()).toHaveValue('My own title')
   })
 
   it('replaces the other title only when the person asks to, with Enter, now from the revision they were told about', async () => {
