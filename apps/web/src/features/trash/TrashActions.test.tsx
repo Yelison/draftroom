@@ -209,6 +209,29 @@ describe('restoring a document while "Load more" is on its way', () => {
   })
 })
 
+describe('restoring a document from the middle of the list', () => {
+  it('selects the row that took its place and gives it the focus, not the first one', async () => {
+    const { user } = await openTrash({
+      wrap: (dataSource) => {
+        const archivedThird = dataSource.archiveDocument({ params: { path: { documentId: fixtures.launchPlan.id } } })
+        return {
+          ...dataSource,
+          listDocuments: async (request) => {
+            await archivedThird
+            return dataSource.listDocuments(request)
+          },
+        }
+      },
+    })
+    await user.click(row(first.title))
+
+    await user.click(panelButton(first.title, 'Restore'))
+
+    await waitFor(() => expect(row(second.title)).toHaveFocus())
+    expect(selectedRow()).toBe(row(second.title))
+  })
+})
+
 describe('restoring two documents at once', () => {
   it('says each was restored, and keeps each document busy until its own answer', async () => {
     const { wrap, answer } = held('restoreDocument')

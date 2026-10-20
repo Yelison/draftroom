@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { DataSource } from '../../data/DataSource.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
@@ -170,11 +170,20 @@ describe('the states of the Trash screen', () => {
   })
 
   it('stays a skeleton while the folders are on their way, and does not say "No folder" in the meantime', async () => {
+    let documentsRead = Promise.resolve<unknown>(undefined)
     renderScreen('/trash', {
-      wrap: (dataSource) => ({ ...dataSource, listFolders: () => new Promise(() => undefined) }),
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listDocuments: (request) => (documentsRead = dataSource.listDocuments(request)),
+        listFolders: () => new Promise(() => undefined),
+      }),
     })
+    await within(main()).findByText('Loading the trash')
 
-    expect(await within(main()).findByText('Loading the trash')).toBeInTheDocument()
+    // The documents are in by now: what is left to wait for is the folders.
+    await act(async () => void (await documentsRead))
+
+    expect(within(main()).getByText('Loading the trash')).toBeInTheDocument()
     expect(within(main()).queryByText(/No folder/)).not.toBeInTheDocument()
     expect(queryRow(first.title)).not.toBeInTheDocument()
   })
