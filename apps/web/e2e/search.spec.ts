@@ -122,7 +122,8 @@ test('keeps every mark inside the line of its excerpt, so what matched can be se
     { width: 640, height: 360 },
   ]) {
     await page.setViewportSize(size)
-    await page.goto('/search?q=the')
+    // "signed" is near the end of the excerpt of the launch plan: in a narrow window it is past the end of the line.
+    await page.goto('/search?q=signed')
     await expect(page.getByRole('main').getByRole('link', { name: launchPlan.title })).toBeVisible()
 
     // A line is cut at its end with an ellipsis, so a word that comes back later in it may be hidden; the first one is not.
