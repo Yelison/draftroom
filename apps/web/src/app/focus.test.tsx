@@ -186,11 +186,11 @@ describe('the order of the Tab key', () => {
   const rail = ['Skip to content', 'Home', 'Documents', 'Shared', 'History', 'Members', 'Settings']
   const layouts = [
     { layout: 'overview', Component: OverviewLayout, explorer: [] },
-    // The explorer is one stop for its search, one for each of its two buttons and one for the tree, however long it is.
+    // The explorer: its search, its two buttons, and the sections of the Documents screen, folded but for "Pinned".
     {
       layout: 'editor',
       Component: EditorLayout,
-      explorer: ['Search documents', 'New document', 'New folder', 'Recent'],
+      explorer: ['Search documents', 'New document', 'More', 'Pinned'],
     },
   ]
 
@@ -220,18 +220,24 @@ describe('the order of the Tab key', () => {
           </DataSourceContext>
         </StrictMode>,
       )
-      if (explorer.length > 0) await screen.findByRole('tree')
+      if (explorer.length > 0) await screen.findByRole('button', { name: 'Pinned' })
       // Signing out is the last stop of the rail, where it is seen: the focus passes it before the explorer and the page.
       await screen.findByRole('button', { name: 'Sign out' })
 
-      const expected = [...rail, 'Sign out', ...explorer, 'Probe']
+      // The explorer has a stop for each control of the sections that are open, so how many it takes depends on the documents:
+      // what is fixed is where it starts and that nothing but it stands between the rail and the page.
+      const expected = [...rail, 'Sign out', ...explorer]
       const visited: string[] = []
-      for (let stop = 0; stop < expected.length; stop++) {
+      const inExplorer: boolean[] = []
+      for (let stop = 0; stop < 40 && visited.at(-1) !== 'Probe'; stop++) {
         await user.tab()
         visited.push(nameOf(document.activeElement))
+        inExplorer.push(document.activeElement?.closest('aside[aria-label="Explorer"]') != null)
       }
 
-      expect(visited).toEqual(expected)
+      expect(visited.slice(0, expected.length)).toEqual(expected)
+      expect(visited.at(-1)).toBe('Probe')
+      expect(inExplorer.slice(rail.length + 1, -1).every(Boolean)).toBe(true)
     },
   )
 })

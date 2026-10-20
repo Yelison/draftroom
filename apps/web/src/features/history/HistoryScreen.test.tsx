@@ -574,7 +574,7 @@ describe('the History screen and the explorer, which share the list of documents
 
   it('offer the documents in the filter after the explorer has read them, and the explorer keeps working after the filter has', async () => {
     const { user, router } = renderScreen(sharePath)
-    await screen.findByRole('tree')
+    await screen.findByRole('button', { name: 'Pinned' })
 
     await act(() => router.navigate('/history'))
     await findRow(newestSentences[0])
@@ -583,7 +583,7 @@ describe('the History screen and the explorer, which share the list of documents
     await user.keyboard('{Escape}')
 
     await act(() => router.navigate(sharePath))
-    expect(await screen.findByRole('tree')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Pinned' })).toBeInTheDocument()
     expect(crashed()).not.toBeInTheDocument()
   })
 
@@ -596,10 +596,11 @@ describe('the History screen and the explorer, which share the list of documents
 
     await act(() => router.navigate(sharePath))
 
-    expect(await screen.findByRole('tree')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Pinned' })).toBeInTheDocument()
     expect(crashed()).not.toBeInTheDocument()
-    // In the folder and among the recent ones: the explorer reads the list the filter read, and has the documents.
-    expect(await screen.findAllByRole('treeitem', { name: new RegExp(fixtures.launchPlan.title) })).not.toHaveLength(0)
+    // Among the pinned ones: the explorer reads the list the filter read, and has the documents.
+    const explorer = screen.getByRole('complementary', { name: 'Explorer' })
+    expect(await within(explorer).findByRole('link', { name: fixtures.launchPlan.title })).toBeInTheDocument()
   })
 })
 
