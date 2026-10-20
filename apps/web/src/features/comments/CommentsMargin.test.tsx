@@ -47,10 +47,27 @@ describe('the controls of the comments in the bar', () => {
     await user.click(within(activity).getByRole('button', { name: 'Close the activity' }))
     expect(screen.queryByRole('complementary', { name: 'Activity' })).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Comments' })).toHaveAttribute('aria-selected', 'true')
+    // The button went with the panel, and the focus is on the tab and not on the page.
+    expect(screen.getByRole('tab', { name: 'Comments' })).toHaveFocus()
 
     await user.click(screen.getByRole('tab', { name: 'Activity' }))
     await user.click(screen.getByRole('tab', { name: 'Comments' }))
     expect(screen.queryByRole('complementary', { name: 'Activity' })).not.toBeInTheDocument()
+  })
+
+  it('closes the activity with Escape, with the focus on the tab', async () => {
+    const user = userEvent.setup()
+    renderCommentedDocument()
+    await findMargin()
+    await user.click(screen.getByRole('tab', { name: 'Activity' }))
+    const activity = await screen.findByRole('complementary', { name: 'Activity' })
+    await within(activity).findAllByRole('heading', { level: 3 })
+    within(activity).getByRole('button', { name: 'Close the activity' }).focus()
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('complementary', { name: 'Activity' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Comments' })).toHaveFocus()
   })
 
   it('keeps the margin while the activity is open: it is the only list apart from the text', async () => {

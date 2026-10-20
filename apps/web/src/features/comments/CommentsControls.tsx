@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Tabs } from '@yelison/forma-ui'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useIntl } from 'react-intl'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { ActivityPanel } from './ActivityPanel.tsx'
@@ -19,6 +19,14 @@ export function CommentsControls({ documentId }: { documentId: string }) {
   const intl = useIntl()
   const { filter, setFilter, tab, setTab } = useCommentsView()
   const threads = useQuery(threadsQuery(useDataSource(), documentId))
+  // The close button of the activity goes with it, and the focus must not fall to the page: it goes to the tab that is selected.
+  const tabs = useRef<HTMLDivElement>(null)
+  const closing = useRef(false)
+  useEffect(() => {
+    if (!closing.current || tab !== 'comments') return
+    closing.current = false
+    tabs.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus()
+  }, [tab])
   const counts = useMemo(() => {
     const all = threads.data ?? []
     const open = all.filter(({ status }) => status === 'open').length
@@ -30,7 +38,7 @@ export function CommentsControls({ documentId }: { documentId: string }) {
       <div className={styles.row}>
         <ThreadFilter value={filter} counts={counts} onChange={setFilter} />
       </div>
-      <div className={styles.row}>
+      <div ref={tabs} className={styles.row}>
         {/* The panels of the tabs are not here: the margin is the one of Comments and the activity opens at the edge of the window. */}
         <Tabs
           className={styles.tabs ?? ''}
@@ -44,7 +52,15 @@ export function CommentsControls({ documentId }: { documentId: string }) {
         />
         <CommentsToggle documentId={documentId} />
       </div>
-      {tab === 'activity' && <ActivityPanel documentId={documentId} onClose={() => setTab('comments')} />}
+      {tab === 'activity' && (
+        <ActivityPanel
+          documentId={documentId}
+          onClose={() => {
+            closing.current = true
+            setTab('comments')
+          }}
+        />
+      )}
     </div>
   )
 }
