@@ -61,6 +61,22 @@ describe('the route table', () => {
   })
 })
 
+describe('the explorer', () => {
+  it('is beside a document in the editor', () => {
+    renderApp('/documents/new')
+
+    expect(screen.getByRole('complementary', { name: 'Explorer' })).toBeInTheDocument()
+  })
+
+  it('is left out of the history of a document, which keeps the compact rail and its place in Documents', () => {
+    renderApp('/documents/d1/versions')
+
+    expect(screen.queryByRole('complementary', { name: 'Explorer' })).not.toBeInTheDocument()
+    expectRail('compact')
+    expect(screen.getAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual(['Documents'])
+  })
+})
+
 describe('the share route', () => {
   afterEach(() => localStorage.clear())
   const shareOf = `/documents/${launchPlan.id}/share`

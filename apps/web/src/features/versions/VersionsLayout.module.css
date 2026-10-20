@@ -1,0 +1,18 @@
+/* The work area is a column that is at least as tall as the window, so the screen can share out that height. */
+.layout {
+  display: grid;
+  grid-template-columns: var(--layout-rail-compact-width) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-16);
+}
+
+@media (width >= 1280px) {
+  .main {
+    padding: var(--space-32);
+  }
+}
