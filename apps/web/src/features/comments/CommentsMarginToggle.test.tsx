@@ -11,34 +11,34 @@ const paragraphs = ['The launch moves to the second week of November.', 'Marketi
 
 const textArea = () => screen.findByRole('textbox', { name: 'Document content' })
 const toggle = () => screen.findByRole('button', { name: /^Comments/ })
-const panel = () => screen.queryByRole('complementary', { name: 'Comments and activity' })
+const margin = () => screen.queryByRole('complementary', { name: 'Comments in the margin' })
 const marks = () => [...document.querySelectorAll('mark')].map((mark) => mark.textContent)
 
-describe('the comments panel opening and closing', () => {
+describe('the comments margin showing and hiding', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('closes and opens from the band, keeps the focus on the button that did it and says what happened', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs })
     const button = await toggle()
-    await waitFor(() => expect(panel()).toBeInTheDocument())
+    await waitFor(() => expect(margin()).toBeInTheDocument())
     expect(button).toHaveAttribute('aria-expanded', 'true')
-    expect(button).toHaveAttribute('aria-controls', 'comments-panel')
+    expect(button).toHaveAttribute('aria-controls', 'comments-margin')
 
     button.focus()
     await user.keyboard('{Enter}')
 
-    expect(panel()).not.toBeInTheDocument()
+    expect(margin()).not.toBeInTheDocument()
     expect(button).toHaveAttribute('aria-expanded', 'false')
     expect(button).toHaveFocus()
-    expect(screen.getByText('Comments panel hidden')).toBeInTheDocument()
+    expect(screen.getByText('Comments hidden')).toBeInTheDocument()
 
     await user.keyboard(' ')
 
-    expect(panel()).toBeInTheDocument()
+    expect(margin()).toBeInTheDocument()
     expect(button).toHaveAttribute('aria-expanded', 'true')
     expect(button).toHaveFocus()
-    expect(screen.getByText('Comments panel shown')).toBeInTheDocument()
+    expect(screen.getByText('Comments shown')).toBeInTheDocument()
   })
 
   it('says it in Spanish, with the number of open threads in the name of the button', async () => {
@@ -49,11 +49,11 @@ describe('the comments panel opening and closing', () => {
     const button = await screen.findByRole('button', { name: 'Comentarios, 1 abierto' })
     await user.click(button)
 
-    expect(screen.getByText('Panel de comentarios oculto')).toBeInTheDocument()
+    expect(screen.getByText('Comentarios ocultos')).toBeInTheDocument()
     expect(button).toHaveFocus()
   })
 
-  it('counts the open threads in the name of the button, whether the panel is shown or not', async () => {
+  it('counts the open threads in the name of the button, whether the margin is shown or not', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs })
 
@@ -63,7 +63,7 @@ describe('the comments panel opening and closing', () => {
     expect(button).toHaveAccessibleName('Comments, 1 open')
   })
 
-  it('keeps the highlights of the threads and the comment being written while the panel is closed', async () => {
+  it('keeps the highlights of the threads and the comment being written while the margin is hidden', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({
       paragraphs,
@@ -73,11 +73,11 @@ describe('the comments panel opening and closing', () => {
     await waitFor(() => expect(marks()).toEqual(['second week']))
 
     await user.click(await toggle())
-    expect(panel()).not.toBeInTheDocument()
+    expect(margin()).not.toBeInTheDocument()
     expect(marks()).toEqual(['second week'])
 
     await user.click(await toggle())
-    expect(within(panel() as HTMLElement).getByText('Is this final?')).toBeInTheDocument()
+    expect(within(margin() as HTMLElement).getByText('Is this final?')).toBeInTheDocument()
   })
 
   it('opens by itself when the person asks to comment on a selection, and puts them in the form', async () => {
@@ -85,18 +85,18 @@ describe('the comments panel opening and closing', () => {
     renderCommentedDocument({ paragraphs })
     const text = (await textArea()) as HTMLElement & { editor: Editor }
     await user.click(await toggle())
-    expect(panel()).not.toBeInTheDocument()
+    expect(margin()).not.toBeInTheDocument()
     act(() => void text.editor.commands.setTextSelection(rangeOf(text.editor, 'second week')))
     text.focus()
 
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
 
-    const comments = await screen.findByRole('complementary', { name: 'Comments and activity' })
+    const comments = await screen.findByRole('complementary', { name: 'Comments in the margin' })
     expect(await within(comments).findByRole('textbox', { name: 'Your comment' })).toHaveFocus()
   })
 })
 
-describe('where the panel starts', () => {
+describe('where the margin starts', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it.each([
@@ -110,7 +110,7 @@ describe('where the panel starts', () => {
     const button = await toggle()
 
     expect(button).toHaveAttribute('aria-expanded', String(open))
-    expect(panel() !== null).toBe(open)
+    expect(margin() !== null).toBe(open)
   })
 
   it('goes with the choice of the person, at any width, and the next document opens as the last was left', async () => {
@@ -118,7 +118,7 @@ describe('where the panel starts', () => {
     simulateViewport(1280)
     const first = renderCommentedDocument({ paragraphs })
     await user.click(await toggle())
-    expect(await screen.findByRole('complementary', { name: 'Comments and activity' })).toBeInTheDocument()
+    expect(await screen.findByRole('complementary', { name: 'Comments in the margin' })).toBeInTheDocument()
     first.unmount()
 
     renderCommentedDocument({ paragraphs })
@@ -134,7 +134,7 @@ describe('where the panel starts', () => {
     act(() => void text.editor.commands.setTextSelection(rangeOf(text.editor, 'second week')))
     text.focus()
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
-    await screen.findByRole('complementary', { name: 'Comments and activity' })
+    await screen.findByRole('complementary', { name: 'Comments in the margin' })
     first.unmount()
 
     renderCommentedDocument({ paragraphs })

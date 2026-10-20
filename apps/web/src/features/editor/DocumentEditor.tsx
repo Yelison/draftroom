@@ -9,6 +9,7 @@ import { presenceLookOf } from '../../collab/presenceColor.ts'
 import type { CollabSession, CollabSnapshot } from '../../collab/session.ts'
 import type { PresenceEntry } from '../../components/Presence/Presence.tsx'
 import { useDataSource } from '../../data/useDataSource.ts'
+import { useCommentsArrived } from '../comments/useCommentsArrived.ts'
 import { CommentsMargin } from '../comments/margin/CommentsMargin.tsx'
 import { useCommentsView } from '../comments/commentsView.ts'
 import { createCommentRequests } from '../comments/commentRequests.ts'
@@ -120,6 +121,9 @@ function Shown({
   focusHeadline: () => void
 }) {
   const intl = useIntl()
+  // The comments are in the page before the text is: a thread that arrives after it would open room in the text under the
+  // person's eyes. A request that failed does not hold the text back: the margin says so and offers to try again.
+  const commentsArrived = useCommentsArrived(document.id)
   const revoked = snapshot.state === 'revoked'
   const stopped = revoked || (!snapshot.loaded && snapshot.state === 'error')
   // What had the focus (the text, the share dialog) goes with the editor when access is removed: the focus must not fall to
@@ -161,7 +165,7 @@ function Shown({
       </EditorStatePanel>
     )
   }
-  if (!snapshot.loaded) return <EditorSkeleton />
+  if (!snapshot.loaded || !commentsArrived) return <EditorSkeleton />
 
   // A new document and provider mean a new editor: the one that was bound to the old ones is left with them.
   return (

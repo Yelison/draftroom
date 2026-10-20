@@ -306,7 +306,7 @@ export function CommentsMargin({ editor, provider, document, personId, requests 
           className={styles.selection}
           style={beside && selectionTop !== null ? { insetBlockStart: selectionTop } : undefined}
         >
-          <SelectionAction onStart={startDraft} />
+          <SelectionAction onStart={startDraft} composing={draft !== null} />
         </div>
       )}
 

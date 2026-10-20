@@ -11,15 +11,14 @@ const toggle = async (name: string) => within(await explorer()).findByRole('butt
 const link = async (name: string) => within(await explorer()).findByRole('link', { name })
 
 /** The requests for documents that the explorer made, by what they asked for. */
-function watchingDocuments(asked: { folderId?: string; unfiled?: boolean; pinned?: boolean }[]) {
+function watchingDocuments(asked: { folderId?: string; unfiled?: boolean }[]) {
   return (dataSource: DataSource): DataSource => ({
     ...dataSource,
     listDocuments: (request) => {
-      const { folderId, unfiled, pinned } = request.params.query ?? {}
+      const { folderId, unfiled } = request.params.query ?? {}
       asked.push({
         ...(folderId === undefined ? {} : { folderId }),
         ...(unfiled === undefined ? {} : { unfiled }),
-        ...(pinned === undefined ? {} : { pinned }),
       })
       return dataSource.listDocuments(request)
     },

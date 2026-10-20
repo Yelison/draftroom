@@ -1,4 +1,5 @@
 import type { Editor } from '@tiptap/core'
+import * as Y from 'yjs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { toBase64 } from '../../collab/base64.ts'
 import { boundDocumentOf, createAnchor, quoteOf, resolveAnchor } from './anchors.ts'
@@ -136,6 +137,20 @@ describe('an anchor that cannot be read', () => {
     open = world(document('abcdef'))
 
     expect(covered(open.local.editor, { start, end })).toBeNull()
+  })
+})
+
+describe('an anchor that names a part of the document that is not the text', () => {
+  it('is orphaned, and reading it does not make that part exist in the Yjs document', () => {
+    open = world(document('abcdef'))
+    const { editor } = open.local
+    const bound = boundDocumentOf(editor.state)
+    if (bound === null) throw new Error('The editor is not bound to a document')
+    const elsewhere = toBase64(Y.encodeRelativePosition(new Y.RelativePosition(null, 'not-the-text', null)))
+    const before = [...bound.ydoc.share.keys()]
+
+    expect(covered(editor, { start: elsewhere, end: elsewhere })).toBeNull()
+    expect([...bound.ydoc.share.keys()]).toEqual(before)
   })
 })
 

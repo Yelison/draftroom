@@ -23,3 +23,23 @@
 .shortLine {
   inline-size: 40%;
 }
+
+/* The margin beside the sheet: a few cards of the height of compact ones, where the threads will be. */
+.margin {
+  display: none;
+}
+
+@media (width >= 1280px) {
+  .margin {
+    display: grid;
+    gap: var(--space-8);
+    align-content: start;
+  }
+}
+
+.card {
+  block-size: calc(var(--space-64) + var(--space-24));
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}

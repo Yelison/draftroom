@@ -29,6 +29,12 @@ export function EditorSkeleton() {
             <div className={styles.shortLine} />
           </div>
         </div>
+        {marginShown && (
+          <div className={styles.margin}>
+            <div className={styles.card} />
+            <div className={styles.card} />
+          </div>
+        )}
       </div>
       <p role="status" className="forma-visually-hidden">
         {intl.formatMessage({ id: 'editor.loading' })}

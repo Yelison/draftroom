@@ -1,4 +1,5 @@
 import { contractLimits, type Schema } from '@draftroom/contract'
+import { fragmentName } from '@draftroom/editor-schema'
 import type { Node } from '@tiptap/pm/model'
 import type { EditorState } from '@tiptap/pm/state'
 import {
@@ -72,7 +73,7 @@ export function resolveAnchor({ ydoc, fragment, mapping }: BoundDocument, anchor
   try {
     const start = decode(anchor.start)
     const end = decode(anchor.end)
-    if (start === null || end === null) return null
+    if (start === null || end === null || !inTheText(start) || !inTheText(end)) return null
     const from = relativePositionToAbsolutePosition(ydoc, fragment, start, mapping)
     const to = relativePositionToAbsolutePosition(ydoc, fragment, end, mapping)
     return from === null || to === null || from >= to ? null : { from, to }
@@ -82,6 +83,12 @@ export function resolveAnchor({ ydoc, fragment, mapping }: BoundDocument, anchor
     return null
   }
 }
+
+/**
+ * Whether a position is in the text or in something in it. One that names another root of the document would make that root
+ * exist when Yjs looks for it, in the document of whoever reads the anchor, and an anchor comes from another person's client.
+ */
+const inTheText = (position: Y.RelativePosition) => position.tname === null || position.tname === fragmentName
 
 /** The text a range covers, as the thread will quote it: a space where a block ends, cut at the contract's limit. */
 export function quoteOf(doc: Node, from: number, to: number): string {
