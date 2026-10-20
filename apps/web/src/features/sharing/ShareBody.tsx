@@ -8,6 +8,7 @@ import { meQuery } from '../editor/meQuery.ts'
 import { StateMessage } from '../documents/StateMessage.tsx'
 import { AccessEditor } from './AccessEditor.tsx'
 import { membersQuery } from '../documents/queries.ts'
+import { workspaceQuery } from '../settings/queries.ts'
 import { accessQuery } from './queries.ts'
 import { ShareSkeleton } from './ShareSkeleton.tsx'
 
@@ -31,6 +32,8 @@ export function ShareBody({
   // The members of the workspace, read the way the history reads them (the same key and the same list), and only for an
   // owner: nobody else has anything to share.
   const members = useQuery({ ...membersQuery(dataSource, document.workspaceId), enabled: owner })
+  // Its name is what the last row of the list calls the whole workspace, so it is read before the rows are shown.
+  const workspace = useQuery({ ...workspaceQuery(dataSource, document.workspaceId), enabled: owner })
   const me = useQuery(meQuery(dataSource))
 
   const refused = access.isError && isApiError(access.error, 'forbidden')
@@ -42,7 +45,7 @@ export function ShareBody({
       />
     )
   }
-  if (access.isError || members.isError) {
+  if (access.isError || members.isError || workspace.isError) {
     return (
       <StateMessage
         role="alert"
@@ -50,10 +53,11 @@ export function ShareBody({
         description={intl.formatMessage({ id: 'sharing.error.description' })}
       >
         <Button
-          loading={access.isFetching || members.isFetching}
+          loading={access.isFetching || members.isFetching || workspace.isFetching}
           onClick={() => {
             void access.refetch()
             void members.refetch()
+            void workspace.refetch()
           }}
         >
           {intl.formatMessage({ id: 'sharing.error.retry' })}
@@ -61,13 +65,16 @@ export function ShareBody({
       </StateMessage>
     )
   }
-  if (access.data === undefined || members.data === undefined) return <ShareSkeleton />
+  if (access.data === undefined || members.data === undefined || workspace.data === undefined) {
+    return <ShareSkeleton />
+  }
   return (
     <AccessEditor
       document={document}
       access={access.data}
       announce={announce}
       members={members.data.items}
+      workspaceName={workspace.data.name}
       meId={me.data?.id}
     />
   )

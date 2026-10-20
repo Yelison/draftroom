@@ -1,9 +1,16 @@
 /*
- * The measures of the dialog, in one place: the width of the role selectors. They are literals until the product token
- * layer has them, and this block is the only one to change. They are read by the rows below, which sit inside `.content`.
+ * The measures of the dialog, in one place. They are literals until the product token layer has them, and this block is
+ * the only one to change. They are read by the rows below, which sit inside `.content`.
+ *
+ * The list is as tall as a share of the window, so that with many people it scrolls inside the dialog and the row that
+ * adds people and the Done button stay in view; the floor keeps three rows visible in a window that is short because it
+ * is zoomed, where the dialog scrolls as a whole instead.
  */
 .content {
-  --sharing-role-width: 176px;
+  --sharing-role-width: 190px;
+  --sharing-list-height: max(40dvh, 200px);
+  /* The row of everyone in the workspace, which stays over the scrolled rows and may take a second line. */
+  --sharing-pinned-row-height: calc(var(--control-height) + 2 * var(--space-12) + 1lh);
 
   display: flex;
   flex-direction: column;
@@ -21,20 +28,63 @@
   font: var(--font-strong);
 }
 
-.people {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.person {
+/*
+ * The people and, last, everyone in the workspace: one card whose rows share the same four columns (avatar, who, role,
+ * action), so that the selectors line up whatever the longest action says. The first column is sized by what it holds
+ * (the avatar and the padding of the row), which a fixed width would not leave room for.
+ */
+.principals {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) var(--sharing-role-width) auto;
-  gap: var(--space-12);
+  column-gap: var(--space-12);
+  align-content: start;
+  position: relative; /* The containing block of the hidden labels of the rows, so that the list clips them as it scrolls. */
+  max-height: var(--sharing-list-height);
+  scroll-padding-bottom: var(--sharing-pinned-row-height); /* What the focus keeps clear of at the foot. */
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+}
+
+.row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  row-gap: var(--space-8);
   align-items: center;
+  padding: var(--space-12) var(--space-12) var(--space-12) var(--space-16);
+  border-top: 1px solid var(--color-line);
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+/* Always in view at the foot of the list, so that what applies to everyone is not lost among many people. */
+.everyone {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--color-bg);
+}
+
+/* The row has no action, so its selector takes that column too: "Only the people above" needs more than a role does. */
+.everyoneControl {
+  grid-column: 3 / -1;
+}
+
+.everyoneMark {
+  display: grid;
+  place-items: center;
+  width: var(--avatar-size-medium);
+  height: var(--avatar-size-medium);
+  border-radius: var(--radius-round);
+  background: var(--color-surface-hover);
+  color: var(--color-muted);
 }
 
 .identity {
@@ -48,16 +98,53 @@
   overflow-wrap: anywhere;
 }
 
-.email,
-.reason,
-.note {
+.caption {
   color: var(--color-muted);
   font: var(--font-caption);
   overflow-wrap: anywhere;
 }
 
-.note {
+/* What a row has to say under its controls: why they are held, or why the last change was refused. */
+.note,
+.problem {
+  grid-column: 2 / -1;
   margin: 0;
+  font: var(--font-caption);
+  overflow-wrap: anywhere;
+}
+
+.note {
+  display: flex;
+  gap: var(--space-6);
+  color: var(--color-muted);
+}
+
+/* The actions of a row that cannot be used (the last owner's, or any while a change is on its way): dimmed, and still there to be read and described. */
+.row button[aria-disabled='true'] {
+  color: var(--color-muted);
+}
+
+/* The row that is saving. */
+.row[aria-busy='true'] {
+  color: var(--color-muted);
+}
+
+/* Takes the height of the form it stands in for, so that the list below does not move when the form is not needed. */
+.addEmpty {
+  display: flex;
+  align-items: center;
+  min-height: calc(1lh + var(--space-6) + var(--control-height));
+  font: var(--font-label);
+}
+
+/* One line of the text tall, so that the icon sits on the first line however the note wraps. */
+.note svg {
+  flex-shrink: 0;
+  height: 1lh;
+}
+
+.problem {
+  color: var(--color-red-ink);
 }
 
 .add {
@@ -67,21 +154,67 @@
   align-items: end;
 }
 
-.problem {
-  margin: 0;
-  color: var(--color-red-ink);
-  font: var(--font-body);
+.add .problem {
+  grid-column: 1 / -1;
 }
 
-.skeleton {
-  height: var(--button-height);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
+/* What stands in for the dialog while the list is on its way: the same grid, with blocks in the place of the content. */
+.skeletonBlock {
+  display: block;
+  border-radius: var(--radius-small);
+  background: var(--color-line);
 }
 
-.skeletons {
+.skeletonHeading {
+  width: 30%;
+  height: 1lh;
+  font: var(--font-strong);
+}
+
+.skeletonField {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: var(--space-6);
+}
+
+.skeletonField .skeletonBlock:first-child {
+  width: 40%;
+  height: 1lh;
+  font: var(--font-label);
+}
+
+/* The button that adds: as tall as the real one and as wide as its label and padding. */
+.skeletonAction {
+  align-self: end;
+  width: calc(var(--space-16) * 3);
+  height: var(--button-height);
+  border-radius: var(--radius-control);
+}
+
+.skeletonControl {
+  height: var(--control-height);
+  border-radius: var(--radius-control);
+}
+
+.skeletonAvatar {
+  width: var(--avatar-size-medium);
+  height: var(--avatar-size-medium);
+  border-radius: var(--radius-round);
+}
+
+.skeletonLines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.skeletonLines .skeletonBlock {
+  width: 50%;
+  height: 1lh;
+  font: var(--font-label);
+}
+
+.skeletonLines .skeletonBlock + .skeletonBlock {
+  width: 35%;
+  font: var(--font-caption);
 }

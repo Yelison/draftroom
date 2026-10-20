@@ -45,10 +45,14 @@ export async function openShare({ documentId = launchPlan.id, signedInAs, wrap }
 export const roleOf = (share: HTMLElement, name: string) =>
   within(share).getByRole('combobox', { name: `Role of ${name}` })
 
-/** The names of the people in the list, in order. */
-export const people = (share: HTMLElement) =>
-  within(within(share).getByRole('list'))
-    .getAllByRole('listitem')
-    .map((item) => item.textContent)
+/** The select that sets how the whole workspace can open the document: the last row of the list. */
+export const generalAccessOf = (share: HTMLElement) =>
+  within(share).getByRole('combobox', { name: 'Access for everyone in Harbor Pine' })
+
+/** The rows of the list, in order: the people, and last, everyone in the workspace. */
+export const rows = (share: HTMLElement) => within(within(share).getByRole('list')).getAllByRole('listitem')
+
+/** The people in the list, in order, without the row of everyone in the workspace. */
+export const people = (share: HTMLElement) => rows(share).slice(0, -1)
 
 export type Role = Schema<'DocumentRole'>

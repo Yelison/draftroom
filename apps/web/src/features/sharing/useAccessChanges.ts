@@ -2,6 +2,7 @@ import type { Schema } from '@draftroom/contract'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { invalidateAfter } from '../documents/invalidate.ts'
+import type { AccessRow } from './accessRow.ts'
 
 type DocumentRole = Schema<'DocumentRole'>
 type GeneralAccess = Schema<'GeneralAccess'>
@@ -16,13 +17,13 @@ export interface AccessChangesOptions {
   document: Pick<Schema<'Document'>, 'id' | 'workspaceId'>
   /** Called for every change the server accepted, once the lists it affects have been marked stale. */
   onDone: (change: AccessChange) => void
-  onFailed: (error: Error) => void
+  onFailed: (error: Error, row: AccessRow) => void
 }
 
 /**
  * The four ways to change who can open a document. Each one marks stale exactly what the table of `docs/api/README.md`
  * names for it, and says what happened only when the server has said so. Only one runs at a time: the screen leaves the
- * controls alone while it does, so two answers never cross.
+ * controls alone while it does, so two answers never cross, and marks the row it is about.
  */
 export function useAccessChanges({ document, onDone, onFailed }: AccessChangesOptions) {
   const dataSource = useDataSource()
@@ -37,7 +38,7 @@ export function useAccessChanges({ document, onDone, onFailed }: AccessChangesOp
       await invalidateAfter(queryClient, 'setAccess', scope)
       onDone({ kind, name, role })
     },
-    onError: onFailed,
+    onError: (error, variables) => onFailed(error, rowOfRoleChange(variables)),
   })
 
   const remove = useMutation({
@@ -47,7 +48,7 @@ export function useAccessChanges({ document, onDone, onFailed }: AccessChangesOp
       await invalidateAfter(queryClient, 'removeAccess', scope)
       onDone({ kind: 'removed', name })
     },
-    onError: onFailed,
+    onError: (error, { userId }) => onFailed(error, { kind: 'person', userId }),
   })
 
   const setGeneral = useMutation({
@@ -57,13 +58,17 @@ export function useAccessChanges({ document, onDone, onFailed }: AccessChangesOp
       await invalidateAfter(queryClient, 'setGeneralAccess', scope)
       onDone({ kind: 'general', access })
     },
-    onError: onFailed,
+    onError: (error) => onFailed(error, { kind: 'general' }),
   })
 
-  return {
-    setRole: setRole.mutate,
-    remove: remove.mutate,
-    setGeneral: setGeneral.mutate,
-    busy: setRole.isPending || remove.isPending || setGeneral.isPending,
-  }
+  let pending: AccessRow | null = null
+  if (setRole.isPending) pending = rowOfRoleChange(setRole.variables)
+  else if (remove.isPending) pending = { kind: 'person', userId: remove.variables.userId }
+  else if (setGeneral.isPending) pending = { kind: 'general' }
+
+  return { setRole: setRole.mutate, remove: remove.mutate, setGeneral: setGeneral.mutate, pending }
 }
+
+/** Giving a role to somebody new belongs to the row that adds people; changing one, to the row of that person. */
+const rowOfRoleChange = ({ kind, userId }: { kind: 'added' | 'changed'; userId: string }): AccessRow =>
+  kind === 'added' ? { kind: 'add' } : { kind: 'person', userId }
