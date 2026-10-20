@@ -1,131 +1,64 @@
 /*
- * The history of a document: the list of versions, and beside it the one that is open, which keeps its place while it
- * loads. The two measures are literals until the product token layer has them, as the list screens' are.
+ * The history of a document: a header, and under it the list of versions beside the one that is read. The screen takes
+ * the height of the window and shares it out, so the two panels have the same size before and after the data arrives
+ * and scroll inside. Below a desktop (a browser zoom of 200 % is one) the panels stack and the page scrolls. The measures
+ * are literals until the product token layer has them, as the list screens' are.
  */
 .screen {
-  --versions-page-width: 1080px;
-  --versions-list-width: 340px;
+  --versions-page-width: 1280px;
+  --versions-list-width: 360px;
 
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: var(--space-24);
+  container-type: inline-size;
+  width: 100%;
   max-width: var(--versions-page-width);
   margin-inline: auto;
 }
 
 .header {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-16);
+}
+
+.heading {
+  min-width: 0;
+}
+
+/* One line is kept before the title arrives: the header is as tall with it as without. */
+.documentTitle {
+  min-height: 1lh;
+  margin: 0;
+  color: var(--color-muted);
+  font: var(--font-body);
+  overflow-wrap: anywhere;
 }
 
 .actions {
   display: flex;
   flex-shrink: 0;
+  flex-wrap: wrap;
   gap: var(--space-8);
 }
 
 .body {
   display: grid;
-  grid-template-columns: var(--versions-list-width) minmax(0, 1fr);
-  gap: var(--space-24);
-  align-items: start;
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-  margin: 0 0 var(--space-16);
-  padding: 0;
-  list-style: none;
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-}
-
-.select {
-  display: flex;
   flex: 1;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-  padding: var(--space-8) var(--space-12);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font: var(--font-body);
-  text-align: start;
-  cursor: pointer;
-}
-
-.select:hover {
-  background: var(--color-surface-hover);
-}
-
-/* The version that is open is a fill, and the keyboard's place a ring, so a row can show both. */
-.select[aria-current='true'] {
-  border-color: var(--color-blue-ink);
-  background: var(--color-blue-bg);
-}
-
-.select:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.name {
-  overflow-wrap: anywhere;
-  font: var(--font-strong);
-}
-
-.detail {
-  color: var(--color-muted);
-  font: var(--font-caption);
-}
-
-.preview {
-  min-width: 0;
+  grid-template-columns: var(--versions-list-width) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--space-24);
   min-height: calc(var(--space-64) * 6);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-panel);
-  background: var(--color-surface);
 }
 
-.previewTitle {
-  margin: 0;
-  padding: var(--space-12) var(--space-24);
-  border-block-end: 1px solid var(--color-line);
-  font: var(--font-section);
-}
-
-.previewSkeleton {
-  height: calc(var(--space-64) * 4);
-  margin: var(--space-24);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-hover);
-}
-
-.readOnly {
-  margin: 0;
-  padding: var(--space-8) var(--space-24) 0;
-  color: var(--color-muted);
-  font: var(--font-caption);
-}
-
-.scroller {
-  max-height: 70vh;
-  padding: var(--space-24);
-  overflow-y: auto;
-  border-radius: var(--radius-panel);
-}
-
-.scroller:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: -2px;
+@container (width < 720px) {
+  .body {
+    flex: none;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
 }

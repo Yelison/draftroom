@@ -1,0 +1,53 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+/* Fixed above the text: the text scrolls under it, and it is as tall with the button as without. */
+.bar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-12);
+  border-block-end: 1px solid var(--color-line);
+}
+
+.notice {
+  flex: 1;
+  min-width: calc(var(--space-64) * 3);
+}
+
+.skeleton {
+  flex: 1;
+  min-height: calc(var(--space-64) * 3);
+  margin: var(--space-24);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-hover);
+}
+
+.scroller {
+  --versions-text-width: 720px;
+
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-24);
+  overflow-y: auto;
+}
+
+.scroller > * {
+  max-width: var(--versions-text-width);
+  margin-inline: auto;
+}
+
+.scroller:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: calc(var(--space-2) * -1);
+}

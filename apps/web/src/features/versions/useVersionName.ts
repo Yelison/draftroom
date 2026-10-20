@@ -1,5 +1,6 @@
 import type { Schema } from '@draftroom/contract'
 import { useIntl } from 'react-intl'
+import type { VersionDay } from './days.ts'
 import { kindSelector } from './kinds.ts'
 
 /** When a version was made, in the person's language: a date and a time, which is what tells two of the same day apart. */
@@ -7,6 +8,22 @@ export function useVersionDate() {
   const intl = useIntl()
   return (version: Pick<Schema<'Version'>, 'createdAt'>) =>
     intl.formatDate(version.createdAt, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+/** What a day of the list is called: "Today", "Yesterday", or its date. */
+export function useDayLabel() {
+  const intl = useIntl()
+  return (day: Pick<VersionDay, 'relative' | 'date'>) =>
+    intl.formatMessage(
+      { id: 'versions.day' },
+      { relative: day.relative, date: intl.formatDate(day.date, { dateStyle: 'medium', timeZone: 'UTC' }) },
+    )
+}
+
+/** The time of day a version was made, which the day heading above it completes. */
+export function useVersionTime() {
+  const intl = useIntl()
+  return (version: Pick<Schema<'Version'>, 'createdAt'>) => intl.formatTime(version.createdAt, { timeStyle: 'short' })
 }
 
 /**

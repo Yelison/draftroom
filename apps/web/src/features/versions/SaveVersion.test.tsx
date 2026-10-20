@@ -40,7 +40,8 @@ describe('saving a version', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(trigger).toHaveFocus()
     expect(await screen.findByText('Version saved.')).toBeInTheDocument()
-    await waitFor(() => expect(rows()).toHaveLength(4))
+    // The automatic versions are hidden, so the list is the one that was there and the new one.
+    await waitFor(() => expect(rows()).toHaveLength(2))
     expect(rows()[0]).toHaveTextContent('Before the review')
     expect(invalidatedKeys()).toContainEqual(['documents', launchPlan.id, 'versions'])
   })
