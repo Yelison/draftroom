@@ -7,7 +7,7 @@ import type { MessageId } from '../../i18n/messages.ts'
 import { StateMessage } from '../documents/StateMessage.tsx'
 import { FormStatus } from '../settings/FormStatus.tsx'
 import { InviteMember } from './InviteMember.tsx'
-import { countMembers, filterMembers, type MemberFilter } from './memberFilters.ts'
+import { countMembers, filterMembers, isKept, type MemberFilter } from './memberFilters.ts'
 import { MemberFilters } from './MemberFilters.tsx'
 import { MembersTable } from './MembersTable.tsx'
 import { RemoveMemberDialog } from './RemoveMemberDialog.tsx'
@@ -35,7 +35,7 @@ export function MemberList({ workspaceId, members, meId }: MemberListProps) {
   const [removal, setRemoval] = useState<Schema<'Member'> | null>(null)
   const [announcement, setAnnouncement] = useState<{ id: MessageId; values: Record<string, string> } | null>(null)
   const [failure, setFailure] = useState<Error | null>(null)
-  const focusHeadline = useRef(false)
+  const [headlineRequests, setHeadlineRequests] = useState(0)
   const canManage = members.some((member) => member.userId === meId && member.role === 'owner')
   const alone = members.length === 1
   const shown = filterMembers(members, filter)
@@ -48,10 +48,10 @@ export function MemberList({ workspaceId, members, meId }: MemberListProps) {
         id: `members.announce.${change.kind}`,
         values: change.kind === 'removed' ? { name: change.name } : { name: change.name, role: change.role },
       })
-      if (change.kind === 'removed') {
-        focusHeadline.current = true
-        setRemoval(null)
-      }
+      if (change.kind === 'removed') setRemoval(null)
+      // The row that had the focus is gone: removed, or no longer one the filter keeps (an owner who is now a member).
+      if (change.kind === 'removed' || (change.kind === 'changed' && !isKept(change.member, filter)))
+        setHeadlineRequests((requests) => requests + 1)
     },
     onFailed: (error) => {
       setFailure(error)
@@ -60,13 +60,11 @@ export function MemberList({ workspaceId, members, meId }: MemberListProps) {
     },
   })
 
-  // The row that opened the dialog is gone, so the focus has nowhere to return to: the headline takes it once the dialog
-  // has closed, and never the body.
+  // The control that had the focus is gone with its row, so the focus has nowhere to return to: the headline takes it once
+  // the dialog, if there was one, has closed, and never the body.
   useEffect(() => {
-    if (removal !== null || !focusHeadline.current) return
-    focusHeadline.current = false
-    focusMainContent()
-  }, [removal])
+    if (headlineRequests > 0) focusMainContent()
+  }, [headlineRequests])
 
   // An owner who steps down, or is demoted by someone else, loses the control that had the focus: the headline takes it and
   // the change is said, never the body.
@@ -88,30 +86,27 @@ export function MemberList({ workspaceId, members, meId }: MemberListProps) {
         {!alone && <p className={styles.count}>{intl.formatMessage({ id: 'members.count' }, countMembers(members))}</p>}
       </div>
       {canManage && <InviteMember busy={changes.busy} failure={failure} onInvite={changes.invite} />}
-      {alone ? (
+      {!alone && <MemberFilters value={filter} onChange={setFilter} />}
+      {shown.length === 0 ? (
+        <StateMessage description={intl.formatMessage({ id: 'members.filter.nobodyPending' })} />
+      ) : (
+        <MembersTable
+          members={shown}
+          lastOwnerId={members.find((member) => isLastOwner(members, member))?.userId}
+          meId={meId}
+          canManage={canManage}
+          busy={changes.busy}
+          onRole={(target, role) => changes.setRole({ member: target, role })}
+          onRemove={setRemoval}
+        />
+      )}
+      {alone && (
         <div className={styles.alone}>
           <StateMessage
             title={intl.formatMessage({ id: 'members.alone.title' })}
             description={intl.formatMessage({ id: 'members.alone.description' })}
           />
         </div>
-      ) : (
-        <>
-          <MemberFilters value={filter} onChange={setFilter} />
-          {shown.length === 0 ? (
-            <StateMessage description={intl.formatMessage({ id: 'members.filter.nobodyPending' })} />
-          ) : (
-            <MembersTable
-              members={shown}
-              lastOwnerId={members.find((member) => isLastOwner(members, member))?.userId}
-              meId={meId}
-              canManage={canManage}
-              busy={changes.busy}
-              onRole={(target, role) => changes.setRole({ member: target, role })}
-              onRemove={setRemoval}
-            />
-          )}
-        </>
       )}
       <p role="status" className="forma-visually-hidden">
         {announcement !== null && intl.formatMessage({ id: announcement.id }, announcement.values)}

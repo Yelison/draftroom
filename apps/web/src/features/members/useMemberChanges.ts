@@ -8,7 +8,9 @@ type WorkspaceRole = Schema<'WorkspaceRole'>
 
 /** What was done, as the screen says it: the person by name, never by id. */
 export type MemberChange =
-  { kind: 'invited' | 'changed'; name: string; role: WorkspaceRole } | { kind: 'removed'; name: string }
+  | { kind: 'invited'; name: string; role: WorkspaceRole }
+  | { kind: 'changed'; name: string; role: WorkspaceRole; member: Schema<'Member'> }
+  | { kind: 'removed'; name: string }
 
 export interface MemberChangesOptions {
   workspaceId: string
@@ -45,7 +47,7 @@ export function useMemberChanges({ workspaceId, onDone, onFailed }: MemberChange
         invalidateAfter(queryClient, 'updateMember', { workspaceId }),
         queryClient.invalidateQueries({ queryKey: queryKeys.workspace(workspaceId) }),
       ])
-      onDone({ kind: 'changed', name: member.name ?? member.email, role: member.role })
+      onDone({ kind: 'changed', name: member.name ?? member.email, role: member.role, member })
     },
     onError: onFailed,
   })

@@ -12,6 +12,9 @@ const keeps: Record<MemberFilter, (member: Member) => boolean> = {
   pending: (member) => member.status === 'pending',
 }
 
+/** Whether the filter keeps the member: what is asked again of a person whose role has just changed. */
+export const isKept = (member: Member, filter: MemberFilter): boolean => keeps[filter](member)
+
 /** The members the filter keeps, in the order the server gave them: the list is whole in the page, so this is exact. */
 export const filterMembers = (members: readonly Member[], filter: MemberFilter): Member[] =>
   members.filter(keeps[filter])

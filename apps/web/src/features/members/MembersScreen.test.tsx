@@ -102,7 +102,20 @@ describe('the Members page', () => {
       expect(within(main()).getByRole('table')).toBeInTheDocument()
     })
 
-    it('keep an owner protected by the people who are not shown: the last owner stays the last one', async () => {
+    it('keep the focus on the headline when a change takes the row out of the filter', async () => {
+      const { user } = await openMembers()
+      await user.selectOptions(roleOf('Daniel Okafor'), 'Owner')
+      await within(main()).findByText('The role of Daniel Okafor is now Owner.')
+      await user.click(chip('Owners'))
+
+      await user.selectOptions(roleOf('Daniel Okafor'), 'Member')
+
+      expect(await within(main()).findByText('The role of Daniel Okafor is now Member.')).toBeInTheDocument()
+      expect(within(main()).queryByRole('row', { name: /Daniel Okafor/ })).not.toBeInTheDocument()
+      expect(headline()).toHaveFocus()
+    })
+
+    it('hold the last owner in the Owners filter too', async () => {
       const { user } = await openMembers()
 
       await user.click(chip('Owners'))
@@ -310,8 +323,8 @@ describe('the Members page', () => {
     expect(within(main()).getByText(marta.name ?? '')).toBeInTheDocument()
   })
 
-  it('tells a person who is alone in the workspace so, instead of a table of one', async () => {
-    const { unmount } = renderScreen('/members', {
+  it('tells a person who is alone in the workspace so, under their own row and with no filters to choose', async () => {
+    renderScreen('/members', {
       wrap: (dataSource) => ({
         ...dataSource,
         listMembers: async (request) => {
@@ -321,11 +334,12 @@ describe('the Members page', () => {
       }),
     })
 
-    expect(await within(main()).findByText('You are the only member')).toBeInTheDocument()
-    expect(within(main()).queryByRole('table')).not.toBeInTheDocument()
+    const notice = await within(main()).findByText('You are the only member')
+    expect(bodyRows().map((row) => row.textContent)).toEqual([expect.stringContaining('Marta Ruiz (you)')])
+    expect(within(main()).getByText(/Last owner\. Give the owner role to someone else/)).toBeInTheDocument()
+    expect(within(main()).getByRole('table').compareDocumentPosition(notice)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(within(main()).queryByRole('group', { name: 'Show' })).not.toBeInTheDocument()
     expect(within(main()).getByRole('textbox', { name: 'Email' })).toBeInTheDocument()
-    unmount()
   })
 
   it('shows a skeleton with a spoken status while the members are on their way', async () => {
@@ -337,6 +351,20 @@ describe('the Members page', () => {
     expect(status).toHaveAttribute('role', 'status')
     expect(status.closest('[aria-busy="true"]')).not.toBeNull()
     expect(headline()).toBeInTheDocument()
+  })
+
+  it('reserves the room of a member while the members are on their way: no invitation, and the sentence a member reads', async () => {
+    renderScreen('/members', {
+      signedInAs: sofia.email,
+      wrap: (dataSource) => ({ ...dataSource, listMembers: () => new Promise(() => undefined) }),
+    })
+
+    await within(main()).findByText('Loading the members')
+
+    // The skeleton is replaced once the workspace says what the person is, so it is looked up again each time.
+    const skeleton = () => main().querySelector('[aria-busy="true"]')
+    await waitFor(() => expect(skeleton()).toHaveTextContent('Only owners can invite people'))
+    expect(skeleton()?.querySelector('[class*="invitePanel"]')).toBeNull()
   })
 
   it('says it could not read the members, and tries again when asked', async () => {
