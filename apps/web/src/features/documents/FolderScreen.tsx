@@ -108,6 +108,7 @@ function FolderDocuments({ workspaceId, folderId }: { workspaceId: string; folde
         folderId={folderId}
         term={term}
         onActions={(document) => actions.open({ kind: 'details', document })}
+        onArchive={(document) => actions.open({ kind: 'archive', document })}
         empty={
           <StateMessage
             title={intl.formatMessage({ id: 'documents.folderEmpty.title' })}

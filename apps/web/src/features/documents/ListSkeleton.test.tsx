@@ -51,11 +51,11 @@ describe('the skeleton of a list', () => {
 })
 
 describe('the skeleton of the documents', () => {
-  it('draws six rows in the grid of the documents and says that they are loading', () => {
+  it('draws six rows, as a list with the measures of the real ones, and says that they are loading', () => {
     inEnglish(<DocumentsSkeleton />)
 
     expect(screen.getAllByRole('listitem')).toHaveLength(6)
-    expect(screen.getByRole('list')).toHaveClass('grid')
+    expect(screen.getByRole('list')).toHaveClass('rows')
     expect(screen.getByRole('status')).toHaveTextContent('Loading documents')
   })
 })

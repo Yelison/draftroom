@@ -24,13 +24,15 @@ function spyOn<Name extends 'createFolder' | 'updateFolder'>(name: Name) {
 
 async function openNewFolder(options?: Parameters<typeof renderScreen>[1]) {
   const view = renderScreen('/documents', options)
-  await view.user.click(await screen.findByRole('button', { name: 'New folder' }))
+  await view.user.click(await screen.findByRole('button', { name: 'More' }))
+  await view.user.click(await screen.findByRole('menuitem', { name: 'New folder' }))
   return { ...view, dialog: await screen.findByRole('dialog', { name: 'New folder' }) }
 }
 
 async function openRenameFolder(options?: Parameters<typeof renderScreen>[1]) {
   const view = renderScreen('/documents', options)
   await view.user.click(await screen.findByRole('button', { name: 'Actions for Product' }))
+  await view.user.click(await screen.findByRole('menuitem', { name: 'Rename folder' }))
   return { ...view, dialog: await screen.findByRole('dialog', { name: 'Rename folder' }) }
 }
 
@@ -42,7 +44,7 @@ describe('creating a folder', () => {
     await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), '  Legal ')
     await user.click(within(dialog).getByRole('button', { name: 'Create folder' }))
 
-    expect(await within(main()).findByRole('link', { name: 'Legal' })).toBeInTheDocument()
+    expect(await within(main()).findByRole('heading', { level: 2, name: 'Legal' })).toBeInTheDocument()
     expect(requests.map((request) => request?.body)).toEqual([{ name: 'Legal' }])
   })
 
@@ -72,7 +74,7 @@ describe('creating a folder', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Create folder' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New folder' })).not.toBeInTheDocument())
-    expect(screen.getByRole('button', { name: 'New folder' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'More' })).toHaveFocus()
   })
 })
 
@@ -86,7 +88,7 @@ describe('renaming a folder', () => {
     await user.type(name, 'Roadmap')
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
 
-    expect(await within(main()).findByRole('link', { name: 'Roadmap' })).toBeInTheDocument()
+    expect(await within(main()).findByRole('heading', { level: 2, name: 'Roadmap' })).toBeInTheDocument()
     expect(requests.map((request) => request?.body)).toEqual([{ name: 'Roadmap', revision: productFolder.revision }])
   })
 
@@ -105,7 +107,7 @@ describe('renaming a folder', () => {
     await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), ' 2')
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
 
-    expect(await within(main()).findByRole('link', { name: 'Product 2' })).toBeInTheDocument()
+    expect(await within(main()).findByRole('heading', { level: 2, name: 'Product 2' })).toBeInTheDocument()
   })
 
   it('says it was changed, keeps what was typed, and goes through on the next try', async () => {
@@ -126,7 +128,7 @@ describe('renaming a folder', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
 
-    expect(await within(main()).findByRole('link', { name: 'Marta’s folder' })).toBeInTheDocument()
+    expect(await within(main()).findByRole('heading', { level: 2, name: 'Marta’s folder' })).toBeInTheDocument()
     expect(requests.map((request) => request?.body.revision)).toEqual([
       productFolder.revision,
       productFolder.revision + 1,

@@ -4,13 +4,13 @@ import { Button } from '@yelison/forma-ui'
 import { useMemo, useRef, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import { useDataSource } from '../../data/useDataSource.ts'
-import { DocumentCard } from './DocumentCard.tsx'
+import { DocumentListRow } from './DocumentListRow.tsx'
 import { DocumentsSkeleton } from './ListSkeleton.tsx'
 import { QueryFailure } from './QueryFailure.tsx'
 import { StateMessage } from './StateMessage.tsx'
 import { documentListQuery } from './queries.ts'
 import { useFocusFirstArrival } from './useFocusFirstArrival.ts'
-import layout from './ListLayout.module.css'
+import rows from './DocumentRows.module.css'
 
 export interface DocumentCollectionProps {
   workspaceId: string
@@ -20,7 +20,10 @@ export interface DocumentCollectionProps {
   term: string | undefined
   /** What to say when there is nothing to list and nobody is searching: the state, and the way to the first document. */
   empty: ReactNode
+  /** Opens the dialog that renames or moves a document. */
   onActions: (document: Schema<'Document'>) => void
+  /** Opens the dialog that archives one. A list that leaves it out does not offer archiving in its rows' menu. */
+  onArchive?: (document: Schema<'Document'>) => void
 }
 
 /**
@@ -28,7 +31,14 @@ export interface DocumentCollectionProps {
  * nothing, and a failure that can be retried. While a search is typed the previous list stays until the new one is
  * there, so the page does not jump from list to skeleton on every key.
  */
-export function DocumentCollection({ workspaceId, folderId, term, empty, onActions }: DocumentCollectionProps) {
+export function DocumentCollection({
+  workspaceId,
+  folderId,
+  term,
+  empty,
+  onActions,
+  onArchive,
+}: DocumentCollectionProps) {
   const intl = useIntl()
   const dataSource = useDataSource()
   const query = useInfiniteQuery({
@@ -60,15 +70,19 @@ export function DocumentCollection({ workspaceId, folderId, term, empty, onActio
 
   return (
     <>
-      <ul ref={list} className={layout.grid}>
+      <ul ref={list} className={`${rows.rows} ${rows.panel}`}>
         {documents.map((document) => (
-          <li key={document.id}>
-            <DocumentCard document={document} onActions={onActions} />
-          </li>
+          <DocumentListRow
+            key={document.id}
+            document={document}
+            onRenameOrMove={onActions}
+            {...(onArchive === undefined ? {} : { onArchive })}
+          />
         ))}
       </ul>
       {query.hasNextPage && (
         <Button
+          className={rows.more}
           variant="secondary"
           loading={query.isFetchingNextPage}
           onClick={() => {

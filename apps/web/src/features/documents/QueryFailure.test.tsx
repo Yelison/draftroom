@@ -11,7 +11,7 @@ import { ApiError, TransportError } from '../../data/errors.ts'
 import { createMockServer } from '../../data/mock/createMockDataSource.ts'
 import { marta } from '../../data/mock/fixtures/index.ts'
 
-const failure = "We couldn't load your documents"
+const failure = "We couldn't load these documents."
 const unauthenticated = new ApiError({ type: 'about:blank', title: 'No session', status: 401, code: 'unauthenticated' })
 
 /** The app with the providers it has (the query client that notices a refused session is theirs), signed in as Marta. */
@@ -44,7 +44,7 @@ describe('what a list says when it could not be read', () => {
 
     // The first failure is retried once, a second later, before the page gives up.
     expect(await screen.findByRole('alert', {}, { timeout: 4000 })).toHaveTextContent(failure)
-    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Try again to load Folders' })).toBeInTheDocument()
   })
 
   it('says nothing when the session is what has ended, because the gate is about to send the person to sign in', async () => {

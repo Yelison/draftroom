@@ -1,6 +1,6 @@
 import { useIntl } from 'react-intl'
 import type { MessageId } from '../../i18n/messages.ts'
-import layout from './ListLayout.module.css'
+import rows from './DocumentRows.module.css'
 import styles from './ListSkeleton.module.css'
 
 export interface ListSkeletonProps {
@@ -29,7 +29,20 @@ export function ListSkeleton({ rows, listClassName, label }: ListSkeletonProps) 
   )
 }
 
-/** The skeleton of the document grid, the one the Documents screen and a folder show. */
+/** The skeleton of a list of documents, with the measures of its rows: the one a folder and the search show. */
 export function DocumentsSkeleton() {
-  return <ListSkeleton rows={6} listClassName={layout.grid} label="documents.loading" />
+  const intl = useIntl()
+
+  return (
+    <div aria-busy="true">
+      <ul className={`${rows.rows} ${rows.panel}`}>
+        {Array.from({ length: 6 }, (_, index) => (
+          <li key={index} className={rows.skeletonRow} />
+        ))}
+      </ul>
+      <p role="status" className="forma-visually-hidden">
+        {intl.formatMessage({ id: 'documents.loading' })}
+      </p>
+    </div>
+  )
 }
