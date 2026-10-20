@@ -100,6 +100,39 @@ describe('the results of a search', () => {
   })
 })
 
+describe('the folder of a result', () => {
+  it('names the folder of a document that is in one, and says "No folder" for one that is in none', async () => {
+    renderScreen('/search?q=the')
+
+    const inFolder = await rowOf('Autumn launch plan')
+    const loose = await rowOf('Weekly update — October 6')
+
+    await waitFor(() => expect(within(inFolder).getByText('In folder Product')).toBeInTheDocument())
+    expect(within(inFolder).queryByText('No folder')).not.toBeInTheDocument()
+    expect(within(loose).getByText('No folder')).toBeInTheDocument()
+    expect(within(loose).queryByText(/^In folder/)).not.toBeInTheDocument()
+  })
+
+  it('says nothing about folders while they are on their way, so a document in one never reads as "No folder"', async () => {
+    renderScreen('/search?q=the', {
+      wrap: (dataSource) => ({ ...dataSource, listFolders: () => new Promise(() => {}) }),
+    })
+
+    await rowOf('Autumn launch plan')
+
+    expect(main()).not.toHaveTextContent(/No folder|In folder/)
+  })
+
+  it('is said in Spanish', async () => {
+    localStorage.setItem(localeStorageKey, 'es')
+    renderScreen('/search?q=de')
+
+    const loose = await rowOf('Actualización semanal — 13 de octubre')
+
+    await waitFor(() => expect(within(loose).getByText('Sin carpeta')).toBeInTheDocument())
+  })
+})
+
 describe('the count of the results', () => {
   it.each([
     { case: 'one result', path: '/search?q=weekly', count: '1 result' },
@@ -198,6 +231,22 @@ describe('the states of the results', () => {
 
     const link = await within(main()).findByRole('link', { name: weeklyEnglish.title })
     await waitFor(() => expect(link).toHaveFocus())
+  })
+
+  it('puts the focus on the headline when the retry finds nothing, as there is no result to take it', async () => {
+    let failures = 1
+    const { user } = renderScreen('/search?q=zzzz', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listDocuments: (request) =>
+          failures-- > 0 ? Promise.reject(unavailable()) : dataSource.listDocuments(request),
+      }),
+    })
+
+    await user.click(await within(await screen.findByRole('alert')).findByRole('button', { name: 'Try again' }))
+
+    expect(await screen.findByText('No results for “zzzz”')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveFocus())
   })
 
   it('shows that "Load more" is working while the next page is on its way', async () => {

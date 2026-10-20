@@ -17,8 +17,8 @@ export type DocumentTextRenderer = (text: string, field: 'title' | 'excerpt') =>
 
 export interface DocumentListRowProps {
   document: Schema<'Document'>
-  /** The folder the document is in, for the lists that mix folders (the pinned ones). */
-  folderName?: string
+  /** The folder the document is in, for the lists that mix folders (the pinned ones and the search); `null` says it is in none. */
+  folderName?: string | null
   /**
    * Opens the dialog of an action. Renaming and moving is for editors and owners, archiving for owners; a list that cannot
    * archive leaves `onArchive` out and its rows do not offer it.
@@ -69,12 +69,18 @@ export function DocumentListRow({ document, folderName, onRenameOrMove, onArchiv
           {folderName !== undefined && (
             <span className={styles.folderTag}>
               <Icon name="folder" />
-              <span aria-hidden="true" className={styles.folderName}>
-                {folderName}
-              </span>
-              <span className="forma-visually-hidden">
-                {intl.formatMessage({ id: 'documents.row.inFolder' }, { name: folderName })}
-              </span>
+              {folderName === null ? (
+                <span className={styles.folderName}>{intl.formatMessage({ id: 'documents.details.noFolder' })}</span>
+              ) : (
+                <>
+                  <span aria-hidden="true" className={styles.folderName}>
+                    {folderName}
+                  </span>
+                  <span className="forma-visually-hidden">
+                    {intl.formatMessage({ id: 'documents.row.inFolder' }, { name: folderName })}
+                  </span>
+                </>
+              )}
             </span>
           )}
         </span>

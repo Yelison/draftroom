@@ -1,13 +1,14 @@
 import type { Schema } from '@draftroom/contract'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { Button } from '@yelison/forma-ui'
 import { useMemo, useRef } from 'react'
 import { useIntl } from 'react-intl'
+import { focusMainContent } from '../../app/mainContent.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { DocumentListRow, type DocumentTextRenderer } from '../documents/DocumentListRow.tsx'
 import { DocumentsSkeleton } from '../documents/ListSkeleton.tsx'
 import { QueryFailure } from '../documents/QueryFailure.tsx'
-import { documentListQuery } from '../documents/queries.ts'
+import { documentListQuery, foldersQuery } from '../documents/queries.ts'
 import { useFocusFirstArrival } from '../documents/useFocusFirstArrival.ts'
 import rows from '../documents/DocumentRows.module.css'
 import { Highlighted } from './Highlighted.tsx'
@@ -36,9 +37,23 @@ export function ResultList({ workspaceId, term, onActions, onArchive }: ResultLi
   const query = useInfiniteQuery(documentListQuery(dataSource, workspaceId, { query: term }))
   const documents = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data])
   const ids = useMemo(() => documents.map((document) => document.id), [documents])
+  const folders = useQuery(foldersQuery(dataSource, workspaceId))
+  const folderNames = useMemo(
+    () =>
+      folders.data === undefined ? undefined : new Map(folders.data.items.map((folder) => [folder.id, folder.name])),
+    [folders.data],
+  )
   const list = useRef<HTMLUListElement>(null)
   // Both "Load more" and "Try again" go away when what they ask for arrives, and take the focus with them.
   const keepFocus = useFocusFirstArrival(list, ids, 'a', JSON.stringify([workspaceId, term]))
+
+  /** Until the folders are known nothing is said about them: a document in a folder must not read as "No folder". */
+  const folderPropsOf = (document: Schema<'Document'>) => {
+    if (folderNames === undefined) return {}
+    if (document.folderId === null) return { folderName: null }
+    const folderName = folderNames.get(document.folderId)
+    return folderName === undefined ? {} : { folderName }
+  }
 
   const renderText: DocumentTextRenderer = (text, field) => (
     <Highlighted text={text} term={term} {...(field === 'excerpt' ? { lead: excerptLead } : {})} />
@@ -66,7 +81,10 @@ export function ResultList({ workspaceId, term, onActions, onArchive }: ResultLi
         <QueryFailure
           onRetry={() => {
             keepFocus()
-            void query.refetch()
+            // A retry that finds nothing has no row to take the focus, and the button it was on is gone.
+            void query.refetch().then((result) => {
+              if (result.data?.pages[0]?.items.length === 0) focusMainContent()
+            })
           }}
           retrying={query.isFetching}
         />
@@ -90,6 +108,7 @@ export function ResultList({ workspaceId, term, onActions, onArchive }: ResultLi
           <DocumentListRow
             key={document.id}
             document={document}
+            {...folderPropsOf(document)}
             onRenameOrMove={onActions}
             onArchive={onArchive}
             renderText={renderText}
