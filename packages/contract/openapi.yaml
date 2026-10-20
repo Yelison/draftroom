@@ -764,7 +764,7 @@ paths:
         - name: unfiled
           in: query
           required: false
-          description: Only the documents that are in no folder. Sent together with `folderId` it is a `400 validation-failed` with `invalid-value` at `/query/unfiled`, whether or not the folder exists.
+          description: Only the documents that are in no folder. `true` together with `folderId` is a `400 validation-failed` with `invalid-value` at `/query/unfiled`, whether or not the folder exists.
           schema:
             type: boolean
             default: false

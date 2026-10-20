@@ -86,11 +86,18 @@ const canonical = (filters: Record<string, unknown>): string =>
       .sort(([a], [b]) => compare(a, b)),
   )
 
-/** Checks `limit` and `cursor` against the filters of the request: the cursor is refused with any other filters. */
-export function readPage({ cursor, limit = defaultLimit }: PageQuery, filters: Record<string, unknown>): PageRequest {
+/** The `limit` of the request, or the default one; a value outside the contract's range is refused. */
+export function checkLimit({ limit = defaultLimit }: PageQuery): number {
   if (!Number.isInteger(limit) || limit < 1 || limit > maxLimit) {
     throw invalid({ pointer: '/query/limit', code: 'invalid-value' })
   }
+  return limit
+}
+
+/** Checks `limit` and `cursor` against the filters of the request: the cursor is refused with any other filters. */
+export function readPage(query: PageQuery, filters: Record<string, unknown>): PageRequest {
+  const limit = checkLimit(query)
+  const { cursor } = query
   const filterKey = canonical(filters)
   return { limit, after: cursor === undefined ? undefined : decodeCursor(cursor, filterKey), filters: filterKey }
 }

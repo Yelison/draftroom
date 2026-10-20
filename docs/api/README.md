@@ -73,7 +73,7 @@ Every 4xx and 5xx is `application/problem+json` (RFC 9457) with `type`, `title`,
 
 | Code | Status | When |
 | --- | --- | --- |
-| `validation-failed` | 400 | The request breaks a rule of the contract: a missing field, a value below its minimum, a bad format, an unknown field, a malformed cursor or one reused with other filters, a `locale` without a `templateId` (`{ pointer: /templateId, code: required }`), a `folderId` that is unknown or belongs to another workspace, `unfiled=true` together with a `folderId` (`invalid-value` at `/query/unfiled`: the two filters exclude each other), a `templateId` that is unknown (`invalid-value`, the same answer for an unknown and a foreign folder). |
+| `validation-failed` | 400 | The request breaks a rule of the contract: a missing field, a value below its minimum, a bad format, an unknown field, a malformed cursor or one reused with other filters, a `locale` without a `templateId` (`{ pointer: /templateId, code: required }`), a `folderId` that is unknown or belongs to another workspace (`invalid-value`, the same answer for an unknown and a foreign folder), a `templateId` that is unknown, `unfiled=true` together with a `folderId` (`invalid-value` at `/query/unfiled`: the two filters exclude each other). |
 | `unauthenticated` | 401 | No valid session, or wrong credentials. |
 | `csrf` | 403 | `X-CSRF-Token` is missing or does not match. |
 | `forbidden` | 403 | The caller can read the resource but their role does not allow the operation. |

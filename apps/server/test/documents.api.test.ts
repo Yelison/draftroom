@@ -773,6 +773,10 @@ describe('pages of documents', () => {
         archived: false,
       }
       const cursor = encodeCursor({ timestamp: '0000-06-01T00:00:00.000000Z', id: randomUUID() }, filters)
+      // The same filters with a real instant are accepted: the refusal below is for the year and not for a cursor
+      // that was built with other filters than the route's.
+      const control = encodeCursor({ timestamp: '2026-06-01T00:00:00.000000Z', id: randomUUID() }, filters)
+      expect((await list(first.owner, first.workspaceId, `?cursor=${control}`)).statusCode).toBe(200)
 
       const response = await list(first.owner, first.workspaceId, `?cursor=${cursor}`)
 

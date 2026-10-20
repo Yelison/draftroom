@@ -561,6 +561,16 @@ export function describeDataSourceContract(name: string, harness: Harness) {
           expect(page.items.every((row) => row.folderId === null)).toBe(true)
         })
 
+        it('is the same as leaving it out when it is false, even with a folder', async () => {
+          const { owner, workspaceId, folder, filed } = await filedAndLoose()
+
+          const page = await owner.listDocuments({
+            params: { path: { workspaceId }, query: { unfiled: false, folderId: folder.id } },
+          })
+
+          expect(page.items.map((row) => row.id)).toEqual([filed.id])
+        })
+
         it('combines with a search and with the archive', async () => {
           const { owner, workspaceId, loose, other } = await filedAndLoose()
           await owner.archiveDocument(document(other.id))
@@ -608,6 +618,18 @@ export function describeDataSourceContract(name: string, harness: Harness) {
               '/query/unfiled',
             )
           }
+        })
+
+        it('reports a limit out of range before the filters that exclude each other', async () => {
+          const { owner, workspaceId, folder } = await filedAndLoose()
+
+          await expectRefusal(
+            owner.listDocuments({
+              params: { path: { workspaceId }, query: { unfiled: true, folderId: folder.id, limit: 0 } },
+            }),
+            'validation-failed',
+            '/query/limit',
+          )
         })
 
         it('is refused with a cursor that came from the list without the filter', async () => {
