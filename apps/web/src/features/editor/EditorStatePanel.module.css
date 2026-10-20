@@ -5,6 +5,7 @@
   gap: var(--space-16);
   max-width: var(--layout-notice-width);
   margin-inline: auto;
+  padding-inline: var(--space-16);
   text-align: center;
 }
 

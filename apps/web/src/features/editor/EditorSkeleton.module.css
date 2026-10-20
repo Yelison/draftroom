@@ -23,18 +23,3 @@
 .shortLine {
   inline-size: 40%;
 }
-
-/* The panel is as wide as the real one, and as tall as the sheet's first screen. */
-.panel {
-  box-sizing: border-box;
-  min-block-size: calc(var(--space-64) * 4);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-panel);
-  background: var(--color-surface);
-}
-
-@media (width >= 1280px) {
-  .panel {
-    inline-size: var(--layout-panel-width);
-  }
-}

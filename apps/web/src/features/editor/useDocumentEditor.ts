@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type * as Y from 'yjs'
 import type { CommentRequests } from '../comments/commentRequests.ts'
 import { commentHighlights } from '../comments/highlightPlugin.ts'
+import { commentGaps } from '../comments/margin/commentGaps.ts'
 import { collaborationExtensions, type CollaboratingPerson } from './CollaborationExtensions.ts'
 import { LinkShortcut } from './LinkShortcut.ts'
 import { updateBytesOf } from './pasteBudget.ts'
@@ -54,6 +55,7 @@ export function useDocumentEditor({
       ...collaborationExtensions({ ydoc, provider, person }),
       LinkShortcut.configure({ onRequest: onLinkRequest }),
       commentHighlights.configure({ requests: commentRequests }),
+      commentGaps,
     ],
     [ydoc, provider, person, onLinkRequest, commentRequests],
   )

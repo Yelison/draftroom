@@ -1,0 +1,64 @@
+/*
+ * The page of a document: the band and the bar, which stay at the top of the window, and under them the sheet with the
+ * comments in its margin. The page is the only thing that scrolls: the sheet and the margin go by together, and every
+ * comment stays level with the text it is about.
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Both stay in sight, one under the other, and the page goes by under them. */
+.chrome {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-sticky);
+}
+
+/*
+ * The sheet and its margin. The margin is the panel's width less the room around it (24 px), and the sheet has the rest, up
+ * to 708 px: 708 px at 1440, 568 px at 1280, where the margin keeps its width and the text gives way. With the margin hidden
+ * the sheet has its 708 px at either width. Under 1280 px the margin goes under the sheet.
+ */
+.stage {
+  --margin-width: calc(var(--layout-panel-width) - var(--space-24));
+
+  display: grid;
+  grid-template-columns: minmax(0, var(--layout-sheet-width));
+  gap: var(--space-16);
+  justify-content: center;
+  align-items: start;
+  padding: var(--space-16);
+}
+
+@media (width >= 1280px) {
+  .stage.withMargin {
+    grid-template-columns: minmax(0, var(--layout-sheet-width)) var(--margin-width);
+  }
+}
+
+/* What the connection says goes over both columns, and takes no room when it has nothing to say. */
+.alerts {
+  grid-column: 1 / -1;
+}
+
+.alerts:empty {
+  display: none;
+}
+
+.sheet {
+  position: relative;
+  min-width: 0;
+  /* The room above the title is the one the notice of working offline is laid over: 48 px at any width. */
+  padding: var(--space-48) var(--space-24);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+}
+
+@media (width >= 1280px) {
+  .sheet {
+    padding: var(--space-48);
+  }
+}

@@ -1,0 +1,37 @@
+/*
+ * One row of the header's height, always, whatever the language and whoever is in the document, so nothing under it moves when
+ * the document arrives or when someone comes or goes. It owns its widths: the state keeps its own, and the crumbs and the
+ * people share what is left, each taking the room it is given and not that of its content.
+ */
+.band {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  box-sizing: border-box;
+  block-size: var(--layout-header-height);
+  padding-inline: var(--space-16);
+  border-block-end: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+.crumbs {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.people {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.state {
+  display: flex;
+  flex: none;
+  gap: var(--space-8);
+  align-items: center;
+}

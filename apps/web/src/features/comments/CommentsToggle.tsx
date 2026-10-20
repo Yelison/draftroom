@@ -3,19 +3,19 @@ import { IconButton, Tooltip } from '@yelison/forma-ui'
 import { useState } from 'react'
 import { useIntl } from 'react-intl'
 import { useDataSource } from '../../data/useDataSource.ts'
-import { commentsPanelId, useCommentsPanel } from './commentsPanelState.ts'
+import { commentsMarginId, useCommentsView } from './commentsView.ts'
 import { threadsQuery } from './queries.ts'
 import styles from './CommentsToggle.module.css'
 
 /**
- * Opens and closes the comments panel from the band above the sheet. It names the panel and says how many threads are open
- * (the count is also drawn, so a closed panel does not hide that there is something to read), and it keeps the focus: it is
- * outside the panel, so closing the panel never takes the focus with it. What it did is said in a region that was already in
- * the page.
+ * Shows and hides the comments of the margin from the bar above the sheet. It names the margin and says how many threads are
+ * open (the count is also drawn, so a hidden margin does not hide that there is something to read), and it keeps the focus:
+ * it is outside the margin, so hiding the margin never takes the focus with it. What it did is said in a region that was
+ * already in the page.
  */
 export function CommentsToggle({ documentId }: { documentId: string }) {
   const intl = useIntl()
-  const { open, toggle } = useCommentsPanel()
+  const { marginShown: open, toggleMargin: toggle } = useCommentsView()
   const threads = useQuery(threadsQuery(useDataSource(), documentId))
   // Counted, so doing it again is a new message and is announced again.
   const [presses, setPresses] = useState(0)
@@ -36,7 +36,7 @@ export function CommentsToggle({ documentId }: { documentId: string }) {
             icon="comment"
             label={label}
             aria-expanded={open}
-            aria-controls={commentsPanelId}
+            aria-controls={commentsMarginId}
             className={styles.button}
             onClick={() => {
               toggle()

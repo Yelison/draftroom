@@ -1,0 +1,12 @@
+.controls {
+  display: flex;
+  flex: none;
+  gap: var(--space-12);
+  align-items: center;
+  padding-inline: var(--space-12);
+}
+
+/* The panels of the tabs are the margin and the activity at the edge of the window, so the ones the tabs bring have no place. */
+.tabs [role='tabpanel'] {
+  display: none;
+}

@@ -1,12 +1,3 @@
-/* One row of the same height with the hint or with the button, so the list under it stays where it is. */
-.row {
-  display: flex;
-  align-items: center;
-  min-block-size: var(--button-height-compact);
-}
-
-.hint {
-  margin: 0;
-  color: var(--color-muted);
-  font: var(--font-caption);
+.action {
+  display: inline-flex;
 }

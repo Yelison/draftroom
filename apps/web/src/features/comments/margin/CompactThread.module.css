@@ -1,0 +1,82 @@
+.compact {
+  display: grid;
+  gap: var(--space-6);
+  box-sizing: border-box;
+  inline-size: 100%;
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: var(--font-body);
+  text-align: start;
+  cursor: pointer;
+}
+
+.compact:hover {
+  background: var(--color-surface-hover);
+}
+
+.compact:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--space-2);
+}
+
+.compact[data-state='resolved'] {
+  background: var(--color-bg);
+}
+
+.badge {
+  justify-self: start;
+}
+
+/* One line, cut with an ellipsis: the height of a compact card is a measure and not a result of the text. */
+.quote {
+  overflow: hidden;
+  padding-inline-start: var(--space-8);
+  border-inline-start: 3px solid var(--color-amber-ink);
+  color: var(--color-muted);
+  font: var(--font-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact[data-state='orphaned'] .quote {
+  border-inline-start-color: var(--color-line);
+  text-decoration: line-through;
+}
+
+.who {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  min-width: 0;
+}
+
+.author {
+  overflow: hidden;
+  font: var(--font-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time {
+  margin-inline-start: auto;
+  color: var(--color-muted);
+  font: var(--font-caption);
+  white-space: nowrap;
+}
+
+/* Two lines of what was said, and no more. */
+.body {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.replies {
+  color: var(--color-muted);
+  font: var(--font-caption);
+}
