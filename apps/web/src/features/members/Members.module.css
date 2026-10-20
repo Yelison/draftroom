@@ -189,8 +189,41 @@
 }
 
 .skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
   block-size: var(--space-64);
+  padding-inline: var(--space-16);
   border-block-start: 1px solid var(--color-line);
+}
+
+.skeletonDot {
+  flex: none;
+  inline-size: var(--avatar-size-medium);
+  block-size: var(--avatar-size-medium);
+  border-radius: var(--radius-round);
+  background: var(--color-surface-hover);
+}
+
+.skeletonLines {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.skeletonBar {
+  block-size: var(--space-12);
+  border-radius: var(--radius-small);
+  background: var(--color-surface-hover);
+}
+
+.skeletonName {
+  inline-size: 30%;
+}
+
+.skeletonEmail {
+  inline-size: 22%;
 }
 
 .skeletonHead + .skeletonRow {

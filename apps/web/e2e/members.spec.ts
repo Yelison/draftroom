@@ -1,6 +1,7 @@
 /* The Members page in the production build, with a real browser: the keyboard from the rail to a removal, the skeleton's measures and the narrow window. */
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures.ts'
+import { signInAsDaniel } from './signInAs.ts'
 
 test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
 
@@ -73,7 +74,8 @@ test('reaches Members from Settings, which no longer has it as a tab', async ({ 
 })
 
 interface Boxes {
-  invite: { top: number; height: number }
+  /** An owner's page has the invitation; a member's has none. */
+  invite: { top: number; height: number } | null
   filters: { top: number; height: number }
   table: { top: number; head: number }
 }
@@ -84,46 +86,73 @@ declare global {
   }
 }
 
-for (const width of [1280, 640] as const) {
-  test(`gives what loads the measures of its skeleton at ${width}px, so the page does not move`, async ({ page }) => {
-    await page.setViewportSize({ width, height: width === 640 ? 360 : 800 })
-    // The skeleton is on screen for a moment only: its measures are taken as it appears, before the real ones replace it.
-    await page.addInitScript(() => {
-      const box = (element: Element | null | undefined) => element?.getBoundingClientRect() ?? new DOMRect()
-      new MutationObserver(() => {
-        const skeleton = document.querySelector('main [aria-busy="true"]')
-        if (skeleton === null || skeleton.children.length < 4 || window.skeleton !== undefined) return
-        const [, invite, filters, table] = skeleton.children
-        window.skeleton = {
-          invite: { top: box(invite).top, height: box(invite).height },
-          filters: { top: box(filters).top, height: box(filters).height },
-          table: { top: box(table).top, head: box(table?.firstElementChild).height },
-        }
-      }).observe(document, { childList: true, subtree: true })
-    })
-    await page.goto('/members')
+/** Takes the measures of the skeleton as it appears, before the real page replaces it: it is on screen for a moment only. */
+function watchSkeleton() {
+  const box = (element: Element | null | undefined) => element?.getBoundingClientRect() ?? new DOMRect()
+  new MutationObserver(() => {
+    const skeleton = document.querySelector('main [aria-busy="true"]')
+    if (skeleton === null || skeleton.children.length < 4 || window.skeleton !== undefined) return
+    // Summary, invitation (an owner's only), filters, table, spoken status.
+    const [, ...blocks] = skeleton.children
+    const [invite, filters, table] = blocks.length === 4 ? blocks : [undefined, ...blocks]
+    window.skeleton = {
+      invite: invite === undefined ? null : { top: box(invite).top, height: box(invite).height },
+      filters: { top: box(filters).top, height: box(filters).height },
+      table: { top: box(table).top, head: box(table?.firstElementChild).height },
+    }
+  }).observe(document, { childList: true, subtree: true })
+}
 
-    const table = main(page).getByRole('table')
-    await expect(table).toBeVisible()
-    const skeleton = await page.evaluate(() => window.skeleton)
-    expect(skeleton, 'the skeleton was seen').toBeDefined()
-    const real = await page.evaluate(() => {
-      const box = (element: Element | null) => element?.getBoundingClientRect() ?? new DOMRect()
-      const invite = document.querySelector('main form')
-      const filters = document.querySelector('main [role="group"]')
-      const panel = document.querySelector('main table')?.parentElement ?? null
-      return {
-        invite: { top: box(invite).top, height: box(invite).height },
-        filters: { top: box(filters).top, height: box(filters).height },
-        table: { top: box(panel).top, head: box(document.querySelector('main thead')).height },
-      }
+/** Where the same blocks are once the members are there. */
+function measureReal(): Boxes {
+  const box = (element: Element | null) => element?.getBoundingClientRect() ?? new DOMRect()
+  const invite = document.querySelector('main form')
+  const filters = document.querySelector('main [role="group"]')
+  const panel = document.querySelector('main table')?.parentElement ?? null
+  return {
+    invite: invite === null ? null : { top: box(invite).top, height: box(invite).height },
+    filters: { top: box(filters).top, height: box(filters).height },
+    table: { top: box(panel).top, head: box(document.querySelector('main thead')).height },
+  }
+}
+
+async function expectSkeletonToHaveTheMeasuresOfThePage(page: Page, hasInvitation: boolean) {
+  await expect(main(page).getByRole('table')).toBeVisible()
+  const skeleton = await page.evaluate(() => window.skeleton)
+  expect(skeleton, 'the skeleton was seen').toBeDefined()
+  const real = await page.evaluate(measureReal)
+  expect(real.invite === null, 'the page has no invitation').toBe(!hasInvitation)
+  expect(skeleton?.invite === null, 'the skeleton reserves no invitation').toBe(!hasInvitation)
+  expect(real.invite?.top ?? 0, 'where the invitation starts').toBeCloseTo(skeleton?.invite?.top ?? 0, 0)
+  expect(real.invite?.height ?? 0, 'the height of the invitation').toBeCloseTo(skeleton?.invite?.height ?? 0, 0)
+  expect(real.filters.top, 'where the filters start').toBeCloseTo(skeleton?.filters.top ?? 0, 0)
+  expect(real.filters.height, 'the height of the filters').toBeCloseTo(skeleton?.filters.height ?? 0, 0)
+  expect(real.table.top, 'where the table starts').toBeCloseTo(skeleton?.table.top ?? 0, 0)
+  expect(real.table.head, 'the height of the header').toBeCloseTo(skeleton?.table.head ?? 0, 0)
+}
+
+for (const width of [1280, 640] as const) {
+  test.describe(`at ${width}px`, () => {
+    test.beforeEach(async ({ page }) => {
+      await page.setViewportSize({ width, height: width === 640 ? 360 : 800 })
     })
-    expect(real.invite.top, 'where the invitation starts').toBeCloseTo(skeleton?.invite.top ?? 0, 0)
-    expect(real.invite.height, 'the height of the invitation').toBeCloseTo(skeleton?.invite.height ?? 0, 0)
-    expect(real.filters.top, 'where the filters start').toBeCloseTo(skeleton?.filters.top ?? 0, 0)
-    expect(real.filters.height, 'the height of the filters').toBeCloseTo(skeleton?.filters.height ?? 0, 0)
-    expect(real.table.top, 'where the table starts').toBeCloseTo(skeleton?.table.top ?? 0, 0)
-    expect(real.table.head, 'the height of the header').toBeCloseTo(skeleton?.table.head ?? 0, 0)
+
+    test('gives what loads the measures of its skeleton, so the page does not move', async ({ page }) => {
+      await page.addInitScript(watchSkeleton)
+      await page.goto('/members')
+
+      await expectSkeletonToHaveTheMeasuresOfThePage(page, true)
+    })
+
+    test('gives a member the skeleton of a member, who has no invitation to wait for', async ({ page }) => {
+      await signInAsDaniel(page)
+      // The sign-in is over: from here the page is the member's, and the way to Members is the rail's, since an address
+      // typed would start the session of the demonstration over.
+      await page.evaluate(watchSkeleton)
+      await page.getByRole('navigation').getByRole('link', { name: 'Members' }).click()
+
+      await expectSkeletonToHaveTheMeasuresOfThePage(page, false)
+    })
   })
 }
 
