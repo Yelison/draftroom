@@ -1,22 +1,11 @@
 /* Shared in the production build, with a real browser: the blocks of permissions, and a document opened with the keyboard alone. */
 import type { Page } from '@playwright/test'
-import { daniel, demoPassword } from '../src/data/mock/fixtures/people.ts'
 import { expect, test } from './fixtures.ts'
+import { signInAsDaniel } from './signInAs.ts'
 
 test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
 
 const main = (page: Page) => page.getByRole('main')
-
-/** Marta owns every document, so nothing is shared with her: Daniel, who edits, comments on and reads hers, signs in. */
-async function signInAsDaniel(page: Page) {
-  await page.goto('/')
-  await page.getByRole('button', { name: 'Sign out' }).click()
-  await expect(page).toHaveURL(/\/sign-in$/)
-  await page.getByRole('textbox', { name: 'Email' }).fill(daniel.email)
-  await page.getByLabel('Password').fill(demoPassword)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL(/\/$/)
-}
 
 async function openSharedFromTheRail(page: Page) {
   await page.getByRole('link', { name: 'Shared' }).focus()

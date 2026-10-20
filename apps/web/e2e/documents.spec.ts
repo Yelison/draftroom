@@ -1,8 +1,8 @@
 /* The Documents screen in the production build, with a real browser: the keyboard, the geometry and the narrow window. */
 import type { Locator, Page } from '@playwright/test'
 import { brandVoice, launchPlan, weeklyEnglish } from '../src/data/mock/fixtures/documents.ts'
-import { daniel, demoPassword } from '../src/data/mock/fixtures/people.ts'
 import { expect, test } from './fixtures.ts'
+import { signInAsDaniel } from './signInAs.ts'
 
 test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
 
@@ -58,14 +58,8 @@ test('pins, folds, moves and opens a document with the keyboard alone', async ({
 
 test('keeps the star and the date of every row in the same place, with a menu or without one', async ({ page }) => {
   // Daniel can change some documents and only read others, so some rows have a menu and some do not.
-  await page.goto('/documents')
-  await page.getByRole('button', { name: 'Sign out' }).click()
-  await expect(page).toHaveURL(/sign-in$/)
-  await page.getByRole('textbox').first().fill(daniel.email)
-  await page.locator('input[type="password"]').fill(demoPassword)
-  await page.keyboard.press('Enter')
-  await expect(page).toHaveURL(/\/$/)
-  await page.getByRole('navigation').locator('a[href$="/documents"]').click()
+  await signInAsDaniel(page)
+  await page.getByRole('navigation').getByRole('link', { name: 'Documents' }).click()
   const rows = main(page).getByRole('listitem')
   await expect(rows.first()).toBeVisible()
   await expect(

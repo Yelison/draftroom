@@ -61,13 +61,13 @@ function isReady(data: InfiniteData<DocumentPage> | undefined) {
 export function useFirstPagesSettled(
   workspaceId: string,
   folderIds: readonly string[],
-  isExpanded: (folderId: string, position: number) => boolean,
+  isExpanded: (folderId: string) => boolean,
 ) {
   const queryClient = useQueryClient()
   useIsFetching({ queryKey: queryKeys.documentLists(workspaceId) })
 
-  return folderIds.every((folderId, position) => {
-    if (!isExpanded(folderId, position)) return true
+  return folderIds.every((folderId) => {
+    if (!isExpanded(folderId)) return true
     const state = queryClient.getQueryState<InfiniteData<DocumentPage>>(
       queryKeys.documentList(workspaceId, filtersOf({ folderId })),
     )

@@ -48,6 +48,7 @@ export function DocumentSections({
   )
 
   const folderList = folders.data?.items
+  if (folderList !== undefined) folds.openByDefault(folderList.map((folder) => folder.id))
   const firstPagesIn = useFirstPagesSettled(
     workspaceId,
     useMemo(() => folderList?.map((folder) => folder.id) ?? [], [folderList]),
@@ -111,13 +112,13 @@ export function DocumentSections({
             retrying={folders.isFetching}
           />
         )}
-        {folders.data?.items.map((folder, position) => (
+        {folders.data?.items.map((folder) => (
           <FolderSection
             key={folder.id}
             workspaceId={workspaceId}
             folder={folder}
-            expanded={folds.isExpanded(folder.id, position)}
-            onToggle={() => folds.toggle(folder.id, position)}
+            expanded={folds.isExpanded(folder.id)}
+            onToggle={() => folds.toggle(folder.id)}
             onRename={onRenameFolder}
             {...actions}
           />

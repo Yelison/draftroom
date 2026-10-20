@@ -6,7 +6,7 @@ import { localeStorageKey } from '../../i18n/locale.ts'
 import { archivedNotice } from './archivedNotice.ts'
 import { fixtures, renderScreen, workspaceFixtures } from './testing/renderScreen.tsx'
 
-const { launchPlan, designReview, weeklyEnglish, interviews, interviewsSpanish } = fixtures
+const { launchPlan, designReview, weeklyEnglish, weeklySpanish, interviews, interviewsSpanish } = fixtures
 const heading = () => screen.findByRole('heading', { level: 1, name: 'Documents' })
 const main = () => screen.getByRole('main')
 const searchbox = () => within(main()).getByRole('searchbox', { name: 'Search documents' })
@@ -389,6 +389,39 @@ describe('a section with a network that takes its time', () => {
     expect(seen.length).toBeGreaterThan(0)
     expect(seen.filter((state) => state.more > 0 && state.links === 0)).toEqual([])
   })
+
+  it('never shows "Show more" over no rows when the only row of a section is pinned and more pages are left', async () => {
+    const seen: { links: number; more: number }[] = []
+    const observer = new MutationObserver(() => {
+      const unfiled = [...document.querySelectorAll('h2')]
+        .find((title) => title.textContent === 'No folder')
+        ?.closest('section')
+      if (unfiled === undefined || unfiled === null || unfiled.closest('[hidden]') !== null) return
+      seen.push({
+        links: unfiled.querySelectorAll('a').length,
+        more: [...unfiled.querySelectorAll('button')].filter((button) => /Show more/.test(button.ariaLabel ?? ''))
+          .length,
+      })
+    })
+    const { user } = renderScreen('/documents', { wrap: slow(1) })
+    await heading()
+    const unfiledSection = await section('No folder')
+    // One document is on the page and more are left: pinning it leaves the page with no row to show.
+    await within(unfiledSection).findByRole('link', { name: weeklySpanish.title })
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+
+    await user.click(within(unfiledSection).getByRole('button', { name: `Pin ${weeklySpanish.title}` }))
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('region', { name: 'Pinned' })).getByRole('link', { name: weeklySpanish.title }),
+      ).toBeVisible(),
+    )
+    await waitFor(() => expect(within(unfiledSection).getAllByRole('link').length).toBeGreaterThan(0))
+    observer.disconnect()
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.filter((state) => state.more > 0 && state.links === 0)).toEqual([])
+  })
 })
 
 describe('the folders that are open when the screen opens', () => {
@@ -432,6 +465,25 @@ describe('the folders that are open when the screen opens', () => {
     await waitFor(() => expect(asked).toContain(extra[2]?.id))
     expect(asked).not.toContain(extra[3]?.id)
     expect(await within(await section('Zeta 3')).findByText('No documents yet')).toBeInTheDocument()
+  })
+
+  it('are fixed by the first list: a folder created ahead of them does not fold one that is open', async () => {
+    asked.length = 0
+    const { user } = renderScreen('/documents', { wrap: withEightFolders })
+    await heading()
+    const lastOpen = () => within(main()).getByRole('button', { name: 'Zeta 2' })
+    await section('Zeta 2')
+    expect(lastOpen()).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(within(main()).getByRole('button', { name: 'More' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'New folder' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New folder' })
+    await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Alpha')
+    await user.click(within(dialog).getByRole('button', { name: 'Create folder' }))
+
+    const alpha = await within(main()).findByRole('button', { name: 'Alpha' })
+    expect(alpha).toHaveAttribute('aria-expanded', 'false')
+    expect(lastOpen()).toHaveAttribute('aria-expanded', 'true')
   })
 })
 
