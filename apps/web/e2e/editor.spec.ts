@@ -625,7 +625,7 @@ test.describe('the keyboard and the focus', () => {
     await expect(page.getByRole('button', { name: 'Comments, 1 open' })).toBeVisible()
 
     const stops: (string | null)[] = []
-    for (let press = 0; press < 17; press++) {
+    for (let press = 0; press < 18; press++) {
       await page.keyboard.press('Tab')
       stops.push(
         await page.evaluate(() => {
@@ -647,6 +647,7 @@ test.describe('the keyboard and the focus', () => {
       'Documents',
       'Shared',
       'History',
+      'Members',
       'Settings',
       'Sign out',
       // The explorer: its search, its two buttons and one stop for the whole tree, which is the open document.
