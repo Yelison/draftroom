@@ -119,6 +119,28 @@ describe('what a revocation leaves for the connections that are being establishe
   })
 })
 
+describe('what a loss of the right to write leaves for the connections that are being established', () => {
+  it('names a connection that took its ticket before it, without a plan to end it, and none that took it after', () => {
+    const { marks } = marksWithClock()
+    const before = marks.ticket()
+    marks.freeze({ userId: 'person-1' })
+    const after = marks.ticket()
+
+    expect(marks.frozen(documentName, contextOf(before))).toBe(true)
+    expect(marks.planFor(documentName, contextOf(before))).toBeUndefined()
+    // One that authenticated after it read the database as it is now: a document that was restored is writable again.
+    expect(marks.frozen(documentName, contextOf(after))).toBe(false)
+  })
+
+  it('does not name a connection that the mark does not select', () => {
+    const { marks } = marksWithClock()
+    const ticket = marks.ticket()
+    marks.freeze({ userId: 'person-2' })
+
+    expect(marks.frozen(documentName, contextOf(ticket))).toBe(false)
+  })
+})
+
 describe('a connection that registers after a revocation', () => {
   // The hooks Hocuspocus calls for a connection, with a connection that has nowhere to send: it records what was done to it.
   function registered(sequence: number) {
@@ -227,6 +249,32 @@ describe('a connection that registers after a revocation', () => {
     await hook<Parameters<Connected>[0]>(extension.connected)(connectedAs(connection))
 
     expect(socket.close).toHaveBeenCalledWith(4403, 'access-revoked')
+    expect(marks.inFlight).toBe(0)
+  })
+
+  it('may not write, and is not closed, when its first message comes after a mark that only froze it', async () => {
+    const { marks, extension } = withExtension()
+    const { socket, connection } = registered(marks.ticket())
+    marks.freeze({ userId: 'person-1' })
+
+    await expect(
+      hook<Parameters<Before>[0]>(extension.beforeHandleMessage)(messageAbout(connection)),
+    ).resolves.toBeUndefined()
+
+    expect(connection.readOnly).toBe(true)
+    expect(socket.close).not.toHaveBeenCalled()
+  })
+
+  it('may not write, and is not closed, as it connects when a mark only froze it, even if it is the only one in flight', async () => {
+    const { marks, extension } = withExtension()
+    const { socket, connection } = registered(marks.ticket())
+    marks.freeze({ userId: 'person-1' })
+
+    await hook<Parameters<Connected>[0]>(extension.connected)(connectedAs(connection))
+
+    // Settling it leaves nothing in flight and so forgets the marks: it has to be asked about before it is settled.
+    expect(connection.readOnly).toBe(true)
+    expect(socket.close).not.toHaveBeenCalled()
     expect(marks.inFlight).toBe(0)
   })
 
