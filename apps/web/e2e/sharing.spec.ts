@@ -3,13 +3,6 @@ import type { Locator, Page } from '@playwright/test'
 import { interviews, launchPlan } from '../src/data/mock/fixtures/documents.ts'
 import { expect, test } from './fixtures.ts'
 
-declare global {
-  interface Window {
-    /** Where the list of the skeleton started, taken as it appeared. */
-    skeleton?: number
-  }
-}
-
 test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
 
 const dialogOf = (page: Page) => page.getByRole('dialog', { name: /^Share “/ })
@@ -133,19 +126,21 @@ test.describe('the share dialog', () => {
       await page.addInitScript(() => {
         new MutationObserver(() => {
           const list = document.querySelector('dialog[open] [aria-busy="true"]')?.children[1]
-          if (list instanceof HTMLElement && window.skeleton === undefined) window.skeleton = list.offsetTop
+          const seen = document.documentElement.dataset
+          if (list instanceof HTMLElement && seen['skeleton'] === undefined) seen['skeleton'] = String(list.offsetTop)
         }).observe(document, { childList: true, subtree: true })
       })
       await page.goto(`/documents/${id}/share`)
 
       const heading = dialogOf(page).getByRole('heading', { name: 'People with access' })
       await expect(heading).toBeVisible()
-      const skeleton = await page.evaluate(() => window.skeleton)
-      expect(skeleton, 'the skeleton was seen').toBeDefined()
+      const seen = await page.evaluate(() => document.documentElement.dataset['skeleton'])
+      expect(seen, 'the skeleton was seen').toBeDefined()
+      const skeleton = Number(seen)
       const section = await heading.evaluate((element) =>
         element.parentElement instanceof HTMLElement ? element.parentElement.offsetTop : null,
       )
-      expect(section).toBeCloseTo(skeleton ?? 0, 0)
+      expect(section).toBeCloseTo(skeleton, 0)
     })
   }
 
