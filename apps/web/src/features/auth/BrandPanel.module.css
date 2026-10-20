@@ -1,5 +1,8 @@
 /* The navigation's dark surface, as the rail has it: narrow first, the points and the room come with the desktop width. */
 .panel {
+  /* How wide the line of the tagline runs, so that it breaks in the same places whatever the width of the column. */
+  --brand-tagline-measure: 17em;
+
   display: flex;
   flex-direction: column;
   gap: var(--space-16);
@@ -91,7 +94,7 @@
   }
 
   .tagline {
-    max-inline-size: 17em;
+    max-inline-size: var(--brand-tagline-measure);
     font: var(--font-title);
   }
 

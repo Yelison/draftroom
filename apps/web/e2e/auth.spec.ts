@@ -183,7 +183,7 @@ for (const words of [english, spanish]) {
         new MutationObserver(() => {
           const button = document.querySelector('main form button[type="submit"]')
           if (button === null) return
-          const parts = ['main h1', 'main form input', 'main form input:nth-of-type(2)']
+          const parts = ['main h1', 'main form input', 'main form input[type="password"]']
           seen.samples?.push({
             busy: button.getAttribute('aria-busy') === 'true',
             tops: [...parts.map((part) => document.querySelector(part)), button].map(

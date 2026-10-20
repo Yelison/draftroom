@@ -502,7 +502,7 @@
   "auth.brand.comment.body": "Abre un hilo sobre las palabras exactas, responde y resuélvelo cuando esté claro.",
   "auth.brand.versions.title": "Se guarda cada versión",
   "auth.brand.versions.body": "Vuelve a una versión anterior y restáurala cuando la necesites.",
-  "auth.switch.label": "Entrar o crear una cuenta",
+  "auth.switch.label": "Iniciar sesión o crear una cuenta",
   "auth.switch.signIn": "Iniciar sesión",
   "auth.switch.signUp": "Crear cuenta",
   "auth.signIn.title": "Iniciar sesión",

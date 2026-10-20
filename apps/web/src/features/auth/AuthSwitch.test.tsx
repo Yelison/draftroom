@@ -7,6 +7,7 @@ const pair = () => screen.getByRole('navigation', { name: 'Sign in or create an 
 describe('the switch between signing in and creating an account', () => {
   it.each([
     ['/sign-in', 'Sign in', 'Create account'],
+    ['/sign-in/', 'Sign in', 'Create account'],
     ['/sign-up', 'Create account', 'Sign in'],
   ])('marks %s as the page that is open, and the other one as a way out', async (path, open, other) => {
     renderSignedOut(path)
@@ -30,14 +31,12 @@ describe('the switch between signing in and creating an account', () => {
     expect(router.state.location.state).toEqual({ from: '/shared' })
   })
 
-  it('is reached with the keyboard before the headline, and Enter follows the link', async () => {
+  it('is one step back from the headline, which has the focus on arriving, and Enter follows the link', async () => {
     const { user, router } = renderSignedOut('/sign-in')
-    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+    screen.getByRole('heading', { level: 1, name: 'Sign in' }).focus()
 
-    // The skip link, then the two ways of the switch, then the first field.
-    await user.tab()
-    await user.tab()
-    await user.tab()
+    // The switch is ahead of the headline in the page: the open screen is the step before it, the other one the next back.
+    await user.tab({ shift: true })
     expect(within(pair()).getByRole('link', { name: 'Create account' })).toHaveFocus()
     await user.keyboard('{Enter}')
 

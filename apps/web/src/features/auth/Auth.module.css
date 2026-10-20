@@ -2,6 +2,8 @@
 .split {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  /* The brand takes what it needs and the form the rest, so the band of the brand does not grow with empty space. */
+  grid-template-rows: auto 1fr;
   min-height: 100vh;
 }
 
@@ -45,6 +47,7 @@
 @media (width >= 1280px) {
   .split {
     grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    grid-template-rows: none;
   }
 
   .formSide {

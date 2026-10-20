@@ -255,7 +255,7 @@ describe('the sign-in screen in Spanish', () => {
       'Escribe tu correo electrónico.',
     )
     expect(screen.getByLabelText('Contraseña')).toHaveAccessibleDescription('Escribe tu contraseña.')
-    const pair = screen.getByRole('navigation', { name: 'Entrar o crear una cuenta' })
+    const pair = screen.getByRole('navigation', { name: 'Iniciar sesión o crear una cuenta' })
     expect(within(pair).getByRole('link', { name: 'Iniciar sesión' })).toHaveAttribute('aria-current', 'page')
     expect(within(pair).getByRole('link', { name: 'Crear cuenta' })).not.toHaveAttribute('aria-current')
     expect(

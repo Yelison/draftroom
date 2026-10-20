@@ -235,3 +235,22 @@ describe('the sign-up screen in Spanish', () => {
     localStorage.clear()
   })
 })
+
+describe('what the sign-up says will happen next', () => {
+  it('says the person starts in a workspace of their own, which they can rename, or in the one that invited them', async () => {
+    renderSignedOut('/sign-up')
+    await screen.findByRole('heading', { level: 1, name: 'Create your account' })
+
+    const note = screen.getByRole('note')
+    expect(note).toHaveTextContent('A workspace of your own')
+    expect(note).toHaveTextContent('named after you. You can rename it in Settings.')
+    expect(note).toHaveTextContent('If someone has already invited this email address, you join theirs instead.')
+  })
+
+  it('has no such note on the sign-in screen', async () => {
+    renderSignedOut('/sign-in')
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+  })
+})
