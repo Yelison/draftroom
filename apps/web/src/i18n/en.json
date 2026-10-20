@@ -140,6 +140,7 @@
   "documents.folderNotFound.description": "It may have been deleted, or you may not have access to it.",
   "documents.folderNotFound.action": "Go to Documents",
   "documents.row.actions": "Actions for {title}",
+  "documents.row.updated": "Updated {date}",
   "documents.row.pin": "Pin {title}",
   "home.loading": "Loading Home",
   "home.start.title": "Start something new",

@@ -140,6 +140,7 @@
   "documents.folderNotFound.description": "Puede que se haya eliminado, o que no tengas acceso a ella.",
   "documents.folderNotFound.action": "Ir a Documentos",
   "documents.row.actions": "Acciones de {title}",
+  "documents.row.updated": "Actualizado el {date}",
   "documents.row.pin": "Fijar {title}",
   "home.loading": "Cargando Inicio",
   "home.start.title": "Empieza algo nuevo",
