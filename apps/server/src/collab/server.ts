@@ -8,7 +8,13 @@ import type { LiveDocuments } from '../http/live-documents.ts'
 import { authenticateExtension } from './authenticate.ts'
 import { createAutoVersions } from './autoVersions.ts'
 import { awarenessGuardExtension } from './awarenessGuard.ts'
-import { endConnections, tellConnections, type ClosePlan, type ConnectionSelector } from './closeConnections.ts'
+import {
+  endConnections,
+  freezeConnections,
+  tellConnections,
+  type ClosePlan,
+  type ConnectionSelector,
+} from './closeConnections.ts'
 import type { ConnectionContext } from './context.ts'
 import { inFlightExtension, RevocationMarks } from './inFlight.ts'
 import { DurabilityRegistry } from './durability.ts'
@@ -72,6 +78,12 @@ export interface CollabServer {
    * role and be established with it.
    */
   endConnections(target: ConnectionTarget, plan: ClosePlan): number
+  /**
+   * Takes the right to write from the live connections that match, synchronously, and from the ones still being
+   * established as they register (the same mark as `endConnections` leaves, without a close). It says how many live ones it
+   * reached. It is for the step of §6.3 that does not depend on what is read afterwards: call it before anything is awaited.
+   */
+  freeze(target: ConnectionTarget): number
   /** Sends a stateless event to the live connections that match, with the selector of `endConnections`. It says how many it reached. */
   tell(target: ConnectionTarget, event: StatelessEvent): number
   /** The work REST does on documents that people may have open: the state a version is saved from, and the restore. */
@@ -158,6 +170,9 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
     now,
   })
 
+  const selectorOf = ({ sessionId, ...target }: ConnectionTarget): ConnectionSelector =>
+    sessionId === undefined ? target : { ...target, sessionId: sessionKey(config.sessionSecret, sessionId) }
+
   return {
     hocuspocus: server.hocuspocus,
     documents,
@@ -169,19 +184,23 @@ export function createCollabServer(options: CollabServerOptions): CollabServer {
       return server.address.port
     },
 
-    endConnections({ sessionId, ...target }, plan) {
-      const selector: ConnectionSelector =
-        sessionId === undefined ? target : { ...target, sessionId: sessionKey(config.sessionSecret, sessionId) }
+    endConnections(target, plan) {
+      const selector = selectorOf(target)
       const ended = endConnections(server.hocuspocus, selector, plan)
       // For the connections that are being established and so not live yet; the selector was valid, or this was not reached.
       marks.leave(selector, plan)
       return ended
     },
 
-    tell({ sessionId, ...target }, event) {
-      const selector: ConnectionSelector =
-        sessionId === undefined ? target : { ...target, sessionId: sessionKey(config.sessionSecret, sessionId) }
-      return tellConnections(server.hocuspocus, selector, event)
+    freeze(target) {
+      const selector = selectorOf(target)
+      const frozen = freezeConnections(server.hocuspocus, selector)
+      marks.freeze(selector)
+      return frozen
+    },
+
+    tell(target, event) {
+      return tellConnections(server.hocuspocus, selectorOf(target), event)
     },
 
     shutDown() {

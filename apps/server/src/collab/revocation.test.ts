@@ -71,6 +71,7 @@ function setUp(source: Partial<AccessFactsSource>, open: readonly ConnectionCont
         calls.push({ code: plan.code, event: plan.event, ended: ended.map(({ userId }) => userId) })
         return ended.length
       },
+      freeze: () => 0,
       tell(target: ConnectionTarget) {
         const reached = open.filter((context) => selects(target, documentName(documentId), context))
         noticed.push(...reached.map(({ userId }) => userId))
@@ -156,7 +157,7 @@ describe('a change to who can open a document', () => {
     const order: string[] = []
     const live = createLiveAccess({
       facts: { ofDocument: async () => [], ofMember: async () => [] },
-      collaboration: { endConnections: () => order.push('closed'), tell: () => 0 },
+      collaboration: { endConnections: () => order.push('closed'), freeze: () => 0, tell: () => 0 },
       broadcaster: { broadcast: () => order.push('told') },
       log: new RecordingLog(),
     })
@@ -233,6 +234,31 @@ describe('a document that is archived, restored or deleted', () => {
     expect(log.entries.map(({ level }) => level)).toEqual(['error'])
   })
 
+  it('archived: takes the right to write from the whole document before it asks for any fact', async () => {
+    const order: string[] = []
+    const live = createLiveAccess({
+      facts: {
+        ofDocument: async () => {
+          order.push('read')
+          return []
+        },
+        ofMember: async () => [],
+      },
+      collaboration: {
+        endConnections: () => order.push('closed'),
+        freeze: (target) => order.push(`frozen ${target.documentId}`),
+        tell: () => 0,
+      },
+      broadcaster: { broadcast: () => undefined },
+      log: new RecordingLog(),
+    })
+
+    await live.documentArchived(documentId)
+
+    // Frozen before the facts are even asked for: what is read afterwards decides only how each connection ends.
+    expect(order.slice(0, 2)).toEqual([`frozen ${documentId}`, 'read'])
+  })
+
   it('restored: recycles every connection, with the notice, without reading anything', async () => {
     const { live, calls } = setUp({}, [connection('ana', 'owner'), connection('ben', 'owner')])
 
@@ -305,6 +331,7 @@ describe('a change to a member of a workspace', () => {
           }
           return 0
         },
+        freeze: () => 0,
         tell: () => 0,
       },
       broadcaster: { broadcast: () => undefined },
@@ -345,6 +372,7 @@ describe('a session that ends', () => {
           ended.push({ target, plan })
           return 1
         },
+        freeze: () => 0,
         tell: () => 0,
       },
       broadcaster: { broadcast: () => undefined },

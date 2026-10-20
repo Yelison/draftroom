@@ -30,7 +30,7 @@ export const factsFromDatabase = (database: Kysely<Database>): AccessFactsSource
 
 export interface RevocationOptions {
   readonly facts: AccessFactsSource
-  readonly collaboration: Pick<CollabServer, 'endConnections' | 'tell'>
+  readonly collaboration: Pick<CollabServer, 'endConnections' | 'freeze' | 'tell'>
   /** Tells the connections of a document that its access changed. */
   readonly broadcaster: DocumentBroadcaster
   readonly log: CollabLog
@@ -112,6 +112,9 @@ export function createLiveAccess({ facts, collaboration, broadcaster, log }: Rev
     },
 
     async documentArchived(documentId) {
+      // Nobody writes to an archived document, owners included, so what takes the right to write needs no fact: it comes
+      // first and before any await (protocol §6.3, step 1). The facts only decide how each connection ends.
+      collaboration.freeze({ documentId })
       let decide: Decide | undefined
       try {
         decide = closureOf(await facts.ofDocument(documentId), false)

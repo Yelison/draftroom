@@ -15,7 +15,8 @@ import type { ConnectionContext } from './context.ts'
 
 interface Mark {
   readonly selector: ConnectionSelector
-  readonly plan: ClosePlan
+  /** How the connections it names end; none for a mark that only takes their right to write. */
+  readonly plan?: ClosePlan
   readonly sequence: number
 }
 
@@ -64,12 +65,27 @@ export class RevocationMarks {
     this.marks.push({ selector, plan, sequence: this.counter })
   }
 
+  /** Called after the live connections lost their right to write: the ones in flight lose it as they are registered. */
+  freeze(selector: ConnectionSelector): void {
+    this.counter += 1
+    this.marks.push({ selector, sequence: this.counter })
+  }
+
   /** What to do with a connection that has just been registered: the plan of a mark that names it and is newer than it. */
   planFor(documentName: string, context: ConnectionContext): ClosePlan | undefined {
     this.forgetWhatNobodyNeeds()
     return this.marks.find(
-      ({ sequence, selector }) => sequence > context.sequence && selects(selector, documentName, context),
+      ({ sequence, selector, plan }) =>
+        plan !== undefined && sequence > context.sequence && selects(selector, documentName, context),
     )?.plan
+  }
+
+  /** Whether a mark that names the connection and is newer than it has taken its right to write, or is about to end it. */
+  frozen(documentName: string, context: ConnectionContext): boolean {
+    this.forgetWhatNobodyNeeds()
+    return this.marks.some(
+      ({ sequence, selector }) => sequence > context.sequence && selects(selector, documentName, context),
+    )
   }
 
   /** The marks that are older than every connection still in flight can reach nobody. */
@@ -92,17 +108,24 @@ export function inFlightExtension(marks: RevocationMarks): Extension<ConnectionC
 
     async beforeHandleMessage({ connection, documentName }) {
       const plan = marks.planFor(documentName, connection.context)
-      if (plan === undefined) return
+      if (plan === undefined) {
+        // Not ended yet, perhaps never: but it may not write, and this is before the message is applied.
+        if (marks.frozen(documentName, connection.context)) connection.readOnly = true
+        return
+      }
       endConnection(connection, plan)
       // Throwing is what stops the message: the close alone would let it through.
       throw new Error('The connection was revoked while it was being established')
     },
 
     async connected({ connection, documentName }) {
+      // Asked before the connection is settled: once nothing is in flight the marks are forgotten, this one's with them.
       const plan = marks.planFor(documentName, connection.context)
+      const frozen = marks.frozen(documentName, connection.context)
       // Registered: from here the live connections are what a revocation finds.
       marks.settle(connection.context.sequence)
       if (plan !== undefined) endConnection(connection, plan)
+      else if (frozen) connection.readOnly = true
     },
 
     async onDisconnect({ context }) {

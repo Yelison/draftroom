@@ -33,6 +33,8 @@ let collab: CollabHarness
 let server: TestApp
 let api: Api
 let sockets: RawClient[] = []
+/** The read of the access facts that a test holds back, as a slow database would: the change is committed and nothing is known yet. */
+let heldFacts: { readonly reached: () => void; readonly gate: Promise<void> } | null = null
 let workspaceId: string
 let owner: Person
 let editor: Person
@@ -45,8 +47,19 @@ beforeAll(async () => {
   const broadcaster: DocumentBroadcaster = {
     broadcast: (id, event) => broadcastToDocument(collab.server.hocuspocus, id, event),
   }
+  const real = factsFromDatabase(db)
   const liveAccess = createLiveAccess({
-    facts: factsFromDatabase(db),
+    facts: {
+      ...real,
+      ofDocument: async (documentId) => {
+        const held = heldFacts
+        if (held !== null) {
+          held.reached()
+          await held.gate
+        }
+        return real.ofDocument(documentId)
+      },
+    },
     collaboration: collab.server,
     broadcaster,
     log: collab.log,
@@ -63,6 +76,7 @@ beforeAll(async () => {
   await join(db, workspaceId, viewer)
 })
 afterEach(() => {
+  heldFacts = null
   store.releaseLoads()
   for (const socket of sockets) socket.terminate()
   sockets = []
@@ -79,6 +93,29 @@ async function newDocument({ archived = false } = {}): Promise<string> {
   await grant(db, { workspaceId, documentId, person: editor, role: 'editor' })
   await grant(db, { workspaceId, documentId, person: viewer, role: 'viewer' })
   return documentId
+}
+
+/** Holds the next read of the access facts of a document until `release`; `reached` says the read was asked for. */
+function holdFacts() {
+  let release = (): void => undefined
+  let reached = (): void => undefined
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  const wasReached = new Promise<void>((resolve) => (reached = resolve))
+  heldFacts = { reached, gate }
+  return {
+    reached: wasReached,
+    release: () => {
+      heldFacts = null
+      release()
+    },
+  }
+}
+
+/** Sends an update made by hand on an open connection, and says whether the server applied it. */
+async function appliesForged(documentId: string, socket: RawClient): Promise<boolean> {
+  const mark = socket.mark
+  socket.send(forged(documentId))
+  return (await socket.waitFor('sync-status', () => true, mark)).saved
 }
 
 /** A person with the document open, authenticated and registered. */
@@ -176,6 +213,23 @@ describe('archiving a document that people have open', () => {
     for (const socket of [byOwner, byEditor, byViewer]) expect(told(socket)).toEqual([{ type: 'document-archived' }])
   })
 
+  it('takes the right to write at the commit, before the facts that decide how each connection ends are read', async () => {
+    const documentId = await newDocument()
+    const byEditor = await open(documentId, editor)
+    const facts = holdFacts()
+
+    const archiving = archive(documentId)
+    await facts.reached
+    // The archive is committed and the facts are still being read: nothing the editor sends now may be applied.
+    const applied = await appliesForged(documentId, byEditor)
+    facts.release()
+
+    expect(applied).toBe(false)
+    expect((await archiving).statusCode).toBe(200)
+    expect(await byEditor.waitForClose()).toEqual({ code: 4403, reason: 'access-revoked' })
+    expect(await storedParagraphs(db, documentId)).toEqual([])
+  })
+
   it('leaves nobody able to write: the editor is refused, and the owner comes back read-only and applies nothing', async () => {
     const documentId = await newDocument()
     const byEditor = await open(documentId, editor)
@@ -217,6 +271,25 @@ describe('archiving a document that people have open', () => {
       await store.waitForHeldLoad()
       return socket
     }
+
+    it('takes the right to write from it as it is registered, while the facts are still being read', async () => {
+      const documentId = await newDocument()
+      const socket = await authenticateWhileLoading(documentId, editor)
+      const facts = holdFacts()
+
+      const archiving = archive(documentId)
+      await facts.reached
+      const mark = socket.mark
+      socket.send(forged(documentId))
+      store.releaseLoads()
+      const applied = (await socket.waitFor('sync-status', () => true, mark)).saved
+      facts.release()
+
+      expect(applied).toBe(false)
+      expect((await archiving).statusCode).toBe(200)
+      expect(await socket.waitForClose()).toEqual({ code: 4403, reason: 'access-revoked' })
+      expect(await storedParagraphs(db, documentId)).toEqual([])
+    })
 
     it.each([
       ['an editor', () => editor, { code: 4403, reason: 'access-revoked' }],

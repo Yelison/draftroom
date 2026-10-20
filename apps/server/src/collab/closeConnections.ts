@@ -100,3 +100,21 @@ export function endConnections(
   }
   return ended
 }
+
+/**
+ * Takes the right to write from every live connection the selector matches, and says how many it reached. It is the first
+ * step of §6.3 on its own, for a change that ends the right of whole classes of connections to write before it is known
+ * how each one ends: synchronous, so that no frame of theirs is applied after the call returns.
+ */
+export function freezeConnections(instance: Hocuspocus<ConnectionContext>, selector: ConnectionSelector): number {
+  if (!hasCondition(selector)) throw new RangeError('Freezing connections needs at least one condition')
+  let frozen = 0
+  for (const document of instance.documents.values()) {
+    for (const connection of document.getConnections() as Connection<ConnectionContext>[]) {
+      if (!selects(selector, document.name, connection.context)) continue
+      connection.readOnly = true
+      frozen += 1
+    }
+  }
+  return frozen
+}
