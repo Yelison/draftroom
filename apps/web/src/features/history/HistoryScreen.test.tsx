@@ -405,6 +405,19 @@ describe('the renames that follow one another in the History screen', () => {
     expect(toggle(row)).toHaveAttribute('aria-expanded', 'false')
   })
 
+  it('are folded again when another filter is chosen, as what was unfolded belonged to the list it was in', async () => {
+    const { user } = renderScreen('/history', { wrap: withPages([renames]) })
+    const row = await findRow(sentence)
+    await user.click(toggle(row))
+    expect(toggle(row)).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(chip('Person'))
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Daniel Okafor' }))
+
+    await waitFor(() => expect(chip('Person: Daniel Okafor')).toBeInTheDocument())
+    expect(toggle(await findRow(sentence))).toHaveAttribute('aria-expanded', 'false')
+  })
+
   it('keep the name of the document as the way to it', async () => {
     renderScreen('/history', { wrap: withPages([renames]) })
     const row = await findRow(sentence)
