@@ -92,8 +92,8 @@ describe('the explorer beside a document', () => {
     const { user } = renderScreen(openPath)
     await tree()
     await screen.findByRole('button', { name: 'Sign out' })
-    // Tab: skip link, five rail items, signing out, search, new document, new folder, then the tree.
-    for (let stop = 0; stop < 11; stop++) await user.tab()
+    // Tab: skip link, six rail items, signing out, search, new document, new folder, then the tree.
+    for (let stop = 0; stop < 12; stop++) await user.tab()
     const stopRow = document.activeElement as HTMLElement
     expect(stopRow).toHaveAttribute('role', 'treeitem')
 
@@ -110,7 +110,7 @@ describe('the explorer beside a document', () => {
     await tree()
     await screen.findByRole('button', { name: 'Sign out' })
 
-    for (let stop = 0; stop < 11; stop++) await user.tab()
+    for (let stop = 0; stop < 12; stop++) await user.tab()
 
     const stopRow = document.activeElement as HTMLElement
     expect(stopRow).toHaveAttribute('aria-selected', 'true')

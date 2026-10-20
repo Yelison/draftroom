@@ -147,9 +147,10 @@ describe('the search URL', () => {
     await heading('Search documents')
     expect(screen.getByText('Search your documents')).toBeInTheDocument()
     expect(searchbox()).toHaveValue('')
-    // Anything the screen would ask would have been asked by now: the workspace is the first thing it reads.
+    // Anything the screen would ask would have been asked by now: the workspace is the first thing it reads. The rail
+    // reads it too, once, to name the workspace; the screen adds no second read.
     await new Promise((resolve) => setTimeout(resolve, 50))
-    expect(watching.current?.calls.workspaces).toBe(0)
+    expect(watching.current?.calls.workspaces).toBe(1)
     expect(watching.current?.calls.queries).toEqual([])
   })
 
