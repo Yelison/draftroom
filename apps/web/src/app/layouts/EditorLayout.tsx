@@ -1,7 +1,6 @@
 import { Outlet, useMatch } from 'react-router'
 import { Explorer } from '../../features/explorer/Explorer.tsx'
 import { NavRail } from '../../components/NavRail/NavRail.tsx'
-import { AccountControl } from '../../features/auth/AccountControl.tsx'
 import { CommentsViewContext, useCommentsViewState } from '../../features/comments/commentsView.ts'
 import { focusMainContent } from '../mainContent.ts'
 import { isNarrowWindow } from '../narrowWindow.ts'
@@ -24,7 +23,7 @@ export function EditorLayout() {
   return (
     <CommentsViewContext value={commentsView}>
       <div className={inHistory ? `${styles.layout} ${styles.history}` : styles.layout}>
-        <NavRail variant="compact" footer={<AccountControl variant="compact" />} />
+        <NavRail variant="compact" />
         <div
           className={styles.explorer}
           inert={inHistory}

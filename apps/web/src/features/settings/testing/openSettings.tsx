@@ -4,19 +4,19 @@ import { renderScreen, type RenderScreenOptions } from '../../documents/testing/
 
 export { renderScreen }
 
-export const main = () => screen.getByRole('main')
+/** The dialog of Settings, which is open whenever the address has `?settings=`. */
+export const dialog = (name = 'Settings') => screen.getByRole('dialog', { name })
 
 /** A refusal the way the server gives it: the status and the stable code, with nothing that is meant for people. */
 export const refusal = (status: number, code: ApiError['code']) =>
   new ApiError({ type: 'about:blank', title: 'Refused', status, code })
 
-/** Opens a tab of Settings and waits until its panel has what it came for: the headline of the tab. */
-export async function openTab(
-  tab: 'profile' | 'workspace' | 'appearance',
-  heading: string,
-  options?: RenderScreenOptions,
-) {
-  const view = renderScreen(`/settings/${tab}`, options)
-  await within(main()).findByRole('heading', { level: 2, name: heading })
+/** Opens Settings over Home and waits until it has what it came for: the three sections of the person. */
+export async function openSettings(options?: RenderScreenOptions & { path?: string }) {
+  const view = renderScreen(options?.path ?? '/?settings=profile', options)
+  await within(await screen.findByRole('dialog', { name: 'Settings' })).findByRole('heading', {
+    level: 2,
+    name: /^(Profile|Perfil)$/,
+  })
   return view
 }

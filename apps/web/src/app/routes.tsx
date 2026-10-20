@@ -9,11 +9,7 @@ import { HistoryScreen } from '../features/history/HistoryScreen.tsx'
 import { HomeScreen } from '../features/home/HomeScreen.tsx'
 import { MembersScreen } from '../features/members/MembersScreen.tsx'
 import { SearchScreen } from '../features/search/SearchScreen.tsx'
-import { AppearanceTab } from '../features/settings/AppearanceTab.tsx'
-import { ProfileTab } from '../features/settings/ProfileTab.tsx'
-import { SettingsScreen } from '../features/settings/SettingsScreen.tsx'
-import { settingsTabHandle } from '../features/settings/settingsTabs.ts'
-import { WorkspaceTab } from '../features/settings/WorkspaceTab.tsx'
+import { settingsAddress, settingsSections } from '../features/settings/useSettingsDialog.ts'
 import { SharedScreen } from '../features/shared/SharedScreen.tsx'
 import { TemplateScreen } from '../features/templates/TemplateScreen.tsx'
 import { TrashScreen } from '../features/trash/TrashScreen.tsx'
@@ -70,19 +66,16 @@ export const routes: RouteObject[] = [
               { path: 'shared', Component: SharedScreen, handle: { section: 'shared' } satisfies RouteHandle },
               { path: 'history', Component: HistoryScreen, handle: { section: 'history' } satisfies RouteHandle },
               { path: 'members', Component: MembersScreen, handle: { section: 'members' } satisfies RouteHandle },
-              {
-                path: 'settings',
-                Component: SettingsScreen,
-                children: [
-                  // Done by the router before anything renders, so there is no page in between to take the focus.
-                  { index: true, loader: () => redirect('/settings/profile') },
-                  { path: 'profile', Component: ProfileTab, handle: settingsTabHandle },
-                  { path: 'workspace', Component: WorkspaceTab, handle: settingsTabHandle },
-                  // Members moved out of Settings to a page of its own; an address typed or bookmarked still lands there.
-                  { path: 'members', loader: () => redirect('/members') },
-                  { path: 'appearance', Component: AppearanceTab, handle: settingsTabHandle },
-                ],
-              },
+              // Settings is a dialog over the page the person is on, kept in the address as `?settings=` and not as a route, which
+              // would take the page from behind it (the editor with its document). These paths are the addresses it had when it
+              // was a page: typed or bookmarked, they open the dialog over Home. The router redirects before anything renders.
+              { path: 'settings', loader: () => redirect(settingsAddress('profile')) },
+              ...settingsSections.map((section) => ({
+                path: `settings/${section}`,
+                loader: () => redirect(settingsAddress(section)),
+              })),
+              // Members moved out of Settings to a page of its own; an address typed or bookmarked still lands there.
+              { path: 'settings/members', loader: () => redirect('/members') },
               { path: 'trash', Component: TrashScreen, handle: { section: 'documents' } satisfies RouteHandle },
               { path: 'search', Component: SearchScreen, handle: { section: 'documents' } satisfies RouteHandle },
               { path: '*', ...screen('screen.notFound') },

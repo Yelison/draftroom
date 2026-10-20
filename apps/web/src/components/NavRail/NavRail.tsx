@@ -1,9 +1,8 @@
-import type { ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import { Link } from 'react-router'
 import { useActiveSection } from '../../app/sections.ts'
+import { AccountMenu } from './AccountMenu.tsx'
 import { navItems } from './navItems.tsx'
-import { RailPerson } from './RailPerson.tsx'
 import { RailWorkspace } from './RailWorkspace.tsx'
 import styles from './NavRail.module.css'
 
@@ -13,17 +12,15 @@ export interface NavRailProps {
    * always does and what every rail does in a window narrower than a desktop.
    */
   variant: 'expanded' | 'compact'
-  /** What closes the rail, at its foot and last in its Tab order: it is part of the navigation, not of the page. */
-  footer?: ReactNode
 }
 
 /**
- * The navigation of the product: the workspace on top, the items, and at the foot the person and what ends their session.
- * Exactly one item is current: the one of the section of the page. Every item is a stop of the Tab key, and the current
- * one is told apart by its background, which is not the focus ring. The foot sits inside the same landmark, so the order
- * of the focus follows what is seen: the rail from top to bottom, then the page.
+ * The navigation of the product: the workspace on top, the items, and at the foot the person, whose menu holds Settings and
+ * signing out. Exactly one item is current: the one of the section of the page. Every item is a stop of the Tab key, and
+ * the current one is told apart by its background, which is not the focus ring. The foot sits inside the same landmark, so
+ * the order of the focus follows what is seen: the rail from top to bottom, then the page.
  */
-export function NavRail({ variant, footer }: NavRailProps) {
+export function NavRail({ variant }: NavRailProps) {
   const intl = useIntl()
   const activeSection = useActiveSection()
 
@@ -45,8 +42,7 @@ export function NavRail({ variant, footer }: NavRailProps) {
         ))}
       </ul>
       <div className={styles.account}>
-        <RailPerson />
-        {footer}
+        <AccountMenu />
       </div>
     </nav>
   )
