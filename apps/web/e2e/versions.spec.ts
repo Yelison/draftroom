@@ -1,6 +1,6 @@
 /* The version history in the production build, with a real browser: from the editor, to a version, to a restore, and back, by keyboard. */
 import type { Page } from '@playwright/test'
-import { launchPlan } from '../src/data/mock/fixtures/documents.ts'
+import { launchPlan, onboardingChecklist } from '../src/data/mock/fixtures/documents.ts'
 import { expect, test } from './fixtures.ts'
 
 test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
@@ -232,6 +232,9 @@ test.describe('the layout', () => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     )
     expect(overflow).toBeLessThanOrEqual(0)
+    // The page scrolls, not the work area: there is no scroll nested in `main`.
+    const nested = await page.getByRole('main').evaluate((main) => main.scrollHeight > main.clientHeight)
+    expect(nested, 'no scroll nested in main').toBe(false)
     // A box whose content is wider than it is has something cut off or sticking out.
     const cut = await page
       .getByRole('main')
@@ -253,6 +256,36 @@ test.describe('the layout', () => {
     expect((listBox?.y ?? 0) + (listBox?.height ?? 0)).toBeLessThanOrEqual(readerBox?.y ?? 0)
     expect((restoreBox?.x ?? 0) + (restoreBox?.width ?? 0)).toBeLessThanOrEqual(640)
   })
+})
+
+test('keeps the comments panel that a thread opened when the person goes to the history and comes back', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto(`/documents/${onboardingChecklist.id}`)
+  expect(await page.evaluate(() => localStorage.getItem('draftroom.commentsPanel'))).toBeNull()
+  const text = page.getByRole('textbox', { name: 'Document content' })
+  const panel = page.getByRole('complementary', { name: 'Comments and activity' })
+  await text.focus()
+  await page.keyboard.type('Ask your buddy anything: no question is too small.')
+  await page.keyboard.press('ArrowLeft')
+  for (let letter = 0; letter < 5; letter++) await page.keyboard.press('Shift+ArrowLeft')
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('small')
+  // The editor learns of the selection from an event the browser sends after the keys.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  await page.keyboard.press('ControlOrMeta+Alt+m')
+  await page.keyboard.type('Is that the right word?')
+  await page.keyboard.press('Control+Enter')
+  // Below 1440 px the panel starts closed: it is the thread that opens it, which is not a choice the browser remembers.
+  await expect(panel).toBeVisible()
+  expect(await page.evaluate(() => localStorage.getItem('draftroom.commentsPanel'))).toBeNull()
+
+  await page.getByRole('button', { name: 'Version history' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Version history' })).toBeVisible()
+  await page.getByRole('link', { name: /^Back to the document/ }).click()
+
+  await expect(page.getByRole('textbox', { name: 'Document content' })).toBeVisible()
+  await expect(panel).toBeVisible()
 })
 
 test.describe('a history as long as a real one', () => {

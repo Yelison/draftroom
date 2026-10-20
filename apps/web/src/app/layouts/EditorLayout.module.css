@@ -36,13 +36,10 @@
 }
 
 /*
- * The history of a document: no explorer, and a page as tall as the window, so the list and the text scroll inside their
- * panels and the bar of the reader stays in sight. The work area is a column that may be shorter than its content.
+ * The history of a document has no explorer. Side by side, the list and the text scroll inside their panels and the bar of
+ * the reader stays in sight, so the page is as tall as the window; stacked (a zoom of 200 % is that), the panels have a
+ * height of their own and the page scrolls, with no scroll nested in the work area.
  */
-.history {
-  height: 100vh;
-}
-
 .history .explorer {
   display: none;
 }
@@ -50,8 +47,18 @@
 .history .main {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  overflow-y: auto;
+}
+
+/* The width at which the screen of the history puts the two panels side by side: 720 px of screen, the rail and the margins. */
+@media (width >= 840px) {
+  .history {
+    height: 100vh;
+  }
+
+  .history .main {
+    min-height: 0;
+    overflow-y: auto;
+  }
 }
 
 @media (width >= 1280px) {
