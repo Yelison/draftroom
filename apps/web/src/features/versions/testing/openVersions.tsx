@@ -3,6 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import type { Schema } from '@draftroom/contract'
 import type { DataSource } from '../../../data/DataSource.ts'
 import { ApiError } from '../../../data/errors.ts'
+import { seedId } from '../../../data/mock/ids.ts'
 import { versions } from '../../../data/mock/fixtures/collaboration.ts'
 import { launchPlan } from '../../../data/mock/fixtures/documents.ts'
 import { daniel } from '../../../data/mock/fixtures/index.ts'
@@ -44,8 +45,6 @@ export const when = (isoDate: string) =>
   new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(isoDate))
 export const time = (isoDate: string) =>
   new Intl.DateTimeFormat('en-US', { timeStyle: 'short' }).format(new Date(isoDate))
-export const day = (isoDate: string) =>
-  new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(isoDate))
 
 const [oldest, named, newest] = versions.filter((version) => version.documentId === launchPlan.id)
 if (oldest === undefined || named === undefined || newest === undefined)
@@ -65,6 +64,9 @@ export const replacing =
   (dataSource: DataSource): DataSource => ({ ...dataSource, ...replacements })
 
 export type Version = Schema<'Version'>
+
+/** An id of a version a test makes up, in the shape the contract gives ids and clear of the fixtures'. */
+export const versionId = (index: number) => seedId(99, index)
 
 /** A version that meets the contract, for a test to list what the fixtures do not have. */
 export const makeVersion = (version: Pick<Version, 'id' | 'createdAt'> & Partial<Version>): Version => ({

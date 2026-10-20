@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { groupByDay } from './days.ts'
-import { makeVersion } from './testing/openVersions.tsx'
+import { makeVersion, versionId } from './testing/openVersions.tsx'
 
-const at = (createdAt: string) => makeVersion({ id: createdAt, createdAt })
+let made = 0
+const at = (createdAt: string) => makeVersion({ id: versionId(++made), createdAt })
 
 describe('grouping versions by day', () => {
   it('keeps the order and starts a group when the day changes', () => {

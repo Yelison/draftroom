@@ -10,11 +10,13 @@ import {
   listing,
   makeVersion,
   openVersions,
+  reading,
   renderScreen,
   replacing,
   rows,
   time,
   unavailable,
+  versionId,
   versionsPath,
 } from './testing/openVersions.tsx'
 
@@ -49,7 +51,7 @@ describe('what the list shows of each version', () => {
     renderScreen(versionsPath(launchPlan.id), {
       wrap: listing([
         makeVersion({
-          id: 'v1',
+          id: versionId(1),
           kind: 'restore',
           label: 'Before the pricing review',
           createdAt: '2026-10-11T09:00:00.000Z',
@@ -72,7 +74,7 @@ describe('the sizes', () => {
     { sizeBytes: 1_400_000, shown: '1.4 MB' },
   ])('are told in the unit that suits them: $sizeBytes bytes are $shown', async ({ sizeBytes, shown }) => {
     renderScreen(versionsPath(launchPlan.id), {
-      wrap: listing([makeVersion({ id: 'v1', createdAt: '2026-10-11T09:00:00.000Z', sizeBytes })]),
+      wrap: listing([makeVersion({ id: versionId(1), createdAt: '2026-10-11T09:00:00.000Z', sizeBytes })]),
     })
 
     await listArrived()
@@ -92,10 +94,10 @@ describe('the days', () => {
     vi.useFakeTimers({ toFake: ['Date'], now: noon })
     renderScreen(versionsPath(launchPlan.id), {
       wrap: listing([
-        makeVersion({ id: 'v1', label: 'Late today', createdAt: at(0, 11) }),
-        makeVersion({ id: 'v2', label: 'Early today', createdAt: at(0, 8) }),
-        makeVersion({ id: 'v3', label: 'Yesterday evening', createdAt: at(1, 23) }),
-        makeVersion({ id: 'v4', label: 'Days ago', createdAt: at(4, 9) }),
+        makeVersion({ id: versionId(1), label: 'Late today', createdAt: at(0, 11) }),
+        makeVersion({ id: versionId(2), label: 'Early today', createdAt: at(0, 8) }),
+        makeVersion({ id: versionId(3), label: 'Yesterday evening', createdAt: at(1, 23) }),
+        makeVersion({ id: versionId(4), label: 'Days ago', createdAt: at(4, 9) }),
       ]),
     })
 
@@ -118,7 +120,7 @@ describe('the days', () => {
   it('compares days of the calendar, not hours: a version of 11 pm is yesterday at 1 am', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 14, 1) })
     renderScreen(versionsPath(launchPlan.id), {
-      wrap: listing([makeVersion({ id: 'v1', label: 'Night', createdAt: at(1, 23) })]),
+      wrap: listing([makeVersion({ id: versionId(1), label: 'Night', createdAt: at(1, 23) })]),
     })
 
     await listArrived()
@@ -152,9 +154,14 @@ describe('the automatic versions', () => {
   it('leave in sight the versions a restore makes: they are the person’s, not the server’s', async () => {
     renderScreen(versionsPath(launchPlan.id), {
       wrap: listing([
-        makeVersion({ id: 'v1', kind: 'restore', createdAt: '2026-10-13T10:00:00.000Z', createdBy: author }),
-        makeVersion({ id: 'v2', kind: 'pre-restore', createdAt: '2026-10-13T10:00:00.000Z', createdBy: author }),
-        makeVersion({ id: 'v3', kind: 'auto', createdAt: '2026-10-13T09:00:00.000Z' }),
+        makeVersion({ id: versionId(1), kind: 'restore', createdAt: '2026-10-13T10:00:00.000Z', createdBy: author }),
+        makeVersion({
+          id: versionId(2),
+          kind: 'pre-restore',
+          createdAt: '2026-10-13T10:00:00.000Z',
+          createdBy: author,
+        }),
+        makeVersion({ id: versionId(3), kind: 'auto', createdAt: '2026-10-13T09:00:00.000Z' }),
       ]),
     })
 
@@ -204,15 +211,20 @@ describe('choosing a version', () => {
     expect(choose(oldest!)).toHaveFocus()
   })
 
-  it('does not change what is read when a version arrives after the person began', async () => {
-    const { user, queryClient } = await openVersions()
-    await user.click(automaticToggle())
-    await user.click(choose(rows()[2]!))
-    await screen.findByText(/first week of November/)
+  it('keeps reading the version it opened on when a newer one arrives meanwhile', async () => {
+    const { server, queryClient } = await openVersions()
+    await reading()
 
+    await server
+      .connect({ signedInAs: marta.email })
+      .createVersion({ params: { path: { documentId: launchPlan.id } }, body: { label: 'Saved meanwhile' } })
     await act(() => queryClient.invalidateQueries({ queryKey: ['documents', launchPlan.id, 'versions'] }))
 
-    expect(screen.getByText(/first week of November/)).toBeInTheDocument()
+    await waitFor(() => expect(rows()).toHaveLength(2))
+    expect(rows()[0]).toHaveTextContent('Saved meanwhile')
+    expect(choose(rows()[1]!)).toHaveAttribute('aria-current', 'true')
+    expect(choose(rows()[0]!)).not.toHaveAttribute('aria-current')
+    expect(screen.getByText(/The launch moves to the second week of November/)).toBeInTheDocument()
   })
 })
 
@@ -227,7 +239,7 @@ describe('the states of the list', () => {
 
   it('says that there are only automatic ones while the switch is off, and shows them when it is on', async () => {
     const { user } = renderScreen(versionsPath(launchPlan.id), {
-      wrap: listing([makeVersion({ id: 'v1', kind: 'auto', createdAt: '2026-10-13T09:00:00.000Z' })]),
+      wrap: listing([makeVersion({ id: versionId(1), kind: 'auto', createdAt: '2026-10-13T09:00:00.000Z' })]),
     })
     expect(await screen.findByText('There are only automatic versions')).toBeInTheDocument()
     expect(screen.queryByText('No versions yet')).not.toBeInTheDocument()
@@ -289,7 +301,7 @@ describe('"Load more"', () => {
       listVersions: async (request) =>
         request?.params.query?.cursor === undefined
           ? {
-              items: [makeVersion({ id: 'v1', label: 'Newest', createdAt: '2026-10-13T09:00:00.000Z' })],
+              items: [makeVersion({ id: versionId(1), label: 'Newest', createdAt: '2026-10-13T09:00:00.000Z' })],
               nextCursor: 'next',
             }
           : { items: second.map(makeVersion), nextCursor: null },
@@ -297,7 +309,7 @@ describe('"Load more"', () => {
 
   it('adds the next page to the rows it has, and the focus goes to the first row that arrived', async () => {
     const view = renderScreen(versionsPath(launchPlan.id), {
-      wrap: pages([{ id: 'v2', label: 'Older', createdAt: '2026-10-12T09:00:00.000Z' }]),
+      wrap: pages([{ id: versionId(2), label: 'Older', createdAt: '2026-10-12T09:00:00.000Z' }]),
     })
     await listArrived()
 
@@ -310,7 +322,7 @@ describe('"Load more"', () => {
 
   it('leaves the focus on the switch when the last page brings only automatic versions, which are hidden', async () => {
     const view = renderScreen(versionsPath(launchPlan.id), {
-      wrap: pages([{ id: 'v2', kind: 'auto', createdAt: '2026-10-12T09:00:00.000Z' }]),
+      wrap: pages([{ id: versionId(2), kind: 'auto', createdAt: '2026-10-12T09:00:00.000Z' }]),
     })
     await listArrived()
 
