@@ -1,5 +1,6 @@
 import type { Schema } from '@draftroom/contract'
 import { Avatar, Icon, IconButton, Menu, type MenuItem } from '@yelison/forma-ui'
+import type { ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import { presenceLookOf } from '../../collab/presenceColor.ts'
 import { DocumentRowLink } from '../../components/DocumentRow/DocumentRowLink.tsx'
@@ -11,6 +12,9 @@ import styles from './DocumentRows.module.css'
 
 export type DocumentAction = 'rename-or-move' | 'archive'
 
+/** Draws a text of the row (its title or its excerpt) in a way of its own, as a search marks what it found in it. */
+export type DocumentTextRenderer = (text: string, field: 'title' | 'excerpt') => ReactNode
+
 export interface DocumentListRowProps {
   document: Schema<'Document'>
   /** The folder the document is in, for the lists that mix folders (the pinned ones). */
@@ -21,13 +25,15 @@ export interface DocumentListRowProps {
    */
   onRenameOrMove: (document: Schema<'Document'>) => void
   onArchive?: (document: Schema<'Document'>) => void
+  /** How the title and the excerpt are drawn; plain text when left out. A document with no excerpt says so either way. */
+  renderText?: DocumentTextRenderer
 }
 
 /**
  * A document in a list: its title opens it, and the row says who made it, the role of the person when it is not
  * ownership, when it changed, and whether it is pinned. The pin and the actions menu sit above the link that covers the row.
  */
-export function DocumentListRow({ document, folderName, onRenameOrMove, onArchive }: DocumentListRowProps) {
+export function DocumentListRow({ document, folderName, onRenameOrMove, onArchive, renderText }: DocumentListRowProps) {
   const intl = useIntl()
   const pin = usePinDocument()
   const canChange = document.role === 'editor' || document.role === 'owner'
@@ -58,7 +64,7 @@ export function DocumentListRow({ document, folderName, onRenameOrMove, onArchiv
       <span className={styles.text}>
         <span className={styles.titleLine}>
           <DocumentRowLink to={`/documents/${document.id}`} className={styles.title}>
-            {document.title}
+            {renderText?.(document.title, 'title') ?? document.title}
           </DocumentRowLink>
           {folderName !== undefined && (
             <span className={styles.folderTag}>
@@ -73,8 +79,10 @@ export function DocumentListRow({ document, folderName, onRenameOrMove, onArchiv
           )}
         </span>
         <span className={styles.excerpt}>
-          {document.excerpt ?? (
+          {document.excerpt === null ? (
             <span className={styles.noText}>{intl.formatMessage({ id: 'documents.row.noText' })}</span>
+          ) : (
+            (renderText?.(document.excerpt, 'excerpt') ?? document.excerpt)
           )}
         </span>
       </span>
