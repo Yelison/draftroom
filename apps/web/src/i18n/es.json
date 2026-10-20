@@ -466,7 +466,7 @@
   "members.role.owner": "Propietario",
   "members.role.member": "Miembro",
   "members.roleLabel": "Rol de {name}",
-  "members.since.invited": "Invitación del {date}",
+  "members.since.invited": "Invitada el {date}",
   "members.invite.email": "Correo electrónico",
   "members.invite.role": "Rol",
   "members.invite.action": "Invitar",
