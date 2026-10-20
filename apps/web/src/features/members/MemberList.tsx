@@ -38,7 +38,9 @@ export function MemberList({ workspaceId, members, meId }: MemberListProps) {
   const [headlineRequests, setHeadlineRequests] = useState(0)
   const canManage = members.some((member) => member.userId === meId && member.role === 'owner')
   const alone = members.length === 1
-  const shown = filterMembers(members, filter)
+  // Alone, there is nothing to filter and the person's own row is the page: a filter chosen before the last invitation left
+  // would otherwise leave it without the row.
+  const shown = filterMembers(members, alone ? 'all' : filter)
 
   const changes = useMemberChanges({
     workspaceId,

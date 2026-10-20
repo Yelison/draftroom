@@ -342,6 +342,29 @@ describe('the Members page', () => {
     expect(within(main()).getByRole('textbox', { name: 'Email' })).toBeInTheDocument()
   })
 
+  it('keeps the row of a person who is left alone, whatever filter was chosen before the last invitation went', async () => {
+    const { user } = renderScreen('/members', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listMembers: async (request) => {
+          const page = await dataSource.listMembers(request)
+          return {
+            ...page,
+            items: page.items.filter((member) => member.userId === marta.id || member.userId === ana.id),
+          }
+        },
+      }),
+    })
+    await user.click(await within(main()).findByRole('button', { name: 'Pending' }))
+
+    await user.click(within(main()).getByRole('button', { name: `Remove ${ana.email}` }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remove' }))
+
+    expect(await within(main()).findByText('You are the only member')).toBeInTheDocument()
+    expect(bodyRows().map((row) => row.textContent)).toEqual([expect.stringContaining('Marta Ruiz (you)')])
+    expect(within(main()).queryByText('Nobody has an invitation pending.')).not.toBeInTheDocument()
+  })
+
   it('shows a skeleton with a spoken status while the members are on their way', async () => {
     renderScreen('/members', {
       wrap: (dataSource) => ({ ...dataSource, listMembers: () => new Promise(() => undefined) }),
@@ -351,6 +374,21 @@ describe('the Members page', () => {
     expect(status).toHaveAttribute('role', 'status')
     expect(status.closest('[aria-busy="true"]')).not.toBeNull()
     expect(headline()).toBeInTheDocument()
+  })
+
+  it('guesses nothing about a person whose role is not known yet: the summary only, and the rest comes under it', async () => {
+    renderScreen('/members', {
+      signedInAs: sofia.email,
+      wrap: (dataSource) => ({
+        ...dataSource,
+        getWorkspace: () => new Promise(() => undefined),
+        listMembers: () => new Promise(() => undefined),
+      }),
+    })
+
+    const skeleton = (await within(main()).findByText('Loading the members')).closest('[aria-busy="true"]')
+    // The summary and the spoken status, and no invitation, filters or table to move once the role arrives.
+    expect(skeleton?.children).toHaveLength(2)
   })
 
   it('reserves the room of a member while the members are on their way: no invitation, and the sentence a member reads', async () => {
