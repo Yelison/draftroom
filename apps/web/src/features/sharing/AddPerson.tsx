@@ -31,7 +31,11 @@ export function AddPerson({ candidates, busy, problem, onAdd, pickerRef }: AddPe
   if (userId !== '' && chosen === undefined) setUserId('')
 
   if (candidates.length === 0) {
-    return <p className={styles.note}>{intl.formatMessage({ id: 'sharing.add.everyone' })}</p>
+    return (
+      <div className={styles.addEmpty}>
+        <p className={styles.note}>{intl.formatMessage({ id: 'sharing.add.everyone' })}</p>
+      </div>
+    )
   }
 
   const described = problem === null ? undefined : problemId

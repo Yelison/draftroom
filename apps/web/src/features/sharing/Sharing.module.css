@@ -28,15 +28,19 @@
 
 /*
  * The people and, last, everyone in the workspace: one card whose rows share the same four columns (avatar, who, role,
- * action), so that the selectors line up whatever the longest action says.
+ * action), so that the selectors line up whatever the longest action says. The first column is sized by what it holds
+ * (the avatar and the padding of the row), which a fixed width would not leave room for.
  */
 .principals {
   display: grid;
-  grid-template-columns: var(--avatar-size-medium) minmax(0, 1fr) var(--sharing-role-width) auto;
+  grid-template-columns: auto minmax(0, 1fr) var(--sharing-role-width) auto;
   column-gap: var(--space-12);
   align-content: start;
   position: relative; /* The containing block of the hidden labels of the rows, so that the list clips them as it scrolls. */
   max-height: var(--sharing-list-height);
+  /* What the focus keeps clear of at the foot: the row of everyone in the workspace, which stays over the scrolled rows
+   * and may take a second line. */
+  scroll-padding-block-end: calc(var(--control-height) + 2 * var(--space-12) + 1lh);
   margin: 0;
   padding: 0;
   overflow-y: auto;
@@ -113,6 +117,19 @@
   display: flex;
   gap: var(--space-6);
   color: var(--color-muted);
+}
+
+/* The controls of a row that cannot be used (the last owner's): dimmed, and still there to be read and described. */
+.held {
+  color: var(--color-muted);
+}
+
+/* Takes the height of the form it stands in for, so that the list below does not move when the form is not needed. */
+.addEmpty {
+  display: flex;
+  align-items: center;
+  min-height: calc(1lh + var(--space-6) + var(--control-height));
+  font: var(--font-label);
 }
 
 /* One line of the text tall, so that the icon sits on the first line however the note wraps. */

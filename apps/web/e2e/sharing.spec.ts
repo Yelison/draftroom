@@ -1,6 +1,6 @@
 /* Sharing in the production build, with a real browser: the share dialog, by keyboard, with many people and in a narrow window. */
 import type { Locator, Page } from '@playwright/test'
-import { interviews } from '../src/data/mock/fixtures/documents.ts'
+import { interviews, launchPlan } from '../src/data/mock/fixtures/documents.ts'
 import { expect, test } from './fixtures.ts'
 
 test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
@@ -79,6 +79,26 @@ test.describe('the share dialog', () => {
     await expect(owner).toHaveAttribute('aria-disabled', 'true')
     await expect(dialog.getByRole('button', { name: 'Remove Marta Ruiz' })).toHaveAttribute('aria-disabled', 'true')
     await expect(rowOf(dialog, 'Marta Ruiz').getByText(/^Last owner\./)).toBeVisible()
+    // What cannot be used looks like it: the button of the last owner is not drawn like the one of a person who can be removed.
+    const colorOf = (name: string) =>
+      dialog.getByRole('button', { name }).evaluate((element) => getComputedStyle(element).color)
+    expect(await colorOf('Remove Marta Ruiz')).not.toBe(await colorOf('Remove Sofía Lindqvist'))
+  })
+
+  test('keeps the avatar clear of the name in every row', async ({ page }) => {
+    await page.goto(`/documents/${interviews.id}/share`)
+    const dialog = dialogOf(page)
+    await expect(dialog.getByRole('list')).toBeVisible()
+
+    const gaps = await dialog.getByRole('listitem').evaluateAll((items) =>
+      items.map((item) => {
+        const [mark, who] = [item.children[0], item.children[1]]
+        if (!mark || !who) throw new Error('A row has no mark and no name')
+        return who.getBoundingClientRect().left - mark.getBoundingClientRect().right
+      }),
+    )
+    // The gap between the columns is 12 px; half a pixel is for the rounding of the layout.
+    for (const gap of gaps) expect(gap).toBeGreaterThanOrEqual(11.5)
   })
 
   test('does not come back when the person goes Back after closing it', async ({ page }) => {
@@ -94,27 +114,34 @@ test.describe('the share dialog', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
-  test('does not move what is below its headings when the list arrives in place of the skeleton', async ({ page }) => {
-    // The skeleton is on screen for a moment only: where its list starts is taken as it appears, before the list replaces it.
-    // Measured by layout, not by box, because the dialog is still scaling in while the skeleton is there.
-    await page.addInitScript(() => {
-      const seen = window as unknown as { skeleton?: number }
-      new MutationObserver(() => {
-        const list = document.querySelector('dialog[open] [aria-busy="true"]')?.children[1]
-        if (list instanceof HTMLElement && seen.skeleton === undefined) seen.skeleton = list.offsetTop
-      }).observe(document, { childList: true, subtree: true })
-    })
-    await page.goto(`/documents/${interviews.id}/share`)
+  for (const { name, id } of [
+    { name: 'a document with people left to add', id: interviews.id },
+    { name: 'a document with everybody added', id: launchPlan.id },
+  ]) {
+    test(`does not move what is below its headings when the list of ${name} arrives in place of the skeleton`, async ({
+      page,
+    }) => {
+      // The skeleton is on screen for a moment only: where its list starts is taken as it appears, before the list replaces it.
+      // Measured by layout, not by box, because the dialog is still scaling in while the skeleton is there.
+      await page.addInitScript(() => {
+        const seen = window as unknown as { skeleton?: number }
+        new MutationObserver(() => {
+          const list = document.querySelector('dialog[open] [aria-busy="true"]')?.children[1]
+          if (list instanceof HTMLElement && seen.skeleton === undefined) seen.skeleton = list.offsetTop
+        }).observe(document, { childList: true, subtree: true })
+      })
+      await page.goto(`/documents/${id}/share`)
 
-    const heading = dialogOf(page).getByRole('heading', { name: 'People with access' })
-    await expect(heading).toBeVisible()
-    const skeleton = await page.evaluate(() => (window as unknown as { skeleton?: number }).skeleton)
-    expect(skeleton, 'the skeleton was seen').toBeDefined()
-    const section = await heading.evaluate((element) =>
-      element.parentElement instanceof HTMLElement ? element.parentElement.offsetTop : null,
-    )
-    expect(section).toBeCloseTo(skeleton ?? 0, 0)
-  })
+      const heading = dialogOf(page).getByRole('heading', { name: 'People with access' })
+      await expect(heading).toBeVisible()
+      const skeleton = await page.evaluate(() => (window as unknown as { skeleton?: number }).skeleton)
+      expect(skeleton, 'the skeleton was seen').toBeDefined()
+      const section = await heading.evaluate((element) =>
+        element.parentElement instanceof HTMLElement ? element.parentElement.offsetTop : null,
+      )
+      expect(section).toBeCloseTo(skeleton ?? 0, 0)
+    })
+  }
 
   test('scrolls the list inside the dialog with many people, and keeps the row that adds people, everyone in the workspace and Done in view', async ({
     page,
@@ -139,6 +166,27 @@ test.describe('the share dialog', () => {
     await expect(everyone(dialog)).toBeInViewport({ ratio: 1 })
     await list.evaluate((element) => element.scrollTo({ top: 0 }))
     await expect(everyone(dialog)).toBeInViewport({ ratio: 1 })
+  })
+
+  test('does not leave the control that has the focus under the row of everyone in the workspace', async ({ page }) => {
+    await page.goto(`/documents/${interviews.id}/share`)
+    const dialog = dialogOf(page)
+    await expect(dialog.getByRole('combobox', { name: 'Person' })).toBeVisible()
+    await addGuestRows(dialog, 15)
+    await dialog.getByRole('combobox', { name: 'Role of Sofía Lindqvist' }).first().focus()
+
+    for (let step = 0; step < 24; step++) {
+      await page.keyboard.press('Tab')
+      const covered = await dialog.evaluate((element) => {
+        const active = document.activeElement
+        const everyone = element.querySelector('[data-row="general"]')
+        if (!active || !everyone || everyone.contains(active) || !element.querySelector('ul')?.contains(active))
+          return false
+        const [a, e] = [active.getBoundingClientRect(), everyone.getBoundingClientRect()]
+        return a.bottom > e.top + 0.5 && a.top < e.bottom
+      })
+      expect(covered, `after ${step + 1} Tab presses`).toBe(false)
+    }
   })
 })
 

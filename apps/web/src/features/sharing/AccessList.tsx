@@ -126,6 +126,7 @@ function PersonRow({ entry, isMe, lastOwner, busy, saving, problem, onRole, onRe
       <Button
         variant="ghost"
         size="compact"
+        className={lastOwner ? styles.held : undefined}
         aria-disabled={held || undefined}
         aria-describedby={described || undefined}
         aria-label={intl.formatMessage({ id: 'sharing.person.removeLabel' }, { name })}
