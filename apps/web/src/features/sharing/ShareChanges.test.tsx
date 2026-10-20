@@ -251,23 +251,35 @@ describe('removing someone in the share dialog', () => {
     await waitFor(() => expect(generalAccessOf(share)).toHaveFocus())
   })
 
-  it('leaves the focus where it was when the server refuses, and does not move it on a refresh that comes later', async () => {
-    let refuse = true
+  it('leaves the focus where it was when the server refuses, and does not move it when the list changes later', async () => {
+    let someoneJoined = false
     const { user, share } = await openShare({
       wrap: (dataSource) => ({
         ...dataSource,
-        removeAccess: (request) =>
-          refuse ? Promise.reject(answer(503, 'unavailable')) : dataSource.removeAccess(request),
+        removeAccess: () => Promise.reject(answer(503, 'unavailable')),
+        setAccess: (request) => {
+          someoneJoined = true
+          return dataSource.setAccess(request)
+        },
+        listAccess: async (request) => {
+          const list = await dataSource.listAccess(request)
+          const guest = {
+            ...list.items[0]!,
+            userId: 'f3e1c0aa-5b7d-4c61-9a52-0d8e7b4a1c33',
+            email: 'guest@harborpine.example',
+            name: 'Guest',
+          }
+          return someoneJoined ? { ...list, items: [...list.items, guest] } : list
+        },
       }),
     })
 
-    await user.click(within(share).getByRole('button', { name: 'Remove Daniel Okafor' }))
+    await user.click(within(share).getByRole('button', { name: 'Remove Sofía Lindqvist' }))
     await within(share).findByRole('alert')
-    refuse = false
-    await user.selectOptions(generalAccessOf(share), 'viewer')
-    await waitFor(() => expect(status(share)).toContain('General access: Can view.'))
+    await user.selectOptions(roleOf(share, 'Daniel Okafor'), 'viewer')
+    await within(share).findByRole('combobox', { name: 'Role of Guest' })
 
-    expect(generalAccessOf(share)).toHaveFocus()
+    expect(roleOf(share, 'Daniel Okafor')).toHaveFocus()
   })
 })
 
