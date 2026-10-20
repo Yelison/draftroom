@@ -17,11 +17,13 @@ export function useTrashSelection(ids: readonly string[]) {
   const [selection, setSelection] = useState<Selection>({ id: null, index: 0 })
 
   const known = selection.id === null ? -1 : ids.indexOf(selection.id)
+  // Rows above the selected one can leave while it stays: its index is where it is now, so that when it leaves in turn the
+  // row that takes its place is the one at that index. Adjusted while rendering, as React asks for state that follows props.
+  if (known >= 0 && known !== selection.index) setSelection({ id: selection.id, index: known })
   const selectedIndex = ids.length === 0 ? -1 : known >= 0 ? known : Math.min(selection.index, ids.length - 1)
 
   return {
     selectedIndex,
-    selectedId: ids[selectedIndex],
     select: (id: string) => setSelection({ id, index: ids.indexOf(id) }),
   }
 }

@@ -2,6 +2,7 @@ import type { Schema } from '@draftroom/contract'
 import { Icon } from '@yelison/forma-ui'
 import type { ReactNode } from 'react'
 import { useIntl } from 'react-intl'
+import { archivedOn } from './archivedOn.ts'
 import styles from './Trash.module.css'
 
 export interface TrashRowProps {
@@ -21,8 +22,7 @@ export interface TrashRowProps {
  */
 export function TrashRow({ document, folderName, selected, onSelect }: TrashRowProps) {
   const intl = useIntl()
-  // An archived document always has the day it was archived; archiving stamps `updatedAt` with it all the same.
-  const archivedAt = document.archivedAt ?? document.updatedAt
+  const archivedAt = archivedOn(document)
   const values = {
     date: intl.formatDate(archivedAt, { dateStyle: 'medium' }),
     folder: folderName,

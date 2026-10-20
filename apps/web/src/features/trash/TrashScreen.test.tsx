@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { DataSource } from '../../data/DataSource.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
@@ -6,6 +6,7 @@ import {
   answer,
   archived,
   findRow,
+  fixtures,
   main,
   onePerPage,
   panel,
@@ -144,17 +145,23 @@ describe('the selection of the Trash', () => {
     expect(selectedRow()).toBe(row(first.title))
   })
 
-  it('selects the row that has the focus with Enter and with Space', async () => {
-    const { user } = renderScreen('/trash')
+  it('selects a row that is clicked even where the browser does not focus a button on a click', async () => {
+    renderScreen('/trash')
     await findRow(first.title)
 
-    row(second.title).focus()
-    await user.keyboard('{Enter}')
-    expect(selectedRow()).toBe(row(second.title))
+    fireEvent.click(row(second.title))
 
-    row(first.title).focus()
-    await user.keyboard(' ')
-    expect(selectedRow()).toBe(row(first.title))
+    expect(selectedRow()).toBe(row(second.title))
+  })
+
+  it('selects a row that gets the focus, whichever way it got it', async () => {
+    renderScreen('/trash')
+    await findRow(first.title)
+
+    act(() => row(second.title).focus())
+
+    expect(selectedRow()).toBe(row(second.title))
+    expect(row(second.title)).toHaveAttribute('tabindex', '0')
   })
 })
 
@@ -243,7 +250,7 @@ describe('the way to the Trash', () => {
 })
 
 describe('the pages of the Trash screen', () => {
-  it('loads the next page when asked, and moves the focus to the first document that arrived without selecting it', async () => {
+  it('loads the next page when asked, and moves the focus, and the selection, to the first document that arrived', async () => {
     const { user } = renderScreen('/trash', { wrap: onePerPage })
     await findRow(first.title)
     expect(within(main()).getAllByRole('listitem')).toHaveLength(1)
@@ -252,7 +259,7 @@ describe('the pages of the Trash screen', () => {
 
     await waitFor(() => expect(within(main()).getAllByRole('listitem')).toHaveLength(2))
     await waitFor(() => expect(row(second.title)).toHaveFocus())
-    expect(selectedRow()).toBe(row(first.title))
+    expect(selectedRow()).toBe(row(second.title))
   })
 
   it('stops offering more once the last page is in', async () => {
@@ -291,5 +298,41 @@ describe('the pages of the Trash screen', () => {
 
     await waitFor(() => expect(within(main()).getAllByRole('listitem')).toHaveLength(2))
     expect(within(main()).queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('the arrow keys after "Load more"', () => {
+  it('go to the row after the one that has the focus, not after the one that was selected before', async () => {
+    const { user } = renderScreen('/trash', {
+      wrap: (dataSource) => {
+        const archived = Promise.all(
+          [fixtures.launchPlan, fixtures.designReview].map((document) =>
+            dataSource.archiveDocument({ params: { path: { documentId: document.id } } }),
+          ),
+        )
+        return {
+          ...dataSource,
+          listDocuments: async (request) => {
+            await archived
+            return dataSource.listDocuments({
+              params: {
+                path: { workspaceId: request?.params.path.workspaceId ?? '' },
+                query: { ...request?.params.query, limit: 2 },
+              },
+            })
+          },
+        }
+      },
+    })
+    await user.click(await within(main()).findByRole('button', { name: 'Load more' }))
+    const rows = () => within(main()).getAllByRole('list')[0]?.querySelectorAll('button') ?? []
+    await waitFor(() => expect(rows()).toHaveLength(4))
+    const arrived = rows()[2]
+    await waitFor(() => expect(arrived).toHaveFocus())
+
+    await user.keyboard('{ArrowDown}')
+
+    expect(rows()[3]).toHaveFocus()
+    expect(selectedRow()).toBe(rows()[3])
   })
 })

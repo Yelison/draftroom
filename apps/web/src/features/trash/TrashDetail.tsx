@@ -2,6 +2,7 @@ import type { Schema } from '@draftroom/contract'
 import { Button, Icon } from '@yelison/forma-ui'
 import { useId } from 'react'
 import { useIntl } from 'react-intl'
+import { archivedOn } from './archivedOn.ts'
 import styles from './Trash.module.css'
 
 export interface TrashDetailProps {
@@ -9,6 +10,8 @@ export interface TrashDetailProps {
   /** The name of the folder the document was archived from; `null` when it has none or the folder is gone. */
   folderName: string | null
   restoring: boolean
+  /** Said when the document that was selected before this one turned out to be gone already; it goes when the selection changes. */
+  notice: string | null
   /** Why the last restore or delete of this document did not happen, said where the person acted. */
   problem: string | null
   onRestore: (document: Schema<'Document'>) => void
@@ -19,11 +22,18 @@ export interface TrashDetailProps {
  * What the selected document is and what can be done with it: the reversible action first and the one that cannot be
  * undone after a separator, with its consequences said beside it. Deleting still asks before it does it.
  */
-export function TrashDetail({ document, folderName, restoring, problem, onRestore, onDelete }: TrashDetailProps) {
+export function TrashDetail({
+  document,
+  folderName,
+  restoring,
+  notice,
+  problem,
+  onRestore,
+  onDelete,
+}: TrashDetailProps) {
   const intl = useIntl()
   const titleId = useId()
   const problemId = useId()
-  const archivedAt = document.archivedAt ?? document.updatedAt
   const day = (date: string) => <time dateTime={date}>{intl.formatDate(date, { dateStyle: 'medium' })}</time>
 
   return (
@@ -32,9 +42,14 @@ export function TrashDetail({ document, folderName, restoring, problem, onRestor
         <Icon name="file" className={styles.rowIcon} />
         <span>{document.title}</span>
       </h2>
+      {notice !== null && (
+        <p role="alert" className={styles.problem}>
+          {notice}
+        </p>
+      )}
       <dl className={styles.facts}>
         <dt>{intl.formatMessage({ id: 'trash.detail.archived' })}</dt>
-        <dd>{day(archivedAt)}</dd>
+        <dd>{day(archivedOn(document))}</dd>
         <dt>{intl.formatMessage({ id: 'trash.detail.folder' })}</dt>
         <dd>{folderName ?? intl.formatMessage({ id: 'documents.details.noFolder' })}</dd>
         <dt>{intl.formatMessage({ id: 'trash.detail.created' })}</dt>

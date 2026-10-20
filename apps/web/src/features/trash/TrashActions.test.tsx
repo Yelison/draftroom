@@ -170,6 +170,48 @@ describe('restoring a document', () => {
   })
 })
 
+describe('the notice that a document was gone already', () => {
+  const someoneDeletedItFirst = (dataSource: DataSource): DataSource => ({
+    ...dataSource,
+    restoreDocument: async (request) => {
+      await dataSource.deleteDocument(request)
+      return dataSource.restoreDocument(request)
+    },
+  })
+
+  it('is said in the panel, not above the list, so that nothing is pushed down', async () => {
+    const { user } = await openTrash({ wrap: someoneDeletedItFirst })
+
+    await user.click(panelButton(first.title, 'Restore'))
+
+    const notice = await within(main()).findByRole('alert')
+    expect(within(panel(second.title)).getByRole('alert')).toBe(notice)
+    expect(within(main()).getByRole('list')).not.toContainElement(notice)
+  })
+
+  it('goes when the selection changes', async () => {
+    const { user } = await openTrash({ wrap: someoneDeletedItFirst })
+    await user.click(panelButton(first.title, 'Restore'))
+    await within(main()).findByRole('alert')
+
+    await user.click(row(second.title))
+
+    expect(within(main()).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('is said where the empty trash is said when nothing is left', async () => {
+    const { user } = await openTrash({ wrap: someoneDeletedItFirst })
+    await user.click(row(second.title))
+    await user.click(panelButton(second.title, 'Restore'))
+    await within(main()).findByRole('alert')
+    await waitFor(() => expect(row(first.title)).toBeInTheDocument())
+    await user.click(panelButton(first.title, 'Restore'))
+
+    await waitFor(() => expect(within(main()).getByText('The trash is empty')).toBeInTheDocument())
+    expect(within(main()).getByRole('alert')).toHaveTextContent(`“${first.title}” isn't in the trash any more`)
+  })
+})
+
 describe('restoring a document while "Load more" is on its way', () => {
   /** Three archived documents in pages of two, with the second page held until the test lets it go. */
   function threeInPagesOfTwo() {

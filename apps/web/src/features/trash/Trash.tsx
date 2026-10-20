@@ -74,6 +74,9 @@ export function Trash({ workspaceId }: { workspaceId: string }) {
     restore(document)
   }
 
+  const folderNameOf = (document: Schema<'Document'>) =>
+    document.folderId === null ? null : (folderNames.get(document.folderId) ?? null)
+
   // The screen as a whole fails only when there is nothing to show: a page of the list that cannot be read, or a list
   // that cannot be read again, leaves what was read on screen.
   if (documentsQuery.isPending || folders.isPending) return <TrashSkeleton />
@@ -90,30 +93,34 @@ export function Trash({ workspaceId }: { workspaceId: string }) {
   }
 
   const selected = documents[selection.selectedIndex]
-  const folderNameOf = (document: Schema<'Document'>) =>
-    document.folderId === null ? null : (folderNames.get(document.folderId) ?? null)
+  const select = (document: Schema<'Document'>) => {
+    setNotice(null)
+    selection.select(document.id)
+  }
 
   return (
     <div className={styles.trash}>
-      {notice !== null && (
-        <p role="alert" className={styles.notice}>
-          {notice}
-        </p>
-      )}
       {selected === undefined ? (
-        <StateMessage
-          title={intl.formatMessage({ id: 'trash.empty.title' })}
-          description={intl.formatMessage({ id: 'trash.empty.description' })}
-        />
+        <>
+          {notice !== null && (
+            <p role="alert" className={styles.problem}>
+              {notice}
+            </p>
+          )}
+          <StateMessage
+            title={intl.formatMessage({ id: 'trash.empty.title' })}
+            description={intl.formatMessage({ id: 'trash.empty.description' })}
+          />
+        </>
       ) : (
         <div className={styles.layout}>
           <div className={styles.listColumn}>
             <TrashList
               ref={list}
               documents={documents}
-              folderNames={folderNames}
+              folderNameOf={folderNameOf}
               selectedIndex={selection.selectedIndex}
-              onSelect={(document) => selection.select(document.id)}
+              onSelect={select}
             />
             {documentsQuery.isFetchNextPageError && (
               <p role="alert" className={styles.problem}>
@@ -138,6 +145,7 @@ export function Trash({ workspaceId }: { workspaceId: string }) {
           <TrashDetail
             document={selected}
             folderName={folderNameOf(selected)}
+            notice={notice}
             restoring={restoring.has(selected.id)}
             problem={problem?.documentId === selected.id ? problem.message : null}
             onRestore={restoreDocument}

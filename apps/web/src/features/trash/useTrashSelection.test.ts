@@ -2,16 +2,18 @@ import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { useTrashSelection } from './useTrashSelection.ts'
 
+const selectionOf = (ids: readonly string[], index: number) => ids[index]
+
 describe('the selection of the trash', () => {
   it('is the first document until another is picked', () => {
-    const { result } = renderHook(() => useTrashSelection(['a', 'b', 'c']))
+    const ids = ['a', 'b', 'c']
+    const { result } = renderHook(() => useTrashSelection(ids))
 
-    expect(result.current.selectedId).toBe('a')
+    expect(selectionOf(ids, result.current.selectedIndex)).toBe('a')
 
     act(() => result.current.select('c'))
 
-    expect(result.current.selectedId).toBe('c')
-    expect(result.current.selectedIndex).toBe(2)
+    expect(selectionOf(ids, result.current.selectedIndex)).toBe('c')
   })
 
   it.each([
@@ -26,13 +28,24 @@ describe('the selection of the trash', () => {
 
     rerender({ ids: left })
 
-    expect(result.current.selectedId).toBe(expected)
+    expect(selectionOf(left, result.current.selectedIndex)).toBe(expected)
+  })
+
+  it('follows the selected document when rows above it leave first, so the row that takes its place is the right one', () => {
+    const { result, rerender } = renderHook(({ ids }) => useTrashSelection(ids), {
+      initialProps: { ids: ['a', 'b', 'c', 'd'] as readonly string[] },
+    })
+    act(() => result.current.select('b'))
+
+    rerender({ ids: ['b', 'c', 'd'] })
+    rerender({ ids: ['c', 'd'] })
+
+    expect(selectionOf(['c', 'd'], result.current.selectedIndex)).toBe('c')
   })
 
   it('is nothing when the list is empty', () => {
     const { result } = renderHook(() => useTrashSelection([]))
 
-    expect(result.current.selectedId).toBeUndefined()
     expect(result.current.selectedIndex).toBe(-1)
   })
 })

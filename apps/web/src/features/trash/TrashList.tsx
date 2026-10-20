@@ -1,5 +1,5 @@
 import type { Schema } from '@draftroom/contract'
-import type { KeyboardEvent, Ref } from 'react'
+import type { FocusEvent, KeyboardEvent, Ref } from 'react'
 import { focusRow } from '../documents/useFocusFirstArrival.ts'
 import { TrashRow } from './TrashRow.tsx'
 import styles from './Trash.module.css'
@@ -7,8 +7,7 @@ import styles from './Trash.module.css'
 export interface TrashListProps {
   ref: Ref<HTMLUListElement>
   documents: readonly Schema<'Document'>[]
-  /** The names of the folders of the workspace by id. */
-  folderNames: ReadonlyMap<string, string>
+  folderNameOf: (document: Schema<'Document'>) => string | null
   selectedIndex: number
   onSelect: (document: Schema<'Document'>) => void
 }
@@ -27,24 +26,31 @@ function indexAfter(key: string, index: number, count: number) {
  * a person with a keyboard gets to the panel without going through every row; the arrow keys, Home and End select the
  * row they move to, and Enter or Space select the row that has the focus (it is a button).
  */
-export function TrashList({ ref, documents, folderNames, selectedIndex, onSelect }: TrashListProps) {
+export function TrashList({ ref, documents, folderNameOf, selectedIndex, onSelect }: TrashListProps) {
   const move = (event: KeyboardEvent<HTMLUListElement>) => {
     const target = indexAfter(event.key, selectedIndex, documents.length)
-    const document = target === undefined ? undefined : documents[target]
-    if (target === undefined || document === undefined) return
+    if (target === undefined) return
     event.preventDefault()
-    onSelect(document)
+    // The row that gets the focus is selected by `select` below.
     focusRow(event.currentTarget, target, 'button')
+  }
+
+  // Whatever puts the focus on a row selects it, such as the first row of a page that has just arrived, so that the arrow
+  // keys start from where the focus is.
+  const select = (event: FocusEvent<HTMLUListElement>) => {
+    const index = [...event.currentTarget.children].findIndex((item) => item.contains(event.target))
+    const document = documents[index]
+    if (document !== undefined && index !== selectedIndex) onSelect(document)
   }
 
   return (
     // The keys are handled where they bubble to: the focus is always on one of the buttons inside.
-    <ul ref={ref} className={styles.list} onKeyDown={move}>
+    <ul ref={ref} className={styles.list} onKeyDown={move} onFocus={select}>
       {documents.map((document, index) => (
         <li key={document.id} className={styles.item}>
           <TrashRow
             document={document}
-            folderName={document.folderId === null ? null : (folderNames.get(document.folderId) ?? null)}
+            folderName={folderNameOf(document)}
             selected={index === selectedIndex}
             onSelect={onSelect}
           />
