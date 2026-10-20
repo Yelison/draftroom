@@ -84,8 +84,23 @@ async function putCaretAfter(person: Participant, line: string): Promise<void> {
   await expect.poll(caretIsAtTheEnd).toBe(true)
 }
 
-const card = (person: Participant) =>
-  person.page.getByRole('complementary', { name: 'Comments and activity' }).getByRole('article')
+const margin = (person: Participant) => person.page.getByRole('complementary', { name: 'Comments in the margin' })
+/** The thread in the margin, compact or whole: the whole card is only the one the person is on. */
+const thread = (person: Participant) => margin(person).locator('[data-thread-id]')
+const card = (person: Participant) => margin(person).getByRole('article')
+
+/** Whether the card of the thread is level with the text it is about, in the page of this person. */
+async function levelWithItsText(person: Participant): Promise<void> {
+  await expect
+    .poll(async () => {
+      const [cardBox, markBox] = await Promise.all([
+        thread(person).boundingBox(),
+        person.page.locator('mark').first().boundingBox(),
+      ])
+      return cardBox === null || markBox === null ? Number.NaN : Math.abs(cardBox.y - markBox.y)
+    })
+    .toBeLessThanOrEqual(8)
+}
 
 test.describe('a comment while the other person writes around it', () => {
   test('stays on the same characters, and is orphaned when they delete them, for both of them', async ({ join }) => {
@@ -102,10 +117,13 @@ test.describe('a comment while the other person writes around it', () => {
     await priya.page.keyboard.press('Control+Alt+m')
     await priya.page.keyboard.type('Is this still the name?')
     await priya.page.keyboard.press('Control+Enter')
-    await expect(card(priya)).toHaveAttribute('data-state', 'open')
-    await expect(card(daniel)).toHaveAttribute('data-state', 'open')
+    await expect(thread(priya)).toHaveAttribute('data-state', 'open')
+    await expect(thread(daniel)).toHaveAttribute('data-state', 'open')
     expect(await highlighted(priya.page)).toEqual([commented])
     await expect.poll(() => highlighted(daniel.page)).toEqual([commented])
+    // The new thread of one person is in the margin of the other, level with its text, with no reload.
+    await levelWithItsText(priya)
+    await levelWithItsText(daniel)
 
     // Daniel types before the range, at its start, inside it, at its end and after it. Each time the range covers the
     // characters it covered, for him and for her: only what is typed inside it belongs to it.
@@ -129,12 +147,14 @@ test.describe('a comment while the other person writes around it', () => {
     await select(daniel, 6, 'launchC plan')
     await daniel.page.keyboard.press('Delete')
     for (const person of [daniel, priya]) {
-      await expect(card(person)).toHaveAttribute('data-state', 'orphaned')
-      await expect(card(person).getByText(commented, { exact: true })).toBeVisible()
+      await expect(thread(person)).toHaveAttribute('data-state', 'orphaned')
+      await expect(thread(person).getByText(commented, { exact: true })).toBeVisible()
       expect(await highlighted(person.page)).toEqual([])
     }
     await card(priya).getByRole('textbox', { name: 'Reply to this thread' }).fill('Then it is gone.')
     await card(priya).getByRole('button', { name: 'Reply' }).click()
+    // Daniel has it compact: he chooses it to read the reply.
+    await thread(daniel).click()
     await expect(card(daniel).getByText('Then it is gone.')).toBeVisible()
   })
 })
@@ -152,7 +172,8 @@ test.describe('a comment while the person who sees it writes on it', () => {
     await priya.page.keyboard.press('Control+Alt+m')
     await priya.page.keyboard.type('Is this still the name?')
     await priya.page.keyboard.press('Control+Enter')
-    await expect(card(daniel)).toHaveAttribute('data-state', 'open')
+
+    await expect(thread(daniel)).toHaveAttribute('data-state', 'open')
 
     // "Show in text" selects exactly the commented words, and she types the new name over them.
     await card(priya).getByRole('button', { name: 'Show in text' }).click()
@@ -163,7 +184,7 @@ test.describe('a comment while the person who sees it writes on it', () => {
 
     // What she sees is what Yjs says, which is what he sees: no highlight on "roadmap", and the thread is orphaned.
     for (const person of [daniel, priya]) {
-      await expect(card(person)).toHaveAttribute('data-state', 'orphaned')
+      await expect(thread(person)).toHaveAttribute('data-state', 'orphaned')
       expect(await highlighted(person.page)).toEqual([])
     }
   })
@@ -194,7 +215,7 @@ test.describe('a comment while the person who sees it writes on it', () => {
     await priya.page.keyboard.press('Control+Alt+m')
     await priya.page.keyboard.type('Fallback start')
     await priya.page.keyboard.press('Control+Enter')
-    await expect(card(priya)).toHaveAttribute('data-state', 'open')
+    await expect(thread(priya)).toHaveAttribute('data-state', 'open')
     await expect.poll(() => highlighted(daniel.page)).toEqual(['de'])
 
     // She types at the end of "abc": the text joins the range, for her as for him.
