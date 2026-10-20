@@ -18,9 +18,10 @@ export interface NavRailProps {
 }
 
 /**
- * The navigation of the product: the workspace on top, the items, and the person at the foot. Exactly one item is current: the one of the section of the page. Every item is a stop
- * of the Tab key, and the current one is told apart by its background, which is not the focus ring. The footer sits inside
- * the same landmark, so the order of the focus follows what is seen: the rail from top to bottom, then the page.
+ * The navigation of the product: the workspace on top, the items, and at the foot the person and what ends their session.
+ * Exactly one item is current: the one of the section of the page. Every item is a stop of the Tab key, and the current
+ * one is told apart by its background, which is not the focus ring. The foot sits inside the same landmark, so the order
+ * of the focus follows what is seen: the rail from top to bottom, then the page.
  */
 export function NavRail({ variant, footer }: NavRailProps) {
   const intl = useIntl()
