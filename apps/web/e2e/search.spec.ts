@@ -29,7 +29,15 @@ test('searches from the explorer, sees what matched in the title and the excerpt
   await expect(page.getByRole('heading', { level: 1, name: 'Search documents' })).toBeFocused()
   const result = page.getByRole('main').getByRole('link', { name: launchPlan.title })
   await expect(result).toBeVisible()
-  await expect(page.getByRole('main').getByRole('status').filter({ hasText: 'result' })).toHaveText('1 result')
+  const count = page.getByRole('main').getByRole('status').filter({ hasText: 'result' })
+  await expect(count).toHaveText('1 result')
+  // On the page for everyone, not only for a screen reader: a line of text has a box of a line, not of a pixel.
+  const box = await count.boundingBox()
+  expect(box?.height).toBeGreaterThanOrEqual(16)
+  expect(box?.width).toBeGreaterThanOrEqual(48)
+  // The folder of the result, in the row that names the document.
+  const row = page.getByRole('main').locator('li').filter({ hasText: launchPlan.title })
+  await expect(row.getByText('Product', { exact: true })).toBeVisible()
   // The word is marked where it was found: once in the title and once in the excerpt, and the link is named by the title.
   const marks = page.getByRole('main').locator('li mark')
   await expect(marks).toHaveText(['launch', 'launch'])
@@ -52,8 +60,10 @@ test('walks back and forward through the searches', async ({ page }) => {
   await page.goto('/search?q=weekly')
   const field = page.getByRole('main').getByRole('searchbox', { name: 'Search documents' })
   await expect(page.getByRole('main').getByRole('link', { name: weeklyEnglish.title })).toBeVisible()
-  await field.fill('launch')
-  await field.press('Enter')
+  await field.focus()
+  await page.keyboard.press('ControlOrMeta+A')
+  await page.keyboard.type('launch')
+  await page.keyboard.press('Enter')
   await expect(page.getByRole('main').getByRole('link', { name: launchPlan.title })).toBeVisible()
 
   await page.goBack()
