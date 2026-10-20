@@ -1,15 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
-import { focusMainContent } from '../../../app/mainContent.ts'
 import { useDataSource } from '../../../data/useDataSource.ts'
 import type { DocumentListRowProps } from '../DocumentListRow.tsx'
 import { foldersQuery, pinnedDocumentsQuery } from '../queries.ts'
-import { FolderSection } from './FolderSection.tsx'
+import { FolderSection, type FolderSectionProps } from './FolderSection.tsx'
 import { PinnedSection } from './PinnedSection.tsx'
 import { SectionFailure } from './SectionFailure.tsx'
 import { DocumentSectionsSkeleton } from './SectionSkeleton.tsx'
 import { UnfiledSection } from './UnfiledSection.tsx'
+import { useFocusWhenSectionsLeave } from './useFocusWhenSectionsLeave.ts'
 import type { SectionFolds } from './useSectionFolds.ts'
 import { useFirstPagesSettled, useSectionDocuments } from './useSectionDocuments.ts'
 import { StateMessage } from '../StateMessage.tsx'
@@ -18,7 +18,7 @@ import styles from './Sections.module.css'
 export interface DocumentSectionsProps extends Pick<DocumentListRowProps, 'onRenameOrMove' | 'onArchive'> {
   workspaceId: string
   folds: SectionFolds
-  onRenameFolder: Parameters<typeof FolderSection>[0]['onRename']
+  onRenameFolder: FolderSectionProps['onRename']
   /** The way to the first document, for a workspace that has none. */
   firstDocument: ReactNode
 }
@@ -28,7 +28,7 @@ export interface DocumentSectionsProps extends Pick<DocumentListRowProps, 'onRen
  * no folder. Each section reads its own documents, so one that fails says so and can be tried again without the others.
  *
  * The page waits for the three reads that decide which sections exist (the folders, the pinned documents and the
- * documents with no folder) and then draws them together; the documents of each folder arrive under their own heading.
+ * documents with no folder) and for the first page of each open folder, and then shows them all together.
  */
 export function DocumentSections({
   workspaceId,
@@ -62,15 +62,7 @@ export function DocumentSections({
   // Until it has been read, "No folder" is drawn (loading or failed); once read, it is drawn only if it lists something.
   const showUnfiled = !unfiled.query.isSuccess || unfiled.documents.length > 0 || unfiled.query.hasNextPage
 
-  // "Pinned" and "No folder" leave the page when their last document does, and the heading that had the focus with them.
-  const sectionsShown = useRef<number | null>(null)
-  const shown = Number(pinnedCount > 0) + Number(showUnfiled)
-  useEffect(() => {
-    if (sectionsShown.current !== null && shown < sectionsShown.current && document.activeElement === document.body) {
-      focusMainContent()
-    }
-    sectionsShown.current = shown
-  }, [shown])
+  useFocusWhenSectionsLeave(Number(pinnedCount > 0) + Number(showUnfiled))
 
   if (!decided) return <DocumentSectionsSkeleton />
 

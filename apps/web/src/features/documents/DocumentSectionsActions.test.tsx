@@ -134,3 +134,15 @@ describe('moving and archiving from a section', () => {
     await waitFor(() => expect(within(main()).getByRole('button', { name: 'Product' })).toHaveFocus())
   })
 })
+
+describe('the menu of a folder section', () => {
+  it('leads to the page of the folder, which lists all of it', async () => {
+    const { user, router } = renderScreen('/documents')
+
+    await user.click(await within(main()).findByRole('button', { name: 'Actions for Product' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Open folder' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/folders/${workspaceFixtures.productFolder.id}`))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Product' })).toBeInTheDocument()
+  })
+})
