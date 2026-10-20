@@ -984,3 +984,210 @@ test.describe('the layout', () => {
     })
   }
 })
+
+// One scroll: the page. A document as long as a real one, with many comments, at the two desktop sizes of the plan.
+test.describe('one scroll', () => {
+  const paragraphs = 30
+
+  /** Starts a comment on the first words of paragraph `number` (or on `quote`), as the key does, and sends it. */
+  async function commentOn(page: Page, quote: string, body: string) {
+    await page.evaluate((words) => {
+      const text = document.querySelector('[role="textbox"][aria-label="Document content"]') as
+        | (HTMLElement & {
+            editor: {
+              state: {
+                doc: { descendants(visit: (node: { isText: boolean; text?: string }, at: number) => void): void }
+              }
+              commands: { setTextSelection(range: { from: number; to: number }): void; focus(): void }
+            }
+          })
+        | null
+      if (text === null) throw new Error('The text is not on the page')
+      let range: { from: number; to: number } | null = null
+      text.editor.state.doc.descendants((node, at) => {
+        const index = node.isText ? (node.text ?? '').indexOf(words) : -1
+        if (range === null && index >= 0) range = { from: at + index, to: at + index + words.length }
+      })
+      if (range === null) throw new Error(`"${words}" is not in the text`)
+      text.editor.commands.focus()
+      text.editor.commands.setTextSelection(range)
+    }, quote)
+    // The editor learns of the selection from an event that the browser sends after; the next key reads what it knows.
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    await page.keyboard.press('ControlOrMeta+Alt+m')
+    await page.keyboard.type(body)
+    await page.keyboard.press('Control+Enter')
+    await expect(marginOf(page).locator('[data-thread-id]').filter({ hasText: body }).first()).toBeAttached()
+  }
+
+  for (const [width, height] of [
+    [1280, 800],
+    [1440, 900],
+  ] as const) {
+    test(`at ${width} × ${height}: only the page scrolls, the band and the bar stay, and each comment is level with its text`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000)
+      await page.setViewportSize({ width, height })
+      await page.goto(documentPath)
+      const text = await open(page)
+      await page.keyboard.press('Control+End')
+      for (let paragraph = 1; paragraph <= paragraphs; paragraph++) {
+        await page.keyboard.press('Enter')
+        await page.keyboard.insertText(`Paragraph ${paragraph} of a text that is long enough to be a real one.`)
+      }
+      // Eleven threads, each on a paragraph of its own, and a second one on the same paragraph as one of them.
+      for (const paragraph of [2, 3, 4, 8, 9, 10, 15, 16, 22, 23, 24]) {
+        await commentOn(page, `Paragraph ${paragraph} `, `Thread on ${paragraph}`)
+      }
+      await commentOn(page, 'long enough', 'A second thread on the last paragraph')
+      // The twelve, and the one the launch plan has already, whose text is gone and which is at the end.
+      const cards = marginOf(page).locator('[data-thread-id]')
+      await expect(cards).toHaveCount(13)
+      await text.evaluate((element) => element.blur())
+
+      // The page is what scrolls: nothing else has a scroll of its own, and the explorer fits.
+      const scrollZones = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('body *')]
+          .filter((element) => {
+            const { overflowY } = getComputedStyle(element)
+            return (overflowY === 'auto' || overflowY === 'scroll') && element.scrollHeight > element.clientHeight + 1
+          })
+          .map((element) => element.tagName + '.' + element.className),
+      )
+      expect(scrollZones, 'zones that scroll on their own').toEqual([])
+      const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight)
+      expect(pageHeight, 'the page is longer than the window').toBeGreaterThan(height)
+
+      // Where each card is, and where its text: the card is level with it, and never above it.
+      const placed = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('aside [data-thread-id]')].map((card) => {
+          const id = card.dataset['threadId'] ?? ''
+          const mark = document.querySelector(`mark[data-comment-thread="${id}"]`)
+          const box = card.getBoundingClientRect()
+          return {
+            id,
+            top: box.top + window.scrollY,
+            bottom: box.bottom + window.scrollY,
+            text: (mark?.getBoundingClientRect().top ?? NaN) + window.scrollY,
+          }
+        }),
+      )
+      expect(placed).toHaveLength(13)
+      const onText = placed.filter((card) => !Number.isNaN(card.text))
+      expect(onText).toHaveLength(12)
+      const tolerance = 6
+      for (const card of onText)
+        expect(card.top, `card ${card.id} is not above its text`).toBeGreaterThanOrEqual(card.text - tolerance)
+      // Nothing overlaps: each card ends before the next one starts, in the order of the text.
+      for (const [index, card] of placed.slice(0, -1).entries()) {
+        expect(card.bottom, `card ${index} ends before the next`).toBeLessThanOrEqual(
+          (placed[index + 1]?.top ?? Infinity) + 0.5,
+        )
+      }
+      // The cards that are the first on their paragraph are level with it; the second on one is pushed under the first.
+      const level = onText.filter((card) => Math.abs(card.top - card.text) <= tolerance)
+      expect(level.length).toBeGreaterThanOrEqual(11)
+      // Cards that would have overlapped the text under them have had room opened for them.
+      expect(await page.locator('[data-comment-gap]').count()).toBeGreaterThan(0)
+
+      // The band and the bar stay at the top of the window as the page goes by under them.
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+      const band = await bandOf(page).boundingBox()
+      const bar = await barOf(page).boundingBox()
+      expect(band?.y).toBe(0)
+      expect(bar?.y).toBeCloseTo((band?.y ?? 0) + (band?.height ?? 0), 0)
+      await expect(commentsToggle(page)).toBeInViewport()
+      await expect(page.getByRole('button', { name: 'Share' })).toBeInViewport()
+    })
+  }
+
+  // A browser zoomed to 200 % on a window of 1280 px is a window of 640 × 360 CSS px: there is no beside for the margin, which
+  // goes under the sheet with its cards in the order of the text, and the band and the bar go by with the page.
+  test('zoomed to 200 %: the margin is under the sheet, in the order of the text, and nothing is cut', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000)
+    await page.setViewportSize({ width: 640, height: 360 })
+    await page.goto(documentPath)
+    await open(page)
+    await page.keyboard.press('Control+End')
+    for (const line of ['The first paragraph, which is commented on.', 'The second paragraph, which is too.']) {
+      await page.keyboard.press('Enter')
+      await page.keyboard.insertText(line)
+    }
+    await commentOn(page, 'second paragraph', 'About the second')
+    await commentOn(page, 'first paragraph', 'About the first')
+
+    const sheet = await sheetOf(page).boundingBox()
+    const margin = await marginOf(page).boundingBox()
+    // Under the sheet, as wide as the page lets it be, and the page does not scroll sideways.
+    expect(margin?.y).toBeGreaterThanOrEqual((sheet?.y ?? 0) + (sheet?.height ?? 0))
+    expect((margin?.x ?? 0) + (margin?.width ?? 0)).toBeLessThanOrEqual(640)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    // In the order of the text, not of the time they were made in.
+    const cards = marginOf(page).locator('[data-thread-id]')
+    await expect(cards.filter({ hasText: 'About the first' })).toBeAttached()
+    const order = await cards.evaluateAll((elements) => elements.map((element) => element.textContent ?? ''))
+    expect(order.findIndex((card) => card.includes('About the first'))).toBeLessThan(
+      order.findIndex((card) => card.includes('About the second')),
+    )
+    // Nothing is cut: each card holds what it says, and none is outside the window.
+    const cut = await cards.evaluateAll((elements) =>
+      elements.filter((element) => element.scrollWidth > element.clientWidth + 1).map((element) => element.className),
+    )
+    expect(cut).toEqual([])
+    // No room was opened in the text, which is measured only beside it.
+    expect(await page.locator('[data-comment-gap]').count()).toBe(0)
+    // The band and the bar are five rows of the toolbar's height: they go by with the page, so the text has the window.
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    expect((await bandOf(page).boundingBox())?.y ?? 0).toBeLessThan(0)
+  })
+})
+
+// The skeleton is on the screen for a moment only: its measures are taken as it appears, before the real ones replace it (the
+// pattern of the other screens of the suite). The band, the bar and the sheet must be where the document will have them.
+for (const width of [1280, 640] as const) {
+  test(`gives the document the band, the bar and the sheet of its skeleton at ${width} px, so nothing moves`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: width === 640 ? 360 : 800 })
+    await page.addInitScript(() => {
+      type Box = { x: number; y: number; width: number; height: number }
+      const seen = window as unknown as { skeleton?: { band: Box; bar: Box; sheet: Box } }
+      const box = (element: Element): Box => {
+        const { x, y, width: w, height: h } = element.getBoundingClientRect()
+        return { x, y, width: w, height: h }
+      }
+      new MutationObserver(() => {
+        const skeleton = document.querySelector('main [aria-busy="true"]')
+        const chrome = skeleton?.firstElementChild
+        const sheet = skeleton?.children[1]?.firstElementChild
+        const [band, bar] = [chrome?.children[0], chrome?.children[1]]
+        if (seen.skeleton === undefined && band && bar && sheet) {
+          seen.skeleton = { band: box(band), bar: box(bar), sheet: box(sheet) }
+        }
+      }).observe(document, { childList: true, subtree: true })
+    })
+    await page.goto(documentPath)
+    await textArea(page).waitFor()
+    await expect(marginOf(page)).toBeAttached()
+
+    const seen = await page.evaluate(
+      () => (window as unknown as { skeleton?: Record<'band' | 'bar' | 'sheet', Record<string, number>> }).skeleton,
+    )
+    expect(seen, 'the skeleton was seen').toBeDefined()
+    const real = {
+      band: await bandOf(page).boundingBox(),
+      bar: await barOf(page).boundingBox(),
+      sheet: await sheetOf(page).boundingBox(),
+    }
+    for (const part of ['band', 'bar', 'sheet'] as const) {
+      expect(real[part]?.x, `${part} x`).toBeCloseTo(seen?.[part]?.['x'] ?? NaN, 0)
+      expect(real[part]?.y, `${part} y`).toBeCloseTo(seen?.[part]?.['y'] ?? NaN, 0)
+      expect(real[part]?.width, `${part} width`).toBeCloseTo(seen?.[part]?.['width'] ?? NaN, 0)
+    }
+    expect(real.band?.height).toBeCloseTo(seen?.band?.['height'] ?? NaN, 0)
+    expect(real.bar?.height).toBeCloseTo(seen?.bar?.['height'] ?? NaN, 0)
+  })
+}
