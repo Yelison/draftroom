@@ -111,7 +111,8 @@ export const routes: RouteObject[] = [
                 ],
               },
               {
-                // Its own chunk, as the editor's: the preview brings Tiptap, ProseMirror and Yjs.
+                // Its own chunk, as the editor's: the reader brings Tiptap, ProseMirror and Yjs. It is in the editor's layout,
+                // which hides the explorer here and keeps it mounted, so coming back to the document finds it as it was.
                 path: 'documents/:documentId/versions',
                 HydrateFallback: VersionsSkeleton,
                 lazy: async () => ({

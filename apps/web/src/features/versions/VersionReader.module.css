@@ -1,0 +1,74 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+  min-width: 0;
+  min-height: 0;
+  height: calc(var(--space-64) * 8);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+@container (width >= 720px) {
+  .panel {
+    height: auto;
+  }
+}
+
+/* Fixed above the text: the text scrolls under it, and it is as tall with the button as without. */
+.bar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-12);
+  border-block-end: 1px solid var(--color-line);
+}
+
+.notice {
+  flex: 1;
+  min-width: calc(var(--space-64) * 3);
+}
+
+/* The place of the button is as tall as the button before it arrives, and under the notice when the panel is too narrow to hold both. */
+.action {
+  display: flex;
+  flex: none;
+  min-height: var(--button-height);
+}
+
+@container (width < 640px) {
+  .action {
+    flex-basis: 100%;
+  }
+}
+
+.skeleton {
+  flex: 1;
+  min-height: calc(var(--space-64) * 3);
+  margin: var(--space-24);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-hover);
+}
+
+.scroller {
+  --versions-text-width: 720px;
+
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-24);
+  overflow-y: auto;
+}
+
+.scroller > * {
+  max-width: var(--versions-text-width);
+  margin-inline: auto;
+}
+
+.scroller:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: calc(var(--space-2) * -1);
+}

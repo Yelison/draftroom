@@ -4,7 +4,6 @@ import { Button, buttonClassName } from '@yelison/forma-ui'
 import { useState } from 'react'
 import { useIntl } from 'react-intl'
 import { Link, useParams } from 'react-router'
-import { PageTitle } from '../../components/PageTitle/PageTitle.tsx'
 import { isApiError } from '../../data/errors.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { StateMessage } from '../documents/StateMessage.tsx'
@@ -12,8 +11,8 @@ import { documentQuery } from '../editor/documentQuery.ts'
 import { canEdit } from '../editor/roles.ts'
 import { RestoreDialog } from './RestoreDialog.tsx'
 import { SaveVersionDialog } from './SaveVersionDialog.tsx'
-import { VersionList } from './VersionList.tsx'
-import { VersionPreview } from './VersionPreview.tsx'
+import { VersionsBody } from './VersionsBody.tsx'
+import { VersionsHeader } from './VersionsHeader.tsx'
 import { VersionsPlaceholder } from './VersionsSkeleton.tsx'
 import { useVersionName } from './useVersionName.ts'
 import styles from './Versions.module.css'
@@ -34,7 +33,6 @@ export function VersionsScreen() {
   const query = useQuery(documentQuery(dataSource, documentId))
   const document = query.data
   const nameOf = useVersionName()
-  const [selected, setSelected] = useState<Schema<'Version'> | null>(null)
   const [restoring, setRestoring] = useState<Schema<'Version'> | null>(null)
   const [saving, setSaving] = useState(false)
   // Counted, so that the same message twice in a row is a new element and is announced again.
@@ -43,10 +41,9 @@ export function VersionsScreen() {
 
   return (
     <div className={styles.screen}>
-      <header className={styles.header}>
-        <PageTitle titleId="screen.versions" />
+      <VersionsHeader documentTitle={document?.title}>
         {document !== undefined && (
-          <div className={styles.actions}>
+          <>
             {/* The name adds the title to the visible words, which it contains (WCAG 2.5.3); the title is the person's and can be long, so it is not drawn. */}
             <Link
               to={`/documents/${document.id}`}
@@ -58,9 +55,9 @@ export function VersionsScreen() {
             {canEdit(document.role) && (
               <Button onClick={() => setSaving(true)}>{intl.formatMessage({ id: 'versions.save.button' })}</Button>
             )}
-          </div>
+          </>
         )}
-      </header>
+      </VersionsHeader>
       {query.isPending && <VersionsPlaceholder />}
       {query.isError && (
         <DocumentProblem
@@ -71,17 +68,7 @@ export function VersionsScreen() {
       )}
       {document !== undefined && (
         <>
-          <div className={styles.body}>
-            <section aria-label={intl.formatMessage({ id: 'versions.list.label' })}>
-              <VersionList
-                documentId={document.id}
-                selectedId={selected?.id ?? null}
-                onSelect={setSelected}
-                onRestore={document.role === 'owner' ? setRestoring : undefined}
-              />
-            </section>
-            <VersionPreview documentId={document.id} version={selected} />
-          </div>
+          <VersionsBody documentId={document.id} onRestore={document.role === 'owner' ? setRestoring : undefined} />
           <SaveVersionDialog
             document={document}
             open={saving}

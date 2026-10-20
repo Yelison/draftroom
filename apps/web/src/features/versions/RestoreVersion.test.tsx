@@ -2,25 +2,25 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { DataSource } from '../../data/DataSource.ts'
 import {
+  automaticToggle,
+  choose,
   conflict,
-  daniel,
   launchPlan,
   launchPlanVersions,
   openVersions,
+  reading,
   rows,
-  sofia,
   unavailable,
-  versionRows,
   when,
 } from './testing/openVersions.tsx'
 
-const restoreButtonOf = (row: HTMLElement) => within(row).getByRole('button', { name: /^Restore “/ })
 const dialog = () => screen.findByRole('dialog')
 
-/** Opens the confirmation for the version that has a name of its own, as its owner does. */
+/** Opens the confirmation for the version that is read, which is the one that has a name of its own, as its owner does. */
 async function askToRestore(wrap?: (dataSource: DataSource) => DataSource) {
   const view = await openVersions(launchPlan.id, wrap === undefined ? {} : { wrap })
-  const trigger = restoreButtonOf(rows()[1]!)
+  await reading()
+  const trigger = screen.getByRole('button', { name: 'Restore this version' })
   await view.user.click(trigger)
   return { ...view, trigger, confirmation: await dialog() }
 }
@@ -39,21 +39,15 @@ function slowRestore() {
   return { wrap, release }
 }
 
-describe('who is offered the restore', () => {
-  it('is an owner, on every version of the list', async () => {
-    await openVersions()
+describe('the list', () => {
+  it('has no restore button on any version: going back is decided from the text that was read', async () => {
+    const { user } = await openVersions()
+    await user.click(automaticToggle())
 
-    expect(screen.getAllByRole('button', { name: /^Restore “/ })).toHaveLength(3)
-  })
-
-  it.each([
-    { role: 'an editor', email: daniel.email },
-    { role: 'a commenter', email: sofia },
-  ])('is not $role: the action is not on the screen', async ({ email }) => {
-    await openVersions(launchPlan.id, { signedInAs: email })
-
+    expect(
+      within(screen.getByRole('region', { name: 'Versions' })).queryByRole('button', { name: /Restore/ }),
+    ).toBeNull()
     expect(rows()).toHaveLength(3)
-    expect(screen.queryByRole('button', { name: /Restore/ })).not.toBeInTheDocument()
   })
 })
 
@@ -118,14 +112,26 @@ describe('restoring a version', () => {
     await user.click(within(confirmation).getByRole('button', { name: 'Restore' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(trigger).toHaveFocus()
+    // The text that was read is still on screen and the button is the same one, so the focus has somewhere to be.
     expect(trigger).toBeInTheDocument()
+    expect(trigger).toHaveFocus()
     expect(await screen.findByText(/The document went back to “Before the pricing review, /)).toBeInTheDocument()
-    // The restore saved how the document was, then the restored state: both are the newest rows.
-    await waitFor(() => expect(rows()).toHaveLength(5))
+    // The restore saved how the document was, then the restored state: both are the newest rows, above the one restored.
+    await waitFor(() => expect(rows()).toHaveLength(3))
     expect(rows()[0]).toHaveTextContent('Restored version')
     expect(rows()[1]).toHaveTextContent('Version before a restore')
     expect(invalidatedKeys()).toContainEqual(['documents', launchPlan.id, 'versions'])
+  })
+
+  it('keeps reading the version that was restored: the text does not change under the owner', async () => {
+    const { confirmation, user } = await askToRestore()
+
+    await user.click(within(confirmation).getByRole('button', { name: 'Restore' }))
+    await waitFor(() => expect(rows()).toHaveLength(3))
+
+    expect(choose(rows()[2]!)).toHaveAttribute('aria-current', 'true')
+    expect(choose(rows()[0]!)).not.toHaveAttribute('aria-current')
+    expect(screen.getByText(/The launch moves to the second week of November/)).toBeInTheDocument()
   })
 
   it('keeps the dialog open and says why when the server could not do it, and works when asked again', async () => {
@@ -163,30 +169,21 @@ describe('restoring a version', () => {
     )
     // Not the generic message: the owner knows what happened and that asking again is the way.
     expect(within(confirmation).queryByText('Something went wrong. Try again.')).not.toBeInTheDocument()
-    expect(await versionRows()).toHaveLength(3)
+    await waitFor(() => expect(rows()).toHaveLength(1))
   })
 
   it('names a version that has no name of its own by what it is and when it was made', async () => {
-    await openVersions()
+    const { user } = await openVersions()
+    await user.click(automaticToggle())
+    await user.click(choose(rows()[0]!))
+    await reading()
 
-    expect(restoreButtonOf(rows()[0]!)).toHaveAccessibleName(
-      `Restore “Automatic version from ${when(launchPlanVersions.newest.createdAt)}”`,
-    )
-  })
-})
+    await user.click(await screen.findByRole('button', { name: 'Restore this version' }))
 
-describe('the versions a restore leaves with the same name', () => {
-  it('are told apart by what names their restore button, so a screen reader hears which one it is', async () => {
-    const { confirmation, user } = await askToRestore()
-    await user.click(within(confirmation).getByRole('button', { name: 'Restore' }))
-    await waitFor(() => expect(rows()).toHaveLength(5))
-
-    const names = screen
-      .getAllByRole('button', { name: /^Restore “/ })
-      .map((button) => button.getAttribute('aria-label'))
-
-    // The restored version copies the name of the one it went back to.
-    expect(names.filter((name) => name?.startsWith('Restore “Before the pricing review, '))).toHaveLength(2)
-    expect(new Set(names).size).toBe(names.length)
+    expect(
+      await screen.findByRole('heading', {
+        name: `Restore “Automatic version from ${when(launchPlanVersions.newest.createdAt)}”?`,
+      }),
+    ).toBeVisible()
   })
 })
