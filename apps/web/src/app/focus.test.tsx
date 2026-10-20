@@ -26,7 +26,7 @@ describe('the focus when the person navigates', () => {
   it('does not take the focus on the first load of a redirected address either', async () => {
     renderApp('/settings')
 
-    await screen.findByRole('heading', { level: 1, name: 'Settings' })
+    await screen.findByRole('heading', { level: 1, name: 'Home' })
     expect(document.body).toHaveFocus()
     await userEvent.tab()
     expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveFocus()
@@ -48,7 +48,7 @@ describe('the focus when the person navigates', () => {
   it.each([
     { to: '/documents/d1/versions', page: 'a page with an id', heading: 'Version history' },
     { to: '/documents/new', page: 'a page of the other layout', heading: 'New document' },
-    { to: '/settings', page: 'an address that redirects', heading: 'Settings' },
+    { to: '/settings', page: 'an address that redirects', heading: 'Home' },
     { to: '/no/such/page', page: 'a page that does not exist', heading: 'Page not found' },
   ])('moves to the headline of $page, and never to the body', async ({ to, heading }) => {
     const { router } = renderApp('/history')
@@ -183,7 +183,7 @@ describe('a dialog that is a route over its page', () => {
 
 describe('the order of the Tab key', () => {
   // The pages hold no control yet, so a probe in the work area shows where the content falls in the order.
-  const rail = ['Skip to content', 'Home', 'Documents', 'Shared', 'History', 'Members', 'Settings']
+  const rail = ['Skip to content', 'Home', 'Documents', 'Shared', 'History', 'Members']
   const layouts = [
     { layout: 'overview', Component: OverviewLayout, explorer: [] },
     // The explorer: its search, its two buttons, and the sections of the Documents screen, folded but for "Pinned".
@@ -202,7 +202,7 @@ describe('the order of the Tab key', () => {
     ''
 
   it.each(layouts)(
-    'goes from the skip link through the rail, signing out and the explorer to the page, in the $layout layout',
+    'goes from the skip link through the rail, the person and the explorer to the page, in the $layout layout',
     async ({ Component, explorer }) => {
       const user = userEvent.setup()
       const routes: RouteObject[] = [
@@ -221,12 +221,14 @@ describe('the order of the Tab key', () => {
         </StrictMode>,
       )
       if (explorer.length > 0) await screen.findByRole('button', { name: 'Pinned' })
-      // Signing out is the last stop of the rail, where it is seen: the focus passes it before the explorer and the page.
-      await screen.findByRole('button', { name: 'Sign out' })
+      // The person, who opens the menu of the account, is the last stop of the rail, where it is seen: the focus passes it
+      // before the explorer and the page.
+      await screen.findByRole('button', { name: 'Marta Ruiz' })
 
       // The explorer has a stop for each control of the sections that are open, so how many it takes depends on the documents:
       // what is fixed is where it starts and that nothing but it stands between the rail and the page.
-      const expected = [...rail, 'Sign out', ...explorer]
+      // The person is named by what the stop holds: the initials of the avatar, which a screen reader skips, and the name.
+      const expected = [...rail, 'MRMarta Ruiz', ...explorer]
       const visited: string[] = []
       const inExplorer: boolean[] = []
       for (let stop = 0; stop < 40 && visited.at(-1) !== 'Probe'; stop++) {
@@ -242,8 +244,7 @@ describe('the order of the Tab key', () => {
   )
 })
 
-describe('the tabs of a page', () => {
-  const tabHandle = { tab: true }
+describe('the dialog of Settings, which the address holds as ?settings=', () => {
   const routes: RouteObject[] = [
     {
       Component: AppFrame,
@@ -256,23 +257,18 @@ describe('the tabs of a page', () => {
               element: (
                 <>
                   <h1 tabIndex={-1}>Page</h1>
-                  <button type="button">Tab</button>
-                  <Outlet />
+                  <button type="button">Open</button>
                 </>
               ),
-              children: [
-                { path: 'first', handle: tabHandle, element: <p>First</p> },
-                { path: 'second', handle: tabHandle, element: <p>Second</p> },
-              ],
             },
-            { path: 'other', element: <h1 tabIndex={-1}>Other</h1> },
           ],
         },
       ],
     },
   ]
-  const open = async (path: string) => {
-    const router = createMemoryRouter(routes, { initialEntries: [path] })
+
+  it('does not take the focus to the headline when only the search changes, which is how it opens and closes', async () => {
+    const router = createMemoryRouter(routes, { initialEntries: ['/page'] })
     render(
       <DataSourceContext value={createMockServer().connect({ signedInAs: marta.email })}>
         <AppProviders>
@@ -280,33 +276,16 @@ describe('the tabs of a page', () => {
         </AppProviders>
       </DataSourceContext>,
     )
-    await screen.findByRole('heading', { level: 1 })
-    return router
-  }
+    await screen.findByRole('button', { name: 'Open' })
+    screen.getByRole('button', { name: 'Open' }).focus()
 
-  it('leaves the focus on the tab the person chose when they move to another tab', async () => {
-    const router = await open('/page/first')
-    screen.getByRole('button', { name: 'Tab' }).focus()
+    await act(() => router.navigate('/page?settings=profile'))
+    // The dialog took it, as it does when it opens; the headline of the page did not.
+    expect(screen.getByRole('heading', { level: 1, name: 'Page' })).not.toHaveFocus()
+    await act(() => router.navigate(-1))
 
-    await act(() => router.navigate('/page/second'))
-
-    expect(screen.getByRole('button', { name: 'Tab' })).toHaveFocus()
-  })
-
-  it('moves to the headline of the next page when the person leaves the tabs for another page', async () => {
-    const router = await open('/page/first')
-
-    await act(() => router.navigate('/other'))
-
-    expect(await screen.findByRole('heading', { level: 1, name: 'Other' })).toHaveFocus()
-  })
-
-  it('moves to the headline of the page when the person arrives at its tabs from another page', async () => {
-    const router = await open('/other')
-
-    await act(() => router.navigate('/page/first'))
-
-    expect(await screen.findByRole('heading', { level: 1, name: 'Page' })).toHaveFocus()
+    // What closed it gives it back to the person's button, and not to the headline either.
+    expect(screen.getByRole('button', { name: 'Marta Ruiz' })).toHaveFocus()
   })
 })
 
@@ -330,12 +309,12 @@ describe('the explorer when the window becomes narrower than a desktop', () => {
   it('leaves the focus where it is when it was not in the explorer', async () => {
     const viewport = simulateViewport(1440)
     renderApp('/documents/new')
-    const settings = await screen.findByRole('link', { name: 'Settings' })
-    act(() => settings.focus())
+    const members = await screen.findByRole('link', { name: 'Members' })
+    act(() => members.focus())
 
     act(() => viewport.resizeTo(640))
 
-    expect(settings).toHaveFocus()
+    expect(members).toHaveFocus()
   })
 
   it('does not move the focus when it leaves the explorer for another element of a desktop window', async () => {

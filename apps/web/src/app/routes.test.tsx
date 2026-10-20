@@ -22,9 +22,9 @@ const routeCases = [
   { path: '/shared?access=editor&selected=d1', active: 'Shared', heading: 'Shared', rail: 'expanded' },
   { path: '/history', active: 'History', heading: 'History', rail: 'expanded' },
   { path: '/members', active: 'Members', heading: 'Members', rail: 'expanded' },
-  { path: '/settings/profile', active: 'Settings', heading: 'Settings', rail: 'expanded' },
-  { path: '/settings/workspace', active: 'Settings', heading: 'Settings', rail: 'expanded' },
-  { path: '/settings/appearance', active: 'Settings', heading: 'Settings', rail: 'expanded' },
+  // Settings is a dialog over the page, which stays the one the rail says it is.
+  { path: '/documents?settings=profile', active: 'Documents', heading: 'Documents', rail: 'expanded' },
+  { path: '/documents/new?settings=profile', active: 'Documents', heading: 'New document', rail: 'compact' },
   { path: '/trash', active: 'Documents', heading: 'Trash', rail: 'expanded' },
   { path: '/search?q=budget', active: 'Documents', heading: 'Search documents', rail: 'expanded' },
   { path: '/documents/new', active: 'Documents', heading: 'New document', rail: 'compact' },
@@ -42,14 +42,7 @@ describe('the route table', () => {
     expect(current).toEqual(active === undefined ? [] : [active])
   })
 
-  it('opens Profile from /settings', async () => {
-    const { router } = renderApp('/settings')
-
-    expect(await screen.findByRole('link', { current: 'page' })).toHaveTextContent('Settings')
-    expect(router.state.location.pathname).toBe('/settings/profile')
-  })
-
-  it('sends /settings/members to the Members page, which is no longer a tab of Settings', async () => {
+  it('sends /settings/members to the Members page, which is no longer a part of Settings', async () => {
     const { router } = renderApp('/settings/members')
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Members' })).toBeInTheDocument()
@@ -61,12 +54,6 @@ describe('the route table', () => {
     renderApp('/documents/d1/versions')
 
     expect(document.title).toBe('Version history · Draftroom')
-  })
-
-  it.each(['/documents/d1/share', '/search?q=budget', '/trash'])('leaves the Settings item alone on %s', (path) => {
-    renderApp(path)
-
-    expect(screen.getByRole('link', { name: 'Settings' })).not.toHaveAttribute('aria-current')
   })
 })
 
@@ -161,7 +148,6 @@ describe('the texts of the shell in both languages', () => {
     { path: '/shared', english: 'Shared', spanish: 'Compartidos' },
     { path: '/history', english: 'History', spanish: 'Historial' },
     { path: '/members', english: 'Members', spanish: 'Miembros' },
-    { path: '/settings/profile', english: 'Settings', spanish: 'Configuración' },
   ]
 
   it.each(
@@ -184,7 +170,7 @@ describe('the texts of the shell in both languages', () => {
     renderApp('/')
 
     const rail = screen.getByRole('navigation', { name: 'Navegación principal' })
-    expect(rail).toHaveTextContent('InicioDocumentosCompartidosHistorialMiembrosConfiguración')
+    expect(rail).toHaveTextContent('InicioDocumentosCompartidosHistorialMiembros')
     expect(screen.getByRole('link', { name: 'Saltar al contenido' })).toBeInTheDocument()
     expect(document.title).toBe('Inicio · Draftroom')
   })
