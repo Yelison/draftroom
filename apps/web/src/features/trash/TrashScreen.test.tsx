@@ -238,10 +238,11 @@ describe('the states of the Trash screen', () => {
 })
 
 describe('the way to the Trash', () => {
-  it('is a link in the toolbar of Documents, and Documents stays the current section there', async () => {
+  it('is in the "More" menu of Documents, and Documents stays the current section there', async () => {
     const { user, router } = renderScreen('/documents')
 
-    await user.click(await screen.findByRole('link', { name: 'Trash' }))
+    await user.click(await screen.findByRole('button', { name: 'More' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Trash' }))
 
     await heading()
     expect(router.state.location.pathname).toBe('/trash')

@@ -17,7 +17,7 @@ async function tabTo(page: Page, target: ReturnType<Page['getByRole']>, key: 'Ta
 
 test('chooses a template with the keyboard, uses it, and opens the new document with its content', async ({ page }) => {
   await page.goto('/documents')
-  const trigger = main(page).getByRole('button', { name: 'More' })
+  const trigger = main(page).getByRole('button', { name: 'More', exact: true })
   await expect(trigger).toBeVisible()
   await tabTo(page, trigger)
   await page.keyboard.press('Enter')
@@ -42,7 +42,7 @@ test('chooses a template with the keyboard, uses it, and opens the new document 
 
 test('puts the focus back on the button that opened the picker when it is closed with Escape', async ({ page }) => {
   await page.goto('/documents')
-  const trigger = main(page).getByRole('button', { name: 'More' })
+  const trigger = main(page).getByRole('button', { name: 'More', exact: true })
   await tabTo(page, trigger)
   await page.keyboard.press('Enter')
   await page.getByRole('menuitem', { name: 'From a template' }).press('Enter')
