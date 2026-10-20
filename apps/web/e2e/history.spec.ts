@@ -116,29 +116,42 @@ test('unfolds a burst of renames with the keyboard, keeps the focus on its butto
   await expect(page.getByRole('tree')).toBeVisible()
 })
 
-test('keeps the separator, the interval and the button together, and the separator off the start of a line, when the title is long', async ({
-  page,
-}) => {
-  const long = `${'A title that someone wrote at great length '.repeat(3).trim()} and then some more words`
-  await page.goto('/documents')
-  await rename(page, launchPlan.title, `${long} one`)
-  await rename(page, `${long} one`, `${long} two`)
-  await rename(page, `${long} two`, long)
-  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'History' }).click()
+// Run with the font of the app and with the generic one the browser falls back to, whose measures are not the same: the
+// wrapping of the title must not depend on which of them the machine has.
+for (const { font, css } of [
+  { font: 'the font of the app', css: null },
+  { font: 'a generic fallback font', css: '*, *::before, *::after { font-family: sans-serif !important; }' },
+]) {
+  test(`keeps the separator, the interval and the button together, and the separator off the start of a line, when the title is long, with ${font}`, async ({
+    page,
+  }) => {
+    // As long as a title can be (200 characters) and made of wide letters, so that it wraps in any font.
+    const long = 'Whimsical memoranda wandering widely '.repeat(5).trim()
+    await page.goto('/documents')
+    await rename(page, launchPlan.title, `${long} one`)
+    await rename(page, `${long} one`, `${long} two`)
+    await rename(page, `${long} two`, long)
+    await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'History' }).click()
+    if (css !== null) await page.addStyleTag({ content: css })
 
-  const burst = rows(page).filter({ hasText: 'was renamed 3 times' })
-  const link = await burst.getByRole('link', { name: long }).boundingBox()
-  expect(link?.height, 'the title wraps over several lines').toBeGreaterThan(40)
-  const separator = await burst.locator('span[aria-hidden="true"]').filter({ hasText: '·' }).boundingBox()
-  const interval = await burst.locator('[id$="-interval"]').boundingBox()
-  const details = await burst.getByRole('button', { name: 'Details' }).boundingBox()
-  const middle = (box: typeof link) => (box?.y ?? 0) + (box?.height ?? 0) / 2
-  // One line: their middles are within a few pixels, whatever their own heights.
-  expect(Math.abs(middle(separator) - middle(interval))).toBeLessThan(8)
-  expect(Math.abs(middle(details) - middle(interval))).toBeLessThan(8)
-  // And it is not the first thing on that line: the title's last words come before it.
-  expect((separator?.x ?? 0) - (link?.x ?? 0)).toBeGreaterThan(16)
-})
+    const burst = rows(page).filter({ hasText: 'was renamed 3 times' })
+    const title = burst.getByRole('link', { name: long })
+    await expect(title).toBeVisible()
+    const lines = await title.evaluate((element) => element.getClientRects().length)
+    expect(lines, 'the title wraps over several lines').toBeGreaterThan(1)
+
+    const link = await title.boundingBox()
+    const separator = await burst.locator('span[aria-hidden="true"]').filter({ hasText: '·' }).boundingBox()
+    const interval = await burst.locator('[id$="-interval"]').boundingBox()
+    const details = await burst.getByRole('button', { name: 'Details' }).boundingBox()
+    const middle = (box: typeof link) => (box?.y ?? 0) + (box?.height ?? 0) / 2
+    // One line: their middles are within a few pixels, whatever their own heights.
+    expect(Math.abs(middle(separator) - middle(interval))).toBeLessThan(8)
+    expect(Math.abs(middle(details) - middle(interval))).toBeLessThan(8)
+    // And it is not the first thing on that line: the title's last words come before it.
+    expect((separator?.x ?? 0) - (link?.x ?? 0)).toBeGreaterThan(16)
+  })
+}
 
 test('goes from the History to a document and back, twice, with the filter and the explorer both working', async ({
   page,
