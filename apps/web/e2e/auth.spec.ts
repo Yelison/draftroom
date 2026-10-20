@@ -58,21 +58,24 @@ const spanish: Words = {
 }
 
 /**
- * Signing out is the last stop of the page in the Tab order, though it sits at the foot of the rail on screen: it is reached
- * with the Tab key from wherever the focus is, which after opening a page is its headline.
+ * Signing out is an item of the menu of the person at the foot of the rail, which is the last stop of the rail in the Tab
+ * order. The menu opens with Enter on the person, on its first item (Settings), and the down arrow reaches Sign out.
  */
-async function tabToSignOut(page: Page, words: Words) {
-  const button = page.getByRole('button', { name: words.signOut })
-  await expect(button).toBeVisible()
+async function tabToPerson(page: Page) {
+  const person = page.getByRole('navigation').getByRole('button')
+  await expect(person).toBeVisible()
   for (let stop = 0; stop < 100; stop++) {
     await page.keyboard.press('Tab')
-    if (await button.evaluate((element) => element === document.activeElement)) return
+    if (await person.evaluate((element) => element === document.activeElement)) return
   }
-  throw new Error(`The Tab key never reached "${words.signOut}"`)
+  throw new Error('The Tab key never reached the person in the rail')
 }
 
 async function signOut(page: Page, words: Words) {
-  await tabToSignOut(page, words)
+  await tabToPerson(page)
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('ArrowDown')
+  await expect(page.getByRole('menuitem', { name: words.signOut })).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/sign-in$/)
   // The headline has the focus, which is what tells a screen reader that the page changed.
@@ -128,7 +131,7 @@ for (const words of [english, spanish]) {
       await page.keyboard.press('Enter')
 
       await expect(page).toHaveURL(/\/$/)
-      await expect(page.getByRole('button', { name: words.signOut })).toBeVisible()
+      await expect(page.getByRole('navigation').getByRole('button')).toBeVisible()
     })
 
     test('says what is missing, as alerts tied to the fields, with the focus on the first', async ({ page }) => {

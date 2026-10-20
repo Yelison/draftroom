@@ -677,7 +677,8 @@ test.describe('the keyboard and the focus', () => {
     }
 
     // The explorer has a stop for each control of the sections that are open: where it starts and that it is whole is what is fixed.
-    const rail = ['Skip to content', 'Home', 'Documents', 'Shared', 'History', 'Members', 'Settings', 'Sign out']
+    // The last stop of the rail is the person, who opens the menu of the account: the initials of the avatar and the name.
+    const rail = ['Skip to content', 'Home', 'Documents', 'Shared', 'History', 'Members', 'MRMarta Ruiz']
     const explorerStart = ['Search documents', 'New document', 'More', 'Pinned']
     expect(stops.slice(0, rail.length + explorerStart.length)).toEqual([...rail, ...explorerStart])
     const fromBand = stops.lastIndexOf('Product')

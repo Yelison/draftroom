@@ -4,7 +4,7 @@ import { expect, test } from './fixtures.ts'
 
 test.use({ locale: 'en-US', colorScheme: 'light' })
 
-const railItems = ['Home', 'Documents', 'Shared', 'History', 'Members', 'Settings']
+const railItems = ['Home', 'Documents', 'Shared', 'History', 'Members']
 
 /** Opens a page and waits until it is on screen: a key pressed while the app is still mounting would be lost. */
 async function open(page: Page, path: string) {
@@ -24,6 +24,12 @@ test('reaches the skip link and then each item of the rail with the Tab key, wit
     await expect(item).toBeFocused()
     await expect(item).toHaveCSS('outline-style', 'solid')
   }
+
+  // The person at the foot, which opens the menu of the account, is the last stop of the rail.
+  await page.keyboard.press('Tab')
+  const person = page.getByRole('navigation').getByRole('button')
+  await expect(person).toBeFocused()
+  await expect(person).toHaveCSS('outline-style', 'solid')
 })
 
 test('moves the focus to the headline of the page opened from the rail', async ({ page }) => {
