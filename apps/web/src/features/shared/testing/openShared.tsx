@@ -10,23 +10,21 @@ export { renderScreen }
 export const sharedWithDaniel = daniel.email
 
 export const main = () => screen.getByRole('main')
-export const filters = () => within(main()).getByRole('group', { name: 'Filter by permission' })
 export const answer = (status: number, code: ApiError['code']) =>
   new ApiError({ type: 'about:blank', title: 'Refused', status, code })
 
-/** The titles in the table, top to bottom. */
-export const titles = () =>
-  within(within(main()).getByRole('table'))
-    .getAllByRole('row')
-    .slice(1)
-    .map((row) => within(row).getAllByRole('cell')[0]?.textContent)
+/** The titles of the documents in one block, top to bottom. */
+export const titlesIn = (section: HTMLElement) =>
+  within(section)
+    .getAllByRole('link')
+    .map((link) => link.textContent)
 
-/** Opens "Shared" as Daniel and waits for the table. */
+/** Opens "Shared" as Daniel and waits for the first block. */
 export async function openShared(
   path = '/shared',
   options?: { wrap?: (dataSource: DataSource) => DataSource; signedInAs?: string },
 ) {
   const view = renderScreen(path, { signedInAs: sharedWithDaniel, ...options })
-  await within(main()).findByRole('table')
+  await within(main()).findAllByRole('region')
   return view
 }

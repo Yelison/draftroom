@@ -4,153 +4,164 @@
   font: var(--font-body);
 }
 
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-8);
-  margin: 0 0 var(--space-16);
-  padding: 0;
-  border: 0;
-}
-
 /*
- * The measures of the table and its preview, in one place. They are literals until the product token layer has them, and
- * this block is the only one to change. The columns and the preview below sit inside `.content`.
+ * The measures of a block and its rows, in one place. They are literals until the product token layer has them, and this
+ * block is the only one to change. The skeleton uses the same classes, which is what keeps the page from moving: the
+ * row height is above what any row's content takes (a label over an avatar, plus the padding), so it is the same for all.
  */
-.content {
-  --shared-preview-width: 320px;
-  --shared-created-by-width: 160px;
-  --shared-permission-width: 128px;
-  --shared-updated-width: 120px;
-  --shared-open-width: 72px;
+.sections {
+  --shared-head-width: 232px;
+  --shared-row-height: 72px;
+  --shared-created-by-width: 176px;
+  --shared-updated-width: 118px;
+  --shared-bar-width: 3px;
 
-  /* The preview takes its own column only when there is one, so the table keeps the rest of the width. */
+  display: flex;
+  flex-direction: column;
+}
+
+.section {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-24);
+  grid-template-columns: var(--shared-head-width) minmax(0, 1fr);
+  gap: var(--space-32);
   align-items: start;
+  padding: var(--space-24) 0;
+  border-top: 1px solid var(--color-line);
 }
 
-.content[data-previewing] {
-  grid-template-columns: minmax(0, 1fr) var(--shared-preview-width);
+.section:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
-.table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  table-layout: fixed;
+/* The bar says the permission with a colour; the title and the sentence say it with words. */
+.sectionHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-height: var(--shared-row-height);
+  padding-inline-start: var(--space-16);
+  border-inline-start: var(--shared-bar-width) solid var(--color-line);
+}
+
+.section[data-role='editor'] .sectionHead {
+  border-inline-start-color: var(--color-green-ink);
+}
+
+.section[data-role='commenter'] .sectionHead {
+  border-inline-start-color: var(--color-purple-ink);
+}
+
+.section[data-role='viewer'] .sectionHead {
+  border-inline-start-color: var(--color-muted);
+}
+
+.sectionTitle {
+  margin: 0;
+  font: var(--font-section);
+}
+
+.sectionDescription {
+  margin: 0;
+  color: var(--color-muted);
   font: var(--font-body);
 }
 
-.table th {
-  padding: var(--space-8) var(--space-12);
-  border-bottom: 1px solid var(--color-line);
-  color: var(--color-muted);
-  font: var(--font-label);
-  text-align: start;
-}
-
-.table td {
-  padding: var(--space-12);
-  border-bottom: 1px solid var(--color-line);
-  overflow-wrap: anywhere;
-  vertical-align: middle;
-}
-
-.table tr[data-selected] td {
-  background: var(--color-surface-hover);
-}
-
-.nameColumn {
-  width: 40%;
-}
-
-.createdByColumn {
-  width: var(--shared-created-by-width);
-}
-
-/* With the preview open the creator and the date are in the preview, and the name gets the room. */
-.table[data-previewing] .createdByColumn,
-.table[data-previewing] .updatedColumn {
-  display: none;
-}
-
-.table[data-previewing] .nameColumn {
-  width: auto;
-}
-
-.permissionColumn {
-  width: var(--shared-permission-width);
-}
-
-.updatedColumn {
-  width: var(--shared-updated-width);
-}
-
-.openColumn {
-  width: var(--shared-open-width);
-}
-
-.nameButton {
+.rows {
+  margin: 0;
   padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-ink);
-  font: var(--font-strong);
-  text-align: start;
-  cursor: pointer;
-}
-
-.nameButton:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.preview {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  padding: var(--space-16);
+  list-style: none;
+  overflow: clip;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-panel);
   background: var(--color-surface);
 }
 
-.previewHeader {
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns:
+    var(--control-icon-size) minmax(0, 1fr) var(--shared-created-by-width) var(--shared-updated-width)
+    var(--space-16);
+  gap: var(--space-16);
+  align-items: center;
+  min-height: var(--shared-row-height);
+  padding: var(--space-12) var(--space-16);
+  border-top: 1px solid var(--color-line);
+  color: var(--color-ink);
+  font: var(--font-body);
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.row:hover {
+  background: var(--color-surface-hover);
+}
+
+.rowIcon,
+.rowGo {
+  color: var(--color-muted);
+}
+
+.rowGo {
+  transform: rotate(-90deg);
+}
+
+.row:hover .rowGo {
+  color: var(--color-ink);
+}
+
+:dir(rtl) .rowGo {
+  transform: rotate(90deg);
+}
+
+.rowText {
   display: flex;
-  gap: var(--space-8);
-  align-items: start;
-  justify-content: space-between;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.previewRole {
-  display: flex;
+.rowTitle,
+.rowExcerpt,
+.personName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.previewTitle {
-  margin: 0;
-  font: var(--font-section);
-  overflow-wrap: anywhere;
+.rowTitle {
+  font: var(--font-strong);
 }
 
-.previewMeta {
-  margin: 0;
+.rowExcerpt {
   color: var(--color-muted);
   font: var(--font-caption);
 }
 
-.previewExcerpt {
-  margin: 0;
-  font: var(--font-body);
-  overflow-wrap: anywhere;
+.noText {
+  font-style: italic;
 }
 
-.more {
-  margin-top: var(--space-16);
+.rowCell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.skeletonRow {
-  height: calc(var(--button-height) + var(--space-24));
-  border-bottom: 1px solid var(--color-line);
+.rowCellLabel {
+  color: var(--color-muted);
+  font: var(--font-caption);
+}
+
+.person {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  min-width: 0;
+}
+
+.date {
+  white-space: nowrap;
 }
