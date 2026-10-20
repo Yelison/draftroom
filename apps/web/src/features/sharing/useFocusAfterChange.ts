@@ -1,8 +1,5 @@
 import { useEffect, useRef } from 'react'
 
-/** The row of «Everyone in the workspace»: the last one of the list, after the people. */
-export const generalRowId = 'general'
-
 type Landing = { after: 'adding'; userId: string } | { after: 'removing'; rowId: string }
 
 /**

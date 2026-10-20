@@ -3,7 +3,7 @@ import { Icon, Select } from '@yelison/forma-ui'
 import { useId } from 'react'
 import { useIntl } from 'react-intl'
 import type { MessageId } from '../../i18n/messages.ts'
-import { generalRowId } from './useFocusAfterChange.ts'
+import { generalRowId } from './accessRow.ts'
 import { generalAccesses, isGeneralAccess } from './roles.ts'
 import styles from './Sharing.module.css'
 

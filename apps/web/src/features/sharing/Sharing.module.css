@@ -9,6 +9,8 @@
 .content {
   --sharing-role-width: 190px;
   --sharing-list-height: max(40dvh, 200px);
+  /* The row of everyone in the workspace, which stays over the scrolled rows and may take a second line. */
+  --sharing-pinned-row-height: calc(var(--control-height) + 2 * var(--space-12) + 1lh);
 
   display: flex;
   flex-direction: column;
@@ -38,9 +40,7 @@
   align-content: start;
   position: relative; /* The containing block of the hidden labels of the rows, so that the list clips them as it scrolls. */
   max-height: var(--sharing-list-height);
-  /* What the focus keeps clear of at the foot: the row of everyone in the workspace, which stays over the scrolled rows
-   * and may take a second line. */
-  scroll-padding-block-end: calc(var(--control-height) + 2 * var(--space-12) + 1lh);
+  scroll-padding-bottom: var(--sharing-pinned-row-height); /* What the focus keeps clear of at the foot. */
   margin: 0;
   padding: 0;
   overflow-y: auto;
@@ -119,8 +119,13 @@
   color: var(--color-muted);
 }
 
-/* The controls of a row that cannot be used (the last owner's): dimmed, and still there to be read and described. */
-.held {
+/* The actions of a row that cannot be used (the last owner's, or any while a change is on its way): dimmed, and still there to be read and described. */
+.row button[aria-disabled='true'] {
+  color: var(--color-muted);
+}
+
+/* The row that is saving. */
+.row[aria-busy='true'] {
   color: var(--color-muted);
 }
 

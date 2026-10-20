@@ -1,12 +1,12 @@
 import type { Schema } from '@draftroom/contract'
 import { useId, useState } from 'react'
 import { useIntl } from 'react-intl'
-import { sameRow, type RowProblem } from './accessRow.ts'
+import { generalRowId, sameRow, type RowProblem } from './accessRow.ts'
 import { AccessList } from './AccessList.tsx'
 import { AddPerson } from './AddPerson.tsx'
 import { sharingProblemId } from './sharingProblem.ts'
 import { useAccessChanges, type AccessChange } from './useAccessChanges.ts'
-import { generalRowId, useFocusAfterChange } from './useFocusAfterChange.ts'
+import { useFocusAfterChange } from './useFocusAfterChange.ts'
 import styles from './Sharing.module.css'
 
 export interface AccessEditorProps {

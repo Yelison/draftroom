@@ -1,3 +1,6 @@
+/** The row of «Everyone in the workspace»: the last one of the list, after the people. */
+export const generalRowId = 'general'
+
 /** The row of the dialog a change belongs to: where its progress is marked and where its refusal is shown. */
 export type AccessRow = { kind: 'add' } | { kind: 'general' } | { kind: 'person'; userId: string }
 

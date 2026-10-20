@@ -116,7 +116,59 @@ describe('a change that is on its way in the share dialog', () => {
   })
 })
 
+describe('the row that is saving in the share dialog', () => {
+  it('is marked busy, and no other row is', async () => {
+    const { user, share } = await openShare({
+      wrap: (dataSource) => ({ ...dataSource, setAccess: () => new Promise<never>(() => undefined) }),
+    })
+
+    await user.selectOptions(roleOf(share, 'Sofía Lindqvist'), 'editor')
+
+    await waitFor(() =>
+      expect(rows(share).map((row) => row.getAttribute('aria-busy'))).toEqual([null, null, 'true', null]),
+    )
+  })
+
+  it('is the row of everyone in the workspace when the general access is what is being saved', async () => {
+    const { user, share } = await openShare({
+      wrap: (dataSource) => ({ ...dataSource, setGeneralAccess: () => new Promise<never>(() => undefined) }),
+    })
+
+    await user.selectOptions(generalAccessOf(share), 'viewer')
+
+    await waitFor(() =>
+      expect(rows(share).map((row) => row.getAttribute('aria-busy'))).toEqual([null, null, null, 'true']),
+    )
+  })
+})
+
 describe('adding someone in the share dialog', () => {
+  it('puts the focus back on the picker when there is still somebody left to add', async () => {
+    const { user, share } = await openShare({
+      documentId: interviews.id,
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listMembers: async (request) => {
+          const list = await dataSource.listMembers(request)
+          const guest = {
+            ...list.items[0]!,
+            userId: 'a41c9e07-3b52-4d8a-8f16-7c2e0b9d5a64',
+            email: 'guest@harborpine.example',
+            name: 'Guest',
+            status: 'active' as const,
+          }
+          return { ...list, items: [...list.items, guest] }
+        },
+      }),
+    })
+
+    await user.selectOptions(within(share).getByRole('combobox', { name: 'Person' }), 'Daniel Okafor')
+    await user.click(within(share).getByRole('button', { name: 'Add' }))
+
+    await within(share).findByRole('combobox', { name: 'Role of Daniel Okafor' })
+    await waitFor(() => expect(within(share).getByRole('combobox', { name: 'Person' })).toHaveFocus())
+  })
+
   it('gives the chosen person the chosen role, announces it, makes stale what the table names and lists them', async () => {
     const setAccess = vi.fn()
     const { user, share, invalidatedKeys } = await openShare({
