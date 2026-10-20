@@ -70,6 +70,7 @@ describe('what the list shows of each version', () => {
 describe('the sizes', () => {
   it.each([
     { sizeBytes: 0, shown: '0 kB' },
+    { sizeBytes: 300, shown: '1 kB' },
     { sizeBytes: 640, shown: '1 kB' },
     { sizeBytes: 3180, shown: '3 kB' },
     { sizeBytes: 1_400_000, shown: '1.4 MB' },
