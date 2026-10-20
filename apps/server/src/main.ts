@@ -47,6 +47,9 @@ const app = buildApp({
   },
   liveAccess: {
     documentChanged: (documentId) => liveAccess.documentChanged(documentId),
+    documentArchived: (documentId) => liveAccess.documentArchived(documentId),
+    documentRestored: (documentId) => liveAccess.documentRestored(documentId),
+    documentDeleted: (documentId) => liveAccess.documentDeleted(documentId),
     memberChanged: (workspaceId, userId) => liveAccess.memberChanged(workspaceId, userId),
     sessionEnded: (sessionId) => liveAccess.sessionEnded(sessionId),
   },

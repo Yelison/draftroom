@@ -181,6 +181,75 @@ describe('a change to who can open a document', () => {
   })
 })
 
+describe('a document that is archived, restored or deleted', () => {
+  // Rows: the connection of a person, what the database says they hold once the document is archived, and how it ends.
+  const archiving: readonly (readonly [string, DocumentRole, Parameters<typeof facts>[1], Call['code']])[] = [
+    ['an editor, who loses the document', 'editor', { grant: 'editor', archived: true }, 'access-revoked'],
+    ['a viewer, who loses the document', 'viewer', { grant: 'viewer', archived: true }, 'access-revoked'],
+    ['an owner, who reconnects read-only', 'owner', { grant: 'owner', archived: true }, 'role-changed'],
+    [
+      'an owner of the workspace, who reconnects read-only',
+      'owner',
+      { workspaceRole: 'owner', archived: true },
+      'role-changed',
+    ],
+  ]
+
+  it.each(archiving)('archived: closes %s, the notice with the close', async (_who, connected, now, code) => {
+    const { live, calls } = setUp({ ofDocument: async () => [facts('ana', now)] }, [connection('ana', connected)])
+
+    await live.documentArchived(documentId)
+
+    expect(calls.filter((call) => call.ended.length > 0)).toEqual([
+      { code, event: { type: 'document-archived' }, ended: ['ana'] },
+    ])
+  })
+
+  it('archived: closes each person by what they hold, in one change', async () => {
+    const { live, calls } = setUp(
+      {
+        ofDocument: async () => [
+          facts('ana', { grant: 'owner', archived: true }),
+          facts('ben', { grant: 'editor', archived: true }),
+        ],
+      },
+      [connection('ana', 'owner'), connection('ben', 'editor')],
+    )
+
+    await live.documentArchived(documentId)
+
+    expect([endedWith(calls, 'role-changed'), endedWith(calls, 'access-revoked')]).toEqual([['ana'], ['ben']])
+  })
+
+  it('archived: closes every connection to authenticate again when it cannot read what the people hold', async () => {
+    const { live, calls, log } = setUp({ ofDocument: () => Promise.reject(new Error('no database')) }, [
+      connection('ana', 'owner'),
+      connection('ben', 'editor'),
+    ])
+
+    await live.documentArchived(documentId)
+
+    expect(calls).toEqual([{ code: 'role-changed', event: { type: 'document-archived' }, ended: ['ana', 'ben'] }])
+    expect(log.entries.map(({ level }) => level)).toEqual(['error'])
+  })
+
+  it('restored: recycles every connection, with the notice, without reading anything', async () => {
+    const { live, calls } = setUp({}, [connection('ana', 'owner'), connection('ben', 'owner')])
+
+    await live.documentRestored(documentId)
+
+    expect(calls).toEqual([{ code: 'role-changed', event: { type: 'access-changed' }, ended: ['ana', 'ben'] }])
+  })
+
+  it('deleted: closes every connection with 4403 and no notice, without reading anything', async () => {
+    const { live, calls } = setUp({}, [connection('ana', 'owner'), connection('ben', 'editor')])
+
+    await live.documentDeleted(documentId)
+
+    expect(calls).toEqual([{ code: 'access-revoked', event: undefined, ended: ['ana', 'ben'] }])
+  })
+})
+
 describe('a change to a member of a workspace', () => {
   it('closes only the connections of that person in that workspace, each with the notice', async () => {
     const elsewhere = '00000000-0000-4000-8000-0000000000bb'

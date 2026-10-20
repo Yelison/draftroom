@@ -15,6 +15,7 @@ import { authoriseDocument, authoriseWorkspace, type AuthorisedDocument } from '
 import { operationRoute } from '../operation-route.ts'
 import { ProblemError } from '../problem.ts'
 import { presentDocument, presentReadable } from '../presenters.ts'
+import { afterCommit } from './after-commit.ts'
 import type { RouteDependencies } from './dependencies.ts'
 
 type FieldError = Schema<'FieldError'>
@@ -39,7 +40,11 @@ function copyOrConflict(state: Uint8Array): ContentCopy {
   }
 }
 
-export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { contract, database }, done) => {
+export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (
+  app,
+  { contract, database, broadcaster, liveAccess },
+  done,
+) => {
   const present = ({ record, role }: AuthorisedDocument): Schema<'Document'> => presentDocument(record, role)
 
   /** The document as it is now, for an answer that follows a change: the person may no longer be allowed to see it. */
@@ -204,6 +209,17 @@ export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { 
         .catch((error: unknown) => {
           throw folderWentAway(error)
         })
+      // Told from what this request wrote, before the document is read again: that read may find the caller without access,
+      // and the change is committed all the same.
+      if (updated) {
+        await afterCommit(request, 'telling the connections the document changed', async () =>
+          broadcaster.broadcast(documentId, {
+            type: 'metadata-changed',
+            title: title ?? record.title,
+            revision: revision + 1,
+          }),
+        )
+      }
       const current = await reload(documentId, userId)
       // Someone else changed it between the read and the write: the write refused, and the caller is told what won.
       if (!updated) throw revisionConflict(current)
@@ -219,11 +235,16 @@ export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { 
       // revision and no event, as restoring a live one is. Everyone else still gets the 404 of an archived document.
       const { record } = await authoriseDocument(database, documentId, userId, 'archive-delete', { onArchived: true })
       if (record.archived_at === null) {
-        await database
+        const archived = await database
           .transaction()
           .execute((trx) =>
             setArchived(trx, { documentId, workspaceId: record.workspace_id, actorId: userId, archive: true }),
           )
+        if (archived) {
+          await afterCommit(request, 'closing the connections of the archived document', () =>
+            liveAccess.documentArchived(documentId),
+          )
+        }
       }
       return present(await reload(documentId, userId))
     }),
@@ -235,11 +256,16 @@ export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { 
       const { documentId } = request.params
       const { record } = await authoriseDocument(database, documentId, userId, 'archive-delete', { onArchived: true })
       if (record.archived_at !== null) {
-        await database
+        const restored = await database
           .transaction()
           .execute((trx) =>
             setArchived(trx, { documentId, workspaceId: record.workspace_id, actorId: userId, archive: false }),
           )
+        if (restored) {
+          await afterCommit(request, 'recycling the connections of the restored document', () =>
+            liveAccess.documentRestored(documentId),
+          )
+        }
       }
       return present(await reload(documentId, userId))
     }),
@@ -255,6 +281,9 @@ export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (app, { 
       if (record.archived_at === null || !(await deleteArchivedDocument(database, documentId))) {
         throw new ProblemError('conflict')
       }
+      await afterCommit(request, 'closing the connections of the deleted document', () =>
+        liveAccess.documentDeleted(documentId),
+      )
       return reply.code(204).send()
     }),
   )

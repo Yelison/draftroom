@@ -8,6 +8,9 @@ export const silentBroadcaster: DocumentBroadcaster = { broadcast: () => undefin
 /** The same for access: no connections are held to anything, because there is no collaboration server to hold them. */
 export const silentLiveAccess: LiveAccess = {
   documentChanged: async () => undefined,
+  documentArchived: async () => undefined,
+  documentRestored: async () => undefined,
+  documentDeleted: async () => undefined,
   memberChanged: async () => undefined,
   sessionEnded: async () => undefined,
 }
