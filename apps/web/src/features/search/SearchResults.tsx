@@ -29,6 +29,7 @@ function Results({ workspaceId, term }: { workspaceId: string; term: string }) {
         term={term}
         empty={null}
         onActions={(document) => actions.open({ kind: 'details', document })}
+        onArchive={(document) => actions.open({ kind: 'archive', document })}
       />
       <DocumentActionDialogs
         actions={actions}

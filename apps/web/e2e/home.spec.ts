@@ -202,6 +202,7 @@ test('lets a card and a chip with a long title grow instead of spilling their te
   await main(page)
     .getByRole('button', { name: `Actions for ${launchPlan.title}` })
     .click()
+  await page.getByRole('menuitem', { name: 'Rename or move' }).click()
   const dialog = page.getByRole('dialog', { name: 'Rename or move' })
   await dialog.getByRole('textbox', { name: 'Title' }).fill(longTitle)
   await dialog.getByRole('button', { name: 'Save' }).click()

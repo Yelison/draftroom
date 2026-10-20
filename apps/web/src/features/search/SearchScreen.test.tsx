@@ -245,3 +245,14 @@ describe('the search results screen in Spanish', () => {
     )
   })
 })
+
+describe('the actions of a result', () => {
+  it('offers the owner of a document to archive it, as every list of documents does', async () => {
+    const { user } = renderScreen('/search?q=launch')
+    await user.click(await within(main()).findByRole('button', { name: 'Actions for Autumn launch plan' }))
+
+    const items = within(await screen.findByRole('menu')).getAllByRole('menuitem')
+
+    expect(items.map((item) => item.textContent)).toEqual(['Rename or move', 'Archive'])
+  })
+})
