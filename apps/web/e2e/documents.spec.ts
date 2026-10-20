@@ -1,6 +1,7 @@
 /* The Documents screen in the production build, with a real browser: the keyboard, the geometry and the narrow window. */
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { brandVoice, launchPlan, weeklyEnglish } from '../src/data/mock/fixtures/documents.ts'
+import { daniel, demoPassword } from '../src/data/mock/fixtures/people.ts'
 import { expect, test } from './fixtures.ts'
 
 test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
@@ -8,13 +9,22 @@ test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, heigh
 const main = (page: Page) => page.getByRole('main')
 const section = (page: Page, name: string) => main(page).getByRole('region', { name })
 
+/** Walks to a control with Tab, as a person does, and fails if the keyboard never gets there. */
+async function tabTo(page: Page, target: Locator) {
+  for (let presses = 0; presses < 60; presses += 1) {
+    if (await target.evaluate((element) => element === document.activeElement)) return
+    await page.keyboard.press('Tab')
+  }
+  throw new Error('The keyboard did not reach the control')
+}
+
 test('pins, folds, moves and opens a document with the keyboard alone', async ({ page }) => {
   await page.goto('/documents')
   const pin = main(page).getByRole('button', { name: `Pin ${weeklyEnglish.title}` })
   await expect(section(page, 'No folder').getByRole('link', { name: weeklyEnglish.title })).toBeVisible()
 
   // Pin: the document moves to "Pinned", and the keyboard stays in the section it was in.
-  await pin.focus()
+  await tabTo(page, pin)
   await page.keyboard.press('Enter')
   await expect(section(page, 'Pinned').getByRole('link', { name: weeklyEnglish.title })).toBeVisible()
   await expect(section(page, 'No folder').getByRole('link', { name: weeklyEnglish.title })).toHaveCount(0)
@@ -22,7 +32,7 @@ test('pins, folds, moves and opens a document with the keyboard alone', async ({
 
   // Fold: the documents of the section go, and the button says so.
   const research = main(page).getByRole('button', { name: 'Research', exact: true })
-  await research.focus()
+  await tabTo(page, research)
   await page.keyboard.press('Enter')
   await expect(research).toHaveAttribute('aria-expanded', 'false')
   await expect(section(page, 'Research').getByRole('link')).toHaveCount(0)
@@ -44,6 +54,36 @@ test('pins, folds, moves and opens a document with the keyboard alone', async ({
   await section(page, 'Ideas').getByRole('link', { name: brandVoice.title }).focus()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(new RegExp(`/documents/${brandVoice.id}$`))
+})
+
+test('keeps the star and the date of every row in the same place, with a menu or without one', async ({ page }) => {
+  // Daniel can change some documents and only read others, so some rows have a menu and some do not.
+  await page.goto('/documents')
+  await page.getByRole('button', { name: 'Sign out' }).click()
+  await expect(page).toHaveURL(/sign-in$/)
+  await page.getByRole('textbox').first().fill(daniel.email)
+  await page.locator('input[type="password"]').fill(demoPassword)
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/$/)
+  await page.getByRole('navigation').locator('a[href$="/documents"]').click()
+  const rows = main(page).getByRole('listitem')
+  await expect(rows.first()).toBeVisible()
+  await expect(
+    main(page)
+      .getByRole('button', { name: /^Actions for / })
+      .first(),
+  ).toBeVisible()
+
+  const places = await rows.evaluateAll((items) =>
+    items.map((item) => ({
+      star: item.querySelector('button[aria-pressed]')?.getBoundingClientRect().x,
+      date: item.querySelector('time')?.getBoundingClientRect().x,
+      menu: item.querySelector('button[aria-haspopup="menu"]') !== null,
+    })),
+  )
+  expect(new Set(places.map((place) => place.menu)), 'rows with and without a menu').toEqual(new Set([true, false]))
+  expect(new Set(places.map((place) => place.star)).size, 'one x for the star').toBe(1)
+  expect(new Set(places.map((place) => place.date)).size, 'one x for the date').toBe(1)
 })
 
 for (const viewport of [

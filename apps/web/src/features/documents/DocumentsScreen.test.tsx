@@ -337,6 +337,102 @@ describe('the pages of a section', () => {
   })
 })
 
+describe('a section with a network that takes its time', () => {
+  /** Every call to the documents takes 30 ms, as a real network would, so the screen renders between ask and answer. */
+  const slow =
+    (limit: number) =>
+    (dataSource: DataSource): DataSource =>
+      pagesOf(limit)({
+        ...dataSource,
+        listDocuments: async (request) => {
+          await new Promise((resolve) => setTimeout(resolve, 30))
+          return dataSource.listDocuments(request)
+        },
+      })
+
+  it('moves the focus to the first document of each page that arrives, and not to the page when the last one does', async () => {
+    const { user } = renderScreen('/documents', { wrap: slow(2) })
+    await heading()
+    const unfiled = await section('No folder')
+    const more = () => within(unfiled).getByRole('button', { name: 'Show more in No folder' })
+    await within(unfiled).findByRole('button', { name: 'Show more in No folder' })
+
+    await user.click(more())
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')).toHaveLength(4))
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')[2]).toHaveFocus())
+
+    await user.click(more())
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')).toHaveLength(5))
+    expect(within(unfiled).queryByRole('button', { name: /Show more/ })).not.toBeInTheDocument()
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')[4]).toHaveFocus())
+  })
+
+  it('never shows "Show more" over a section with no rows while it asks for the page after one of pinned documents', async () => {
+    const seen: { links: number; more: number }[] = []
+    const observer = new MutationObserver(() => {
+      const research = [...document.querySelectorAll('section')].find((item) => item.textContent?.includes('Research'))
+      if (research === undefined || research.closest('[hidden]') !== null) return
+      seen.push({
+        links: research.querySelectorAll('a').length,
+        more: [...research.querySelectorAll('button')].filter((button) => /Show more/.test(button.ariaLabel ?? ''))
+          .length,
+      })
+    })
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+    renderScreen('/documents', { wrap: slow(1) })
+    await heading()
+
+    expect(await within(await section('Research')).findByRole('link', { name: interviewsSpanish.title })).toBeVisible()
+    observer.disconnect()
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.filter((state) => state.more > 0 && state.links === 0)).toEqual([])
+  })
+})
+
+describe('the folders that are open when the screen opens', () => {
+  const extra = ['Zeta 1', 'Zeta 2', 'Zeta 3', 'Zeta 4'].map((name, index) => ({
+    ...workspaceFixtures.productFolder,
+    id: `00000000-0000-4000-8000-00000000f00${index}`,
+    name,
+  }))
+  const asked: string[] = []
+  const withEightFolders = (dataSource: DataSource): DataSource => ({
+    ...dataSource,
+    listFolders: async (request) => {
+      const page = await dataSource.listFolders(request)
+      return { ...page, items: [...page.items, ...extra] }
+    },
+    listDocuments: async (request) => {
+      const folderId = request?.params.query?.folderId
+      if (folderId !== undefined) asked.push(folderId)
+      if (extra.some((folder) => folder.id === folderId)) return { items: [], nextCursor: null }
+      return dataSource.listDocuments(request)
+    },
+  })
+
+  it('are the first six: the others are folded, and ask for nothing until they are opened', async () => {
+    asked.length = 0
+    const { user } = renderScreen('/documents', { wrap: withEightFolders })
+    await heading()
+    await section('Zeta 4')
+
+    const toggle = (name: string) => within(main()).getByRole('button', { name })
+    expect(toggle('Zeta 2')).toHaveAttribute('aria-expanded', 'true')
+    expect(toggle('Zeta 3')).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle('Zeta 4')).toHaveAttribute('aria-expanded', 'false')
+    expect(asked).toEqual(expect.arrayContaining([workspaceFixtures.productFolder.id, extra[1]?.id]))
+    expect(asked).not.toContain(extra[2]?.id)
+    expect(asked).not.toContain(extra[3]?.id)
+
+    await user.click(toggle('Zeta 3'))
+
+    expect(toggle('Zeta 3')).toHaveAttribute('aria-expanded', 'true')
+    await waitFor(() => expect(asked).toContain(extra[2]?.id))
+    expect(asked).not.toContain(extra[3]?.id)
+    expect(await within(await section('Zeta 3')).findByText('No documents yet')).toBeInTheDocument()
+  })
+})
+
 describe('the states of the Documents screen', () => {
   it('shows the shape of the sections, with a spoken status, while the folders are on their way', async () => {
     let called = false
@@ -412,14 +508,21 @@ describe('the states of the Documents screen', () => {
   })
 
   it.each([
-    { read: 'the folders', retry: 'Try again to load Folders', fails: 'listFolders', stays: 'No folder' },
+    {
+      read: 'the folders',
+      title: 'Folders',
+      retry: 'Try again to load Folders',
+      fails: 'listFolders',
+      stays: 'No folder',
+    },
     {
       read: 'the pinned documents',
+      title: 'Pinned',
       retry: 'Try again to load Pinned',
       fails: 'listPinnedDocuments',
       stays: 'No folder',
     },
-  ] as const)('says $read could not load, and the other sections stay', async ({ retry, fails, stays }) => {
+  ] as const)('says $read could not load, and the other sections stay', async ({ retry, fails, stays, title }) => {
     let fail = true
     const { user } = renderScreen('/documents', {
       wrap: (dataSource) => ({
@@ -434,6 +537,7 @@ describe('the states of the Documents screen', () => {
 
     expect(await within(main()).findByRole('alert')).toHaveTextContent("We couldn't load these documents.")
     expect(await section(stays)).toBeInTheDocument()
+    expect(within(main()).getByRole('heading', { level: 2, name: title })).toBeVisible()
     fail = false
     await user.click(within(main()).getByRole('button', { name: retry }))
 

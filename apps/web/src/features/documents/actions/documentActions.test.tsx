@@ -224,6 +224,25 @@ describe('who is offered the actions', () => {
   })
 })
 
+describe('the archive button of the dialog', () => {
+  it.each([
+    { who: 'an editor', signedInAs: daniel.email, offered: false },
+    { who: 'an owner', signedInAs: undefined, offered: true },
+  ])('is offered to $who of the document: $offered', async ({ signedInAs, offered }) => {
+    const { dialog } = await openRename('Autumn launch plan', signedInAs === undefined ? {} : { signedInAs })
+
+    expect(within(dialog).queryByRole('button', { name: 'Archive' }) !== null).toBe(offered)
+  })
+
+  it('takes an owner from the dialog to the question that asks first', async () => {
+    const { user, dialog } = await openRename('Autumn launch plan')
+
+    await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Archive “Autumn launch plan”?' })).toBeInTheDocument()
+  })
+})
+
 describe('archiving a document', () => {
   async function openArchive(title: string, options?: Parameters<typeof renderScreen>[1]) {
     const view = renderScreen('/documents', options)
