@@ -79,6 +79,31 @@ describe('starting a document from Home', () => {
     expect(requests).toHaveLength(1)
   })
 
+  it('shows the wait on the template that was chosen, and not on "New document", and locks the rest', async () => {
+    const { user } = await renderHome({ wrap: overriding({ createDocument: () => never() }) })
+    const chosen = await within(start()).findByRole('button', { name: /Project brief/ })
+
+    await user.click(chosen)
+
+    expect(chosen).toHaveAttribute('aria-busy', 'true')
+    expect(within(start()).getByRole('button', { name: /Meeting notes/ })).toHaveAttribute('aria-busy', 'false')
+    expect(within(start()).getByRole('button', { name: /Meeting notes/ })).toHaveAttribute('aria-disabled', 'true')
+    const blank = within(start()).getByRole('button', { name: 'New document' })
+    expect(blank).not.toHaveAttribute('aria-busy', 'true')
+    expect(blank).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('shows the wait on "New document" for a blank document, and locks the tiles', async () => {
+    const { user } = await renderHome({ wrap: overriding({ createDocument: () => never() }) })
+    const tile = await within(start()).findByRole('button', { name: /Project brief/ })
+
+    await user.click(within(start()).getByRole('button', { name: 'New document' }))
+
+    expect(within(start()).getByRole('button', { name: /^Loading/ })).toHaveAttribute('aria-busy', 'true')
+    expect(tile).toHaveAttribute('aria-disabled', 'true')
+    expect(tile).toHaveAttribute('aria-busy', 'false')
+  })
+
   it('says why the document could not be made, next to what was chosen', async () => {
     const { user } = await renderHome({
       wrap: overriding({

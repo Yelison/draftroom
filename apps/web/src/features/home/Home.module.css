@@ -134,6 +134,12 @@
   cursor: progress;
 }
 
+/* The tile that is being made into a document. */
+.tile[aria-busy='true'] {
+  border-color: var(--color-blue-ink);
+  background: var(--color-blue-bg);
+}
+
 .tileIcon {
   display: grid;
   flex: none;

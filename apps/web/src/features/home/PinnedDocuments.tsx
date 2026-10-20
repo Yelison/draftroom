@@ -22,6 +22,9 @@ export function PinnedDocuments({ pinned }: { pinned: UseQueryResult<Schema<'Doc
   const { grid, ref, columns } = useGridColumns()
   const [unfolded, setUnfolded] = useState(false)
   const firstUnfolded = useRef<number | null>(null)
+  const toggle = useRef<HTMLButtonElement>(null)
+  // The chip that has the focus, by its place in the list; it stays after the chip is gone, which is how it is missed.
+  const focusedChip = useRef<number | null>(null)
   const items = pinned.data?.items ?? []
   const folded = foldedRows * columns
   const shown = unfolded ? items : items.slice(0, folded)
@@ -32,6 +35,15 @@ export function PinnedDocuments({ pinned }: { pinned: UseQueryResult<Schema<'Doc
     grid?.querySelectorAll('a')[firstUnfolded.current]?.focus()
     firstUnfolded.current = null
   })
+
+  // A narrower grid folds more chips away. If the focus was on one of them it would fall to the page: the button that
+  // shows them is where it goes on.
+  useLayoutEffect(() => {
+    if (focusedChip.current === null || unfolded || focusedChip.current < folded) return
+    if (grid?.contains(document.activeElement)) return
+    toggle.current?.focus()
+    focusedChip.current = null
+  }, [folded, unfolded, grid])
 
   if (pinned.isSuccess && items.length === 0) return null
 
@@ -46,7 +58,20 @@ export function PinnedDocuments({ pinned }: { pinned: UseQueryResult<Schema<'Doc
         <ListSkeleton rows={2} listClassName={`${styles.chips} ${styles.chipsSkeleton}`} label="home.pinned.loading" />
       ) : (
         <>
-          <ul ref={ref} id={listId} className={styles.chips}>
+          <ul
+            ref={ref}
+            id={listId}
+            className={styles.chips}
+            onFocus={(event) => {
+              focusedChip.current = Array.from(event.currentTarget.children).indexOf(
+                (event.target as HTMLElement).closest('li') as Element,
+              )
+            }}
+            onBlur={(event) => {
+              // Moving on to something else is not losing the focus; a chip that goes away gives no such event.
+              if (event.relatedTarget !== null) focusedChip.current = null
+            }}
+          >
             {shown.map((document) => (
               <li key={document.id}>
                 <Link to={`/documents/${document.id}`} className={styles.chip}>
@@ -58,7 +83,8 @@ export function PinnedDocuments({ pinned }: { pinned: UseQueryResult<Schema<'Doc
           </ul>
           {items.length > folded && (
             <Button
-              variant="ghost"
+              ref={toggle}
+              variant="secondary"
               aria-expanded={unfolded}
               aria-controls={listId}
               onClick={() => {

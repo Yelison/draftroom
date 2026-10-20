@@ -87,6 +87,7 @@ describe('the latest event of Home', () => {
     expect(line).toHaveTextContent(/A version of “.+” was saved automatically/)
     // The avatar of a person is its initials: nobody did this, so there are none.
     expect(within(line).queryByText(/^[A-Z]{1,2}$/)).not.toBeInTheDocument()
+    expect(line.querySelector('svg')).toBeInTheDocument()
   })
 
   it('shows a skeleton with a spoken status while it is on its way', async () => {

@@ -24,8 +24,12 @@ export function StartSection({ workspaceId }: { workspaceId: string }) {
         </div>
         <Button
           icon="plus"
-          loading={create.isPending}
-          onClick={() => create.mutate({ title: intl.formatMessage({ id: 'documents.untitled' }) })}
+          // The wait is shown where it was asked for: here for a blank document, on the tile for a template.
+          loading={create.isPending && create.variables?.template === undefined}
+          aria-disabled={create.isPending}
+          onClick={() => {
+            if (!create.isPending) create.mutate({ title: intl.formatMessage({ id: 'documents.untitled' }) })
+          }}
         >
           {intl.formatMessage({ id: 'documents.new' })}
         </Button>

@@ -1,5 +1,6 @@
 import { useIntl } from 'react-intl'
 import { ListSkeleton } from '../documents/ListSkeleton.tsx'
+import { TilesSkeleton } from './TilesSkeleton.tsx'
 import styles from './Home.module.css'
 
 /**
@@ -24,11 +25,7 @@ export function HomeSkeleton() {
           </div>
           <div>
             <p className={styles.tilesLabel}>&nbsp;</p>
-            <ul className={`${styles.tiles} ${styles.tilesSkeleton}`}>
-              {[0, 1, 2].map((tile) => (
-                <li key={tile} />
-              ))}
-            </ul>
+            <TilesSkeleton />
           </div>
           <p role="status" className="forma-visually-hidden">
             {intl.formatMessage({ id: 'home.loading' })}

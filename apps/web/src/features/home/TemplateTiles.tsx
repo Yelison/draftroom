@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl'
 import type { useCreateDocument } from '../documents/actions/useCreateDocument.ts'
 import { useTemplates } from '../templates/queries.ts'
 import { SectionError } from './SectionError.tsx'
+import { TilesSkeleton } from './TilesSkeleton.tsx'
 import styles from './Home.module.css'
 
 /** The document that "New document" makes, which the tiles make from a template. */
@@ -31,11 +32,7 @@ export function TemplateTiles({ create }: { create: Create }) {
         </div>
       ) : query.isPending ? (
         <div aria-busy="true">
-          <ul className={`${styles.tiles} ${styles.tilesSkeleton}`}>
-            {[0, 1, 2].map((tile) => (
-              <li key={tile} />
-            ))}
-          </ul>
+          <TilesSkeleton />
           <p role="status" className="forma-visually-hidden">
             {intl.formatMessage({ id: 'templates.loading' })}
           </p>
@@ -47,6 +44,7 @@ export function TemplateTiles({ create }: { create: Create }) {
               <button
                 type="button"
                 className={styles.tile}
+                aria-busy={create.isPending && create.variables?.template?.id === template.id}
                 aria-disabled={create.isPending}
                 onClick={() => {
                   if (!create.isPending) create.mutate({ title: template.name, template: { id: template.id, locale } })

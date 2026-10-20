@@ -1,6 +1,6 @@
 /* Home in the production build, with a real browser: starting a document, the cards, the pinned rows, and what has to hold at every width. */
 import type { Locator, Page } from '@playwright/test'
-import { interviews, launchPlan } from '../src/data/mock/fixtures/documents.ts'
+import { interviews, launchPlan, weeklyEnglish } from '../src/data/mock/fixtures/documents.ts'
 import { expect, test } from './fixtures.ts'
 
 test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
@@ -86,6 +86,9 @@ test('shows a pinned document as a chip with a filled star, drawn like the pin o
   await page.goto('/documents')
   const onDocuments = await look(main(page).getByRole('button', { name: `Pin ${launchPlan.title}` }))
   expect(onDocuments.fill).not.toBe('none')
+  const loose = await look(main(page).getByRole('button', { name: `Pin ${weeklyEnglish.title}` }))
+  expect(loose.fill).toBe('none')
+  expect(loose.color).not.toBe(onDocuments.color)
 
   await page.getByRole('link', { name: 'Home' }).click()
   const chip = pinned(page).getByRole('link', { name: launchPlan.title })
@@ -152,6 +155,24 @@ test('refolds to two rows of the new columns when the window is zoomed while Hom
   expect(wide).toBeGreaterThan(4)
   expect(await rowsOf(chips)).toBe(2)
   await expect(toggle).toBeVisible()
+})
+
+test('keeps the focus on the button that shows the rest when the window narrows and its chip is folded away', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await makeDocuments(page, 2)
+  await pinEverything(page)
+  const chips = pinned(page).getByRole('link')
+  const toggle = pinned(page).getByRole('button', { name: /^Show all \d+ pinned$/ })
+  await expect(toggle).toBeVisible()
+  await chips.nth(6).focus()
+  await expect(chips.nth(6)).toBeFocused()
+
+  await page.setViewportSize({ width: 640, height: 360 })
+
+  await expect(chips).toHaveCount(4)
+  await expect(toggle).toBeFocused()
 })
 
 test('lets a card and a chip with a long title grow instead of spilling their text out of them', async ({ page }) => {
@@ -287,7 +308,7 @@ for (const { name, locale, colorScheme, pinnedName } of looks) {
               setTimeout(() => resolve(total), 500)
             }),
         )
-        expect(shift, `layout shift at ${width}px`).toBeLessThan(0.1)
+        expect(shift, `layout shift at ${width}px`).toBe(0)
       }
     })
   })
