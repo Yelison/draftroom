@@ -114,7 +114,9 @@ test('unfolds a burst of renames with the keyboard, keeps the focus on its butto
   await expect(burst.getByRole('link', { name: 'Autumn launch plan, final' })).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(new RegExp(`/documents/${launchPlan.id}`))
-  await expect(page.getByRole('tree')).toBeVisible()
+  await expect(
+    page.getByRole('complementary', { name: 'Explorer' }).getByRole('button', { name: 'Pinned' }),
+  ).toBeVisible()
 })
 
 // Run with the font of the app and with the generic one the browser falls back to, whose measures are not the same: the
@@ -167,7 +169,9 @@ test('goes from the History to a document and back, twice, with the filter and t
   await openFirstEvent()
 
   // The explorer of the editor reads the list of documents the filter read: it is there, and the app stands.
-  await expect(page.getByRole('tree')).toBeVisible()
+  await expect(
+    page.getByRole('complementary', { name: 'Explorer' }).getByRole('button', { name: 'Pinned' }),
+  ).toBeVisible()
   await expect(page.getByText('Unexpected Application Error')).toHaveCount(0)
 
   await rail.getByRole('link', { name: 'History' }).click()
@@ -177,7 +181,9 @@ test('goes from the History to a document and back, twice, with the filter and t
   await page.keyboard.press('Escape')
 
   await openFirstEvent()
-  await expect(page.getByRole('tree')).toBeVisible()
+  await expect(
+    page.getByRole('complementary', { name: 'Explorer' }).getByRole('button', { name: 'Pinned' }),
+  ).toBeVisible()
   await expect(page.getByText('Unexpected Application Error')).toHaveCount(0)
 })
 
