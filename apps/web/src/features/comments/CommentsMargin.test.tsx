@@ -1,6 +1,7 @@
+import { onlineManager } from '@tanstack/react-query'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataSource } from '../../data/DataSource.ts'
 import { ApiError, TransportError } from '../../data/errors.ts'
 import { sofia } from '../../data/mock/fixtures/index.ts'
@@ -233,6 +234,32 @@ describe('the states of the comments', () => {
     const margin = await findMargin()
 
     expect(await within(margin).findByRole('button', { name: 'Try again' })).toBeInTheDocument()
+  })
+})
+
+describe('a document opened from the copy this device kept, with no connection', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    onlineManager.setOnline(true)
+  })
+
+  it('lists its threads as they are, and not as orphans: nothing has told the text where they are', async () => {
+    const first = renderCommentedDocument({ paragraphs })
+    await waitFor(() => expect(screen.getByText('Sync status: Synced')).toBeInTheDocument())
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    act(() => window.dispatchEvent(new Event('offline')))
+    await waitFor(() => expect(screen.getByText('Sync status: Offline with local copy')).toBeInTheDocument())
+    first.unmount()
+    // A new page knows nothing of the network the old one lost.
+    onlineManager.setOnline(true)
+
+    renderCommentedDocument({ paragraphs })
+
+    const margin = await findMargin()
+    await within(margin).findByText(signedOff)
+    expect(screen.getByText('Sync status: Offline with local copy')).toBeInTheDocument()
+    expect(threadOf(margin, signedOff)).toHaveAttribute('data-state', 'open')
+    expect(within(margin).queryByText('Comments on removed text')).not.toBeInTheDocument()
   })
 })
 
