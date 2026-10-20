@@ -12,6 +12,7 @@ import { MemberFilters } from './MemberFilters.tsx'
 import { MembersTable } from './MembersTable.tsx'
 import { RemoveMemberDialog } from './RemoveMemberDialog.tsx'
 import { useMemberChanges, type MemberChange } from './useMemberChanges.ts'
+import { isLastOwner } from './workspaceRoles.ts'
 import styles from './Members.module.css'
 
 /** What a refusal says here in this screen's own words; the rest is what every screen says about a refusal. */
@@ -102,7 +103,7 @@ export function MemberList({ workspaceId, members, meId }: MemberListProps) {
           ) : (
             <MembersTable
               members={shown}
-              everyone={members}
+              lastOwnerId={members.find((member) => isLastOwner(members, member))?.userId}
               meId={meId}
               canManage={canManage}
               busy={changes.busy}

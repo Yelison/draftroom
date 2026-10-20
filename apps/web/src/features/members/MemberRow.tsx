@@ -35,7 +35,9 @@ export function MemberRow({ member, isMe, canManage, lastOwner, busy, onRole, on
     <tr data-member={member.userId}>
       <td>
         <div className={styles.who}>
-          <Avatar name={name} tone={presenceLookOf(member.userId).tone} decorative />
+          <span className={styles.avatar}>
+            <Avatar name={name} tone={presenceLookOf(member.userId).tone} decorative />
+          </span>
           <span className={styles.identity}>
             <span className={styles.name}>{isMe ? intl.formatMessage({ id: 'members.you' }, { name }) : name}</span>
             {member.name !== null && <span className={styles.email}>{member.email}</span>}

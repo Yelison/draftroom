@@ -68,7 +68,7 @@
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  padding: var(--space-8) var(--space-12);
+  padding: var(--space-8);
   border-block-end: 1px solid var(--color-line);
   background: var(--color-surface);
   color: var(--color-muted);
@@ -85,7 +85,7 @@
 }
 
 .table td {
-  padding: var(--space-8) var(--space-12);
+  padding: var(--space-8);
   border-block-start: 1px solid var(--color-line);
   vertical-align: middle;
 }
@@ -98,17 +98,23 @@
   background: var(--color-surface-hover);
 }
 
-/* Columns for a desktop window; a narrower one gives up the date to leave the people their room. */
+/* Columns for a desktop window; a narrower one (the page zoomed to 200 %) gives up the date and the avatars to leave the
+ * people their room, and keeps the cells close. */
 .roleColumn {
-  inline-size: calc(var(--space-64) * 2.5);
+  inline-size: calc(var(--space-64) * 2.25);
 }
 
 .statusColumn {
-  inline-size: calc(var(--space-64) * 1.75);
+  inline-size: calc(var(--space-64) * 1.5);
 }
 
 .actionsColumn {
   inline-size: calc(var(--space-64) * 1.5);
+}
+
+.avatar {
+  display: none;
+  flex: none;
 }
 
 .since {
@@ -192,6 +198,15 @@
 }
 
 @media (width >= 1280px) {
+  .avatar {
+    display: flex;
+  }
+
+  .table th,
+  .table td {
+    padding-inline: var(--space-12);
+  }
+
   .roleColumn {
     inline-size: calc(var(--space-64) * 3);
   }

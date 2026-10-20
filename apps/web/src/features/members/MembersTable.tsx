@@ -1,15 +1,15 @@
 import type { Schema } from '@draftroom/contract'
 import { useIntl } from 'react-intl'
 import { MemberRow, type MemberRowProps } from './MemberRow.tsx'
-import { isLastOwner } from './workspaceRoles.ts'
 import styles from './Members.module.css'
 
 type Member = Schema<'Member'>
 
 export interface MembersTableProps extends Pick<MemberRowProps, 'canManage' | 'busy' | 'onRole' | 'onRemove'> {
-  /** The members to show, which are some of `everyone`: whether a person is the last owner depends on all of them. */
+  /** The members to show: some of the workspace, once the filter has had its say. */
   members: readonly Member[]
-  everyone: readonly Member[]
+  /** The one owner who cannot step down, if there is one: decided over the whole workspace, not over the rows shown. */
+  lastOwnerId: string | undefined
   meId: string
 }
 
@@ -18,7 +18,7 @@ export interface MembersTableProps extends Pick<MemberRowProps, 'canManage' | 'b
  * rows scroll. There is no table in Forma UI, so this one is the page's own, made of its tokens. A member who cannot
  * change anything has no column of actions at all.
  */
-export function MembersTable({ members, everyone, meId, canManage, busy, onRole, onRemove }: MembersTableProps) {
+export function MembersTable({ members, lastOwnerId, meId, canManage, busy, onRole, onRemove }: MembersTableProps) {
   const intl = useIntl()
 
   return (
@@ -50,7 +50,7 @@ export function MembersTable({ members, everyone, meId, canManage, busy, onRole,
               member={member}
               isMe={member.userId === meId}
               canManage={canManage}
-              lastOwner={isLastOwner(everyone, member)}
+              lastOwner={member.userId === lastOwnerId}
               busy={busy}
               onRole={onRole}
               onRemove={onRemove}
