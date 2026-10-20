@@ -7,9 +7,9 @@ import { FolderScreen } from '../features/documents/FolderScreen.tsx'
 import { EditorSkeleton } from '../features/editor/EditorSkeleton.tsx'
 import { HistoryScreen } from '../features/history/HistoryScreen.tsx'
 import { HomeScreen } from '../features/home/HomeScreen.tsx'
+import { MembersScreen } from '../features/members/MembersScreen.tsx'
 import { SearchScreen } from '../features/search/SearchScreen.tsx'
 import { AppearanceTab } from '../features/settings/AppearanceTab.tsx'
-import { MembersTab } from '../features/settings/MembersTab.tsx'
 import { ProfileTab } from '../features/settings/ProfileTab.tsx'
 import { SettingsScreen } from '../features/settings/SettingsScreen.tsx'
 import { settingsTabHandle } from '../features/settings/settingsTabs.ts'
@@ -69,6 +69,7 @@ export const routes: RouteObject[] = [
               },
               { path: 'shared', Component: SharedScreen, handle: { section: 'shared' } satisfies RouteHandle },
               { path: 'history', Component: HistoryScreen, handle: { section: 'history' } satisfies RouteHandle },
+              { path: 'members', Component: MembersScreen, handle: { section: 'members' } satisfies RouteHandle },
               {
                 path: 'settings',
                 Component: SettingsScreen,
@@ -77,7 +78,8 @@ export const routes: RouteObject[] = [
                   { index: true, loader: () => redirect('/settings/profile') },
                   { path: 'profile', Component: ProfileTab, handle: settingsTabHandle },
                   { path: 'workspace', Component: WorkspaceTab, handle: settingsTabHandle },
-                  { path: 'members', Component: MembersTab, handle: settingsTabHandle },
+                  // Members moved out of Settings to a page of its own; an address typed or bookmarked still lands there.
+                  { path: 'members', loader: () => redirect('/members') },
                   { path: 'appearance', Component: AppearanceTab, handle: settingsTabHandle },
                 ],
               },

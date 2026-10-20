@@ -21,9 +21,9 @@ const routeCases = [
   { path: '/shared', active: 'Shared', heading: 'Shared', rail: 'expanded' },
   { path: '/shared?access=editor&selected=d1', active: 'Shared', heading: 'Shared', rail: 'expanded' },
   { path: '/history', active: 'History', heading: 'History', rail: 'expanded' },
+  { path: '/members', active: 'Members', heading: 'Members', rail: 'expanded' },
   { path: '/settings/profile', active: 'Settings', heading: 'Settings', rail: 'expanded' },
   { path: '/settings/workspace', active: 'Settings', heading: 'Settings', rail: 'expanded' },
-  { path: '/settings/members', active: 'Settings', heading: 'Settings', rail: 'expanded' },
   { path: '/settings/appearance', active: 'Settings', heading: 'Settings', rail: 'expanded' },
   { path: '/trash', active: 'Documents', heading: 'Trash', rail: 'expanded' },
   { path: '/search?q=budget', active: 'Documents', heading: 'Search documents', rail: 'expanded' },
@@ -47,6 +47,14 @@ describe('the route table', () => {
 
     expect(await screen.findByRole('link', { current: 'page' })).toHaveTextContent('Settings')
     expect(router.state.location.pathname).toBe('/settings/profile')
+  })
+
+  it('sends /settings/members to the Members page, which is no longer a tab of Settings', async () => {
+    const { router } = renderApp('/settings/members')
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Members' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/members')
+    expect(screen.getAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual(['Members'])
   })
 
   it('titles the tab after the page, in the language of the app', () => {
@@ -149,6 +157,7 @@ describe('the texts of the shell in both languages', () => {
     { path: '/documents', english: 'Documents', spanish: 'Documentos' },
     { path: '/shared', english: 'Shared', spanish: 'Compartidos' },
     { path: '/history', english: 'History', spanish: 'Historial' },
+    { path: '/members', english: 'Members', spanish: 'Miembros' },
     { path: '/settings/profile', english: 'Settings', spanish: 'Configuración' },
   ]
 
@@ -172,7 +181,7 @@ describe('the texts of the shell in both languages', () => {
     renderApp('/')
 
     const rail = screen.getByRole('navigation', { name: 'Navegación principal' })
-    expect(rail).toHaveTextContent('InicioDocumentosCompartidosHistorialConfiguración')
+    expect(rail).toHaveTextContent('InicioDocumentosCompartidosHistorialMiembrosConfiguración')
     expect(screen.getByRole('link', { name: 'Saltar al contenido' })).toBeInTheDocument()
     expect(document.title).toBe('Inicio · Draftroom')
   })

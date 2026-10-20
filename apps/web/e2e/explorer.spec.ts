@@ -15,9 +15,9 @@ async function openExplorer(page: Page, path = `/documents/${weeklyEnglish.id}`)
   await expect(tree(page)).toBeVisible()
 }
 
-/** Tabs to the tree: the skip link, the five items of the rail, signing out, the search, the two buttons and then the tree. */
+/** Tabs to the tree: the skip link, the six items of the rail, signing out, the search, the two buttons and then the tree. */
 async function tabToTree(page: Page) {
-  for (let stop = 0; stop < 11; stop++) await page.keyboard.press('Tab')
+  for (let stop = 0; stop < 12; stop++) await page.keyboard.press('Tab')
 }
 
 test('walks the tree with the keyboard and keeps the open document selected while it does', async ({ page }) => {

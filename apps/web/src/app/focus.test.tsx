@@ -183,7 +183,7 @@ describe('a dialog that is a route over its page', () => {
 
 describe('the order of the Tab key', () => {
   // The pages hold no control yet, so a probe in the work area shows where the content falls in the order.
-  const rail = ['Skip to content', 'Home', 'Documents', 'Shared', 'History', 'Settings']
+  const rail = ['Skip to content', 'Home', 'Documents', 'Shared', 'History', 'Members', 'Settings']
   const layouts = [
     { layout: 'overview', Component: OverviewLayout, explorer: [] },
     // The explorer is one stop for its search, one for each of its two buttons and one for the tree, however long it is.

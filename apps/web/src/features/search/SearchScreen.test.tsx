@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { DataSource } from '../../data/DataSource.ts'
 import { ApiError } from '../../data/errors.ts'
+import { queryKeys } from '../../data/queryKeys.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { fixtures, renderScreen } from '../documents/testing/renderScreen.tsx'
 
@@ -142,14 +143,16 @@ describe('the search URL', () => {
     ['has a q of spaces', '/search?q=%20%20'],
   ])('invites to search, and asks the server for nothing, when it %s', async (_name, path) => {
     const watching: { current?: ReturnType<typeof watch> } = {}
-    renderScreen(path, { wrap: (dataSource) => (watching.current = watch(dataSource)).watched })
+    const { queryClient } = renderScreen(path, { wrap: (dataSource) => (watching.current = watch(dataSource)).watched })
 
     await heading('Search documents')
     expect(screen.getByText('Search your documents')).toBeInTheDocument()
     expect(searchbox()).toHaveValue('')
-    // Anything the screen would ask would have been asked by now: the workspace is the first thing it reads.
+    // Anything the screen would ask would have been asked by now: the workspace is the first thing it reads. The rail
+    // reads it too, and a query that two readers share is fetched once, so the calls cannot tell them apart: the readers
+    // can. One is the rail's, and the screen, with nothing to search for, is not another.
     await new Promise((resolve) => setTimeout(resolve, 50))
-    expect(watching.current?.calls.workspaces).toBe(0)
+    expect(queryClient.getQueryCache().find({ queryKey: queryKeys.workspaces() })?.getObserversCount()).toBe(1)
     expect(watching.current?.calls.queries).toEqual([])
   })
 

@@ -1,5 +1,6 @@
 import type { Schema } from '@draftroom/contract'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '../../data/queryKeys.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { invalidateAfter } from '../documents/invalidate.ts'
 
@@ -7,7 +8,9 @@ type WorkspaceRole = Schema<'WorkspaceRole'>
 
 /** What was done, as the screen says it: the person by name, never by id. */
 export type MemberChange =
-  { kind: 'invited' | 'changed'; name: string; role: WorkspaceRole } | { kind: 'removed'; name: string }
+  | { kind: 'invited'; name: string; role: WorkspaceRole }
+  | { kind: 'changed'; name: string; role: WorkspaceRole; member: Schema<'Member'> }
+  | { kind: 'removed'; name: string }
 
 export interface MemberChangesOptions {
   workspaceId: string
@@ -39,8 +42,12 @@ export function useMemberChanges({ workspaceId, onDone, onFailed }: MemberChange
     mutationFn: ({ member, role }: { member: Schema<'Member'>; role: WorkspaceRole }) =>
       dataSource.updateMember({ params: { path: { ...path, userId: member.userId } }, body: { role } }),
     onSuccess: async (member) => {
-      await invalidateAfter(queryClient, 'updateMember', { workspaceId })
-      onDone({ kind: 'changed', name: member.name ?? member.email, role: member.role })
+      // The role the rail shows the person in comes from the workspace, which the table of mutations does not mark stale.
+      await Promise.all([
+        invalidateAfter(queryClient, 'updateMember', { workspaceId }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspace(workspaceId) }),
+      ])
+      onDone({ kind: 'changed', name: member.name ?? member.email, role: member.role, member })
     },
     onError: onFailed,
   })

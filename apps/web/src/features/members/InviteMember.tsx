@@ -52,20 +52,23 @@ export function InviteMember({ busy, failure, onInvite }: InviteMemberProps) {
   }
 
   return (
-    <form className={styles.invite} onSubmit={submit} noValidate>
+    <form
+      className={`${styles.invitePanel} ${styles.invite}`}
+      aria-label={intl.formatMessage({ id: 'members.invite.label' })}
+      onSubmit={submit}
+      noValidate
+    >
       <Input
         type="email"
-        label={intl.formatMessage({ id: 'settings.members.invite.email' })}
+        label={intl.formatMessage({ id: 'members.invite.email' })}
         value={email}
         onChange={(event) => setEmail(event.target.value)}
         error={
-          shown === null
-            ? undefined
-            : intl.formatMessage({ id: `settings.members.invite.${shown}` }, { max: emailMaxLength })
+          shown === null ? undefined : intl.formatMessage({ id: `members.invite.${shown}` }, { max: emailMaxLength })
         }
       />
       <Select
-        label={intl.formatMessage({ id: 'settings.members.invite.role' })}
+        label={intl.formatMessage({ id: 'members.invite.role' })}
         value={role}
         onChange={(event) => {
           if (isWorkspaceRole(event.target.value)) setRole(event.target.value)
@@ -73,12 +76,12 @@ export function InviteMember({ busy, failure, onInvite }: InviteMemberProps) {
       >
         {workspaceRoles.map((value) => (
           <option key={value} value={value}>
-            {intl.formatMessage({ id: `settings.members.role.${value}` })}
+            {intl.formatMessage({ id: `members.role.${value}` })}
           </option>
         ))}
       </Select>
       <Button type="submit" aria-disabled={busy || undefined}>
-        {intl.formatMessage({ id: 'settings.members.invite.action' })}
+        {intl.formatMessage({ id: 'members.invite.action' })}
       </Button>
     </form>
   )
