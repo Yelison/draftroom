@@ -455,11 +455,10 @@ describe('the renames that follow one another in the History screen', () => {
     expect(toggle(await findRow(sentence))).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('put the button right after the interval, and keep the separator out of what the button is described by', async () => {
+  it('keep the separator out of what the button is described by', async () => {
     renderScreen('/history', { wrap: withPages([renames]) })
     const button = toggle(await findRow(sentence))
 
-    expect(button.previousElementSibling).toHaveTextContent(/renamed 4 times.*\d:\d\d/)
     expect(button).toHaveAccessibleDescription(expect.stringContaining('renamed 4 times'))
     expect(button).not.toHaveAccessibleDescription(/·/)
   })

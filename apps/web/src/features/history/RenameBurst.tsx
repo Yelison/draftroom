@@ -27,35 +27,37 @@ export function RenameBurst({ burst }: { burst: Burst }) {
     <>
       <ActorAvatar actor={newest.actor} />
       <div className={styles.burst}>
-        <span className={styles.text}>
-          <span id={`${id}-summary`} className={styles.summary}>
-            <span>
-              {intl.formatMessage(
-                { id: 'history.burst.renamed' },
-                { title: <DocumentLink document={newest.document} />, count: burst.events.length },
-              )}
-            </span>
+        <span className={styles.burstText}>
+          <span id={`${id}-sentence`}>
+            {intl.formatMessage(
+              { id: 'history.burst.renamed' },
+              { title: <DocumentLink document={newest.document} />, count: burst.events.length },
+            )}
+          </span>
+          {/* A no-break space, so that a line never ends before the separator: the group after it cannot start a line. */}
+          {'\u00a0'}
+          <span className={styles.burstTail}>
             <span aria-hidden="true" className={styles.interval}>
               ·
             </span>
-            <span className={styles.interval}>
+            <span id={`${id}-interval`} className={styles.interval}>
               {intl.formatDateTimeRange(new Date(oldest.createdAt), new Date(newest.createdAt), {
                 timeStyle: 'short',
                 timeZone,
               })}
             </span>
+            <button
+              type="button"
+              className={styles.toggle}
+              aria-expanded={expanded}
+              aria-controls={`${id}-people`}
+              aria-describedby={`${id}-sentence ${id}-interval`}
+              onClick={() => setExpanded((open) => !open)}
+            >
+              {intl.formatMessage({ id: 'history.burst.details' })}
+              <Icon name="chevron" size={16} className={expanded ? styles.chevronOpen : styles.chevron} />
+            </button>
           </span>
-          <button
-            type="button"
-            className={styles.toggle}
-            aria-expanded={expanded}
-            aria-controls={`${id}-people`}
-            aria-describedby={`${id}-summary`}
-            onClick={() => setExpanded((open) => !open)}
-          >
-            {intl.formatMessage({ id: 'history.burst.details' })}
-            <Icon name="chevron" size={16} className={expanded ? styles.chevronOpen : styles.chevron} />
-          </button>
         </span>
         {/* Hidden, not unmounted: what the button controls is always there to point at. */}
         <ul id={`${id}-people`} hidden={!expanded} className={styles.people}>

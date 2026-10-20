@@ -145,11 +145,21 @@
   outline-offset: var(--space-2);
 }
 
-.summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4) var(--space-8);
+/* The sentence of a burst flows as text, so a long title wraps like any other; what follows it never splits. */
+.burstText {
+  display: block;
   min-width: 0;
+  padding-top: var(--space-4);
+  font: var(--font-body);
+  overflow-wrap: anywhere;
+}
+
+/* The separator, the interval and the button stay together: none of them can open a line or fall to one of its own. */
+.burstTail {
+  display: inline-flex;
+  gap: var(--space-8);
+  align-items: center;
+  white-space: nowrap;
 }
 
 .interval {

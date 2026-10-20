@@ -116,6 +116,30 @@ test('unfolds a burst of renames with the keyboard, keeps the focus on its butto
   await expect(page.getByRole('tree')).toBeVisible()
 })
 
+test('keeps the separator, the interval and the button together, and the separator off the start of a line, when the title is long', async ({
+  page,
+}) => {
+  const long = `${'A title that someone wrote at great length '.repeat(3).trim()} and then some more words`
+  await page.goto('/documents')
+  await rename(page, launchPlan.title, `${long} one`)
+  await rename(page, `${long} one`, `${long} two`)
+  await rename(page, `${long} two`, long)
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'History' }).click()
+
+  const burst = rows(page).filter({ hasText: 'was renamed 3 times' })
+  const link = await burst.getByRole('link', { name: long }).boundingBox()
+  expect(link?.height, 'the title wraps over several lines').toBeGreaterThan(40)
+  const separator = await burst.locator('span[aria-hidden="true"]').filter({ hasText: '·' }).boundingBox()
+  const interval = await burst.locator('[id$="-interval"]').boundingBox()
+  const details = await burst.getByRole('button', { name: 'Details' }).boundingBox()
+  const middle = (box: typeof link) => (box?.y ?? 0) + (box?.height ?? 0) / 2
+  // One line: their middles are within a few pixels, whatever their own heights.
+  expect(Math.abs(middle(separator) - middle(interval))).toBeLessThan(8)
+  expect(Math.abs(middle(details) - middle(interval))).toBeLessThan(8)
+  // And it is not the first thing on that line: the title's last words come before it.
+  expect((separator?.x ?? 0) - (link?.x ?? 0)).toBeGreaterThan(16)
+})
+
 test('goes from the History to a document and back, twice, with the filter and the explorer both working', async ({
   page,
 }) => {
