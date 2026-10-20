@@ -58,11 +58,30 @@ export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (
     operationRoute(contract, 'listDocuments', async (request): Promise<Schema<'DocumentPage'>> => {
       const { userId } = principalOf(request)
       const { workspaceId } = request.params
-      const { query, folderId, archived = false, cursor, limit = contractLimits.page.defaultSize } = request.query
+      const {
+        query,
+        folderId,
+        unfiled = false,
+        archived = false,
+        cursor,
+        limit = contractLimits.page.defaultSize,
+      } = request.query
+
+      // Two filters that cannot both hold are a fault of the request's shape, so they are refused before the database
+      // is read, whether or not the folder exists.
+      if (unfiled && folderId !== undefined) {
+        throw new ProblemError('validation-failed', { errors: [invalidValue('/query/unfiled')] })
+      }
 
       // A cursor says nothing about a resource: whether it fits these filters is the shape of the request, which is
       // checked before anyone is told whether the workspace exists.
-      const filters: CursorFilters = { workspaceId, query: query ?? null, folderId: folderId ?? null, archived }
+      const filters: CursorFilters = {
+        workspaceId,
+        query: query ?? null,
+        folderId: folderId ?? null,
+        unfiled,
+        archived,
+      }
       const after = cursor === undefined ? undefined : decodeCursor(cursor, filters)
       if (after === null) throw new ProblemError('validation-failed', { errors: [invalidValue('/query/cursor')] })
 
@@ -75,6 +94,7 @@ export const documentRoutes: FastifyPluginCallback<RouteDependencies> = (
         userId,
         workspaceId,
         archived,
+        unfiled,
         limit,
         ...(query === undefined ? {} : { query }),
         ...(folderId === undefined ? {} : { folderId }),

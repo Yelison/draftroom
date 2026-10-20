@@ -615,6 +615,123 @@ describe('pages of documents', () => {
     expect(response).toMatchObject({ statusCode: 400, body: { errors: [{ pointer: '/query/limit' }] } })
   })
 
+  describe('the documents in no folder', () => {
+    async function workspaceWithFolders() {
+      const { workspaceId, owner } = await workspaceWithOwner()
+      const folderId = await createFolder(db, workspaceId, 'Launch')
+      return { workspaceId, owner, folderId }
+    }
+
+    it('lists only the ones that are in no folder, in the usual order', async () => {
+      const { workspaceId, owner, folderId } = await workspaceWithFolders()
+      await createDocument(db, { workspaceId, creator: owner, folderId, updatedAt: '2026-10-05T10:00:00Z' })
+      const older = await createDocument(db, { workspaceId, creator: owner, updatedAt: '2026-10-01T10:00:00Z' })
+      const newer = await createDocument(db, { workspaceId, creator: owner, updatedAt: '2026-10-03T10:00:00Z' })
+
+      const page = bodyAs<Page>(await list(owner, workspaceId, '?unfiled=true'))
+
+      expect(page.items.map((item) => item.id)).toEqual([newer, older])
+      expect(page.items.every((item) => item.folderId === null)).toBe(true)
+    })
+
+    it('lists every document when it is false, as when it is left out', async () => {
+      const { workspaceId, owner, folderId } = await workspaceWithFolders()
+      await createDocument(db, { workspaceId, creator: owner, folderId })
+      await createDocument(db, { workspaceId, creator: owner })
+
+      const page = bodyAs<Page>(await list(owner, workspaceId, '?unfiled=false'))
+
+      expect(page.items).toHaveLength(2)
+    })
+
+    it('combines with a search on the title', async () => {
+      const { workspaceId, owner, folderId } = await workspaceWithFolders()
+      await createDocument(db, { workspaceId, creator: owner, folderId, title: 'Launch in a folder' })
+      await createDocument(db, { workspaceId, creator: owner, title: 'Budget with no folder' })
+      const match = await createDocument(db, { workspaceId, creator: owner, title: 'Launch with no folder' })
+
+      const page = bodyAs<Page>(await list(owner, workspaceId, '?unfiled=true&query=launch'))
+
+      expect(page.items.map((item) => item.id)).toEqual([match])
+    })
+
+    it('combines with the archive: the archived documents the person owns that are in no folder', async () => {
+      const { workspaceId, owner, folderId } = await workspaceWithFolders()
+      await createDocument(db, { workspaceId, creator: owner, folderId, archived: true })
+      const archived = await createDocument(db, { workspaceId, creator: owner, archived: true })
+      await createDocument(db, { workspaceId, creator: owner })
+
+      const page = bodyAs<Page>(await list(owner, workspaceId, '?unfiled=true&archived=true'))
+
+      expect(page.items.map((item) => item.id)).toEqual([archived])
+    })
+
+    it('pages without skipping or repeating one, and ends with a null cursor', async () => {
+      const { workspaceId, owner, folderId } = await workspaceWithFolders()
+      const loose = []
+      for (const day of [1, 2, 3, 4, 5]) {
+        await createDocument(db, { workspaceId, creator: owner, folderId, updatedAt: `2026-10-0${day}T11:00:00Z` })
+        loose.push(await createDocument(db, { workspaceId, creator: owner, updatedAt: `2026-10-0${day}T10:00:00Z` }))
+      }
+
+      const { ids, pages } = await readAll(owner, workspaceId, 2, '&unfiled=true')
+
+      expect(ids).toEqual([...loose].reverse())
+      expect(pages).toBe(3)
+    })
+
+    it("holds only what the person can read: another member's private document is not in it", async () => {
+      const { workspaceId, owner } = await workspaceWithFolders()
+      const colleague = await createPerson(db, 'Camila Ortega')
+      await join(db, workspaceId, colleague)
+      await createDocument(db, { workspaceId, creator: owner, title: 'Private' })
+      const mine = await createDocument(db, { workspaceId, creator: colleague, title: 'Mine' })
+
+      const page = bodyAs<Page>(await list(colleague, workspaceId, '?unfiled=true'))
+
+      expect(page.items.map((item) => item.id)).toEqual([mine])
+    })
+
+    it.each([['an existing folder'], ['a folder that does not exist']])(
+      'is refused together with %s, before the database is read',
+      async (name) => {
+        const { workspaceId, owner, folderId } = await workspaceWithFolders()
+        const target = name === 'an existing folder' ? folderId : randomUUID()
+
+        const response = await list(owner, workspaceId, `?unfiled=true&folderId=${target}`)
+
+        expect(response).toMatchObject({
+          statusCode: 400,
+          body: { code: 'validation-failed', errors: [{ pointer: '/query/unfiled', code: 'invalid-value' }] },
+        })
+      },
+    )
+
+    it('tells a person outside the workspace the same 400 for both filters: it is the shape of the request', async () => {
+      const { workspaceId, owner } = await workspaceWithFolders()
+      const outsider = await createPerson(db, 'Luis Vega')
+
+      const asMember = await list(owner, workspaceId, `?unfiled=true&folderId=${randomUUID()}`)
+      const asOutsider = await list(outsider, workspaceId, `?unfiled=true&folderId=${randomUUID()}`)
+
+      expect(asOutsider).toMatchObject({ statusCode: 400, body: asMember.body })
+    })
+
+    it('is refused with a cursor of the whole list, and the cursor of the unfiled list is refused without the filter', async () => {
+      const { workspaceId, owner } = await workspaceWithFolders()
+      for (let index = 0; index < 3; index += 1) await createDocument(db, { workspaceId, creator: owner })
+      const whole = bodyAs<Page>(await list(owner, workspaceId, '?limit=1')).nextCursor
+      const unfiled = bodyAs<Page>(await list(owner, workspaceId, '?limit=1&unfiled=true')).nextCursor
+
+      const wholeWithFilter = await list(owner, workspaceId, `?unfiled=true&cursor=${whole}`)
+      const unfiledWithout = await list(owner, workspaceId, `?cursor=${unfiled}`)
+
+      for (const response of [wholeWithFilter, unfiledWithout]) {
+        expect(response).toMatchObject({ statusCode: 400, body: { errors: [{ pointer: '/query/cursor' }] } })
+      }
+    })
+  })
+
   describe('a cursor', () => {
     let first: { workspaceId: string; owner: Person; cursor: string }
     beforeAll(async () => {
@@ -636,6 +753,7 @@ describe('pages of documents', () => {
       ['another search', '?query=budget'],
       ['no search', ''],
       ['the archive', '?query=launch&archived=true'],
+      ['only the unfiled', '?query=launch&unfiled=true'],
     ])('is refused with %s: it belongs to the list it came from', async (_name, filters) => {
       const joiner = filters === '' ? '?' : '&'
       const response = await list(first.owner, first.workspaceId, `${filters}${joiner}cursor=${first.cursor}`)
@@ -647,8 +765,18 @@ describe('pages of documents', () => {
     })
 
     it('is refused when it names a year that does not exist, as invalid and not as a failure of the server', async () => {
-      const filters = { workspaceId: first.workspaceId, query: null, folderId: null, archived: false }
+      const filters = {
+        workspaceId: first.workspaceId,
+        query: null,
+        folderId: null,
+        unfiled: false,
+        archived: false,
+      }
       const cursor = encodeCursor({ timestamp: '0000-06-01T00:00:00.000000Z', id: randomUUID() }, filters)
+      // The same filters with a real instant are accepted: the refusal below is for the year and not for a cursor
+      // that was built with other filters than the route's.
+      const control = encodeCursor({ timestamp: '2026-06-01T00:00:00.000000Z', id: randomUUID() }, filters)
+      expect((await list(first.owner, first.workspaceId, `?cursor=${control}`)).statusCode).toBe(200)
 
       const response = await list(first.owner, first.workspaceId, `?cursor=${cursor}`)
 

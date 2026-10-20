@@ -1764,6 +1764,11 @@ export interface operations {
                 query?: string;
                 /** @description Only the documents of this folder. A folder that is unknown, or belongs to another workspace, is a `400 validation-failed` at `/query/folderId`. */
                 folderId?: components["schemas"]["Id"];
+                /**
+                 * @description Only the documents that are in no folder. `true` together with `folderId` is a `400 validation-failed` with `invalid-value` at `/query/unfiled`, whether or not the folder exists.
+                 * @example true
+                 */
+                unfiled?: boolean;
                 /** @description List archived documents instead of live ones. */
                 archived?: boolean;
             };

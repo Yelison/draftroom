@@ -8,7 +8,7 @@ import { templateContent } from '../fixtures/templateContent.ts'
 import { record } from '../events.ts'
 import { caller, documentOf, requireRole, workspaceOf, type Context } from '../guards.ts'
 import { textLimits } from '../limits.ts'
-import { paginate, readPage } from '../pagination.ts'
+import { checkLimit, paginate, readPage } from '../pagination.ts'
 import { conflict, documentChanged, invalid } from '../problems.ts'
 import { documentRole } from '../roles.ts'
 import { checkParameterText, checkTexts } from '../text.ts'
@@ -65,9 +65,16 @@ export function documentOperations(ctx: Context): DocumentOperations {
         workspaceId: path.workspaceId,
         query: query.query,
         folderId: query.folderId,
+        unfiled: query.unfiled === true,
         archived: query.archived === true,
       }
       if (query.query !== undefined) checkParameterText('/query/query', query.query, textLimits.search)
+      // As in the server: the shape of each parameter first, then two filters that exclude each other, and only then
+      // whether the cursor fits them.
+      checkLimit(query)
+      if (query.unfiled === true && query.folderId !== undefined) {
+        throw invalid({ pointer: '/query/unfiled', code: 'invalid-value' })
+      }
       const page = readPage(query, filters)
       const { workspace } = workspaceOf(ctx, path.workspaceId)
       checkFolder(workspace.id, query.folderId, '/query/folderId')
@@ -78,6 +85,7 @@ export function documentOperations(ctx: Context): DocumentOperations {
         const role = documentRole(world, user.id, document)
         if (role === undefined || (document.archivedAt !== null) !== (query.archived === true)) return false
         if (query.folderId !== undefined && document.folderId !== query.folderId) return false
+        if (query.unfiled === true && document.folderId !== null) return false
         return needle === undefined || `${document.title}\n${document.excerpt ?? ''}`.toLowerCase().includes(needle)
       })
       const { items, nextCursor } = paginate(rows, byRecency, page)

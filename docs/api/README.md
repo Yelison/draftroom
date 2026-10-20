@@ -73,7 +73,7 @@ Every 4xx and 5xx is `application/problem+json` (RFC 9457) with `type`, `title`,
 
 | Code | Status | When |
 | --- | --- | --- |
-| `validation-failed` | 400 | The request breaks a rule of the contract: a missing field, a value below its minimum, a bad format, an unknown field, a malformed cursor or one reused with other filters, a `locale` without a `templateId` (`{ pointer: /templateId, code: required }`), a `folderId` that is unknown or belongs to another workspace, a `templateId` that is unknown (`invalid-value`, the same answer for an unknown and a foreign folder). |
+| `validation-failed` | 400 | The request breaks a rule of the contract: a missing field, a value below its minimum, a bad format, an unknown field, a malformed cursor or one reused with other filters, a `locale` without a `templateId` (`{ pointer: /templateId, code: required }`), a `folderId` that is unknown or belongs to another workspace (`invalid-value`, the same answer for an unknown and a foreign folder), a `templateId` that is unknown, `unfiled=true` together with a `folderId` (`invalid-value` at `/query/unfiled`: the two filters exclude each other). |
 | `unauthenticated` | 401 | No valid session, or wrong credentials. |
 | `csrf` | 403 | `X-CSRF-Token` is missing or does not match. |
 | `forbidden` | 403 | The caller can read the resource but their role does not allow the operation. |
@@ -98,6 +98,7 @@ The two statuses are split by what went wrong and where. A text **in the request
 
 - `limit`: 1 to 100, default 25.
 - `cursor`: the opaque token the previous page returned as `nextCursor`. Clients never build or read one. A cursor is bound to the filters of the request that produced it: an invalid cursor, or one used with other filters, is `400 validation-failed` with the pointer `/query/cursor`.
+- `listDocuments` filters by `query`, `folderId`, `unfiled` and `archived`, and they combine. `unfiled=true` keeps only the documents that are in no folder, which `folderId` cannot ask for. Sent with `folderId` it is `400 validation-failed` at `/query/unfiled`, whether or not the folder exists: it is a fault of the request's shape, so it is answered before the workspace is looked up, as the cursor is. The cursor remembers `unfiled` like every other filter.
 - The response carries `items` and `nextCursor`, which is `null` on the last page.
 - The cursor encodes the sort key and the id, so the order is stable when several rows share a timestamp.
 
