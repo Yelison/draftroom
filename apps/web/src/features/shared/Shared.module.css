@@ -18,6 +18,7 @@
 
   display: flex;
   flex-direction: column;
+  container-type: inline-size;
 }
 
 .section {
@@ -34,7 +35,10 @@
   border-top: 0;
 }
 
-/* The bar says the permission with a colour; the title and the sentence say it with words. */
+/*
+ * The bar says the permission with a colour; the title and the sentence say it with words. The colours are the tones of
+ * the permission badge (`Permission`): green for editor, blue for commenter, the muted ink of the neutral tone for viewer.
+ */
 .sectionHead {
   display: flex;
   flex-direction: column;
@@ -49,7 +53,7 @@
 }
 
 .section[data-role='commenter'] .sectionHead {
-  border-inline-start-color: var(--color-purple-ink);
+  border-inline-start-color: var(--color-blue-ink);
 }
 
 .section[data-role='viewer'] .sectionHead {
@@ -164,4 +168,51 @@
 
 .date {
   white-space: nowrap;
+}
+
+/*
+ * When the block does not have room for its head beside its rows (a narrow window, or the page zoomed), the head goes on
+ * top, and a row is the icon, the text and the arrow with who made it and when it changed on a second line. The height
+ * of a row is another one then, and it is the skeleton's too, because the skeleton wears the same classes.
+ */
+@container (max-width: 900px) {
+  .section {
+    --shared-row-height: 120px;
+
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-16);
+  }
+
+  .sectionHead {
+    min-height: 72px;
+  }
+
+  .row {
+    grid-template-columns: var(--control-icon-size) minmax(0, 1fr) auto var(--space-16);
+    row-gap: var(--space-8);
+  }
+
+  .rowIcon,
+  .rowText {
+    grid-row: 1;
+  }
+
+  .rowText {
+    grid-column: 2 / 4;
+  }
+
+  .rowCreatedBy {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .rowUpdated {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .rowGo {
+    grid-column: 4;
+    grid-row: 1 / 3;
+  }
 }

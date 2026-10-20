@@ -46,7 +46,9 @@ describe('the Shared screen', () => {
     expect(within(row).getByText('Created by')).toBeInTheDocument()
     expect(within(row).getByText('Marta Ruiz')).toBeInTheDocument()
     expect(within(row).getByText('Updated')).toBeInTheDocument()
-    expect(within(row).getByText(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/)).toBeInTheDocument()
+    const updated = within(row).getByText(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/)
+    expect(updated.tagName).toBe('TIME')
+    expect(updated).toHaveAttribute('datetime', expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/))
     expect(within(row).getByText(/^The launch moves to the second week/)).toBeInTheDocument()
   })
 

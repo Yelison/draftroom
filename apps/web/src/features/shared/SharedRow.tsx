@@ -23,7 +23,7 @@ export function SharedRow({ document }: { document: Schema<'Document'> }) {
           {document.excerpt ?? <span className={styles.noText}>{intl.formatMessage({ id: 'shared.row.noText' })}</span>}
         </span>
       </span>
-      <span className={styles.rowCell}>
+      <span className={`${styles.rowCell} ${styles.rowCreatedBy}`}>
         <span className={styles.rowCellLabel}>{intl.formatMessage({ id: 'shared.row.createdBy' })}</span>
         <span className={styles.person}>
           <Avatar
@@ -35,9 +35,11 @@ export function SharedRow({ document }: { document: Schema<'Document'> }) {
           <span className={styles.personName}>{document.createdBy.name}</span>
         </span>
       </span>
-      <span className={styles.rowCell}>
+      <span className={`${styles.rowCell} ${styles.rowUpdated}`}>
         <span className={styles.rowCellLabel}>{intl.formatMessage({ id: 'shared.row.updated' })}</span>
-        <span className={styles.date}>{intl.formatDate(document.updatedAt, { dateStyle: 'medium' })}</span>
+        <time dateTime={document.updatedAt} className={styles.date}>
+          {intl.formatDate(document.updatedAt, { dateStyle: 'medium' })}
+        </time>
       </span>
       <Icon name="chevron" className={styles.rowGo} />
     </li>

@@ -100,3 +100,23 @@ test('moves neither the headline nor the first block, and gives the rows the hei
   expect(block).toBeCloseTo(skeleton?.block ?? 0, 0)
   expect(row).toBeCloseTo(skeleton?.row ?? 0, 0)
 })
+
+test.describe('in a window as narrow as the page zoomed to 200 %', () => {
+  test.use({ viewport: { width: 640, height: 360 } })
+
+  test('keeps the title of every row readable and each row inside its block', async ({ page }) => {
+    await signInAsDaniel(page)
+    await openSharedFromTheRail(page)
+
+    const links = main(page).getByRole('region').getByRole('link')
+    await expect(links).toHaveCount(6)
+    for (const link of await links.all()) {
+      await expect(link).toBeVisible()
+      expect((await link.boundingBox())?.width ?? 0).toBeGreaterThan(0)
+    }
+    const overflowing = await main(page)
+      .getByRole('listitem')
+      .evaluateAll((rows) => rows.filter((row) => row.scrollWidth > row.clientWidth).length)
+    expect(overflowing).toBe(0)
+  })
+})

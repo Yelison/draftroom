@@ -2,9 +2,14 @@ import type { Schema } from '@draftroom/contract'
 import { describe, expect, it } from 'vitest'
 import { groupByRole } from './groupByRole.ts'
 
-const document = (id: string, role: Schema<'DocumentRole'>) => ({ id, role }) as Schema<'Document'>
+interface Item {
+  id: string
+  role: Schema<'DocumentRole'>
+}
 
-const summary = (documents: Schema<'Document'>[]) =>
+const document = (id: string, role: Item['role']): Item => ({ id, role })
+
+const summary = (documents: Item[]) =>
   groupByRole(documents).map(({ role, documents }) => [role, documents.map(({ id }) => id)])
 
 describe('groupByRole', () => {

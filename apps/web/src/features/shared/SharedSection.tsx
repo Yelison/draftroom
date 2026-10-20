@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { useIntl } from 'react-intl'
 import type { MessageId } from '../../i18n/messages.ts'
 import { SharedRow } from './SharedRow.tsx'
+import type { Schema } from '@draftroom/contract'
 import type { SharedGroup, SharedRole } from './groupByRole.ts'
 import styles from './Shared.module.css'
 
@@ -15,7 +16,7 @@ const copy: Record<SharedRole, { title: MessageId; description: MessageId }> = {
  * What the person can do, said as a sentence, and the documents they can do it with. The count is in the name of the
  * section for a screen reader and is not drawn, since the rows are the count.
  */
-export function SharedSection({ group }: { group: SharedGroup }) {
+export function SharedSection({ group }: { group: SharedGroup<Schema<'Document'>> }) {
   const intl = useIntl()
   const headingId = useId()
   const countId = useId()
