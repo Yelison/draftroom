@@ -14,6 +14,7 @@
   --trash-panel-width: 336px;
   --trash-row-height: 68px;
   --trash-bar-width: 3px;
+  --trash-panel-skeleton-height: 428px;
 
   container-type: inline-size;
 }
@@ -125,6 +126,11 @@
   border: 1px solid var(--color-line);
   border-radius: var(--radius-panel);
   background: var(--color-surface);
+}
+
+/* About what the panel takes for a title of one line, so that it arrives without much change of height. */
+.panelSkeleton {
+  min-height: var(--trash-panel-skeleton-height);
 }
 
 /* Beside a long list the panel stays in view while the list is read, if the window is tall enough to show all of it. */

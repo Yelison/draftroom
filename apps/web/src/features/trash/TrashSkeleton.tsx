@@ -13,7 +13,7 @@ export function TrashSkeleton() {
             <li key={row} className={styles.item} />
           ))}
         </ul>
-        <div className={styles.panel} />
+        <div className={`${styles.panel} ${styles.panelSkeleton}`} />
       </div>
       <p role="status" className="forma-visually-hidden">
         {intl.formatMessage({ id: 'trash.loading' })}
