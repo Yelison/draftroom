@@ -1,5 +1,5 @@
 import { waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { fixtures, renderScreen } from '../documents/testing/renderScreen.tsx'
 import { failingOnce, main, manyPinned, never, overriding, renderHome } from './testing/homeData.ts'
@@ -10,6 +10,24 @@ const titles = () =>
   within(pinned())
     .getAllByRole('link')
     .map((link) => link.textContent)
+
+/** A window whose grid lays out `columns` columns: jsdom has no layout, so the tracks the browser would report are said. */
+function layingOut(columns: number) {
+  const real = window.getComputedStyle.bind(window)
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+    const style = real(element, pseudo)
+    return element instanceof HTMLUListElement && element.id !== ''
+      ? new Proxy(style, {
+          get: (target, property) =>
+            property === 'gridTemplateColumns'
+              ? Array.from({ length: columns }, () => '100px').join(' ')
+              : Reflect.get(target, property, target),
+        })
+      : style
+  })
+}
+
+afterEach(() => vi.restoreAllMocks())
 
 describe('the pinned documents of Home', () => {
   it('lists what the person pinned as chips with a star, in the order the list gives', async () => {
@@ -77,6 +95,22 @@ describe('the pinned documents of Home', () => {
     await user.keyboard('{Enter}')
 
     expect(within(pinned()).getByRole('link', { name: 'Pinned 9' })).toHaveFocus()
+  })
+
+  it('folds at two rows of the columns the grid has, also when the chips arrive after the section', async () => {
+    layingOut(2)
+    await renderHome({
+      wrap: (dataSource) =>
+        overriding({
+          listPinnedDocuments: async (request) => {
+            await new Promise((resolve) => setTimeout(resolve, 50))
+            return manyPinned(12)(dataSource).listPinnedDocuments(request)
+          },
+        })(dataSource),
+    })
+
+    expect(await within(main()).findByRole('button', { name: 'Show all 12 pinned' })).toBeInTheDocument()
+    expect(titles()).toHaveLength(4)
   })
 
   it('counts in Spanish when the app is in Spanish', async () => {

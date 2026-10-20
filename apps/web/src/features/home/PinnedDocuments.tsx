@@ -19,7 +19,7 @@ const foldedRows = 2
 export function PinnedDocuments({ pinned }: { pinned: UseQueryResult<Schema<'DocumentList'>> }) {
   const intl = useIntl()
   const listId = useId()
-  const { grid, columns } = useGridColumns<HTMLUListElement>()
+  const { grid, ref, columns } = useGridColumns()
   const [unfolded, setUnfolded] = useState(false)
   const firstUnfolded = useRef<number | null>(null)
   const items = pinned.data?.items ?? []
@@ -29,7 +29,7 @@ export function PinnedDocuments({ pinned }: { pinned: UseQueryResult<Schema<'Doc
   // The chips that were folded are in the page once the render is done: the first of them is where the keyboard goes on.
   useLayoutEffect(() => {
     if (firstUnfolded.current === null) return
-    grid.current?.querySelectorAll('a')[firstUnfolded.current]?.focus()
+    grid?.querySelectorAll('a')[firstUnfolded.current]?.focus()
     firstUnfolded.current = null
   })
 
@@ -46,7 +46,7 @@ export function PinnedDocuments({ pinned }: { pinned: UseQueryResult<Schema<'Doc
         <ListSkeleton rows={2} listClassName={`${styles.chips} ${styles.chipsSkeleton}`} label="home.pinned.loading" />
       ) : (
         <>
-          <ul ref={grid} id={listId} className={styles.chips}>
+          <ul ref={ref} id={listId} className={styles.chips}>
             {shown.map((document) => (
               <li key={document.id}>
                 <Link to={`/documents/${document.id}`} className={styles.chip}>
