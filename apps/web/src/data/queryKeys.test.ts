@@ -153,8 +153,10 @@ describe('what each row leaves stale in a real cache', () => {
   })
 })
 
-// Section 9 of the collaboration protocol says, for each event, which queries the screen must refresh. The table above
-// follows the rows of the code; this one follows the document, so a row that grows or loses a name is a failure.
+// The "Cache and invalidation" table of `docs/api/README.md` says, for each event of the collaboration protocol (section
+// 9), which queries the screen must refresh. The table above follows the rows of the code; this one follows that
+// document, so a row that grows or loses a name is a failure. Section 9 itself names only the document for
+// `metadata-changed` and `document-archived`: the lists are the README's.
 describe('what each event of the collaboration protocol refreshes (section 9)', () => {
   it.each([
     { event: 'metadata-changed', names: ['document', 'documentLists'] },

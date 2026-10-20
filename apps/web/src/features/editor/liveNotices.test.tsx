@@ -3,7 +3,7 @@ import { act, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { copiesOf } from '../../collab/offlineCache.ts'
 import type { DataSource } from '../../data/DataSource.ts'
-import { marta } from '../../data/mock/fixtures/index.ts'
+import { daniel, marta } from '../../data/mock/fixtures/index.ts'
 import { launchPlan, openEditor, people } from './testing/renderEditor.tsx'
 
 afterEach(() => vi.restoreAllMocks())
@@ -116,6 +116,7 @@ describe('a document archived while it is open', () => {
   it('takes the access from a person who is not an owner: the screen says so and the copy of this device is purged', async () => {
     const { server } = await openEditor({ signedInAs: people.daniel })
     await screen.findByText('Sync status: Synced')
+    expect(await copiesOf(daniel.id)).toHaveLength(1)
     const owner = server.connect({ signedInAs: people.marta })
 
     await owner.archiveDocument({ params: { path: { documentId: launchPlan.id } } })
@@ -124,6 +125,7 @@ describe('a document archived while it is open', () => {
 
     expect(await screen.findByRole('heading', { name: 'Your access to this document was removed' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Document content' })).not.toBeInTheDocument()
+    await waitFor(async () => expect(await copiesOf(daniel.id)).toEqual([]))
   })
 
   it('leaves the owner the document to read: not editable, with the copy of this device kept', async () => {
