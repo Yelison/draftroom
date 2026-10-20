@@ -1,0 +1,6 @@
+/* The browser's yellow is neither a token nor readable in both themes: the amber pair is the one with a declared contrast. */
+.match {
+  border-radius: var(--radius-small);
+  background: var(--color-amber-bg);
+  color: var(--color-amber-ink);
+}

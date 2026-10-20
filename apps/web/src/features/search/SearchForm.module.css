@@ -3,3 +3,9 @@
   max-width: var(--list-search-width);
   margin-block: var(--space-24);
 }
+
+.scope {
+  margin: var(--space-8) 0 0;
+  color: var(--color-muted);
+  font: var(--font-caption);
+}

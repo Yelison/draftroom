@@ -1,5 +1,5 @@
 import { SearchField } from '@yelison/forma-ui'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useIntl } from 'react-intl'
 import styles from './SearchForm.module.css'
 import { useSearchSubmit } from './useSearchSubmit.ts'
@@ -10,7 +10,7 @@ export interface SearchFormProps {
 }
 
 /**
- * The search field of the results. Its text is the person's until the URL changes under it (Back, Forward, a new
+ * The search field of the results, with what it searches in. Its text is the person's until the URL changes under it (Back, Forward, a new
  * search): then it shows what the URL says. The field is not remounted for that, so it keeps the focus Enter left on it.
  */
 export function SearchForm({ term }: SearchFormProps) {
@@ -22,6 +22,7 @@ export function SearchForm({ term }: SearchFormProps) {
     setText(term ?? '')
   }
   const submit = useSearchSubmit(text)
+  const scopeId = useId()
 
   return (
     <div className={styles.search}>
@@ -31,7 +32,12 @@ export function SearchForm({ term }: SearchFormProps) {
         value={text}
         onValueChange={setText}
         onKeyDown={submit}
+        aria-describedby={scopeId}
       />
+      {/* What the server looks in, said where the person types: a word that is further into the text will not be found. */}
+      <p id={scopeId} className={styles.scope}>
+        {intl.formatMessage({ id: 'search.scope' })}
+      </p>
     </div>
   )
 }

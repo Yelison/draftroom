@@ -1,0 +1,13 @@
+/* A line of its own whether it has words or not: `lh` is the line height of the font token, so no font changes it. */
+.count {
+  min-height: 1lh;
+  margin: 0 0 var(--space-12);
+  color: var(--color-ink);
+  font: var(--font-strong);
+}
+
+.moreFailed {
+  margin: var(--space-16) 0 0;
+  color: var(--color-red-ink);
+  font: var(--font-caption);
+}

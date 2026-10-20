@@ -29,23 +29,23 @@ function watch(dataSource: DataSource) {
 }
 
 describe('the search results screen', () => {
-  it('says what was searched and lists the documents that match', async () => {
+  it('keeps its headline and the text of the search, and lists the documents that match', async () => {
     renderScreen('/search?q=weekly')
 
-    await heading('Results for “weekly”')
+    await heading('Search documents')
     expect(await within(main()).findByRole('link', { name: 'Weekly update — October 6' })).toHaveAttribute(
       'href',
       `/documents/${fixtures.weeklyEnglish.id}`,
     )
     expect(within(main()).queryByRole('link', { name: 'Autumn launch plan' })).not.toBeInTheDocument()
     expect(searchbox()).toHaveValue('weekly')
-    expect(document.title).toBe('Results for “weekly” · Draftroom')
+    expect(document.title).toBe('Search documents · Draftroom')
   })
 
   it('finds a document by its excerpt, and never lists an archived one', async () => {
     renderScreen('/search?q=pricing')
 
-    await heading('Results for “pricing”')
+    await heading('Search documents')
     expect(await within(main()).findByRole('link', { name: 'Autumn launch plan' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Old pricing draft' })).not.toBeInTheDocument()
   })
@@ -59,7 +59,7 @@ describe('the search results screen', () => {
           new Promise((resolve) => (arrive = () => resolve(dataSource.listDocuments(request)))),
       }),
     })
-    await heading('Results for “weekly”')
+    await heading('Search documents')
 
     // Once the documents are asked for, the skeleton of the list is the one that stays until they arrive.
     await waitFor(() => expect(arrive).toBeDefined())
@@ -112,7 +112,7 @@ describe('the search results screen', () => {
           }),
       }),
     })
-    await heading('Results for “a”')
+    await heading('Search documents')
     expect(await within(main()).findAllByRole('link')).toHaveLength(2)
 
     await user.click(within(main()).getByRole('button', { name: 'Load more' }))
@@ -144,7 +144,7 @@ describe('the search URL', () => {
     const watching: { current?: ReturnType<typeof watch> } = {}
     renderScreen(path, { wrap: (dataSource) => (watching.current = watch(dataSource)).watched })
 
-    await heading('Search results')
+    await heading('Search documents')
     expect(screen.getByText('Search your documents')).toBeInTheDocument()
     expect(searchbox()).toHaveValue('')
     // Anything the screen would ask would have been asked by now: the workspace is the first thing it reads.
@@ -159,7 +159,8 @@ describe('the search URL', () => {
       wrap: (dataSource) => (watching.current = watch(dataSource)).watched,
     })
 
-    await heading(`Results for “${'x'.repeat(200)}”`)
+    await heading('Search documents')
+    expect(searchbox()).toHaveValue('x'.repeat(200))
     await waitFor(() => expect(watching.current?.calls.queries).toEqual(['x'.repeat(200)]))
   })
 
@@ -167,7 +168,7 @@ describe('the search URL', () => {
     const watching: { current?: ReturnType<typeof watch> } = {}
     renderScreen('/search?q=a%26b%23c%25d', { wrap: (dataSource) => (watching.current = watch(dataSource)).watched })
 
-    await heading('Results for “a&b#c%d”')
+    await heading('Search documents')
     await waitFor(() => expect(watching.current?.calls.queries).toEqual(['a&b#c%d']))
   })
 })
@@ -175,31 +176,31 @@ describe('the search URL', () => {
 describe('searching again from the results', () => {
   it('puts the new search in the URL when Enter is pressed, and keeps the focus in the field', async () => {
     const { user, router } = renderScreen('/search?q=weekly')
-    await heading('Results for “weekly”')
+    await heading('Search documents')
 
     await user.clear(searchbox())
     await user.type(searchbox(), '  launch {Enter}')
 
-    await heading('Results for “launch”')
-    expect(router.state.location.search).toBe('?q=launch')
+    await waitFor(() => expect(router.state.location.search).toBe('?q=launch'))
     expect(await within(main()).findByRole('link', { name: 'Autumn launch plan' })).toBeInTheDocument()
     expect(searchbox()).toHaveFocus()
   })
 
   it('does not search anything new, or leave, until Enter is pressed', async () => {
     const { user, router } = renderScreen('/search?q=weekly')
-    await heading('Results for “weekly”')
+    await heading('Search documents')
 
     await user.clear(searchbox())
     await user.type(searchbox(), 'launch')
 
     expect(router.state.location.search).toBe('?q=weekly')
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Results for “weekly”')
+    expect(within(main()).getByRole('link', { name: 'Weekly update — October 6' })).toBeInTheDocument()
+    expect(within(main()).queryByRole('link', { name: 'Autumn launch plan' })).not.toBeInTheDocument()
   })
 
   it('does nothing when Enter is pressed on an empty field', async () => {
     const { user, router } = renderScreen('/search?q=weekly')
-    await heading('Results for “weekly”')
+    await heading('Search documents')
 
     await user.clear(searchbox())
     await user.keyboard('{Enter}')
@@ -209,19 +210,19 @@ describe('searching again from the results', () => {
 
   it('follows Back and Forward, the field and the results with them', async () => {
     const { user, router } = renderScreen('/search?q=weekly')
-    await heading('Results for “weekly”')
+    await heading('Search documents')
     await user.clear(searchbox())
     await user.type(searchbox(), 'launch{Enter}')
-    await heading('Results for “launch”')
+    await within(main()).findByRole('link', { name: 'Autumn launch plan' })
 
     await act(() => router.navigate(-1))
-    await heading('Results for “weekly”')
+    await heading('Search documents')
     expect(searchbox()).toHaveValue('weekly')
     expect(await within(main()).findByRole('link', { name: 'Weekly update — October 6' })).toBeInTheDocument()
 
     await act(() => router.navigate(1))
-    await heading('Results for “launch”')
     expect(searchbox()).toHaveValue('launch')
+    expect(await within(main()).findByRole('link', { name: 'Autumn launch plan' })).toBeInTheDocument()
   })
 })
 
@@ -230,11 +231,10 @@ describe('the search results screen in Spanish', () => {
     localStorage.setItem(localeStorageKey, 'es')
     const { router } = renderScreen('/search')
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Resultados de búsqueda' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Buscar documentos' })).toBeInTheDocument()
     expect(screen.getByText('Busca en tus documentos')).toBeInTheDocument()
 
     await act(() => router.navigate('/search?q=semanal'))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Resultados para «semanal»' })).toBeInTheDocument()
     expect(await within(main()).findByRole('link', { name: /semanal/ })).toBeInTheDocument()
     await waitFor(() =>
       expect(

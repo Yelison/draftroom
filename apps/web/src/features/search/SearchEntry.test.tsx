@@ -16,7 +16,7 @@ describe.each([
 
     await user.type(await field(), '  weekly {Enter}')
 
-    const title = await screen.findByRole('heading', { level: 1, name: 'Results for “weekly”' })
+    const title = await screen.findByRole('heading', { level: 1, name: 'Search documents' })
     expect(router.state.location.pathname).toBe('/search')
     expect(router.state.location.search).toBe('?q=weekly')
     await waitFor(() => expect(title).toHaveFocus())
@@ -39,7 +39,8 @@ describe.each([
 
     await user.type(await field(), 'a&b#c%d{Enter}')
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Results for “a&b#c%d”' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Search documents' })).toBeInTheDocument()
+    expect(within(screen.getByRole('main')).getByRole('searchbox')).toHaveValue('a&b#c%d')
   })
 
   it('does not take the Enter that confirms a composition of an input method for a search', async () => {
@@ -65,7 +66,7 @@ describe('Enter twice on the same search', () => {
   it('leaves one place in the history, so Back goes to the screen before the results', async () => {
     const { user, router } = renderScreen('/documents')
     await user.type(await documentsSearch(), 'weekly{Enter}')
-    await screen.findByRole('heading', { level: 1, name: 'Results for “weekly”' })
+    await screen.findByRole('heading', { level: 1, name: 'Search documents' })
 
     await user.type(within(screen.getByRole('main')).getByRole('searchbox'), '{Enter}')
     await act(() => router.navigate(-1))
