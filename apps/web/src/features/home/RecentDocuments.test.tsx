@@ -1,7 +1,7 @@
 import { within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { daniel } from '../../data/mock/fixtures/index.ts'
-import { fixtures, renderScreen } from '../documents/testing/renderScreen.tsx'
+import { fixtures } from '../documents/testing/renderScreen.tsx'
 import { failingOnce, main, never, overriding, renderHome } from './testing/homeData.ts'
 
 const { launchPlan, designReview, weeklyEnglish, weeklySpanish } = fixtures
@@ -110,7 +110,7 @@ describe('the documents to pick up on Home', () => {
   )
 
   it('shows a skeleton with a spoken status while they are on their way', async () => {
-    renderScreen('/', { wrap: overriding({ listDocuments: never }) })
+    await renderHome({ wrap: overriding({ listDocuments: never }) })
 
     expect(await within(main()).findByText('Loading your recent documents')).toHaveAttribute('role', 'status')
   })

@@ -124,6 +124,7 @@ describe('the pinned documents of Home', () => {
     renderScreen('/', { wrap: overriding({ listPinnedDocuments: never }) })
 
     expect(await within(main()).findByText('Loading your pinned documents')).toHaveAttribute('role', 'status')
+    expect(within(pinned()).getAllByRole('listitem')).toHaveLength(2)
   })
 
   it('says it could not read them, and tries again when asked', async () => {

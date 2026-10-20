@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { localeStorageKey } from '../../i18n/locale.ts'
-import { renderScreen, workspaceFixtures } from '../documents/testing/renderScreen.tsx'
+import { fixtures, renderScreen, workspaceFixtures } from '../documents/testing/renderScreen.tsx'
 import { failingOnce, main, never, overriding, renderHome } from './testing/homeData.ts'
 
 describe('the headline of Home', () => {
@@ -14,6 +14,7 @@ describe('the headline of Home', () => {
 
   it('goes on without the name when the workspace cannot be read', async () => {
     await renderHome({ wrap: overriding({ getWorkspace: () => Promise.reject(new Error('offline')) }) })
+    await within(main()).findAllByRole('link', { name: fixtures.launchPlan.title })
 
     expect(within(main()).queryByText(workspaceFixtures.harborPine.name)).not.toBeInTheDocument()
     expect(within(main()).queryByRole('alert')).not.toBeInTheDocument()
@@ -32,14 +33,14 @@ describe('the headline of Home', () => {
 
 describe('what Home shows while it loads and when there is nothing yet', () => {
   it('shows the sections that are on their way as skeletons with a spoken status', async () => {
-    renderScreen('/', { wrap: overriding({ listDocuments: never, listTemplates: never }) })
+    await renderHome({ wrap: overriding({ listDocuments: never, listTemplates: never }) })
 
     expect(await within(main()).findByText('Loading your recent documents')).toHaveAttribute('role', 'status')
     expect(await within(main()).findByText('Loading templates')).toHaveAttribute('role', 'status')
   })
 
   it('draws the pinned documents and the latest event only once the documents above them have arrived', async () => {
-    renderScreen('/', { wrap: overriding({ listDocuments: never }) })
+    await renderHome({ wrap: overriding({ listDocuments: never }) })
     await within(main()).findByText('Loading your recent documents')
 
     expect(within(main()).queryByRole('region', { name: 'Pinned' })).not.toBeInTheDocument()

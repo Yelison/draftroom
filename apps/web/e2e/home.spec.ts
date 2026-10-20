@@ -169,13 +169,14 @@ for (const width of widths) {
     await page.setViewportSize({ width, height: width === 640 ? 360 : 800 })
     // The skeleton is on screen for a moment only: its measures are taken as it appears, before the real ones replace it.
     await page.addInitScript(() => {
-      const seen = window as unknown as { skeleton?: { start: number; blocks: number[] } }
+      const seen = window as unknown as { skeleton?: { start: number; top: number; blocks: number[] } }
       new MutationObserver(() => {
         const start = document.querySelector('main section[aria-busy="true"]')
         const blocks = [...document.querySelectorAll('main [aria-busy="true"] li')]
         if (start !== null && blocks.length >= 6 && seen.skeleton === undefined) {
           seen.skeleton = {
             start: start.getBoundingClientRect().height,
+            top: start.getBoundingClientRect().top,
             blocks: blocks.map((block) => block.getBoundingClientRect().height),
           }
         }
@@ -186,16 +187,20 @@ for (const width of widths) {
     await expect(recent(page).getByRole('link', { name: launchPlan.title })).toBeVisible()
     await expect(main(page).getByRole('button', { name: /Meeting notes/ })).toBeVisible()
     const skeleton = await page.evaluate(
-      () => (window as unknown as { skeleton?: { start: number; blocks: number[] } }).skeleton,
+      () => (window as unknown as { skeleton?: { start: number; top: number; blocks: number[] } }).skeleton,
     )
     expect(skeleton, 'the skeleton was seen').toBeDefined()
     const start = await main(page)
       .getByRole('region', { name: 'Start something new' })
-      .evaluate((element) => element.getBoundingClientRect().height)
+      .evaluate((element) => ({
+        height: element.getBoundingClientRect().height,
+        top: element.getBoundingClientRect().top,
+      }))
     const real = await main(page)
       .locator('li:has(> button), li:has(h3)')
       .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().height))
-    expect(start).toBeCloseTo(skeleton?.start ?? 0, 0)
+    expect(start.height).toBeCloseTo(skeleton?.start ?? 0, 0)
+    expect(start.top, 'where it starts').toBeCloseTo(skeleton?.top ?? 0, 0)
     expect(real).toHaveLength(6)
     real.forEach((height, index) => expect(height, `block ${index}`).toBeCloseTo(skeleton?.blocks[index] ?? 0, 0))
   })

@@ -69,6 +69,7 @@ describe('the latest event of Home', () => {
 
     expect(within(main()).queryByRole('region', { name: 'Latest' })).not.toBeInTheDocument()
     expect(within(main()).queryByRole('link', { name: 'See all activity' })).not.toBeInTheDocument()
+    expect(within(main()).queryByText('Loading the latest activity')).not.toBeInTheDocument()
   })
 
   it('credits a version the server saved on its own to nobody, with a clock and not initials', async () => {
