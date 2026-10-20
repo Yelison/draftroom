@@ -14,9 +14,11 @@ const namedWhen = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeSt
 const namedName = `Before the pricing review, ${namedWhen}`
 
 const list = (page: Page) => page.getByRole('region', { name: 'Versions' })
+const reader = (page: Page) => page.getByRole('region', { name: 'Version', exact: true })
+const toggle = (page: Page) => list(page).getByRole('button', { name: 'Show automatic versions' })
 
 test.describe('the version history', () => {
-  test('is opened from the editor, a version is read, restored and the way back to the document is the keyboard', async ({
+  test('is opened from the editor, an automatic version is shown and read, restored with a confirmation, all by keyboard', async ({
     page,
   }) => {
     await page.goto(`/documents/${launchPlan.id}`)
@@ -27,22 +29,30 @@ test.describe('the version history', () => {
 
     await expect(page).toHaveURL(new RegExp(`/documents/${launchPlan.id}/versions$`))
     await expect(page.getByRole('heading', { level: 1, name: 'Version history' })).toBeFocused()
+    // The automatic versions wait behind the switch: only the one a person saved is listed, and it is the one that is read.
+    await expect(list(page).getByRole('listitem')).toHaveCount(1)
+    await expect(reader(page).getByText('Nothing you do here changes the document.')).toBeVisible()
+
+    await toggle(page).focus()
+    await page.keyboard.press('Enter')
+    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true')
     await expect(list(page).getByRole('listitem')).toHaveCount(3)
 
-    // Read the version that has a name of its own.
-    const row = list(page).getByRole('button', { name: /^Before the pricing review/ })
-    await row.focus()
+    // Read the oldest one, which is an automatic one.
+    const oldest = list(page).getByRole('listitem').last().getByRole('button')
+    await oldest.focus()
     await page.keyboard.press('Enter')
-    await expect(row).toHaveAttribute('aria-current', 'true')
-    const text = page.getByRole('region', { name: `Text of “${namedName}”` })
+    await expect(oldest).toHaveAttribute('aria-current', 'true')
+    await expect(oldest).toBeFocused()
+    const text = reader(page).getByRole('region', { name: /^Text of “Automatic version from / })
     await expect(text.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'false')
-    await expect(text).toContainText('The launch moves to the second week of November.')
+    await expect(text).toContainText('The launch is planned for the first week of November')
 
-    // Restore it: the dialog opens on the way out, and the focus comes back to the button that asked.
-    const restore = list(page).getByRole('button', { name: `Restore “${namedName}”` })
+    // Restore it: the dialog opens, the way out has the focus, and when it closes the focus is back on the button.
+    const restore = reader(page).getByRole('button', { name: 'Restore this version' })
     await restore.focus()
     await page.keyboard.press('Enter')
-    const dialog = page.getByRole('dialog', { name: `Restore “${namedName}”?` })
+    const dialog = page.getByRole('dialog', { name: /^Restore “Automatic version from .*”\?$/ })
     await expect(dialog).toContainText('How it is now is saved first as a version')
     await expect(dialog.getByRole('button', { name: 'Close' })).toBeFocused()
     await page.keyboard.press('Tab')
@@ -51,10 +61,12 @@ test.describe('the version history', () => {
 
     await expect(dialog).toBeHidden()
     await expect(restore).toBeFocused()
-    await expect(page.getByText(/The document went back to “Before the pricing review, /)).toBeAttached()
+    await expect(page.getByText(/The document went back to “Automatic version from /)).toBeAttached()
     await expect(list(page).getByRole('listitem')).toHaveCount(5)
     await expect(list(page).getByRole('listitem').first()).toContainText('Restored version')
     await expect(list(page).getByRole('listitem').nth(1)).toContainText('Version before a restore')
+    // What was read is still read, and still marked.
+    await expect(oldest).toHaveAttribute('aria-current', 'true')
 
     // Back to the document.
     const back = page.getByRole('link', { name: 'Back to the document “Autumn launch plan”' })
@@ -66,7 +78,7 @@ test.describe('the version history', () => {
 
   test('saves a version with a name, with the keyboard, and the focus comes back to the button', async ({ page }) => {
     await page.goto(`/documents/${launchPlan.id}/versions`)
-    await expect(list(page).getByRole('listitem')).toHaveCount(3)
+    await expect(list(page).getByRole('listitem')).toHaveCount(1)
     const save = page.getByRole('button', { name: 'Save a version' })
     await save.focus()
     await page.keyboard.press('Enter')
@@ -78,6 +90,15 @@ test.describe('the version history', () => {
     await expect(dialog).toBeHidden()
     await expect(save).toBeFocused()
     await expect(list(page).getByRole('listitem').first()).toContainText('Ready for review')
+  })
+
+  test('has no explorer, which the editor has', async ({ page }) => {
+    await page.goto(`/documents/${launchPlan.id}/versions`)
+    await expect(list(page).getByRole('listitem')).toHaveCount(1)
+    await expect(page.getByRole('complementary', { name: 'Explorer' })).toHaveCount(0)
+
+    await page.goto(`/documents/${launchPlan.id}`)
+    await expect(page.getByRole('complementary', { name: 'Explorer' })).toBeVisible()
   })
 })
 
@@ -98,17 +119,43 @@ const shifts = (page: Page) =>
       }),
   )
 
+/** The box of an element as the page lays it out, to compare what the skeleton took with what replaced it. */
+interface Box {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+interface Geometry {
+  header: Box
+  list: Box
+  reader: Box
+}
+type Seen = { skeleton?: Geometry }
+
+const geometryOf = (page: Page) =>
+  page.evaluate((): Geometry => {
+    const box = (element: Element | null): Box => {
+      const { x, y, width, height } = (element ?? document.body).getBoundingClientRect()
+      return { x, y, width, height }
+    }
+    return {
+      header: box(document.querySelector('main header')),
+      list: box(document.querySelector('main section[aria-labelledby]')),
+      reader: box(document.querySelector('main section[aria-label="Version"]')),
+    }
+  })
+
 test.describe('the layout', () => {
   for (const width of [1440, 1280]) {
     test.describe(`at ${width} px`, () => {
       test.use({ viewport: { width, height: 900 } })
 
-      test('has no horizontal scroll with a version open', async ({ page }) => {
+      test('has no horizontal scroll with the automatic versions shown and one of them open', async ({ page }) => {
         await page.goto(`/documents/${launchPlan.id}/versions`)
-        await list(page)
-          .getByRole('button', { name: /^Before the pricing review/ })
-          .click()
-        await expect(page.locator('.ProseMirror[contenteditable="false"]')).toContainText('second week of November')
+        await toggle(page).click()
+        await list(page).getByRole('listitem').first().getByRole('button').click()
+        await expect(page.locator('.ProseMirror[contenteditable="false"]')).toContainText('Marketing prepares')
 
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
       })
@@ -121,14 +168,119 @@ test.describe('the layout', () => {
           await route.continue()
         })
         await page.goto(`/documents/${launchPlan.id}/versions`)
-        await expect(list(page).getByRole('listitem')).toHaveCount(3)
+        await expect(list(page).getByRole('listitem')).toHaveCount(1)
+        await expect(reader(page).getByText(/^You are reading the version of /)).toBeVisible()
 
         // The screen is small, so a block that jumps scores little: what is measured is none at all, not the editor's one in a hundred.
         expect(await shifts(page)).toBeLessThan(0.001)
       })
     })
   }
+
+  for (const [width, height] of [
+    [1280, 800],
+    [640, 360],
+  ] as const) {
+    test(`gives the list and the reader the box of their skeletons at ${width} px, so nothing moves`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height })
+      await page.route('**/assets/VersionsScreen-*.js', async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 400))
+        await route.continue()
+      })
+      // The skeleton is on screen for a moment only: its boxes are taken as it appears, before the real ones replace it.
+      await page.addInitScript(() => {
+        const seen = window as unknown as Seen
+        new MutationObserver(() => {
+          const list = document.querySelector('main section[aria-labelledby] [aria-busy="true"]')
+          const reader = document.querySelector('main section[aria-label="Version"] [aria-busy="true"]')
+          if (list === null || reader === null || seen.skeleton !== undefined) return
+          const box = (element: Element | null) => {
+            const { x, y, width, height } = (element ?? document.body).getBoundingClientRect()
+            return { x, y, width, height }
+          }
+          seen.skeleton = {
+            header: box(document.querySelector('main header')),
+            list: box(list.closest('section')),
+            reader: box(reader.closest('section')),
+          }
+        }).observe(document, { childList: true, subtree: true })
+      })
+      await page.goto(`/documents/${launchPlan.id}/versions`)
+      await expect(reader(page).getByText(/^You are reading the version of /)).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Save a version' })).toBeVisible()
+
+      const skeleton = await page.evaluate(() => (window as unknown as Seen).skeleton)
+      expect(skeleton, 'the skeleton was seen').toBeDefined()
+      const loaded = await geometryOf(page)
+      for (const part of ['header', 'list', 'reader'] as const) {
+        for (const side of ['x', 'y', 'width', 'height'] as const) {
+          expect(loaded[part][side], `${part} ${side}`).toBeCloseTo(skeleton?.[part][side] ?? NaN, 0)
+        }
+      }
+    })
+  }
+
+  test('cuts nothing and has no sideways scroll in a window of 640 × 360, which is the page zoomed to 200 %', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 640, height: 360 })
+    await page.goto(`/documents/${launchPlan.id}/versions`)
+    await expect(reader(page).getByRole('button', { name: 'Restore this version' })).toBeVisible()
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(0)
+    // A box whose content is wider than it is has something cut off or sticking out.
+    const cut = await page
+      .getByRole('main')
+      .evaluate((root) =>
+        [...root.querySelectorAll<HTMLElement>('*')]
+          .filter(
+            (element) =>
+              element.scrollWidth > element.clientWidth + 1 && getComputedStyle(element).display !== 'inline',
+          )
+          .map((element) => element.textContent?.slice(0, 40)),
+      )
+    expect(cut).toEqual([])
+    // The panels give way: the list is above the reader, and the button that restores is whole inside the window.
+    const [listBox, readerBox, restoreBox] = await Promise.all([
+      list(page).boundingBox(),
+      reader(page).boundingBox(),
+      reader(page).getByRole('button', { name: 'Restore this version' }).boundingBox(),
+    ])
+    expect((listBox?.y ?? 0) + (listBox?.height ?? 0)).toBeLessThanOrEqual(readerBox?.y ?? 0)
+    expect((restoreBox?.x ?? 0) + (restoreBox?.width ?? 0)).toBeLessThanOrEqual(640)
+  })
 })
+
+const looks = [
+  { name: 'English, light', locale: 'en-US', colorScheme: 'light' },
+  { name: 'Spanish, dark', locale: 'es-ES', colorScheme: 'dark' },
+] as const
+
+for (const { name, locale, colorScheme } of looks) {
+  test.describe(name, () => {
+    test.use({ locale, colorScheme })
+
+    test('has no horizontal scroll at 1280 and 1440 px', async ({ page }) => {
+      for (const width of [1280, 1440]) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.goto(`/documents/${launchPlan.id}/versions`)
+        await expect(
+          page.getByRole('button', { name: /^(Restore this version|Restaurar esta versión)$/ }),
+        ).toBeVisible()
+
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        )
+        expect(overflow, `${width}px`).toBeLessThanOrEqual(0)
+      }
+    })
+  })
+}
 
 test.describe('the header of the history with a title of 200 characters', () => {
   for (const locale of ['en-US', 'es-ES'] as const) {

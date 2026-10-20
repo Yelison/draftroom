@@ -3,10 +3,17 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  height: calc(var(--space-64) * 8);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-panel);
   background: var(--color-surface);
   overflow: hidden;
+}
+
+@container (width >= 720px) {
+  .panel {
+    height: auto;
+  }
 }
 
 /* Fixed above the text: the text scrolls under it, and it is as tall with the button as without. */

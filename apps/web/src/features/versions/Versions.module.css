@@ -39,11 +39,13 @@
   overflow-wrap: anywhere;
 }
 
+/* The row of buttons is as tall as a button before they arrive, so the header is as tall with them as without. */
 .actions {
   display: flex;
   flex-shrink: 0;
   flex-wrap: wrap;
   gap: var(--space-8);
+  min-height: var(--button-height);
 }
 
 .body {
@@ -56,6 +58,11 @@
 }
 
 @container (width < 720px) {
+  /* Under the title, in a row of their own, whether they are there yet or not: they would wrap when they arrive. */
+  .actions {
+    flex-basis: 100%;
+  }
+
   .body {
     flex: none;
     grid-template-columns: minmax(0, 1fr);
