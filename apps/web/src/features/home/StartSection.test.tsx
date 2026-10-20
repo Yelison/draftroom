@@ -93,6 +93,23 @@ describe('starting a document from Home', () => {
     expect(blank).toHaveAttribute('aria-disabled', 'true')
   })
 
+  it('makes one document when "New document" is pressed while one is being made from a template', async () => {
+    const requests: unknown[] = []
+    const { user } = await renderHome({
+      wrap: overriding({
+        createDocument: (request) => {
+          requests.push(request.body)
+          return never()
+        },
+      }),
+    })
+
+    await user.click(await within(start()).findByRole('button', { name: /Project brief/ }))
+    await user.click(within(start()).getByRole('button', { name: 'New document' }))
+
+    expect(requests).toHaveLength(1)
+  })
+
   it('shows the wait on "New document" for a blank document, and locks the tiles', async () => {
     const { user } = await renderHome({ wrap: overriding({ createDocument: () => never() }) })
     const tile = await within(start()).findByRole('button', { name: /Project brief/ })

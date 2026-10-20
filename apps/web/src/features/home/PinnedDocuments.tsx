@@ -63,13 +63,15 @@ export function PinnedDocuments({ pinned }: { pinned: UseQueryResult<Schema<'Doc
             id={listId}
             className={styles.chips}
             onFocus={(event) => {
-              focusedChip.current = Array.from(event.currentTarget.children).indexOf(
-                (event.target as HTMLElement).closest('li') as Element,
-              )
+              const chip = event.target instanceof Element ? event.target.closest('li') : null
+              if (chip !== null) focusedChip.current = Array.from(event.currentTarget.children).indexOf(chip)
             }}
             onBlur={(event) => {
-              // Moving on to something else is not losing the focus; a chip that goes away gives no such event.
-              if (event.relatedTarget !== null) focusedChip.current = null
+              // Moving on to something else, or clicking away from a chip that is still there, is not losing the focus to
+              // a chip that goes away: that one gives no such event, or gives it when it is no longer in the page.
+              if (event.relatedTarget !== null || (event.target instanceof Node && event.target.isConnected)) {
+                focusedChip.current = null
+              }
             }}
           >
             {shown.map((document) => (

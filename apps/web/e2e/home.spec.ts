@@ -175,6 +175,27 @@ test('keeps the focus on the button that shows the rest when the window narrows 
   await expect(toggle).toBeFocused()
 })
 
+test('does not move the focus to the button when it was clicked away from a chip and the window narrows', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await makeDocuments(page, 2)
+  await pinEverything(page)
+  const chips = pinned(page).getByRole('link')
+  const toggle = pinned(page).getByRole('button', { name: /^Show all \d+ pinned$/ })
+  await expect(toggle).toBeVisible()
+  await chips.nth(6).focus()
+  // The empty part of the rail takes no focus, so the blur of the chip names no element it goes to.
+  await page.mouse.click(100, 600)
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true)
+  await expect(chips.nth(6)).not.toBeFocused()
+
+  await page.setViewportSize({ width: 640, height: 360 })
+
+  await expect(chips).toHaveCount(4)
+  await expect(toggle).not.toBeFocused()
+})
+
 test('lets a card and a chip with a long title grow instead of spilling their text out of them', async ({ page }) => {
   const longTitle = `${'A title that someone wrote at great length '.repeat(3).trim()} and then some more words`
   await page.goto('/documents')
