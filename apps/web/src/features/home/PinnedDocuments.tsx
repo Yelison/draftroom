@@ -1,135 +1,78 @@
 import type { Schema } from '@draftroom/contract'
 import type { UseQueryResult } from '@tanstack/react-query'
-import { Button } from '@yelison/forma-ui'
-import { useEffect, useRef, useState } from 'react'
+import { Button, Icon } from '@yelison/forma-ui'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { useIntl } from 'react-intl'
-import { DocumentRow } from '../../components/DocumentRow/DocumentRow.tsx'
-import { DocumentRowLink } from '../../components/DocumentRow/DocumentRowLink.tsx'
-import { usePinDocument } from '../documents/actions/usePinDocument.ts'
-import { useCreateDocument } from '../documents/actions/useCreateDocument.ts'
-import { PinButton } from '../documents/PinButton.tsx'
-import { problemMessageId } from '../documents/problemMessage.ts'
-import { StateMessage } from '../documents/StateMessage.tsx'
-import layout from '../documents/ListLayout.module.css'
-import { PinnedLoading } from './PinnedLoading.tsx'
-import { PinnedSection } from './PinnedSection.tsx'
+import { Link } from 'react-router'
+import { ListSkeleton } from '../documents/ListSkeleton.tsx'
+import { SectionError } from './SectionError.tsx'
+import { useGridColumns } from './useGridColumns.ts'
 import styles from './Home.module.css'
 
-type Document = Schema<'Document'>
-
-export interface PinnedDocumentsProps {
-  workspaceId: string
-  pinned: UseQueryResult<Schema<'DocumentList'>>
-}
+/** How many rows of the grid the pinned documents take before the rest is folded behind a button. */
+const foldedRows = 2
 
 /**
- * The documents the person pinned: loading, none yet (with the way to a first document), the cards, and a failure that
- * can be retried. Taking a pin off removes the card, so the focus goes to the card that takes its place.
+ * The documents the person pinned, as chips with a star. At most two rows are drawn; with more, a button unfolds the rest
+ * where they are and folds them again. A person with none has no section at all.
  */
-export function PinnedDocuments({ workspaceId, pinned }: PinnedDocumentsProps) {
+export function PinnedDocuments({ pinned }: { pinned: UseQueryResult<Schema<'DocumentList'>> }) {
   const intl = useIntl()
-  const unpin = usePinDocument()
-  const create = useCreateDocument(workspaceId)
-  const list = useRef<HTMLUListElement>(null)
-  const createButton = useRef<HTMLButtonElement>(null)
-  // The card that gets the focus when the one that was unpinned is gone: the next one, the one before, or the button of the empty state.
-  const [focusNext, setFocusNext] = useState<string | 'create' | null>(null)
-  const [unpinnedTitle, setUnpinnedTitle] = useState<string | null>(null)
-  const announcement =
-    unpinnedTitle === null ? '' : intl.formatMessage({ id: 'home.pinned.unpinned' }, { title: unpinnedTitle })
+  const listId = useId()
+  const { grid, columns } = useGridColumns<HTMLUListElement>()
+  const [unfolded, setUnfolded] = useState(false)
+  const firstUnfolded = useRef<number | null>(null)
+  const items = pinned.data?.items ?? []
+  const folded = foldedRows * columns
+  const shown = unfolded ? items : items.slice(0, folded)
 
-  const documents = pinned.data?.items
-  const ids = documents?.map((document) => document.id).join()
-  useEffect(() => {
-    if (focusNext === null) return
-    const target =
-      focusNext === 'create'
-        ? createButton.current
-        : list.current?.querySelector<HTMLElement>(`[data-document="${focusNext}"] button`)
-    // The button of the empty state is not there until the list says so: the focus waits for it.
-    if (target === null || target === undefined) return
-    target.focus()
-    setFocusNext(null)
-  }, [focusNext, ids])
+  // The chips that were folded are in the page once the render is done: the first of them is where the keyboard goes on.
+  useLayoutEffect(() => {
+    if (firstUnfolded.current === null) return
+    grid.current?.querySelectorAll('a')[firstUnfolded.current]?.focus()
+    firstUnfolded.current = null
+  })
 
-  if (pinned.isPending) return <PinnedLoading />
-  if (pinned.isError) {
-    return (
-      <PinnedSection>
-        <StateMessage
-          role="alert"
-          title={intl.formatMessage({ id: 'home.pinned.error.title' })}
-          description={intl.formatMessage({ id: 'home.pinned.error.description' })}
-        >
-          <Button loading={pinned.isFetching} onClick={() => void pinned.refetch()}>
-            {intl.formatMessage({ id: 'home.pinned.error.retry' })}
-          </Button>
-        </StateMessage>
-      </PinnedSection>
-    )
-  }
-
-  const items = pinned.data.items
-  const takeOff = (document: Document) => {
-    if (unpin.isPending) return
-    const index = items.findIndex((item) => item.id === document.id)
-    const neighbour = items[index + 1] ?? items[index - 1]
-    unpin.mutate(document, {
-      onSuccess: () => {
-        setUnpinnedTitle(document.title)
-        setFocusNext(neighbour?.id ?? 'create')
-      },
-    })
-  }
+  if (pinned.isSuccess && items.length === 0) return null
 
   return (
-    <PinnedSection>
-      {unpin.isError && (
-        <p role="alert" className={styles.problem}>
-          {intl.formatMessage({ id: problemMessageId(unpin.error) })}
-        </p>
-      )}
-      {items.length === 0 ? (
-        <StateMessage
-          title={intl.formatMessage({ id: 'home.pinned.empty.title' })}
-          description={intl.formatMessage({ id: 'home.pinned.empty.description' })}
-        >
-          <Button
-            ref={createButton}
-            loading={create.isPending}
-            onClick={() => create.mutate({ title: intl.formatMessage({ id: 'documents.untitled' }) })}
-          >
-            {intl.formatMessage({ id: 'documents.new' })}
-          </Button>
-        </StateMessage>
+    <section aria-labelledby="home-pinned">
+      <h2 id="home-pinned" className={styles.group}>
+        {intl.formatMessage({ id: 'home.pinned.title' })}
+      </h2>
+      {pinned.isError ? (
+        <SectionError title="home.pinned.error" retrying={pinned.isFetching} onRetry={() => void pinned.refetch()} />
+      ) : pinned.isPending ? (
+        <ListSkeleton rows={2} listClassName={`${styles.chips} ${styles.chipsSkeleton}`} label="home.pinned.loading" />
       ) : (
-        <ul ref={list} className={layout.grid}>
-          {items.map((document) => (
-            <li key={document.id} data-document={document.id} className={styles.item}>
-              <DocumentRow
-                card
-                className={styles.card}
-                title={<DocumentRowLink to={`/documents/${document.id}`}>{document.title}</DocumentRowLink>}
-                meta={
-                  <span className={styles.excerpt}>
-                    {document.excerpt ?? intl.formatMessage({ id: 'home.pinned.noExcerpt' })}
-                  </span>
-                }
-                trailing={
-                  <PinButton
-                    pinned
-                    label={intl.formatMessage({ id: 'home.pinned.unpin' }, { title: document.title })}
-                    onClick={() => takeOff(document)}
-                  />
-                }
-              />
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul ref={grid} id={listId} className={styles.chips}>
+            {shown.map((document) => (
+              <li key={document.id}>
+                <Link to={`/documents/${document.id}`} className={styles.chip}>
+                  <Icon name="star" className={styles.chipStar} />
+                  <span>{document.title}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {items.length > folded && (
+            <Button
+              variant="ghost"
+              aria-expanded={unfolded}
+              aria-controls={listId}
+              onClick={() => {
+                firstUnfolded.current = unfolded ? null : folded
+                setUnfolded(!unfolded)
+              }}
+            >
+              {unfolded
+                ? intl.formatMessage({ id: 'home.pinned.showFewer' })
+                : intl.formatMessage({ id: 'home.pinned.showAll' }, { count: items.length })}
+            </Button>
+          )}
+        </>
       )}
-      <p role="status" className="forma-visually-hidden">
-        {announcement}
-      </p>
-    </PinnedSection>
+    </section>
   )
 }
