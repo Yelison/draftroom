@@ -1,25 +1,99 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { localeStorageKey } from '../../i18n/locale.ts'
-import { answer, filters, main, openShared, renderScreen, titles } from './testing/openShared.tsx'
+import { answer, main, openShared, renderScreen, titlesIn } from './testing/openShared.tsx'
 
 const heading = () => screen.findByRole('heading', { level: 1, name: 'Shared' })
+const section = (name: RegExp | string) => within(main()).getByRole('region', { name })
 
 describe('the Shared screen', () => {
-  it('lists what others shared with the person, each with its creator and the permission the person has', async () => {
+  it('has a block for each permission the person has, in the order edit, comment, view, and says what they can do', async () => {
     await openShared()
 
-    const row = within(main()).getByRole('row', { name: /Autumn launch plan/ })
-    expect(within(row).getByText('Marta Ruiz')).toBeInTheDocument()
-    expect(within(row).getByText('Editor')).toBeInTheDocument()
-    expect(within(main()).getByRole('row', { name: /Presupuesto 2027/ })).toHaveTextContent('Viewer')
-    expect(within(main()).queryByRole('row', { name: /Old pricing draft/ })).not.toBeInTheDocument()
+    const blocks = within(main()).getAllByRole('region')
+    expect(blocks.map((block) => within(block).getByRole('heading', { level: 2 }).textContent)).toEqual([
+      'You can edit',
+      'You can comment',
+      'You can view',
+    ])
+    expect(within(blocks[0]!).getByText('You can change the text and add comments.')).toBeInTheDocument()
+    expect(
+      within(blocks[1]!).getByText('You can read the text and add comments, but not change it.'),
+    ).toBeInTheDocument()
+    expect(within(blocks[2]!).getByText('You can read it, but not change it or comment on it.')).toBeInTheDocument()
   })
 
-  it('says how many documents the list has, in a region that was in the page before the list', async () => {
+  it('puts each document in the block of its permission, with the order of the list inside it', async () => {
     await openShared()
 
-    expect(within(main()).getByText('6 documents').closest('[role="status"]')).not.toBeNull()
+    expect(titlesIn(section(/^You can edit/))).toEqual(['Autumn launch plan', 'Weekly update — October 6'])
+    expect(titlesIn(section(/^You can view/))).toContain('Presupuesto 2027')
+    expect(within(main()).queryByText('Old pricing draft')).not.toBeInTheDocument()
+  })
+
+  it('says how many documents a block has in its name, which a screen reader reads', async () => {
+    await openShared()
+
+    expect(section('You can edit 2 documents')).toBeInTheDocument()
+  })
+
+  it('shows what a row knows: who created the document and when it changed, and the start of its text', async () => {
+    await openShared()
+
+    const row = within(section(/^You can edit/))
+      .getByRole('link', { name: 'Autumn launch plan' })
+      .closest('li')!
+    expect(within(row).getByText('Created by')).toBeInTheDocument()
+    expect(within(row).getByText('Marta Ruiz')).toBeInTheDocument()
+    expect(within(row).getByText('Updated')).toBeInTheDocument()
+    const updated = within(row).getByText(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/)
+    expect(updated.tagName).toBe('TIME')
+    expect(updated).toHaveAttribute('datetime', expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/))
+    expect(within(row).getByText(/^The launch moves to the second week/)).toBeInTheDocument()
+  })
+
+  it('says "No text yet" for a document with no text', async () => {
+    await openShared('/shared', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listSharedDocuments: async (request) => {
+          const list = await dataSource.listSharedDocuments(request)
+          return { items: list.items.map((document) => ({ ...document, excerpt: null })) }
+        },
+      }),
+    })
+
+    expect(within(main()).getAllByText('No text yet')).toHaveLength(6)
+  })
+
+  it('draws only the blocks that have documents', async () => {
+    await openShared('/shared', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listSharedDocuments: async (request) => {
+          const list = await dataSource.listSharedDocuments(request)
+          return { items: list.items.filter((document) => document.role === 'viewer') }
+        },
+      }),
+    })
+
+    expect(within(main()).getAllByRole('region')).toHaveLength(1)
+    expect(within(main()).queryByRole('heading', { name: /^You can edit/ })).not.toBeInTheDocument()
+  })
+
+  it('asks the server once, for the whole list, and not for each permission', async () => {
+    const asked: unknown[] = []
+    await openShared('/shared', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listSharedDocuments: (request) => {
+          asked.push(request?.params?.query)
+          return dataSource.listSharedDocuments(request)
+        },
+      }),
+    })
+
+    expect(asked).toEqual([undefined])
   })
 
   it('writes the words and the dates in Spanish when the app is in Spanish', async () => {
@@ -27,21 +101,51 @@ describe('the Shared screen', () => {
     renderScreen('/shared', { signedInAs: 'daniel@harborpine.example' })
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Compartidos' })).toBeInTheDocument()
-    const row = await within(main()).findByRole('row', { name: /Autumn launch plan/ })
-    expect(within(row).getByText('Editor')).toBeInTheDocument()
-    expect(within(main()).getByRole('group', { name: 'Filtrar por permiso' })).toBeInTheDocument()
-    expect(within(main()).getByText('6 documentos')).toBeInTheDocument()
-    expect(within(row).getByRole('link', { name: 'Abrir «Autumn launch plan»' })).toBeInTheDocument()
+    const edit = await within(main()).findByRole('region', { name: 'Puedes editar 2 documentos' })
+    expect(within(edit).getByText('Puedes cambiar el texto y añadir comentarios.')).toBeInTheDocument()
+    expect(within(edit).getAllByText('Creado por')).toHaveLength(2)
+    expect(within(edit).getAllByText('Actualizado')).toHaveLength(2)
+  })
+})
+
+describe('opening a shared document', () => {
+  it('is one link for each row, whose name is the title, and there is no "Open" button', async () => {
+    await openShared()
+
+    const links = within(main()).getAllByRole('link')
+    expect(links).toHaveLength(6)
+    expect(within(main()).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(main()).queryByRole('link', { name: /^Open/ })).not.toBeInTheDocument()
+    expect(within(main()).getByRole('link', { name: 'Autumn launch plan' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/^\/documents\//),
+    )
   })
 
-  it('opens a document from its row', async () => {
+  it('happens with a click on the row', async () => {
     const { router, user } = await openShared()
 
-    await user.click(within(main()).getByRole('link', { name: 'Open “Autumn launch plan”' }))
+    await user.click(within(main()).getByRole('link', { name: 'Autumn launch plan' }))
 
     await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/documents\/.+/))
   })
 
+  it('happens with the keyboard: Tab goes from row to row and Enter opens the one with the focus', async () => {
+    const { router, user } = await openShared()
+    const links = within(main()).getAllByRole('link')
+
+    await user.click(within(main()).getByRole('heading', { level: 1 }))
+    await user.tab()
+    expect(links[0]).toHaveFocus()
+    await user.tab()
+    expect(links[1]).toHaveFocus()
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/documents\/.+/))
+  })
+})
+
+describe('the states of the Shared screen', () => {
   it('shows a skeleton with a spoken status while the list is on its way, under the headline the page already has', async () => {
     renderScreen('/shared', {
       signedInAs: 'daniel@harborpine.example',
@@ -49,16 +153,17 @@ describe('the Shared screen', () => {
     })
 
     await heading()
-    expect(await within(main()).findByText('Loading shared documents')).toHaveAttribute('role', 'status')
-    expect(within(main()).queryByRole('table')).not.toBeInTheDocument()
+    const status = await within(main()).findByText('Loading shared documents')
+    expect(status).toHaveAttribute('role', 'status')
+    expect(status.closest('[aria-busy="true"]')).not.toBeNull()
+    expect(within(main()).queryByRole('region')).not.toBeInTheDocument()
   })
 
-  it('says nothing has been shared when the list is empty, and offers no way out of a filter that is not there', async () => {
+  it('says in one sentence that nothing has been shared when the list is empty', async () => {
     renderScreen('/shared', { signedInAs: 'marta@harborpine.example' })
 
-    expect(await within(main()).findByText('Nothing has been shared with you yet')).toBeInTheDocument()
-    expect(within(main()).queryByRole('button', { name: 'Show all documents' })).not.toBeInTheDocument()
-    expect(within(main()).queryByRole('table')).not.toBeInTheDocument()
+    expect(await within(main()).findByText('Nobody has shared a document with you yet.')).toBeInTheDocument()
+    expect(within(main()).queryByRole('region')).not.toBeInTheDocument()
   })
 
   it('says it could not read the list, and tries again when asked', async () => {
@@ -77,84 +182,7 @@ describe('the Shared screen', () => {
     expect(await within(main()).findByRole('alert')).toHaveTextContent("We couldn't load your documents")
     await user.click(within(main()).getByRole('button', { name: 'Try again' }))
 
-    expect(await within(main()).findByRole('table')).toBeInTheDocument()
+    expect(await within(main()).findAllByRole('region')).toHaveLength(3)
     expect(within(main()).queryByRole('alert')).not.toBeInTheDocument()
-  })
-})
-
-describe('the filters of the Shared screen', () => {
-  it('are toggle buttons in a named group, with "All" pressed until one is chosen', async () => {
-    await openShared()
-
-    const chips = within(filters()).getAllByRole('button')
-    expect(chips.map((chip) => [chip.textContent, chip.getAttribute('aria-pressed')])).toEqual([
-      ['All', 'true'],
-      ['Can edit', 'false'],
-      ['Can comment', 'false'],
-      ['Can view', 'false'],
-    ])
-  })
-
-  it('narrow the list to one permission, keep the filter in the address and leave the focus on the chip', async () => {
-    const { router, user } = await openShared()
-
-    await user.click(within(filters()).getByRole('button', { name: 'Can edit' }))
-
-    await waitFor(() => expect(titles()).toEqual(['Autumn launch plan', 'Weekly update — October 6']))
-    expect(router.state.location.search).toBe('?access=edit')
-    expect(within(filters()).getByRole('button', { name: 'Can edit' })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(filters()).getByRole('button', { name: 'Can edit' })).toHaveFocus()
-    expect(within(main()).getByText('2 documents')).toBeInTheDocument()
-  })
-
-  it('start applied when the address has one', async () => {
-    await openShared('/shared?access=view')
-
-    expect(within(filters()).getByRole('button', { name: 'Can view' })).toHaveAttribute('aria-pressed', 'true')
-    expect(titles()).toEqual(expect.arrayContaining(['Presupuesto 2027']))
-    expect(titles()).not.toContain('Autumn launch plan')
-  })
-
-  it('ignore a value the contract does not know instead of asking the server for it', async () => {
-    await openShared('/shared?access=admin')
-
-    expect(within(filters()).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
-    expect(titles()).toHaveLength(6)
-  })
-
-  it('ask the server only for the permission chosen', async () => {
-    const asked: unknown[] = []
-    const { user } = await openShared('/shared', {
-      wrap: (dataSource) => ({
-        ...dataSource,
-        listSharedDocuments: (request) => {
-          asked.push(request?.params?.query)
-          return dataSource.listSharedDocuments(request)
-        },
-      }),
-    })
-
-    await user.click(within(filters()).getByRole('button', { name: 'Can comment' }))
-
-    await waitFor(() => expect(asked).toEqual([undefined, { access: 'comment' }]))
-  })
-
-  it('say when no document has the permission, and "Show all documents" clears the filter and keeps the focus in the filters', async () => {
-    const { user } = renderScreen('/shared?access=edit', {
-      signedInAs: 'daniel@harborpine.example',
-      wrap: (dataSource) => ({
-        ...dataSource,
-        listSharedDocuments: (request) =>
-          request?.params?.query?.access === undefined
-            ? dataSource.listSharedDocuments(request)
-            : Promise.resolve({ items: [] }),
-      }),
-    })
-
-    expect(await within(main()).findByText('No documents with this permission')).toBeInTheDocument()
-    await user.click(within(main()).getByRole('button', { name: 'Show all documents' }))
-
-    expect(await within(main()).findByRole('table')).toBeInTheDocument()
-    expect(within(filters()).getByRole('button', { name: 'All' })).toHaveFocus()
   })
 })
