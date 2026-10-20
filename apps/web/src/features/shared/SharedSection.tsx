@@ -1,8 +1,8 @@
+import type { Schema } from '@draftroom/contract'
 import { useId } from 'react'
 import { useIntl } from 'react-intl'
 import type { MessageId } from '../../i18n/messages.ts'
 import { SharedRow } from './SharedRow.tsx'
-import type { Schema } from '@draftroom/contract'
 import type { SharedGroup, SharedRole } from './groupByRole.ts'
 import styles from './Shared.module.css'
 

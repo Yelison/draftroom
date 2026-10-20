@@ -12,6 +12,8 @@
 .sections {
   --shared-head-width: 232px;
   --shared-row-height: 72px;
+  --shared-row-height-narrow: 120px;
+  --shared-head-min-height: 72px;
   --shared-created-by-width: 176px;
   --shared-updated-width: 118px;
   --shared-bar-width: 3px;
@@ -173,22 +175,23 @@
 /*
  * When the block does not have room for its head beside its rows (a narrow window, or the page zoomed), the head goes on
  * top, and a row is the icon, the text and the arrow with who made it and when it changed on a second line. The height
- * of a row is another one then, and it is the skeleton's too, because the skeleton wears the same classes.
+ * of a row is another one then, and it is the skeleton's too, because the skeleton wears the same classes. The 900px
+ * cannot be a variable: a container query does not read custom properties.
  */
 @container (max-width: 900px) {
   .section {
-    --shared-row-height: 120px;
+    --shared-row-height: var(--shared-row-height-narrow);
 
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-16);
   }
 
   .sectionHead {
-    min-height: 72px;
+    min-height: var(--shared-head-min-height);
   }
 
   .row {
-    grid-template-columns: var(--control-icon-size) minmax(0, 1fr) auto var(--space-16);
+    grid-template-columns: var(--control-icon-size) minmax(0, 1fr) var(--shared-updated-width) var(--space-16);
     row-gap: var(--space-8);
   }
 
