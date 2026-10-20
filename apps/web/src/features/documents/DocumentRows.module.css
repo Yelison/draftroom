@@ -10,6 +10,8 @@
   --document-created-by-width: 176px;
   --document-role-width: 96px;
   --document-updated-width: 176px;
+  /* The star and the menu, with the gap between them: a row with no menu keeps the place, so the columns line up. */
+  --document-actions-width: calc(var(--button-height) * 2 + var(--space-4));
 
   margin: 0;
   padding: 0;
@@ -34,7 +36,7 @@
   display: grid;
   grid-template-columns:
     var(--control-icon-size) minmax(0, 1fr) var(--document-created-by-width) var(--document-role-width)
-    var(--document-updated-width) auto;
+    var(--document-updated-width) var(--document-actions-width);
   gap: var(--space-16);
   align-items: center;
   height: var(--document-row-height);
@@ -149,7 +151,7 @@
   }
 
   .row {
-    grid-template-columns: var(--control-icon-size) minmax(0, 1fr) auto;
+    grid-template-columns: var(--control-icon-size) minmax(0, 1fr) var(--document-actions-width);
     row-gap: var(--space-8);
   }
 

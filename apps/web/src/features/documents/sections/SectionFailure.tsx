@@ -1,6 +1,6 @@
 import { Button } from '@yelison/forma-ui'
 import { useIntl } from 'react-intl'
-import { useSessionEnding } from '../QueryFailure.tsx'
+import { useSessionEnding } from '../useSessionEnding.ts'
 import styles from './Sections.module.css'
 
 export interface SectionFailureProps {

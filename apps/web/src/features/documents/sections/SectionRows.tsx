@@ -1,5 +1,5 @@
 import { Button } from '@yelison/forma-ui'
-import { useRef, type ReactNode } from 'react'
+import { useMemo, useRef, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import { DocumentListRow, type DocumentListRowProps } from '../DocumentListRow.tsx'
 import { useFocusFirstArrival } from '../useFocusFirstArrival.ts'
@@ -25,11 +25,15 @@ export function SectionRows({ sectionKey, name, data, empty, ...actions }: Secti
   const intl = useIntl()
   const { query, documents, firstPageEmpty } = data
   const list = useRef<HTMLUListElement>(null)
-  const ids = documents.map((document) => document.id)
+  // Stable between renders: the hooks below follow the rows by the identity of this list.
+  const ids = useMemo(() => documents.map((document) => document.id), [documents])
   const onFocus = useFocusAfterRemoval(list, ids, () => document.getElementById(toggleIdOf(sectionKey)))
   const loadingMore = useFocusFirstArrival(list, ids, 'a', sectionKey)
 
-  if (query.isPending) return <SectionSkeletonRows />
+  // Pages that hold only pinned documents are asked for one after the other: until there is a row, or no more pages, the
+  // section is on its way, and "Show more" over no rows would be a lie.
+  const searching = documents.length === 0 && query.hasNextPage && !query.isFetchNextPageError
+  if (query.isPending || searching) return <SectionSkeletonRows />
   // A failed "Show more" or a failed refresh leaves the rows that are there, and says so beside them.
   if (query.isError && query.data === undefined)
     return <SectionFailure name={name} onRetry={() => void query.refetch()} retrying={query.isFetching} />

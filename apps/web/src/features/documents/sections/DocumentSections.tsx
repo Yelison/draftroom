@@ -6,7 +6,7 @@ import type { DocumentListRowProps } from '../DocumentListRow.tsx'
 import { foldersQuery, pinnedDocumentsQuery } from '../queries.ts'
 import { FolderSection, type FolderSectionProps } from './FolderSection.tsx'
 import { PinnedSection } from './PinnedSection.tsx'
-import { SectionFailure } from './SectionFailure.tsx'
+import { FailedSection } from './FailedSection.tsx'
 import { DocumentSectionsSkeleton } from './SectionSkeleton.tsx'
 import { UnfiledSection } from './UnfiledSection.tsx'
 import { useFocusWhenSectionsLeave } from './useFocusWhenSectionsLeave.ts'
@@ -89,13 +89,11 @@ export function DocumentSections({
       {/* In the page, and so already asking for its documents, but not shown until they are all in. */}
       <div className={styles.sections} hidden={!arrived}>
         {pinned.isError && (
-          <div className={styles.section}>
-            <SectionFailure
-              name={intl.formatMessage({ id: 'documents.section.pinned' })}
-              onRetry={() => void pinned.refetch()}
-              retrying={pinned.isFetching}
-            />
-          </div>
+          <FailedSection
+            name={intl.formatMessage({ id: 'documents.section.pinned' })}
+            onRetry={() => void pinned.refetch()}
+            retrying={pinned.isFetching}
+          />
         )}
         {pinnedCount > 0 && pinned.data !== undefined && (
           <PinnedSection
@@ -107,21 +105,19 @@ export function DocumentSections({
           />
         )}
         {folders.isError && (
-          <div className={styles.section}>
-            <SectionFailure
-              name={intl.formatMessage({ id: 'documents.section.folders' })}
-              onRetry={() => void folders.refetch()}
-              retrying={folders.isFetching}
-            />
-          </div>
+          <FailedSection
+            name={intl.formatMessage({ id: 'documents.section.folders' })}
+            onRetry={() => void folders.refetch()}
+            retrying={folders.isFetching}
+          />
         )}
-        {folders.data?.items.map((folder) => (
+        {folders.data?.items.map((folder, position) => (
           <FolderSection
             key={folder.id}
             workspaceId={workspaceId}
             folder={folder}
-            expanded={folds.isExpanded(folder.id)}
-            onToggle={() => folds.toggle(folder.id)}
+            expanded={folds.isExpanded(folder.id, position)}
+            onToggle={() => folds.toggle(folder.id, position)}
             onRename={onRenameFolder}
             {...actions}
           />

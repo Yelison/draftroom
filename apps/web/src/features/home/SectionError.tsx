@@ -1,7 +1,7 @@
 import { Button } from '@yelison/forma-ui'
 import { useIntl } from 'react-intl'
 import type { MessageId } from '../../i18n/messages.ts'
-import { useSessionEnding } from '../documents/QueryFailure.tsx'
+import { useSessionEnding } from '../documents/useSessionEnding.ts'
 import styles from './Home.module.css'
 
 export interface SectionErrorProps {

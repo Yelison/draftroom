@@ -1,5 +1,5 @@
 import type { Schema } from '@draftroom/contract'
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useIntl } from 'react-intl'
 import { DocumentListRow, type DocumentListRowProps } from '../DocumentListRow.tsx'
 import rows from '../DocumentRows.module.css'
@@ -18,11 +18,8 @@ export interface PinnedSectionProps extends Pick<DocumentListRowProps, 'onRename
 export function PinnedSection({ documents, folderNames, expanded, onToggle, ...actions }: PinnedSectionProps) {
   const intl = useIntl()
   const list = useRef<HTMLUListElement>(null)
-  const onFocus = useFocusAfterRemoval(
-    list,
-    documents.map((document) => document.id),
-    () => document.getElementById(toggleIdOf('pinned')),
-  )
+  const ids = useMemo(() => documents.map((document) => document.id), [documents])
+  const onFocus = useFocusAfterRemoval(list, ids, () => document.getElementById(toggleIdOf('pinned')))
 
   return (
     <SectionFrame

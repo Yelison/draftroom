@@ -29,6 +29,10 @@
   font: var(--font-section);
 }
 
+.failedTitle {
+  padding: var(--space-8) var(--space-16);
+}
+
 .toggle {
   display: flex;
   gap: var(--space-8);
