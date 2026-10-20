@@ -143,6 +143,8 @@ export interface DocumentSearch {
   /** Text in the title or the excerpt, without regard to case. */
   readonly query?: string
   readonly folderId?: string
+  /** Only the documents in no folder. Never together with `folderId`: the route refuses that before it gets here. */
+  readonly unfiled?: boolean
   /** The archived documents the person owns, instead of the live ones they can read. */
   readonly archived: boolean
   readonly after?: CursorPosition
@@ -163,6 +165,7 @@ export async function listDocuments(db: Kysely<Database>, search: DocumentSearch
     search.workspaceId,
   )
   if (search.folderId !== undefined) query = query.where('d.folder_id', '=', search.folderId)
+  if (search.unfiled === true) query = query.where('d.folder_id', 'is', null)
   if (search.query !== undefined) {
     // `strpos` and not LIKE: the text is the person's, and `%` and `_` in it must mean themselves. Parenthesised on
     // purpose: an `or` that is not would let the excerpt match skip every other condition of the query.

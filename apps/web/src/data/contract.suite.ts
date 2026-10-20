@@ -536,6 +536,94 @@ export function describeDataSourceContract(name: string, harness: Harness) {
         )
       })
 
+      describe('the documents in no folder', () => {
+        /** A folder with one document in it, one document at the top level and one more with a distinctive title. */
+        async function filedAndLoose() {
+          const { owner, workspaceId } = await harness.scenario()
+          const folder = await owner.createFolder({ ...inWorkspace(workspaceId), body: { name: 'Plans' } })
+          const filed = await owner.createDocument({
+            ...inWorkspace(workspaceId),
+            body: { title: 'Filed zephyr', folderId: folder.id },
+          })
+          const loose = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Loose zephyr' } })
+          const other = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Loose quartz' } })
+          return { owner, workspaceId, folder, filed, loose, other }
+        }
+
+        it('lists only the documents that are in no folder', async () => {
+          const { owner, workspaceId, filed, loose, other } = await filedAndLoose()
+
+          const page = await owner.listDocuments({ params: { path: { workspaceId }, query: { unfiled: true } } })
+
+          const ids = page.items.map((row) => row.id)
+          expect(ids).toEqual(expect.arrayContaining([loose.id, other.id]))
+          expect(ids).not.toContain(filed.id)
+          expect(page.items.every((row) => row.folderId === null)).toBe(true)
+        })
+
+        it('combines with a search and with the archive', async () => {
+          const { owner, workspaceId, loose, other } = await filedAndLoose()
+          await owner.archiveDocument(document(other.id))
+
+          const searched = await owner.listDocuments({
+            params: { path: { workspaceId }, query: { unfiled: true, query: 'zephyr' } },
+          })
+          const archived = await owner.listDocuments({
+            params: { path: { workspaceId }, query: { unfiled: true, archived: true, query: 'quartz' } },
+          })
+
+          expect(searched.items.map((row) => row.id)).toEqual([loose.id])
+          expect(archived.items.map((row) => row.id)).toEqual([other.id])
+        })
+
+        it('pages without repeating or skipping a document', async () => {
+          const { owner, workspaceId, filed, loose, other } = await filedAndLoose()
+
+          const seen: string[] = []
+          let cursor: string | undefined
+          do {
+            const page = await owner.listDocuments({
+              params: {
+                path: { workspaceId },
+                query: { unfiled: true, limit: 1, ...(cursor === undefined ? {} : { cursor }) },
+              },
+            })
+            seen.push(...page.items.map((row) => row.id))
+            cursor = page.nextCursor ?? undefined
+          } while (cursor !== undefined)
+
+          // The scenario may hold other documents, so what counts is that none repeats and none is lost.
+          expect(new Set(seen).size).toBe(seen.length)
+          expect(seen).toEqual(expect.arrayContaining([loose.id, other.id]))
+          expect(seen).not.toContain(filed.id)
+        })
+
+        it('is refused together with a folder, whether or not the folder exists', async () => {
+          const { owner, workspaceId, folder } = await filedAndLoose()
+
+          for (const folderId of [folder.id, crypto.randomUUID()]) {
+            await expectRefusal(
+              owner.listDocuments({ params: { path: { workspaceId }, query: { unfiled: true, folderId } } }),
+              'validation-failed',
+              '/query/unfiled',
+            )
+          }
+        })
+
+        it('is refused with a cursor that came from the list without the filter', async () => {
+          const { owner, workspaceId } = await filedAndLoose()
+          const whole = await owner.listDocuments({ params: { path: { workspaceId }, query: { limit: 1 } } })
+
+          await expectRefusal(
+            owner.listDocuments({
+              params: { path: { workspaceId }, query: { unfiled: true, limit: 1, cursor: whole.nextCursor ?? '' } },
+            }),
+            'validation-failed',
+            '/query/cursor',
+          )
+        })
+      })
+
       it('pages the versions of a document, newest first', async () => {
         const { owner, workspaceId } = await harness.scenario()
         const created = await owner.createDocument({ ...inWorkspace(workspaceId), body: { title: 'Versioned' } })

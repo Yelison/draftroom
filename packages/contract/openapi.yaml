@@ -761,6 +761,14 @@ paths:
           description: Only the documents of this folder. A folder that is unknown, or belongs to another workspace, is a `400 validation-failed` at `/query/folderId`.
           schema:
             $ref: '#/components/schemas/Id'
+        - name: unfiled
+          in: query
+          required: false
+          description: Only the documents that are in no folder. Sent together with `folderId` it is a `400 validation-failed` with `invalid-value` at `/query/unfiled`, whether or not the folder exists.
+          schema:
+            type: boolean
+            default: false
+          example: true
         - name: archived
           in: query
           required: false

@@ -65,8 +65,11 @@ export function documentOperations(ctx: Context): DocumentOperations {
         workspaceId: path.workspaceId,
         query: query.query,
         folderId: query.folderId,
+        unfiled: query.unfiled === true,
         archived: query.archived === true,
       }
+      if (query.unfiled === true && query.folderId !== undefined)
+        throw invalid({ pointer: '/query/unfiled', code: 'invalid-value' })
       if (query.query !== undefined) checkParameterText('/query/query', query.query, textLimits.search)
       const page = readPage(query, filters)
       const { workspace } = workspaceOf(ctx, path.workspaceId)
@@ -78,6 +81,7 @@ export function documentOperations(ctx: Context): DocumentOperations {
         const role = documentRole(world, user.id, document)
         if (role === undefined || (document.archivedAt !== null) !== (query.archived === true)) return false
         if (query.folderId !== undefined && document.folderId !== query.folderId) return false
+        if (query.unfiled === true && document.folderId !== null) return false
         return needle === undefined || `${document.title}\n${document.excerpt ?? ''}`.toLowerCase().includes(needle)
       })
       const { items, nextCursor } = paginate(rows, byRecency, page)
