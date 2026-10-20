@@ -177,8 +177,10 @@ describe('the states of the comments', () => {
       }),
     })
 
-    // The comments are asked for by the screen of the document, so once they are, that is the skeleton on the page.
+    // The comments are asked for by the screen of the document, so once they are, that is the skeleton on the page. The text
+    // would be there by now (the document loads in a moment, in the mock) if the comments did not hold it back.
     await waitFor(() => expect(arrive).toBeDefined())
+    await new Promise((resolve) => setTimeout(resolve, 500))
     expect(screen.getByText('Loading document')).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Document content' })).not.toBeInTheDocument()
 

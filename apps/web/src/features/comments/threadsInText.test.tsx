@@ -153,6 +153,26 @@ describe('moving between the text and its threads with the keyboard', () => {
     expect(await within(margin).findByRole('region', { name: 'New comment' })).toBeInTheDocument()
   })
 
+  it('changes the filter when the text asks for a thread that it hides, so the person is not told to look for what they cannot see', async () => {
+    const user = userEvent.setup()
+    renderCommentedDocument({ paragraphs, started: [week], fixtureThreads: false })
+    const editor = await editorOf()
+    const margin = await findMargin()
+    const text = await screen.findByRole('textbox', { name: 'Document content' })
+    await waitFor(() => expect(marks()).toHaveLength(1))
+    await user.click(screen.getByRole('button', { name: /^Resolved \(/ }))
+    await waitFor(() => expect(within(margin).queryByText(week.body)).not.toBeInTheDocument())
+
+    text.focus()
+    act(() => void editor.commands.setTextSelection(rangeOf(editor, 'second week').from + 2))
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /^Open \(/ })).toHaveAttribute('aria-pressed', 'true'),
+    )
+    await waitFor(() => expect(threadOf(margin, week.body)).toHaveFocus())
+  })
+
   it('also works for a commenter, whose text takes no edits', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({

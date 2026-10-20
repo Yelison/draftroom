@@ -81,6 +81,16 @@ describe('the explorer beside a document', () => {
     expect(within(await explorer()).queryByRole('link', { name: budget.title })).not.toBeInTheDocument()
   })
 
+  it('draws each document on a line, with its title and nothing of its excerpt, its author or its date', async () => {
+    renderScreen(openPath)
+
+    const row = (await link('Autumn launch plan')).closest('li') as HTMLElement
+
+    expect(row.querySelector('time')).toBeNull()
+    expect(within(row).queryByText('Created by')).not.toBeInTheDocument()
+    expect(within(row).queryByText(/second week of November/)).not.toBeInTheDocument()
+  })
+
   it('opens a document with a click', async () => {
     const { user, router } = renderScreen(openPath)
 
