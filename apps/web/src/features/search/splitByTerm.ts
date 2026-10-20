@@ -1,10 +1,10 @@
+import { graphemes } from './graphemes.ts'
+
 /** A run of a text, and whether the search matched it. */
 export interface TextChunk {
   text: string
   match: boolean
 }
-
-const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
 /** The characters a letter lowercases to, one by one: a few lowercase to more than one (`İ`), so the text and the term are
  * compared as lists of code points rather than as strings whose indexes would drift from the original's. */

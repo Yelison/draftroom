@@ -1,6 +1,5 @@
+import { graphemes } from './graphemes.ts'
 import type { TextChunk } from './splitByTerm.ts'
-
-const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
 const isSpace = (character: string | undefined) => character !== undefined && /^\s+$/u.test(character)
 
@@ -22,6 +21,8 @@ export function keepMatchInView(chunks: readonly TextChunk[], lead: number): Tex
   const cutInsideWord = !isSpace(characters[characters.length - lead - 1]?.segment) && !isSpace(kept[0])
   // A word that starts before the cut is left out whole.
   const start = cutInsideWord ? kept.findIndex(isSpace) + 1 : 0
-  const shown = start > 0 ? kept.slice(start) : kept
+  // The ellipsis stands where the text was cut, so the space the cut fell on is not kept after it.
+  const firstLetter = kept.findIndex((character) => !isSpace(character))
+  const shown = kept.slice(Math.max(start, firstLetter))
   return [{ text: `${omission}${shown.join('')}`, match: false }, ...rest]
 }

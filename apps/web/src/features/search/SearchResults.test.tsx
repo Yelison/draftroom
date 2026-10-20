@@ -217,6 +217,19 @@ describe('the states of the results', () => {
     expect(marksOf(await rowOf('Autumn launch plan'))).toEqual(['launch', 'launch'])
   })
 
+  it('keeps the live region of the count from one search to the next, so the new count is announced and not a new region', async () => {
+    const { user } = renderScreen('/search?q=the')
+    await waitFor(() => expect(countLine()).toHaveTextContent(/^5 results$/))
+    const region = countLine()
+
+    await user.clear(searchbox())
+    await user.type(searchbox(), 'weekly{Enter}')
+
+    await waitFor(() => expect(region).toHaveTextContent(/^1 result$/))
+    expect(region).toBeInTheDocument()
+    expect(countLine()).toBe(region)
+  })
+
   it('puts the focus on the first result when the retry of the first page works', async () => {
     let failures = 1
     const { user } = renderScreen('/search?q=weekly', {

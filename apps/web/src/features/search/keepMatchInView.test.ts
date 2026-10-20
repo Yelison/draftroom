@@ -11,6 +11,12 @@ describe('keepMatchInView', () => {
     { case: 'a match at the start', text: 'Launch moves', lead: 8, shown: ['[Launch]', ' moves'] },
     { case: 'no match', text: 'Nothing here for you', lead: 4, shown: ['Nothing here for you'] },
     {
+      case: 'a cut that falls on a space',
+      text: 'wordone wordtwo launch',
+      lead: 9,
+      shown: [`${omission}wordtwo `, '[launch]'],
+    },
+    {
       case: 'a match far from the start',
       text: 'Shipped the pricing page and the legal review; launch moves',
       lead: 10,

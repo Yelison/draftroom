@@ -73,7 +73,15 @@ export function ResultList({ workspaceId, term, onActions, onArchive }: ResultLi
     </p>
   )
 
-  if (query.isPending) return <ResultsLoading />
+  // The count line stays mounted from one search to the next, so the live region says the new count and is not new itself.
+  if (query.isPending) {
+    return (
+      <>
+        {countLine}
+        <DocumentsSkeleton />
+      </>
+    )
+  }
   if (query.data === undefined) {
     return (
       <>
@@ -139,7 +147,7 @@ export function ResultList({ workspaceId, term, onActions, onArchive }: ResultLi
   )
 }
 
-/** What the results are while they are on their way: the count line and the skeleton of the list, which keep its places. */
+/** What stands in for the results while the workspace is on its way: the count line and the skeleton, which keep their places. */
 export function ResultsLoading() {
   return (
     <>
