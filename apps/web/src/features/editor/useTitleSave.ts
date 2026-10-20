@@ -1,7 +1,7 @@
 import type { Schema } from '@draftroom/contract'
 import { contractLimits } from '@draftroom/contract'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { isApiError, type ApiError } from '../../data/errors.ts'
 import { keysAfterMutation } from '../../data/queryKeys.ts'
@@ -26,9 +26,13 @@ function currentFromConflict(error: ApiError): DocumentMeta | null {
  * - The title is the document's metadata, saved by `updateDocument`; it is not part of the Yjs content.
  * - The field shows what the person typed until that is saved, and the server's title the rest of the time, so a change
  *   someone else made arrives in a field the person has not touched.
- * - Saves are queued by the mutation's `scope`, and each reads the revision from the cache when it runs, so two quick
- *   saves never send the same revision (which the second would lose to the first).
- * - A `409` puts the server's document in the cache and keeps what the person typed: nothing they wrote is lost.
+ * - What the person types is saved against the revision they started from, which only their own saves move on: a rename
+ *   by someone else that arrives while they type refreshes the document, but it must not be overwritten without the
+ *   person being told (`metadata-changed` exists for that, protocol section 9).
+ * - Saves are queued by the mutation's `scope`, and each reads that revision when it runs, after the save before it has
+ *   moved it on, so two quick saves never send the same revision (which the second would lose to the first).
+ * - A `409` puts the server's document in the cache and keeps what the person typed: nothing they wrote is lost. Typing
+ *   is then from the server's revision, so pressing Enter again is a choice to replace the other title.
  * - Nothing here says "saved": whether the server stored the change is not the person's to be told twice.
  */
 export function useTitleSave(document: DocumentMeta) {
@@ -37,16 +41,20 @@ export function useTitleSave(document: DocumentMeta) {
   const query = documentQuery(dataSource, document.id)
   const [typed, setTyped] = useState<string | null>(null)
   const [problem, setProblem] = useState<TitleProblem | null>(null)
+  // The revision the typed title is a change to: read from the cache when typing starts, then moved by the saves and the
+  // conflicts of this field alone. A ref, because no render depends on it.
+  const base = useRef<number | null>(null)
 
   const save = useMutation({
     scope: { id: `document-title:${document.id}` },
     mutationFn: (title: string) => {
-      const { revision } = queryClient.getQueryData(query.queryKey) ?? document
+      const revision = base.current ?? (queryClient.getQueryData(query.queryKey) ?? document).revision
       return dataSource.updateDocument({ params: { path: { documentId: document.id } }, body: { title, revision } })
     },
     onSuccess: (updated, title) => {
       // The response is the next revision to send; the other lists are marked stale and fetched again when read.
       queryClient.setQueryData(query.queryKey, updated)
+      base.current = updated.revision
       const scope = { workspaceId: updated.workspaceId, documentId: updated.id }
       for (const key of keysAfterMutation('updateDocument', scope)) {
         if (key !== query.queryKey) void queryClient.invalidateQueries({ queryKey: key })
@@ -57,6 +65,7 @@ export function useTitleSave(document: DocumentMeta) {
       const current = isApiError(error, 'revision-conflict') ? currentFromConflict(error) : null
       if (current !== null) {
         queryClient.setQueryData(query.queryKey, current)
+        base.current = current.revision
         setProblem('conflict')
         setTyped((text) => (text?.trim() === current.title ? null : text))
         return
@@ -71,6 +80,7 @@ export function useTitleSave(document: DocumentMeta) {
 
   function change(next: string) {
     const clipped = clipToCodePoints(next, contractLimits.documentTitle.max)
+    if (typed === null) base.current = (queryClient.getQueryData(query.queryKey) ?? document).revision
     setTyped(clipped)
     setProblem(clipped === next ? null : 'tooLong')
   }

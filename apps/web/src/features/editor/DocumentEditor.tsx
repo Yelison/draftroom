@@ -196,7 +196,8 @@ function EditorWorkspace({
   const intl = useIntl()
   const commentsPanel = useCommentsPanel()
   // The role says what the screen offers and the connection what the server allows: the text takes edits only when both do.
-  const mayEdit = canEdit(document.role)
+  // An archived document is read-only for its owners too, and the server refuses to rename it.
+  const mayEdit = canEdit(document.role) && document.archivedAt === null
   const editable = mayEdit && snapshot.editable
   const [linkRequest, setLinkRequest] = useState<LinkRequest | null>(null)
   const [linkChange, setLinkChange] = useState<LinkChange | null>(null)
