@@ -10,8 +10,8 @@ import styles from './Timeline.module.css'
 
 /**
  * What happened, by week and by day with the time of each event at its side: a line down the page with a point for each
- * entry, amber for a change of who can open a document. The week and the day are headings, one level under the
- * headline of the screen.
+ * entry, amber for a change of who can open a document. The week is a region named by its heading, one level under
+ * the headline of the screen; the day is a heading inside it, so the list of regions does not fill up with days.
  */
 export function Timeline({ weeks }: { weeks: readonly TimelineWeek[] }) {
   const intl = useIntl()
@@ -21,18 +21,16 @@ export function Timeline({ weeks }: { weeks: readonly TimelineWeek[] }) {
   return (
     <div className={styles.timeline}>
       {weeks.map((week) => (
-        <section key={week.key} aria-labelledby={`${id}-${week.key}`} className={styles.week}>
-          <h2 id={`${id}-${week.key}`} className={styles.weekTitle}>
+        <section key={week.key} aria-labelledby={`${id}-week-${week.key}`} className={styles.week}>
+          <h2 id={`${id}-week-${week.key}`} className={styles.weekTitle}>
             {intl.formatMessage(
               { id: 'history.week' },
               { date: intl.formatDate(week.start, { month: 'short', day: 'numeric', timeZone: 'UTC' }) },
             )}
           </h2>
           {week.days.map((day) => (
-            <section key={day.key} aria-labelledby={`${id}-${day.key}`} className={styles.day}>
-              <h3 id={`${id}-${day.key}`} className={styles.dayTitle}>
-                {intl.formatDate(day.date, { dateStyle: 'full', timeZone: 'UTC' })}
-              </h3>
+            <div key={day.key} className={styles.day}>
+              <h3 className={styles.dayTitle}>{intl.formatDate(day.date, { dateStyle: 'full', timeZone: 'UTC' })}</h3>
               <ol className={styles.list}>
                 {day.entries.map((entry) => {
                   const event = entryEvent(entry)
@@ -52,7 +50,7 @@ export function Timeline({ weeks }: { weeks: readonly TimelineWeek[] }) {
                   )
                 })}
               </ol>
-            </section>
+            </div>
           ))}
         </section>
       ))}

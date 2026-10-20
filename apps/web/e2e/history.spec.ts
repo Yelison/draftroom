@@ -91,6 +91,11 @@ test('unfolds a burst of renames with the keyboard, keeps the focus on its butto
   const people = page.locator(`#${await details.getAttribute('aria-controls')}`)
   await expect(people).toBeHidden()
 
+  // The button sits right after the interval, not at the far end of the row.
+  const written = await details.locator('xpath=preceding-sibling::span[1]').boundingBox()
+  const button = await details.boundingBox()
+  expect((button?.x ?? 0) - ((written?.x ?? 0) + (written?.width ?? 0))).toBeLessThanOrEqual(24)
+
   await details.focus()
   await page.keyboard.press('Enter')
   await expect(details).toHaveAttribute('aria-expanded', 'true')
@@ -138,44 +143,51 @@ test('goes from the History to a document and back, twice, with the filter and t
   await expect(page.getByText('Unexpected Application Error')).toHaveCount(0)
 })
 
-test('does not move the headline, the filters or the rows when the events arrive in place of the skeleton', async ({
-  page,
-}) => {
-  // The skeleton is on screen for a moment only: what is where is taken as it appears, before the events replace it.
-  await page.addInitScript(() => {
-    const seen = window as unknown as { before?: Record<string, number | null> }
-    const top = (selector: string) => document.querySelector(selector)?.getBoundingClientRect().top ?? null
-    new MutationObserver(() => {
-      const row = document.querySelector('[aria-busy="true"] li')
-      if (row !== null && seen.before === undefined) {
-        seen.before = {
-          title: top('h1'),
-          // What is above the rows: the filters, or the place they take while the workspace is on its way.
-          filters: row.closest('[aria-busy="true"]')?.previousElementSibling?.getBoundingClientRect().top ?? null,
-          row: row.getBoundingClientRect().top,
-          rowHeight: row.getBoundingClientRect().height,
+// The second window is what a browser zoomed to 200 % leaves of a desktop one: the chips of the filters are taller there.
+for (const viewport of [
+  { width: 1280, height: 800 },
+  { width: 640, height: 360 },
+]) {
+  test(`does not move the headline, the filters or the rows when the events arrive in place of the skeleton, in a window of ${viewport.width} px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport)
+    // The skeleton is on screen for a moment only: what is where is taken as it appears, before the events replace it.
+    await page.addInitScript(() => {
+      const seen = window as unknown as { before?: Record<string, number | null> }
+      const top = (selector: string) => document.querySelector(selector)?.getBoundingClientRect().top ?? null
+      new MutationObserver(() => {
+        const row = document.querySelector('[aria-busy="true"] li')
+        if (row !== null && seen.before === undefined) {
+          seen.before = {
+            title: top('h1'),
+            // What is above the rows: the filters, or the place they take while the workspace is on its way.
+            filters: row.closest('[aria-busy="true"]')?.previousElementSibling?.getBoundingClientRect().top ?? null,
+            row: row.getBoundingClientRect().top,
+            rowHeight: row.getBoundingClientRect().height,
+          }
         }
-      }
-    }).observe(document, { childList: true, subtree: true })
-  })
-  await page.goto('/history')
+      }).observe(document, { childList: true, subtree: true })
+    })
+    await page.goto('/history')
 
-  const first = rows(page).first()
-  await expect(first).toContainText('Marta Ruiz')
-  const seen = await page.evaluate(() => (window as unknown as { before?: Record<string, number | null> }).before)
-  expect(seen, 'the skeleton was seen').toBeDefined()
-  const after = await page.evaluate(() => {
-    const top = (selector: string) => document.querySelector(selector)?.getBoundingClientRect().top ?? null
-    const row = document.querySelector('main li[data-entry]')?.getBoundingClientRect()
-    return { title: top('h1'), filters: top('[role="group"]'), row: row?.top ?? null, rowHeight: row?.height ?? null }
-  })
+    const first = rows(page).first()
+    await expect(first).toContainText('Marta Ruiz')
+    const seen = await page.evaluate(() => (window as unknown as { before?: Record<string, number | null> }).before)
+    expect(seen, 'the skeleton was seen').toBeDefined()
+    const after = await page.evaluate(() => {
+      const top = (selector: string) => document.querySelector(selector)?.getBoundingClientRect().top ?? null
+      const row = document.querySelector('main li[data-entry]')?.getBoundingClientRect()
+      return { title: top('h1'), filters: top('[role="group"]'), row: row?.top ?? null, rowHeight: row?.height ?? null }
+    })
 
-  expect(after.title).toBeCloseTo(seen?.title ?? NaN, 0)
-  expect(seen?.filters, 'the place of the filters was seen').not.toBeNull()
-  expect(after.filters).toBeCloseTo(seen?.filters ?? NaN, 0)
-  expect(after.row).toBeCloseTo(seen?.row ?? NaN, 0)
-  expect(after.rowHeight).toBeCloseTo(seen?.rowHeight ?? NaN, 0)
-})
+    expect(after.title).toBeCloseTo(seen?.title ?? NaN, 0)
+    expect(seen?.filters, 'the place of the filters was seen').not.toBeNull()
+    expect(after.filters).toBeCloseTo(seen?.filters ?? NaN, 0)
+    expect(after.row).toBeCloseTo(seen?.row ?? NaN, 0)
+    expect(after.rowHeight).toBeCloseTo(seen?.rowHeight ?? NaN, 0)
+  })
+}
 
 test('has no horizontal scroll at 1280 and 1440 px in either theme', async ({ page }) => {
   for (const colorScheme of ['light', 'dark'] as const) {

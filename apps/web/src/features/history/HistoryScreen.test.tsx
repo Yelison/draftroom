@@ -12,6 +12,7 @@ import {
   newestSentences,
   renderScreen,
   rows,
+  sofia,
   unavailable,
   watchingHistory,
   withPages,
@@ -69,6 +70,13 @@ describe('the History screen', () => {
     expect(within(main()).queryByText(/access to/)).not.toBeInTheDocument()
   })
 
+  it('does not label anything as Access for a person who owns none of the documents those changes are about', async () => {
+    renderScreen('/history', { signedInAs: sofia.email })
+
+    await findRow('Sofía Lindqvist commented on “Autumn launch plan”')
+    expect(within(main()).queryByText('Access')).not.toBeInTheDocument()
+  })
+
   it('says a version saved on its own without naming anyone, and a change of access without the person it is about', async () => {
     renderScreen('/history', {
       wrap: (dataSource) => ({
@@ -97,7 +105,10 @@ describe('the History screen', () => {
       }),
     })
 
-    expect(await findRow('A version of “Autumn launch plan” was saved automatically')).toBeInTheDocument()
+    const automatic = await findRow('A version of “Autumn launch plan” was saved automatically')
+    // Nobody did it, so there is no person's initial to read as one: a clock stands where the avatar would.
+    expect(within(automatic).queryByText('D')).not.toBeInTheDocument()
+    expect(automatic.querySelector('svg')).toBeInTheDocument()
     expect(await findRow("Marta Ruiz removed someone's access to “Autumn launch plan”")).toBeInTheDocument()
   })
 
@@ -351,6 +362,32 @@ describe('the events of the History screen', () => {
   })
 })
 
+describe('the weeks and days of the History screen', () => {
+  // The first day of a week with events, in each language: a Sunday for `en` and a Monday for `es`, where the heading of
+  // the week and the heading of the day are about the same date.
+  it.each([
+    ['en', '2026-10-11T12:00:00.000Z', 'Week of Oct 11', 'Sunday, October 11, 2026'],
+    ['es', '2026-10-12T12:00:00.000Z', 'Semana del 12 oct', 'lunes, 12 de octubre de 2026'],
+  ])(
+    'name a week once, and a day under it, when events fall on the first day of the week, in %s',
+    async (language, at, week, day) => {
+      localStorage.setItem(localeStorageKey, language)
+      renderScreen('/history', { wrap: withPages([[activityEvent(at, { type: 'thread.created' })]]) })
+      await within(main()).findByRole('heading', { level: 3, name: day })
+
+      const ids = [...main().querySelectorAll('[id]')].map((element) => element.id)
+      expect(new Set(ids).size).toBe(ids.length)
+      // Only the week is a region, and it is named as its heading says: the day is a heading inside it.
+      expect(
+        within(main())
+          .getAllByRole('region')
+          .map((region) => region.getAttribute('aria-labelledby')),
+      ).toHaveLength(1)
+      expect(within(main()).getByRole('region', { name: week })).toBeInTheDocument()
+    },
+  )
+})
+
 describe('the renames that follow one another in the History screen', () => {
   const minutesAfter = (minutes: number) => new Date(Date.UTC(2026, 9, 13, 8, 0) + minutes * 60_000).toISOString()
   // Newest first: Daniel renamed at 08:10 and 08:06, Marta at 08:00 and 08:04.
@@ -416,6 +453,15 @@ describe('the renames that follow one another in the History screen', () => {
 
     await waitFor(() => expect(chip('Person: Daniel Okafor')).toBeInTheDocument())
     expect(toggle(await findRow(sentence))).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('put the button right after the interval, and keep the separator out of what the button is described by', async () => {
+    renderScreen('/history', { wrap: withPages([renames]) })
+    const button = toggle(await findRow(sentence))
+
+    expect(button.previousElementSibling).toHaveTextContent(/renamed 4 times.*\d:\d\d/)
+    expect(button).toHaveAccessibleDescription(expect.stringContaining('renamed 4 times'))
+    expect(button).not.toHaveAccessibleDescription(/·/)
   })
 
   it('keep the name of the document as the way to it', async () => {

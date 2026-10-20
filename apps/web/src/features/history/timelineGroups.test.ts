@@ -51,6 +51,8 @@ describe('groupByWeekAndDay', () => {
 
 describe('firstDayOfWeek', () => {
   it.each([
+    ['en', 7],
+    ['es', 1],
     ['en-US', 7],
     ['es-ES', 1],
     ['en-GB', 1],

@@ -27,13 +27,16 @@ export function RenameBurst({ burst }: { burst: Burst }) {
     <>
       <ActorAvatar actor={newest.actor} />
       <div className={styles.burst}>
-        <div className={styles.burstSummary}>
-          <span id={`${id}-summary`} className={styles.text}>
+        <span className={styles.text}>
+          <span id={`${id}-summary`} className={styles.summary}>
             <span>
               {intl.formatMessage(
                 { id: 'history.burst.renamed' },
                 { title: <DocumentLink document={newest.document} />, count: burst.events.length },
               )}
+            </span>
+            <span aria-hidden="true" className={styles.interval}>
+              ·
             </span>
             <span className={styles.interval}>
               {intl.formatDateTimeRange(new Date(oldest.createdAt), new Date(newest.createdAt), {
@@ -53,7 +56,7 @@ export function RenameBurst({ burst }: { burst: Burst }) {
             {intl.formatMessage({ id: 'history.burst.details' })}
             <Icon name="chevron" size={16} className={expanded ? styles.chevronOpen : styles.chevron} />
           </button>
-        </div>
+        </span>
         {/* Hidden, not unmounted: what the button controls is always there to point at. */}
         <ul id={`${id}-people`} hidden={!expanded} className={styles.people}>
           {burst.events.map((event) => (

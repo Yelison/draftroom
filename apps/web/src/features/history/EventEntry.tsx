@@ -1,4 +1,4 @@
-import { Badge } from '@yelison/forma-ui'
+import { Badge, Icon } from '@yelison/forma-ui'
 import { useIntl } from 'react-intl'
 import { ActorAvatar } from './ActorAvatar.tsx'
 import { DocumentLink } from './DocumentLink.tsx'
@@ -13,7 +13,14 @@ export function EventEntry({ event }: { event: ActivityEvent }) {
 
   return (
     <>
-      <ActorAvatar actor={event.actor} />
+      {event.actor === null ? (
+        // Nobody did it: a person's initials would read as one, so the server's own changes get a clock.
+        <span className={styles.automatic}>
+          <Icon name="clock" size={16} />
+        </span>
+      ) : (
+        <ActorAvatar actor={event.actor} />
+      )}
       <span className={styles.text}>
         <span>
           {sentence(event, (document) => (

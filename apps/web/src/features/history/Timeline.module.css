@@ -4,7 +4,7 @@
  */
 .timeline {
   --timeline-time-width: 72px;
-  --timeline-gap: 40px;
+  --timeline-gap: var(--space-40);
   --timeline-line-x: calc(var(--timeline-time-width) + var(--space-12));
   --timeline-point: var(--space-12);
   --timeline-line: var(--space-2);
@@ -128,8 +128,8 @@
 
 .documentLink {
   color: var(--color-link);
-  /* Colour alone does not tell a link from the words around it (WCAG 1.4.1): the weight does, as the underline would. */
-  font-weight: 500;
+  /* Colour alone does not tell a link from the words around it (WCAG 1.4.1): the heavier weight of the label does. */
+  font: var(--font-label);
   text-decoration: none;
 }
 
@@ -145,25 +145,31 @@
   outline-offset: var(--space-2);
 }
 
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-8);
+  min-width: 0;
+}
+
 .interval {
   color: var(--color-muted);
   white-space: nowrap;
 }
 
-.interval::before {
-  content: '· ';
+/* Who the change is credited to when nobody is: the clock takes the place of the avatar, as tall and as wide. */
+.automatic {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--avatar-size-small);
+  height: var(--avatar-size-small);
+  color: var(--color-muted);
 }
 
 .burst {
   flex: 1;
   min-width: 0;
-}
-
-.burstSummary {
-  display: flex;
-  gap: var(--space-12);
-  align-items: flex-start;
-  justify-content: space-between;
 }
 
 .toggle {

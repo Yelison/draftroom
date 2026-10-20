@@ -2,11 +2,11 @@ import { screen, waitFor, within } from '@testing-library/react'
 import type { DataSource } from '../../../data/DataSource.ts'
 import { ApiError } from '../../../data/errors.ts'
 import * as fixtures from '../../../data/mock/fixtures/documents.ts'
-import { daniel, marta } from '../../../data/mock/fixtures/index.ts'
+import { daniel, marta, sofia } from '../../../data/mock/fixtures/index.ts'
 import { renderScreen } from '../../documents/testing/renderScreen.tsx'
 import type { ActivityEvent } from '../activityEvents.ts'
 
-export { daniel, fixtures, marta, renderScreen }
+export { daniel, fixtures, marta, renderScreen, sofia }
 
 export const main = () => screen.getByRole('main')
 
