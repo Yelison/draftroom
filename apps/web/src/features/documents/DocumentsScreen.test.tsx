@@ -370,8 +370,10 @@ describe('a section with a network that takes its time', () => {
   it('never shows "Show more" over a section with no rows while it asks for the page after one of pinned documents', async () => {
     const seen: { links: number; more: number }[] = []
     const observer = new MutationObserver(() => {
-      const research = [...document.querySelectorAll('section')].find((item) => item.textContent?.includes('Research'))
-      if (research === undefined || research.closest('[hidden]') !== null) return
+      const research = [...document.querySelectorAll('h2')]
+        .find((title) => title.textContent === 'Research')
+        ?.closest('section')
+      if (research === undefined || research === null || research.closest('[hidden]') !== null) return
       seen.push({
         links: research.querySelectorAll('a').length,
         more: [...research.querySelectorAll('button')].filter((button) => /Show more/.test(button.ariaLabel ?? ''))
