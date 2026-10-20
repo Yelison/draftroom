@@ -25,9 +25,14 @@ export type Placement =
 
 type Placements = ReadonlyMap<string, Placement>
 
-/** What the screen tells the plugin: the threads to show, whether the first handshake is done and the thread in focus. */
+/**
+ * What the screen tells the plugin: the threads to show, the resolved ones it only places (they have no highlight and the
+ * click and the key do not reach them, but the margin puts their cards level with their text), whether the first handshake
+ * is done and the thread in focus.
+ */
 interface HighlightInput {
   threads: readonly HighlightedThread[]
+  resolved: readonly HighlightedThread[]
   handshaken: boolean
   activeThreadId: string | null
 }
@@ -51,6 +56,13 @@ export function highlightedThreads(
   return threads.filter(({ status }) => status === 'open').map(({ id, anchor }) => ({ id, anchor }))
 }
 
+/** The resolved threads among these, which the plugin places and does not highlight. */
+export function resolvedThreads(
+  threads: readonly (HighlightedThread & { status: Schema<'ThreadStatus'> })[],
+): HighlightedThread[] {
+  return threads.filter(({ status }) => status === 'resolved').map(({ id, anchor }) => ({ id, anchor }))
+}
+
 /** Where a thread is in the text of this editor state. */
 export function placementOf(state: EditorState, threadId: string): Placement {
   return highlightKey.getState(state)?.placements.get(threadId) ?? unresolved
@@ -62,15 +74,19 @@ export function placementsOf(state: EditorState): Placements {
 }
 
 /**
- * Tells the plugin which threads to show, whether the first handshake is done, and which thread the person is on. It is a
- * transaction of its own that changes no content and is not an undo step.
+ * Tells the plugin which threads to show, which ones to only place, whether the first handshake is done, and which thread
+ * the person is on. It is a transaction of its own that changes no content and is not an undo step.
  */
 export function showHighlights(
   editor: Editor,
   threads: readonly HighlightedThread[],
-  { handshaken, activeThreadId = null }: { handshaken: boolean; activeThreadId?: string | null },
+  {
+    handshaken,
+    activeThreadId = null,
+    resolved = [],
+  }: { handshaken: boolean; activeThreadId?: string | null; resolved?: readonly HighlightedThread[] },
 ): void {
-  const input: HighlightInput = { threads, handshaken, activeThreadId }
+  const input: HighlightInput = { threads, resolved, handshaken, activeThreadId }
   editor.view.dispatch(editor.state.tr.setMeta(highlightKey, input).setMeta('addToHistory', false))
 }
 
@@ -107,6 +123,7 @@ function highlightPlugin(requests: CommentRequests | null): Plugin<HighlightStat
     state: {
       init: () => ({
         threads: [],
+        resolved: [],
         handshaken: false,
         activeThreadId: null,
         placements: new Map(),
@@ -168,17 +185,19 @@ function updated(
 ): HighlightState {
   const unchanged =
     input.threads === previous.threads &&
+    input.resolved === previous.resolved &&
     input.handshaken === previous.handshaken &&
     input.activeThreadId === previous.activeThreadId &&
     samePlacements(placements, previous.placements)
   if (unchanged) return previous
-  return { ...input, placements, decorations: decorationsOf(state, placements, input.activeThreadId) }
+  const highlighted = new Set(input.threads.map(({ id }) => id))
+  return { ...input, placements, decorations: decorationsOf(state, placements, highlighted, input.activeThreadId) }
 }
 
-function resolveFromYjs(state: EditorState, { threads, handshaken }: HighlightInput): Placements {
+function resolveFromYjs(state: EditorState, { threads, resolved, handshaken }: HighlightInput): Placements {
   const bound = boundDocumentOf(state)
   return new Map(
-    threads.map(({ id, anchor }): [string, Placement] => {
+    [...threads, ...resolved].map(({ id, anchor }): [string, Placement] => {
       if (!handshaken || bound === null) return [id, unresolved]
       const range = resolveAnchor(bound, anchor)
       return [id, range === null ? { status: 'orphaned' } : { status: 'placed', ...range }]
@@ -198,9 +217,14 @@ function mapThrough(placements: Placements, mapping: Mapping): Placements {
   )
 }
 
-function decorationsOf(state: EditorState, placements: Placements, activeThreadId: string | null): DecorationSet {
+function decorationsOf(
+  state: EditorState,
+  placements: Placements,
+  highlighted: ReadonlySet<string>,
+  activeThreadId: string | null,
+): DecorationSet {
   const marks = [...placements].flatMap(([id, placement]) =>
-    placement.status === 'placed'
+    placement.status === 'placed' && highlighted.has(id)
       ? [
           Decoration.inline(
             placement.from,
@@ -238,8 +262,9 @@ function samePlacements(a: Placements, b: Placements): boolean {
  */
 export function threadAt(state: EditorState, position: number, { caret }: { caret: boolean }): string | null {
   let found: { id: string; length: number } | null = null
+  const resolved = new Set(highlightKey.getState(state)?.resolved.map(({ id }) => id))
   for (const [id, placement] of placementsOf(state)) {
-    if (placement.status !== 'placed' || position < placement.from) continue
+    if (placement.status !== 'placed' || resolved.has(id) || position < placement.from) continue
     if (caret ? position > placement.to : position >= placement.to) continue
     const length = placement.to - placement.from
     if (found === null || length < found.length) found = { id, length }
