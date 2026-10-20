@@ -143,14 +143,15 @@ export const sessionChanges = ['signUp', 'signIn', 'signOut'] as const satisfies
 type ChangeEvent = Exclude<StatelessEvent['type'], 'stored' | 'document-too-large'>
 
 export const eventInvalidations = {
-  'metadata-changed': ['document'],
+  // The title and the folder show in the lists as well as in the editor (the table of `docs/api/README.md`).
+  'metadata-changed': ['document', 'documentLists'],
   // The document too: it carries the caller's role, which is what decides what the editor offers once the mode flips.
   'access-changed': ['access', 'document', 'shared'],
   // The protocol also says "and that thread", and there is no query of one thread: the list is what shows it.
   'comments-changed': ['threads'],
   'versions-changed': ['versions'],
-  // The archived state the protocol says to show is read from the document.
-  'document-archived': ['document'],
+  // The archived state the protocol says to show is read from the document, and the document leaves the lists of the living.
+  'document-archived': ['document', 'documentLists'],
 } as const satisfies Record<ChangeEvent, readonly InvalidationName[]>
 
 const resolve = (names: readonly InvalidationName[], scope: Scope): QueryKey[] =>

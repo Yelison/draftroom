@@ -71,6 +71,7 @@ function setUp(source: Partial<AccessFactsSource>, open: readonly ConnectionCont
         calls.push({ code: plan.code, event: plan.event, ended: ended.map(({ userId }) => userId) })
         return ended.length
       },
+      freeze: () => 0,
       tell(target: ConnectionTarget) {
         const reached = open.filter((context) => selects(target, documentName(documentId), context))
         noticed.push(...reached.map(({ userId }) => userId))
@@ -156,7 +157,7 @@ describe('a change to who can open a document', () => {
     const order: string[] = []
     const live = createLiveAccess({
       facts: { ofDocument: async () => [], ofMember: async () => [] },
-      collaboration: { endConnections: () => order.push('closed'), tell: () => 0 },
+      collaboration: { endConnections: () => order.push('closed'), freeze: () => 0, tell: () => 0 },
       broadcaster: { broadcast: () => order.push('told') },
       log: new RecordingLog(),
     })
@@ -178,6 +179,100 @@ describe('a change to who can open a document', () => {
     expect(calls).toEqual([{ code: 'role-changed', event: undefined, ended: ['ana', 'ben'] }])
     expect(told).toEqual([`${documentId} access-changed`])
     expect(log.entries.map(({ level }) => level)).toEqual(['error'])
+  })
+})
+
+describe('a document that is archived, restored or deleted', () => {
+  // Rows: the connection of a person, what the database says they hold once the document is archived, and how it ends.
+  const archiving: readonly (readonly [string, DocumentRole, Parameters<typeof facts>[1], Call['code']])[] = [
+    ['an editor, who loses the document', 'editor', { grant: 'editor', archived: true }, 'access-revoked'],
+    ['a viewer, who loses the document', 'viewer', { grant: 'viewer', archived: true }, 'access-revoked'],
+    ['an owner, who reconnects read-only', 'owner', { grant: 'owner', archived: true }, 'role-changed'],
+    [
+      'an owner of the workspace, who reconnects read-only',
+      'owner',
+      { workspaceRole: 'owner', archived: true },
+      'role-changed',
+    ],
+  ]
+
+  it.each(archiving)('archived: closes %s, the notice with the close', async (_who, connected, now, code) => {
+    const { live, calls } = setUp({ ofDocument: async () => [facts('ana', now)] }, [connection('ana', connected)])
+
+    await live.documentArchived(documentId)
+
+    expect(calls.filter((call) => call.ended.length > 0)).toEqual([
+      { code, event: { type: 'document-archived' }, ended: ['ana'] },
+    ])
+  })
+
+  it('archived: closes each person by what they hold, in one change', async () => {
+    const { live, calls } = setUp(
+      {
+        ofDocument: async () => [
+          facts('ana', { grant: 'owner', archived: true }),
+          facts('ben', { grant: 'editor', archived: true }),
+        ],
+      },
+      [connection('ana', 'owner'), connection('ben', 'editor')],
+    )
+
+    await live.documentArchived(documentId)
+
+    expect([endedWith(calls, 'role-changed'), endedWith(calls, 'access-revoked')]).toEqual([['ana'], ['ben']])
+  })
+
+  it('archived: closes every connection to authenticate again when it cannot read what the people hold', async () => {
+    const { live, calls, log } = setUp({ ofDocument: () => Promise.reject(new Error('no database')) }, [
+      connection('ana', 'owner'),
+      connection('ben', 'editor'),
+    ])
+
+    await live.documentArchived(documentId)
+
+    expect(calls).toEqual([{ code: 'role-changed', event: { type: 'document-archived' }, ended: ['ana', 'ben'] }])
+    expect(log.entries.map(({ level }) => level)).toEqual(['error'])
+  })
+
+  it('archived: takes the right to write from the whole document before it asks for any fact', async () => {
+    const order: string[] = []
+    const live = createLiveAccess({
+      facts: {
+        ofDocument: async () => {
+          order.push('read')
+          return []
+        },
+        ofMember: async () => [],
+      },
+      collaboration: {
+        endConnections: () => order.push('closed'),
+        freeze: (target) => order.push(`frozen ${target.documentId}`),
+        tell: () => 0,
+      },
+      broadcaster: { broadcast: () => undefined },
+      log: new RecordingLog(),
+    })
+
+    await live.documentArchived(documentId)
+
+    // Frozen before the facts are even asked for: what is read afterwards decides only how each connection ends.
+    expect(order.slice(0, 2)).toEqual([`frozen ${documentId}`, 'read'])
+  })
+
+  it('restored: recycles every connection, with the notice, without reading anything', async () => {
+    const { live, calls } = setUp({}, [connection('ana', 'owner'), connection('ben', 'owner')])
+
+    await live.documentRestored(documentId)
+
+    expect(calls).toEqual([{ code: 'role-changed', event: { type: 'access-changed' }, ended: ['ana', 'ben'] }])
+  })
+
+  it('deleted: closes every connection with 4403 and no notice, without reading anything', async () => {
+    const { live, calls } = setUp({}, [connection('ana', 'owner'), connection('ben', 'editor')])
+
+    await live.documentDeleted(documentId)
+
+    expect(calls).toEqual([{ code: 'access-revoked', event: undefined, ended: ['ana', 'ben'] }])
   })
 })
 
@@ -236,6 +331,7 @@ describe('a change to a member of a workspace', () => {
           }
           return 0
         },
+        freeze: () => 0,
         tell: () => 0,
       },
       broadcaster: { broadcast: () => undefined },
@@ -276,6 +372,7 @@ describe('a session that ends', () => {
           ended.push({ target, plan })
           return 1
         },
+        freeze: () => 0,
         tell: () => 0,
       },
       broadcaster: { broadcast: () => undefined },

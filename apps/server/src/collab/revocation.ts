@@ -30,7 +30,7 @@ export const factsFromDatabase = (database: Kysely<Database>): AccessFactsSource
 
 export interface RevocationOptions {
   readonly facts: AccessFactsSource
-  readonly collaboration: Pick<CollabServer, 'endConnections' | 'tell'>
+  readonly collaboration: Pick<CollabServer, 'endConnections' | 'freeze' | 'tell'>
   /** Tells the connections of a document that its access changed. */
   readonly broadcaster: DocumentBroadcaster
   readonly log: CollabLog
@@ -47,13 +47,20 @@ function accessOf(role: ConnectionContext['role'] | null, archived: boolean): Co
 /**
  * How each connection ends, by the facts at the moment they were read. A person with no facts is not in the workspace
  * (or the document is gone), so nothing is left for them to open.
+ *
+ * A connection remembers the role it was made with, not whether the document was archived then. For a change of access
+ * the archive did not change, so the facts say it. Archiving does change it, and then `archivedBefore` is what the
+ * connections were made under: without it an owner's connection would be compared with itself and never recycled.
  */
-function closureOf(facts: readonly AccessFacts[]) {
+function closureOf(facts: readonly AccessFacts[], archivedBefore?: boolean) {
   const byPersonAndDocument = new Map(facts.map((row) => [keyOf(row.documentId, row.userId), row]))
   return ({ role, userId }: ConnectionContext, documentId: string): Closure | null => {
     const now = byPersonAndDocument.get(keyOf(documentId, userId))
     const archived = now?.archived ?? false
-    return closureFor(accessOf(role, archived), now === undefined ? 'refused' : accessOf(effectiveRole(now), archived))
+    return closureFor(
+      accessOf(role, archivedBefore ?? archived),
+      now === undefined ? 'refused' : accessOf(effectiveRole(now), archived),
+    )
   }
 }
 
@@ -102,6 +109,31 @@ export function createLiveAccess({ facts, collaboration, broadcaster, log }: Rev
       // in order, so the ones about to close hear what happened and the ones that stay refresh what they show.
       broadcaster.broadcast(documentId, { type: 'access-changed' })
       hold({ documentId }, decide)
+    },
+
+    async documentArchived(documentId) {
+      // Nobody writes to an archived document, owners included, so what takes the right to write needs no fact: it comes
+      // first and before any await (protocol §6.3, step 1). The facts only decide how each connection ends.
+      collaboration.freeze({ documentId })
+      let decide: Decide | undefined
+      try {
+        decide = closureOf(await facts.ofDocument(documentId), false)
+      } catch (error) {
+        log.error({ documentId, error }, 'the access of an archived document could not be read')
+      }
+      // The notice travels with each close, which is how a connection still being established receives it as well.
+      hold({ documentId }, decide, { type: 'document-archived' })
+    },
+
+    // Whoever is connected to an archived document is an owner, read-only: nothing is read, because every one of them
+    // has to reconnect to be allowed to write, and authentication gives each the mode they hold now.
+    async documentRestored(documentId) {
+      collaboration.endConnections({ documentId }, { code: 'role-changed', event: { type: 'access-changed' } })
+    },
+
+    // Nothing is read: nobody has anything left to open, and there is no event for a document that is gone.
+    async documentDeleted(documentId) {
+      collaboration.endConnections({ documentId }, { code: 'access-revoked' })
     },
 
     async memberChanged(workspaceId, userId) {
