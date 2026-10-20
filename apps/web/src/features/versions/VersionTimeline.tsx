@@ -3,6 +3,7 @@ import { Button } from '@yelison/forma-ui'
 import { useMemo, useRef, useState } from 'react'
 import { useIntl } from 'react-intl'
 import { StateMessage } from '../documents/StateMessage.tsx'
+import { useTimelineCalendar } from '../history/useTimelineCalendar.ts'
 import { groupByDay } from './days.ts'
 import { AutomaticToggle, TimelineFrame, TimelineSkeleton } from './TimelineFrame.tsx'
 import { useFocusAfterLoadMore } from './useFocusAfterLoadMore.ts'
@@ -35,7 +36,7 @@ export function VersionTimeline({
 }: VersionTimelineProps) {
   const intl = useIntl()
   const dayLabel = useDayLabel()
-  const { timeZone = new Intl.DateTimeFormat().resolvedOptions().timeZone } = intl
+  const { timeZone } = useTimelineCalendar()
   // Taken once: the day a version is called "today" by does not change under a person who is reading.
   const [now] = useState(() => new Date())
   const days = useMemo(() => groupByDay(versions, timeZone, now), [versions, timeZone, now])
@@ -51,11 +52,17 @@ export function VersionTimeline({
   })
 
   const automaticToggle = (
-    <AutomaticToggle ref={toggle} pressed={showAutomatic} disabled={query.isError} onToggle={onToggleAutomatic} />
+    <AutomaticToggle
+      ref={toggle}
+      pressed={showAutomatic}
+      disabled={query.isError || (query.isSuccess && arrived === 0 && !query.hasNextPage)}
+      onToggle={onToggleAutomatic}
+    />
   )
 
   if (query.isPending) return <TimelineSkeleton />
-  if (query.isError) {
+  // A page that failed to load is not a list that failed: what has arrived stays, and the error sits by "Load more".
+  if (query.isError && query.data === undefined) {
     return (
       <TimelineFrame toggle={automaticToggle}>
         <StateMessage
@@ -97,6 +104,11 @@ export function VersionTimeline({
             </ul>
           </div>
         ))}
+        {query.isFetchNextPageError && (
+          <p role="alert" className={styles.pageProblem}>
+            {intl.formatMessage({ id: 'versions.loadMore.error' })}
+          </p>
+        )}
         {query.hasNextPage && (
           <Button
             variant="secondary"
@@ -106,7 +118,7 @@ export function VersionTimeline({
               void query.fetchNextPage()
             }}
           >
-            {intl.formatMessage({ id: 'versions.loadMore' })}
+            {intl.formatMessage({ id: query.isFetchNextPageError ? 'versions.error.retry' : 'versions.loadMore' })}
           </Button>
         )}
       </div>

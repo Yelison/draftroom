@@ -34,7 +34,7 @@ describe('grouping versions by day', () => {
     { instant: '2026-10-13T23:59:00Z', relative: 'yesterday' },
     { instant: '2026-10-12T23:59:00Z', relative: 'earlier' },
   ])('calls $instant $relative when it is the 14th at 1 am', ({ instant, relative }) => {
-    const [first] = groupByDay([at(instant)], 'UTC', new Date('2026-10-14T13:00:00Z'))
+    const [first] = groupByDay([at(instant)], 'UTC', new Date('2026-10-14T01:00:00Z'))
 
     expect(first?.relative).toBe(relative)
   })

@@ -17,7 +17,6 @@ import { WorkspaceTab } from '../features/settings/WorkspaceTab.tsx'
 import { SharedScreen } from '../features/shared/SharedScreen.tsx'
 import { TemplateScreen } from '../features/templates/TemplateScreen.tsx'
 import { TrashScreen } from '../features/trash/TrashScreen.tsx'
-import { VersionsLayout } from '../features/versions/VersionsLayout.tsx'
 import { VersionsSkeleton } from '../features/versions/VersionsSkeleton.tsx'
 import type { MessageId } from '../i18n/messages.ts'
 import { AppFrame } from './AppFrame.tsx'
@@ -111,14 +110,9 @@ export const routes: RouteObject[] = [
                   },
                 ],
               },
-            ],
-          },
-          {
-            // The history has one task, so it has no explorer: a layout of its own, and the editor's stays as it was.
-            Component: VersionsLayout,
-            children: [
               {
-                // Its own chunk, as the editor's: the reader brings Tiptap, ProseMirror and Yjs.
+                // Its own chunk, as the editor's: the reader brings Tiptap, ProseMirror and Yjs. It is in the editor's layout,
+                // which hides the explorer here and keeps it mounted, so coming back to the document finds it as it was.
                 path: 'documents/:documentId/versions',
                 HydrateFallback: VersionsSkeleton,
                 lazy: async () => ({

@@ -44,10 +44,15 @@ export function VersionsBody({ documentId, onRestore }: VersionsBodyProps) {
       />
       {query.isPending ? (
         <ReaderPlaceholder />
-      ) : query.isError ? (
+      ) : query.isError && query.data === undefined ? (
         <ReaderPanel />
       ) : (
-        <VersionReader documentId={documentId} version={reading} onRestore={onRestore} />
+        <VersionReader
+          documentId={documentId}
+          version={reading}
+          onlyAutomatic={versions.length > 0}
+          onRestore={onRestore}
+        />
       )}
     </div>
   )

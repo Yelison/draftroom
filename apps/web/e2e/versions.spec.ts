@@ -84,13 +84,20 @@ test.describe('the version history', () => {
     await expect(list(page).getByRole('listitem').first()).toContainText('Ready for review')
   })
 
-  test('has no explorer, which the editor has', async ({ page }) => {
+  test('hides the explorer, which the editor has, and Tab never goes into it', async ({ page }) => {
     await page.goto(`/documents/${launchPlan.id}/versions`)
     await expect(list(page).getByRole('listitem')).toHaveCount(1)
-    await expect(page.getByRole('complementary', { name: 'Explorer' })).toHaveCount(0)
+    const explorer = page.getByRole('complementary', { name: 'Explorer' })
+    await expect(explorer).toBeHidden()
+
+    await page.getByRole('link', { name: 'Documents' }).focus()
+    for (let presses = 0; presses < 12; presses++) {
+      await page.keyboard.press('Tab')
+      expect(await page.evaluate(() => document.activeElement?.closest('aside') !== null)).toBe(false)
+    }
 
     await page.goto(`/documents/${launchPlan.id}`)
-    await expect(page.getByRole('complementary', { name: 'Explorer' })).toBeVisible()
+    await expect(explorer).toBeVisible()
   })
 })
 
@@ -245,6 +252,68 @@ test.describe('the layout', () => {
     ])
     expect((listBox?.y ?? 0) + (listBox?.height ?? 0)).toBeLessThanOrEqual(readerBox?.y ?? 0)
     expect((restoreBox?.x ?? 0) + (restoreBox?.width ?? 0)).toBeLessThanOrEqual(640)
+  })
+})
+
+test.describe('a history as long as a real one', () => {
+  test.use({ viewport: { width: 1280, height: 800 } })
+
+  test('fits the window: the list and the text scroll inside their panels, and the bar stays in sight', async ({
+    page,
+  }) => {
+    // A text longer than the window, saved as the newest version, and fifteen versions in the list.
+    await page.goto(`/documents/${launchPlan.id}`)
+    const editor = page.getByRole('textbox', { name: 'Document content' })
+    await editor.click()
+    await page.keyboard.press('Control+End')
+    for (let paragraph = 1; paragraph <= 60; paragraph++) {
+      await page.keyboard.press('Enter')
+      await page.keyboard.type(`Paragraph ${paragraph} of a text that is long enough to need its own scroll.`)
+    }
+    await page.getByRole('button', { name: 'Version history' }).click()
+    for (let version = 1; version <= 14; version++) {
+      await page.getByRole('button', { name: 'Save a version' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Save a version' })
+      await dialog.getByRole('textbox', { name: 'Name (optional)' }).fill(`Draft ${version}`)
+      await page.keyboard.press('Enter')
+      await expect(dialog).toBeHidden()
+    }
+    await expect(list(page).getByRole('listitem')).toHaveCount(15)
+    await list(page).getByRole('listitem').first().getByRole('button').click()
+    const text = reader(page).getByRole('region', { name: /^Text of / })
+    await expect(text).toContainText('Paragraph 60')
+
+    const fits = await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)
+    expect(fits, 'the page does not scroll').toBe(true)
+    const scrolls = (box: ReturnType<typeof page.locator>) =>
+      box.evaluate((element) => element.scrollHeight > element.clientHeight)
+    expect(await scrolls(text), 'the text scrolls inside its panel').toBe(true)
+    expect(await scrolls(list(page).locator('> div').last()), 'the list scrolls inside its panel').toBe(true)
+
+    await text.evaluate((element) => element.scrollTo({ top: element.scrollHeight }))
+    await expect(reader(page).getByText(/^You are reading the version of /)).toBeInViewport()
+    await expect(reader(page).getByRole('button', { name: 'Restore this version' })).toBeInViewport()
+  })
+
+  test('keeps the bar of the reader as tall when the text arrives at 640 px', async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 800 })
+    await page.addInitScript(() => {
+      const seen = window as unknown as { bar?: number }
+      new MutationObserver(() => {
+        const bar = document.querySelector('main section[aria-label="Version"] > div:first-child')
+        if (bar !== null && seen.bar === undefined && bar.textContent?.includes('Nothing you do here')) {
+          seen.bar = bar.getBoundingClientRect().height
+        }
+      }).observe(document, { childList: true, subtree: true })
+    })
+    await page.goto(`/documents/${launchPlan.id}/versions`)
+    const restore = reader(page).getByRole('button', { name: 'Restore this version' })
+    await expect(restore).toBeVisible()
+
+    const seen = await page.evaluate(() => (window as unknown as { bar?: number }).bar)
+    expect(seen, 'the bar was seen before the text').toBeDefined()
+    const bar = await reader(page).locator('> div:first-child').boundingBox()
+    expect(bar?.height).toBeCloseTo(seen ?? NaN, 0)
   })
 })
 

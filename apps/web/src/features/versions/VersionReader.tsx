@@ -34,6 +34,8 @@ export interface VersionReaderProps {
   documentId: string
   /** The version to read, or `null` when there is none to choose yet. */
   version: Schema<'Version'> | null
+  /** Why there is none to read: the versions that exist are all automatic, and hidden. */
+  onlyAutomatic?: boolean
   /** Given only to owners: the server refuses anyone else, and a button that can only fail is not offered. */
   onRestore?: ((version: Schema<'Version'>) => void) | undefined
 }
@@ -42,12 +44,14 @@ export interface VersionReaderProps {
  * What the chosen version held, with a bar above it that says which version it is and that reading it changes nothing.
  * Restoring is offered from here, once the text has been read, and not from the list.
  */
-export function VersionReader({ documentId, version, onRestore }: VersionReaderProps) {
+export function VersionReader({ documentId, version, onlyAutomatic = false, onRestore }: VersionReaderProps) {
   const intl = useIntl()
   return (
     <ReaderPanel>
       {version === null ? (
-        <StateMessage title={intl.formatMessage({ id: 'versions.reader.empty' })} />
+        <StateMessage
+          title={intl.formatMessage({ id: onlyAutomatic ? 'versions.reader.hidden' : 'versions.reader.empty' })}
+        />
       ) : (
         // Another version is another reading: nothing of the last one, loading or failed, carries over.
         <Reading key={version.id} documentId={documentId} version={version} onRestore={onRestore} />
@@ -72,7 +76,7 @@ function Reading({
   if (content.isPending) {
     return (
       <>
-        <ReaderBar version={version} />
+        <ReaderBar version={version} offersRestore={onRestore !== undefined} />
         <div aria-busy="true" className={styles.skeleton}>
           <p role="status" className="forma-visually-hidden">
             {intl.formatMessage({ id: 'versions.reader.loading' })}
@@ -84,7 +88,7 @@ function Reading({
   if (content.isError) {
     return (
       <>
-        <ReaderBar version={version} />
+        <ReaderBar version={version} offersRestore={onRestore !== undefined} />
         <StateMessage
           role="alert"
           title={intl.formatMessage({ id: 'versions.reader.error.title' })}
@@ -117,7 +121,7 @@ function Text({
   const restore = document !== null && onRestore !== undefined ? () => onRestore(version) : undefined
   return (
     <>
-      <ReaderBar version={version} onRestore={restore} />
+      <ReaderBar version={version} offersRestore={onRestore !== undefined} onRestore={restore} />
       {document === null ? (
         <StateMessage
           role="alert"
@@ -135,7 +139,16 @@ function Text({
 }
 
 /** Fixed above the text: which version this is, that nothing here changes the document, and for owners the way back to it. */
-function ReaderBar({ version, onRestore }: { version: Schema<'Version'>; onRestore?: (() => void) | undefined }) {
+function ReaderBar({
+  version,
+  offersRestore,
+  onRestore,
+}: {
+  version: Schema<'Version'>
+  /** The person is an owner: the place of the button is kept while the text is not there yet. */
+  offersRestore: boolean
+  onRestore?: (() => void) | undefined
+}) {
   const intl = useIntl()
   const dateOf = useVersionDate()
   return (
@@ -147,8 +160,12 @@ function ReaderBar({ version, onRestore }: { version: Schema<'Version'>; onResto
       >
         {intl.formatMessage({ id: 'versions.reader.bar.description' })}
       </Alert>
-      {onRestore !== undefined && (
-        <Button onClick={onRestore}>{intl.formatMessage({ id: 'versions.reader.restore' })}</Button>
+      {offersRestore && (
+        <div className={styles.action}>
+          {onRestore !== undefined && (
+            <Button onClick={onRestore}>{intl.formatMessage({ id: 'versions.reader.restore' })}</Button>
+          )}
+        </div>
       )}
     </div>
   )

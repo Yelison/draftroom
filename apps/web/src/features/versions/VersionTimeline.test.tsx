@@ -69,7 +69,8 @@ describe('what the list shows of each version', () => {
 
 describe('the sizes', () => {
   it.each([
-    { sizeBytes: 640, shown: '640 byte' },
+    { sizeBytes: 0, shown: '0 kB' },
+    { sizeBytes: 640, shown: '1 kB' },
     { sizeBytes: 3180, shown: '3 kB' },
     { sizeBytes: 1_400_000, shown: '1.4 MB' },
   ])('are told in the unit that suits them: $sizeBytes bytes are $shown', async ({ sizeBytes, shown }) => {
@@ -235,6 +236,8 @@ describe('the states of the list', () => {
     expect(await screen.findByText('No versions yet')).toBeInTheDocument()
     expect(within(list()).queryAllByRole('listitem')).toHaveLength(0)
     expect(await screen.findByText('There is no version to read yet')).toBeInTheDocument()
+    // Nothing to show: the switch is there, off, and the list says why.
+    expect(automaticToggle()).toBeDisabled()
   })
 
   it('says that there are only automatic ones while the switch is off, and shows them when it is on', async () => {
@@ -242,6 +245,9 @@ describe('the states of the list', () => {
       wrap: listing([makeVersion({ id: versionId(1), kind: 'auto', createdAt: '2026-10-13T09:00:00.000Z' })]),
     })
     expect(await screen.findByText('There are only automatic versions')).toBeInTheDocument()
+    // The reader says the same, not that there is nothing to read.
+    expect(screen.getByText('Show the automatic versions to read one.')).toBeInTheDocument()
+    expect(screen.queryByText('There is no version to read yet')).not.toBeInTheDocument()
     expect(screen.queryByText('No versions yet')).not.toBeInTheDocument()
     expect(within(list()).queryAllByRole('listitem')).toHaveLength(0)
 
@@ -318,6 +324,42 @@ describe('"Load more"', () => {
     await waitFor(() => expect(rows()).toHaveLength(2))
     expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
     expect(choose(rows()[1]!)).toHaveFocus()
+  })
+
+  it('keeps the list and the text when a page fails, says so by the button, and keeps the focus on it', async () => {
+    let failing = true
+    const view = renderScreen(versionsPath(launchPlan.id), {
+      wrap: replacing({
+        listVersions: async (request) => {
+          if (request?.params.query?.cursor === undefined)
+            return {
+              items: [makeVersion({ id: versionId(1), label: 'Newest', createdAt: '2026-10-13T09:00:00.000Z' })],
+              nextCursor: 'next',
+            }
+          if (failing) throw unavailable()
+          return {
+            items: [makeVersion({ id: versionId(2), label: 'Older', createdAt: '2026-10-12T09:00:00.000Z' })],
+            nextCursor: null,
+          }
+        },
+      }),
+    })
+    await listArrived()
+    await view.user.click(screen.getByRole('button', { name: 'Load more' }))
+
+    const alert = await within(list()).findByRole('alert')
+    expect(alert).toHaveTextContent("We couldn't load more versions")
+    expect(rows()).toHaveLength(1)
+    expect(
+      within(screen.getByRole('region', { name: 'Version' })).getByText(/^You are reading the version of /),
+    ).toBeVisible()
+    const retry = within(list()).getByRole('button', { name: 'Try again' })
+    expect(retry).toHaveFocus()
+    failing = false
+    await view.user.click(retry)
+
+    await waitFor(() => expect(rows()).toHaveLength(2))
+    expect(within(list()).queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('leaves the focus on the switch when the last page brings only automatic versions, which are hidden', async () => {

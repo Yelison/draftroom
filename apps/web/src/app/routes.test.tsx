@@ -1,4 +1,5 @@
-import { screen } from '@testing-library/react'
+import { act, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { launchPlan } from '../data/mock/fixtures/documents.ts'
 import { localeStorageKey } from '../i18n/locale.ts'
@@ -68,12 +69,32 @@ describe('the explorer', () => {
     expect(screen.getByRole('complementary', { name: 'Explorer' })).toBeInTheDocument()
   })
 
-  it('is left out of the history of a document, which keeps the compact rail and its place in Documents', () => {
+  it('is out of the way in the history of a document: unreachable, which keeps the compact rail and its place in Documents', () => {
     renderApp('/documents/d1/versions')
 
-    expect(screen.queryByRole('complementary', { name: 'Explorer' })).not.toBeInTheDocument()
+    const explorer = screen.getByRole('complementary', { name: 'Explorer' })
+    expect(explorer.closest('[inert]')).not.toBeNull()
     expectRail('compact')
     expect(screen.getAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual(['Documents'])
+  })
+
+  it('is the same one when the person comes back from the history, with the folders as they left them', async () => {
+    const user = userEvent.setup()
+    const { router } = renderApp('/documents/new')
+    const explorer = screen.getByRole('complementary', { name: 'Explorer' })
+    const folder = await screen.findByRole('treeitem', { name: 'Operaciones' })
+    expect(folder).toHaveAttribute('aria-expanded', 'false')
+    await user.click(folder)
+    expect(folder).toHaveAttribute('aria-expanded', 'true')
+
+    await act(() => router.navigate('/documents/d1/versions'))
+    expect(screen.getByRole('complementary', { name: 'Explorer' })).toBe(explorer)
+    expect(explorer.closest('[inert]')).not.toBeNull()
+    await act(() => router.navigate('/documents/new'))
+
+    expect(screen.getByRole('complementary', { name: 'Explorer' })).toBe(explorer)
+    expect(explorer.closest('[inert]')).toBeNull()
+    expect(screen.getByRole('treeitem', { name: 'Operaciones' })).toHaveAttribute('aria-expanded', 'true')
   })
 })
 

@@ -1,6 +1,7 @@
 .panel {
   display: flex;
   flex-direction: column;
+  container-type: inline-size;
   min-width: 0;
   min-height: 0;
   height: calc(var(--space-64) * 8);
@@ -30,6 +31,19 @@
 .notice {
   flex: 1;
   min-width: calc(var(--space-64) * 3);
+}
+
+/* The place of the button is as tall as the button before it arrives, and under the notice when the panel is too narrow to hold both. */
+.action {
+  display: flex;
+  flex: none;
+  min-height: var(--button-height);
+}
+
+@container (width < 640px) {
+  .action {
+    flex-basis: 100%;
+  }
 }
 
 .skeleton {

@@ -125,3 +125,14 @@
   font: var(--font-caption);
   font-variant-numeric: tabular-nums;
 }
+
+/* The ring keeps the avatar a circle on the fill of the selected row, which has the avatar's own background. */
+.item[aria-current='true'] :global(.forma-avatar) {
+  box-shadow: 0 0 0 var(--space-2) var(--color-surface);
+}
+
+.pageProblem {
+  margin: var(--space-8) var(--space-16);
+  color: var(--color-red-ink);
+  font: var(--font-caption);
+}
