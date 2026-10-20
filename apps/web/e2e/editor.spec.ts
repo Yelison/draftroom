@@ -813,8 +813,13 @@ test.describe('the band and the bar above the sheet', () => {
               // The people end before the state starts: the two share a row and must not run into each other.
               if (people !== null) expect((people?.x ?? 0) + (people?.width ?? 0)).toBeLessThanOrEqual(share?.x ?? 0)
               // On a desktop the parts of the bar share its row; under it, the filter and the tabs are rows of their own.
-              if (desktop) expect(Math.abs((filter?.y ?? 0) - (tools?.y ?? 0))).toBeLessThan(toolbarRow)
-              else expect(filter?.y).toBeGreaterThanOrEqual((tools?.y ?? 0) + toolbarRow)
+              if (desktop) {
+                expect(Math.abs((filter?.y ?? 0) - (tools?.y ?? 0))).toBeLessThan(toolbarRow)
+                // And they do not run into each other: the toolbar keeps every button, whatever the language.
+                expect((tools?.x ?? 0) + (tools?.width ?? 0)).toBeLessThanOrEqual(filter?.x ?? 0)
+                const link = await toolbar.getByRole('button', { name: /^(Link|Enlace)$/ }).boundingBox()
+                expect((link?.x ?? 0) + (link?.width ?? 0)).toBeLessThanOrEqual((tools?.x ?? 0) + (tools?.width ?? 0))
+              } else expect(filter?.y).toBeGreaterThanOrEqual((tools?.y ?? 0) + toolbarRow)
               expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
             }
 
