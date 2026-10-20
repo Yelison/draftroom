@@ -1,34 +1,16 @@
 import type { Schema } from '@draftroom/contract'
 import { useQuery } from '@tanstack/react-query'
 import { Alert, Button } from '@yelison/forma-ui'
-import { useMemo, type ReactNode } from 'react'
+import { useMemo } from 'react'
 import { useIntl } from 'react-intl'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { StateMessage } from '../documents/StateMessage.tsx'
+import { ReaderPanel } from './ReaderPanel.tsx'
 import { PreviewDocument } from './PreviewDocument.tsx'
 import { versionContentQuery } from './queries.ts'
 import { documentOf } from './versionDocument.ts'
 import { useVersionDate, useVersionName } from './useVersionName.ts'
 import styles from './VersionReader.module.css'
-
-/** The panel beside the list, which is there before there is anything to read in it. */
-export function ReaderPanel({ children }: { children?: ReactNode }) {
-  const intl = useIntl()
-  return (
-    <section className={styles.panel} aria-label={intl.formatMessage({ id: 'versions.reader.label' })}>
-      {children}
-    </section>
-  )
-}
-
-/** The panel while the versions are on their way: the room the text will take, so nothing moves when it arrives. */
-export function ReaderPlaceholder() {
-  return (
-    <ReaderPanel>
-      <div aria-busy="true" className={styles.skeleton} />
-    </ReaderPanel>
-  )
-}
 
 export interface VersionReaderProps {
   documentId: string

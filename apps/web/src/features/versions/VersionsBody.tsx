@@ -1,6 +1,7 @@
 import type { Schema } from '@draftroom/contract'
 import { useMemo, useState } from 'react'
-import { ReaderPanel, ReaderPlaceholder, VersionReader } from './VersionReader.tsx'
+import { ReaderPanel, ReaderPlaceholder } from './ReaderPanel.tsx'
+import { VersionReader } from './VersionReader.tsx'
 import { useVersions } from './useVersions.ts'
 import { VersionTimeline } from './VersionTimeline.tsx'
 import styles from './Versions.module.css'

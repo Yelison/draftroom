@@ -1,4 +1,4 @@
-import { ReaderPlaceholder } from './VersionReader.tsx'
+import { ReaderPlaceholder } from './ReaderPanel.tsx'
 import { TimelineSkeleton } from './TimelineFrame.tsx'
 import { VersionsHeader } from './VersionsHeader.tsx'
 import styles from './Versions.module.css'
