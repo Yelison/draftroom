@@ -18,6 +18,7 @@ export const navItems: readonly NavItem[] = [
   { section: 'documents', to: '/documents', labelId: 'nav.documents', icon: <Icon name="file" size={iconSize} /> },
   { section: 'shared', to: '/shared', labelId: 'nav.shared', icon: <Icon name="team" size={iconSize} /> },
   { section: 'history', to: '/history', labelId: 'nav.history', icon: <Icon name="clock" size={iconSize} /> },
+  { section: 'members', to: '/members', labelId: 'nav.members', icon: <Icon name="clients" size={iconSize} /> },
   // Settings opens its first tab directly: the redirect from `/settings` is for addresses typed or bookmarked.
   {
     section: 'settings',

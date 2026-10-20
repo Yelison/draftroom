@@ -10,9 +10,88 @@
   overflow-y: auto;
 }
 
-.footer {
+/* What sits at the foot: the person, and what ends the session under them. */
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   margin-block-start: auto;
   padding-block-start: var(--space-16);
+}
+
+/* The place of the workspace, kept from the first paint: what is not there yet does not move the items. */
+.identity {
+  min-block-size: calc(var(--space-32) + var(--space-8) + var(--space-16));
+  padding-block-end: var(--space-16);
+}
+
+.workspace {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-12);
+  min-width: 0;
+  padding: var(--space-4) var(--space-0);
+  color: var(--color-nav-ink);
+}
+
+.mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  inline-size: var(--space-32);
+  block-size: var(--space-32);
+  border-radius: var(--radius-control);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  font: var(--font-strong);
+}
+
+/* The compact rail has no room for the words, and keeps them for the title and for a screen reader: the same clip as
+ * the screen-reader-only text of Forma UI, which the wide rail takes off. */
+.names,
+.personName {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.workspaceName {
+  font: var(--font-strong);
+  overflow-wrap: anywhere;
+}
+
+.role {
+  color: var(--color-nav-text);
+  font: var(--font-caption);
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-12);
+  min-width: 0;
+  min-block-size: calc(var(--avatar-size-small) + var(--space-16));
+  padding: var(--space-8) var(--space-0);
+  color: var(--color-nav-ink);
+}
+
+.personName {
+  font: var(--font-label);
+  overflow-wrap: anywhere;
 }
 
 .items {
@@ -85,5 +164,26 @@
     font: inherit;
     hyphens: manual;
     overflow-wrap: normal;
+  }
+
+  .expanded .workspace {
+    justify-content: flex-start;
+    padding-inline: var(--space-12);
+  }
+
+  .expanded .person {
+    justify-content: flex-start;
+    padding-inline: var(--space-12);
+  }
+
+  .expanded .names,
+  .expanded .personName {
+    position: static;
+    inline-size: auto;
+    block-size: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
   }
 }
