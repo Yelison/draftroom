@@ -20,9 +20,10 @@ export function PreviewDocument({ document, label }: { document: Y.Doc; label: s
     {
       extensions,
       editable: false,
-      editorProps: { attributes: { class: prose.prose ?? '' } },
+      // Read, not edited: a `textbox` would be a field with no name, so the text is a document, named for the version.
+      editorProps: { attributes: { class: prose.prose ?? '', role: 'document', 'aria-label': label } },
     },
-    [extensions],
+    [extensions, label],
   )
 
   // The text is read, not edited, so it takes no focus of its own; the region around it does, so a long version scrolls

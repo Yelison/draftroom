@@ -26,8 +26,9 @@ describe('the reader of a version', () => {
     expect(text).toHaveTextContent('The launch moves to the second week of November.')
     const editor = text.querySelector('.ProseMirror')
     expect(editor).toHaveAttribute('contenteditable', 'false')
-    // The name is the region's alone: the text inside would be said twice with one of its own.
-    expect(editor).not.toHaveAttribute('aria-label')
+    // Read-only text is not a field: a `textbox` with no name is what a screen reader would announce as one to fill in.
+    expect(within(text).queryByRole('textbox')).not.toBeInTheDocument()
+    expect(within(text).getByRole('document', { name: /^Text of “Before the pricing review, / })).toBe(editor)
   })
 
   it('replaces the text when another version is chosen, and shows nothing of the last one', async () => {
