@@ -35,6 +35,7 @@
   grid-template-columns: var(--avatar-size-medium) minmax(0, 1fr) var(--sharing-role-width) auto;
   column-gap: var(--space-12);
   align-content: start;
+  position: relative; /* The containing block of the hidden labels of the rows, so that the list clips them as it scrolls. */
   max-height: var(--sharing-list-height);
   margin: 0;
   padding: 0;
