@@ -1,8 +1,9 @@
 import { useIntl } from 'react-intl'
+import type { DocumentRowOptions } from '../DocumentListRow.tsx'
 import { SectionFrame } from './SectionFrame.tsx'
 import { SectionRows, type SectionRowsProps } from './SectionRows.tsx'
 
-export interface UnfiledSectionProps extends Pick<SectionRowsProps, 'data' | 'onRenameOrMove' | 'onArchive'> {
+export interface UnfiledSectionProps extends Pick<SectionRowsProps, 'data'>, DocumentRowOptions {
   expanded: boolean
   onToggle: () => void
 }
@@ -13,7 +14,14 @@ export function UnfiledSection({ expanded, onToggle, ...rows }: UnfiledSectionPr
   const name = intl.formatMessage({ id: 'documents.section.unfiled' })
 
   return (
-    <SectionFrame sectionKey="unfiled" title={name} icon="file" expanded={expanded} onToggle={onToggle}>
+    <SectionFrame
+      sectionKey="unfiled"
+      title={name}
+      icon="file"
+      expanded={expanded}
+      onToggle={onToggle}
+      compact={rows.compact === true}
+    >
       <SectionRows sectionKey="unfiled" name={name} empty={null} {...rows} />
     </SectionFrame>
   )

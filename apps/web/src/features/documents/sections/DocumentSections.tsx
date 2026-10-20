@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import { useDataSource } from '../../../data/useDataSource.ts'
-import type { DocumentListRowProps } from '../DocumentListRow.tsx'
+import type { DocumentRowOptions } from '../DocumentListRow.tsx'
 import { foldersQuery, pinnedDocumentsQuery } from '../queries.ts'
 import { FolderSection, type FolderSectionProps } from './FolderSection.tsx'
 import { PinnedSection } from './PinnedSection.tsx'
@@ -15,7 +15,7 @@ import { useFirstPagesSettled, useSectionDocuments } from './useSectionDocuments
 import { StateMessage } from '../StateMessage.tsx'
 import styles from './Sections.module.css'
 
-export interface DocumentSectionsProps extends Pick<DocumentListRowProps, 'onRenameOrMove' | 'onArchive'> {
+export interface DocumentSectionsProps extends DocumentRowOptions {
   workspaceId: string
   folds: SectionFolds
   onRenameFolder: FolderSectionProps['onRename']
@@ -65,7 +65,7 @@ export function DocumentSections({
 
   useFocusWhenSectionsLeave(Number(pinnedCount > 0) + Number(showUnfiled))
 
-  if (!decided) return <DocumentSectionsSkeleton />
+  if (!decided) return <DocumentSectionsSkeleton compact={actions.compact === true} />
 
   const nothingAtAll =
     folders.isSuccess &&
@@ -86,9 +86,12 @@ export function DocumentSections({
 
   return (
     <>
-      {!arrived && <DocumentSectionsSkeleton />}
+      {!arrived && <DocumentSectionsSkeleton compact={actions.compact === true} />}
       {/* In the page, and so already asking for its documents, but not shown until they are all in. */}
-      <div className={styles.sections} hidden={!arrived}>
+      <div
+        className={actions.compact === true ? `${styles.sections} ${styles.compactSections}` : styles.sections}
+        hidden={!arrived}
+      >
         {pinned.isError && (
           <FailedSection
             name={intl.formatMessage({ id: 'documents.section.pinned' })}

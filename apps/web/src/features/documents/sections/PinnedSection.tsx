@@ -1,12 +1,12 @@
 import type { Schema } from '@draftroom/contract'
 import { useMemo, useRef } from 'react'
 import { useIntl } from 'react-intl'
-import { DocumentListRow, type DocumentListRowProps } from '../DocumentListRow.tsx'
+import { DocumentListRow, type DocumentRowOptions } from '../DocumentListRow.tsx'
 import rows from '../DocumentRows.module.css'
 import { SectionFrame, toggleIdOf } from './SectionFrame.tsx'
 import { useFocusAfterRemoval } from './useFocusAfterRemoval.ts'
 
-export interface PinnedSectionProps extends Pick<DocumentListRowProps, 'onRenameOrMove' | 'onArchive'> {
+export interface PinnedSectionProps extends DocumentRowOptions {
   documents: readonly Schema<'Document'>[]
   /** The names of the folders by id, so each row says where its document is. */
   folderNames: ReadonlyMap<string, string>
@@ -28,8 +28,13 @@ export function PinnedSection({ documents, folderNames, expanded, onToggle, ...a
       icon="star"
       expanded={expanded}
       onToggle={onToggle}
+      compact={actions.compact === true}
     >
-      <ul ref={list} className={rows.rows} onFocus={onFocus}>
+      <ul
+        ref={list}
+        className={actions.compact === true ? `${rows.rows} ${rows.compact}` : rows.rows}
+        onFocus={onFocus}
+      >
         {documents.map((document) => {
           const folderName = document.folderId === null ? undefined : folderNames.get(document.folderId)
           return (
