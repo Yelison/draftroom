@@ -91,6 +91,9 @@ const rangeLabel: Record<HistoryRange, MessageId> = {
   month: 'history.filters.range.month',
 }
 
+/** The place of the filters before they can be shown. */
+export const FiltersPlaceholder = () => <div aria-hidden="true" className={styles.placeholder} />
+
 export interface HistoryFiltersProps {
   workspaceId: string
   state: HistoryFilterState

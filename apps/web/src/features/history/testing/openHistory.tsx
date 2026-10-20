@@ -1,18 +1,28 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import type { DataSource } from '../../../data/DataSource.ts'
 import { ApiError } from '../../../data/errors.ts'
 import * as fixtures from '../../../data/mock/fixtures/documents.ts'
 import { daniel, marta } from '../../../data/mock/fixtures/index.ts'
 import { renderScreen } from '../../documents/testing/renderScreen.tsx'
+import type { ActivityEvent } from '../activityEvents.ts'
 
 export { daniel, fixtures, marta, renderScreen }
 
 export const main = () => screen.getByRole('main')
 
-const escaped = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/** The rows of the timeline, one for each event or burst; what a row says is what its text holds. */
+export const rows = () =>
+  within(main())
+    .getAllByRole('listitem')
+    .filter((item) => item.hasAttribute('data-entry'))
 
-/** The accessible name of the row of an event: its sentence, which the time of day follows. */
-export const sentenceOf = (text: string) => new RegExp(`^${escaped(text)}`)
+/** The row that says `sentence`, once it is there. */
+export const findRow = (sentence: string) =>
+  waitFor(() => {
+    const row = rows().find((candidate) => candidate.textContent?.includes(sentence))
+    if (row === undefined) throw new Error(`No row says “${sentence}”`)
+    return row
+  })
 
 /** What the history shows of the seed, newest first: the first four sentences, for a person who can read everything. */
 export const newestSentences = [
@@ -51,3 +61,18 @@ export const inPagesOf =
             : { ...request, params: { ...request.params, query: { ...request.params.query, limit: size } } },
         ),
     })
+
+/**
+ * The history as these pages, in order, whatever the filters: the cursor of a page is the number of the next one. A page
+ * the test says to `fail` is refused each time it is asked for, so that a test can then let it through.
+ */
+export const withPages =
+  (pages: readonly ActivityEvent[][], fail: (page: number) => boolean = () => false) =>
+  (dataSource: DataSource): DataSource => ({
+    ...dataSource,
+    listWorkspaceActivity: async (request) => {
+      const page = Number(request?.params.query?.cursor ?? 0)
+      if (fail(page)) throw unavailable()
+      return { items: pages[page] ?? [], nextCursor: page + 1 < pages.length ? String(page + 1) : null }
+    },
+  })

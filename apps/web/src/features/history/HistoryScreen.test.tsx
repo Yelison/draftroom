@@ -1,25 +1,27 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { localeStorageKey } from '../../i18n/locale.ts'
+import { activityEvent } from './testing/activityEvent.ts'
 import {
   daniel,
+  findRow,
   fixtures,
   inPagesOf,
   main,
   marta,
   newestSentences,
   renderScreen,
-  sentenceOf,
+  rows,
   unavailable,
   watchingHistory,
+  withPages,
   type Calls,
 } from './testing/openHistory.tsx'
 
 const heading = () => screen.findByRole('heading', { level: 1, name: 'History' })
 const chip = (name: string | RegExp) => within(main()).getByRole('button', { name })
-const days = () => within(main()).getAllByRole('heading', { level: 2 })
-const rows = () =>
-  within(main()).getAllByRole('button', { name: / (renamed|commented|replied|created|resolved|saved|gave|changed)/ })
+const weeks = () => within(main()).getAllByRole('heading', { level: 2 })
+const days = () => within(main()).getAllByRole('heading', { level: 3 })
 
 /** How many different days the events of the seed fall on, where the person is: the instants are fixed, the days are not. */
 const daysOfTheSeed = () =>
@@ -40,7 +42,7 @@ describe('the History screen', () => {
   it('lists what happened across the documents, newest first, with each day written once above its first event', async () => {
     renderScreen('/history')
     await heading()
-    await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await findRow(newestSentences[0])
 
     expect(
       rows()
@@ -57,15 +59,13 @@ describe('the History screen', () => {
 
   it('tells the owner of a document who was given access, and tells nobody else', async () => {
     renderScreen('/history')
-    expect(
-      await within(main()).findByText('Marta Ruiz gave Daniel Okafor access to “Autumn launch plan”'),
-    ).toBeInTheDocument()
+    expect(await findRow('Marta Ruiz gave Daniel Okafor access to “Autumn launch plan”')).toBeInTheDocument()
   })
 
   it('does not tell a person who owns nothing how a document is shared', async () => {
     renderScreen('/history', { signedInAs: daniel.email })
 
-    await within(main()).findByRole('button', { name: /created “Presupuesto 2027”/ })
+    await findRow('created “Presupuesto 2027”')
     expect(within(main()).queryByText(/access to/)).not.toBeInTheDocument()
   })
 
@@ -97,10 +97,8 @@ describe('the History screen', () => {
       }),
     })
 
-    expect(
-      await within(main()).findByText('A version of “Autumn launch plan” was saved automatically'),
-    ).toBeInTheDocument()
-    expect(within(main()).getByText("Marta Ruiz removed someone's access to “Autumn launch plan”")).toBeInTheDocument()
+    expect(await findRow('A version of “Autumn launch plan” was saved automatically')).toBeInTheDocument()
+    expect(await findRow("Marta Ruiz removed someone's access to “Autumn launch plan”")).toBeInTheDocument()
   })
 
   it('writes the days, the times and the sentences in Spanish when the app is in Spanish', async () => {
@@ -108,13 +106,12 @@ describe('the History screen', () => {
     renderScreen('/history')
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Historial' })).toBeInTheDocument()
-    expect(
-      await within(main()).findByRole('button', { name: /Marta Ruiz cambió el nombre de «Autumn launch plan»/ }),
-    ).toBeInTheDocument()
+    expect(await findRow('Marta Ruiz cambió el nombre de «Autumn launch plan»')).toBeInTheDocument()
     expect(within(main()).getByRole('group', { name: 'Filtrar el historial' })).toBeInTheDocument()
     expect(days()[0]).toHaveTextContent(
       new Intl.DateTimeFormat('es', { dateStyle: 'full' }).format(new Date('2026-10-13T08:42:00.000Z')),
     )
+    expect(weeks()[0]).toHaveTextContent(/^Semana del \d+ \p{L}+/u)
   })
 
   it('shows a skeleton with a spoken status while the history is on its way, under the headline the page already has', async () => {
@@ -153,21 +150,21 @@ describe('the History screen', () => {
     expect(await within(main()).findByRole('alert')).toHaveTextContent("We couldn't load the history")
     await user.click(within(main()).getByRole('button', { name: 'Try again' }))
 
-    expect(await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })).toBeInTheDocument()
+    expect(await findRow(newestSentences[0])).toBeInTheDocument()
     expect(within(main()).queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('goes on with "Load more", and puts the focus on the first event that arrived when the last page is in', async () => {
     const calls: Calls = []
     const { user } = renderScreen('/history', { wrap: inPagesOf(10, calls) })
-    await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await findRow(newestSentences[0])
     expect(rows()).toHaveLength(10)
 
     await user.click(within(main()).getByRole('button', { name: 'Load more' }))
 
     await waitFor(() => expect(rows()).toHaveLength(14))
     expect(within(main()).queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
-    expect(rows()[10]).toHaveFocus()
+    expect(within(rows()[10] as HTMLElement).getAllByRole('link')[0]).toHaveFocus()
     expect(calls.map((call) => call.params.query?.cursor !== undefined)).toEqual([false, true])
   })
 })
@@ -179,7 +176,7 @@ describe('the filters of the History screen', () => {
 
   it('narrow the list to one document, say so on the chip, and keep the choice in the address', async () => {
     const { user, router } = renderScreen('/history')
-    await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await findRow(newestSentences[0])
 
     await user.click(chip('Document'))
     await user.click(await screen.findByRole('menuitemradio', { name: fixtures.designReview.title }))
@@ -195,7 +192,7 @@ describe('the filters of the History screen', () => {
   it('combine: a document, a person and a period each take away what the others left', async () => {
     holdTheDate()
     const { user } = renderScreen('/history')
-    await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await findRow(newestSentences[0])
 
     await user.click(chip('Document'))
     await user.click(await screen.findByRole('menuitemradio', { name: fixtures.launchPlan.title }))
@@ -215,7 +212,7 @@ describe('the filters of the History screen', () => {
   it('open on the filters the address names, and ignore a value that is not one of them', async () => {
     renderScreen(`/history?person=${daniel.id}&range=never&document=not-an-id`)
 
-    await within(main()).findByRole('button', { name: /Daniel Okafor created “Notas de la revisión de diseño”/ })
+    await findRow('Daniel Okafor created “Notas de la revisión de diseño”')
     expect(chip('Person: Daniel Okafor')).toBeInTheDocument()
     expect(chip('Period')).toBeInTheDocument()
     expect(chip('Document')).toBeInTheDocument()
@@ -246,7 +243,7 @@ describe('the filters of the History screen', () => {
     expect(await within(main()).findByText('No events match these filters')).toBeInTheDocument()
     await user.click(within(main()).getByRole('button', { name: 'Clear filters' }))
 
-    expect(await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })).toBeInTheDocument()
+    expect(await findRow(newestSentences[0])).toBeInTheDocument()
     expect(router.state.location.search).toBe('')
     // The button went with the filters: the focus stays among them.
     expect(chip('Document')).toHaveFocus()
@@ -254,7 +251,7 @@ describe('the filters of the History screen', () => {
 
   it('are a group with a name, one chip each, and a menu that offers every choice and the way to take it off', async () => {
     const { user } = renderScreen('/history')
-    await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await findRow(newestSentences[0])
 
     const group = within(main()).getByRole('group', { name: 'Filter the history' })
     expect(
@@ -280,7 +277,7 @@ describe('the filters of the History screen', () => {
         },
       }),
     })
-    await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await findRow(newestSentences[0])
 
     await user.click(chip('Person'))
     await user.click(await screen.findByRole('menuitem', { name: "Couldn't load the list. Try again" }))
@@ -290,60 +287,33 @@ describe('the filters of the History screen', () => {
   })
 })
 
-describe('opening an event of the History screen', () => {
-  it('shows what it says beside the list, puts the focus on the panel, and gives it back to the row when it closes', async () => {
-    const { user } = renderScreen('/history')
-    const row = await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+describe('the events of the History screen', () => {
+  it('make the name of the document the way to it, inside the sentence', async () => {
+    renderScreen('/history')
+    const row = await findRow(newestSentences[0])
 
-    await user.click(row)
-
-    const panel = within(main()).getByRole('complementary', { name: 'Event details' })
-    expect(within(panel).getByRole('heading', { level: 2, name: 'Event details' })).toHaveFocus()
-    expect(within(panel).getByText(newestSentences[0])).toBeInTheDocument()
-    expect(within(panel).getByRole('link', { name: 'Open document' })).toHaveAttribute(
-      'href',
-      `/documents/${fixtures.launchPlan.id}`,
-    )
-    expect(row).toHaveAttribute('aria-expanded', 'true')
-    expect(row).toHaveAttribute('aria-controls', panel.id)
-
-    await user.click(within(panel).getByRole('button', { name: 'Close' }))
-
-    expect(within(main()).queryByRole('complementary')).not.toBeInTheDocument()
-    expect(row).toHaveFocus()
-    expect(row).toHaveAttribute('aria-expanded', 'false')
+    const link = within(row).getByRole('link', { name: fixtures.launchPlan.title })
+    expect(link).toHaveAttribute('href', `/documents/${fixtures.launchPlan.id}`)
+    expect(row).toHaveTextContent(newestSentences[0])
   })
 
-  it('opens with the keyboard alone', async () => {
-    const { user } = renderScreen('/history')
-    const row = await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+  it('label a change of who can open a document as Access, and no other event', async () => {
+    renderScreen('/history')
+    const access = await findRow('Marta Ruiz gave Daniel Okafor access to “Autumn launch plan”')
 
-    row.focus()
-    await user.keyboard('{Enter}')
-
-    expect(within(main()).getByRole('heading', { level: 2, name: 'Event details' })).toHaveFocus()
+    expect(within(access).getByText('Access')).toBeInTheDocument()
+    expect(within(await findRow(newestSentences[0])).queryByText('Access')).not.toBeInTheDocument()
   })
 
-  it('says it is no longer available when the person loses access to its document, and keeps the focus where it is', async () => {
-    const { user, server, queryClient } = renderScreen('/history', { signedInAs: daniel.email })
-    const budget = await within(main()).findByRole('button', { name: /created “Presupuesto 2027”/ })
-    await user.click(budget)
-    expect(within(main()).getByRole('complementary')).toHaveTextContent('Presupuesto 2027')
+  it('label it in Spanish', async () => {
+    localStorage.setItem(localeStorageKey, 'es')
+    renderScreen('/history')
 
-    await server.connect({ signedInAs: marta.email }).removeAccess({
-      params: { path: { documentId: fixtures.budget.id, userId: daniel.id } },
-    })
-    await queryClient.invalidateQueries()
-
-    const panel = within(main()).getByRole('complementary')
-    expect(await within(panel).findByRole('alert')).toHaveTextContent('This event is no longer available')
-    expect(within(panel).queryByText(/Presupuesto 2027/)).not.toBeInTheDocument()
-    expect(within(panel).queryByRole('link', { name: 'Open document' })).not.toBeInTheDocument()
-    expect(within(panel).getByRole('heading', { level: 2 })).toHaveFocus()
-    expect(within(main()).queryByRole('button', { name: /Presupuesto 2027/ })).not.toBeInTheDocument()
+    const access = await findRow('Marta Ruiz dio acceso a Daniel Okafor a «Autumn launch plan»')
+    expect(within(access).getByText('Acceso')).toBeInTheDocument()
   })
 
-  it('does not open a row of the list that is still on screen while the filtered one is on its way', async () => {
+  it('keep the timeline that was there while the filtered one is on its way', async () => {
     let answer: () => void = () => undefined
     const { user } = renderScreen('/history', {
       wrap: (dataSource) => ({
@@ -356,29 +326,180 @@ describe('opening an event of the History screen', () => {
               }),
       }),
     })
-    const newest = await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await findRow(newestSentences[0])
     await user.click(chip('Person'))
     await user.click(await screen.findByRole('menuitemradio', { name: 'Daniel Okafor' }))
-    await waitFor(() => expect(newest).toHaveAttribute('aria-disabled', 'true'))
 
-    await user.click(newest)
+    await waitFor(() => expect(main().querySelector('[aria-busy="true"]')).toBeInTheDocument())
+    expect(rows()).toHaveLength(14)
     answer()
 
     await waitFor(() => expect(rows()).toHaveLength(3))
-    expect(within(main()).queryByRole('complementary')).not.toBeInTheDocument()
-    expect(within(main()).queryByText('This event is no longer available')).not.toBeInTheDocument()
-    expect(rows()[0]).not.toHaveAttribute('aria-disabled')
+    expect(main().querySelector('[aria-busy="true"]')).not.toBeInTheDocument()
   })
 
-  it('closes when another filter is chosen, instead of saying the event is gone', async () => {
-    const { user } = renderScreen('/history')
-    await user.click(await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) }))
+  it('leave the timeline when the person loses access to the document of an event', async () => {
+    const { server, queryClient } = renderScreen('/history', { signedInAs: daniel.email })
+    await findRow('created “Presupuesto 2027”')
 
-    await user.click(chip('Document'))
-    await user.click(await screen.findByRole('menuitemradio', { name: fixtures.designReview.title }))
+    await server.connect({ signedInAs: marta.email }).removeAccess({
+      params: { path: { documentId: fixtures.budget.id, userId: daniel.id } },
+    })
+    await queryClient.invalidateQueries()
 
-    await waitFor(() => expect(rows()).toHaveLength(3))
-    expect(within(main()).queryByRole('complementary')).not.toBeInTheDocument()
+    await waitFor(() => expect(rows().some((row) => row.textContent?.includes('Presupuesto 2027'))).toBe(false))
+  })
+})
+
+describe('the renames that follow one another in the History screen', () => {
+  const minutesAfter = (minutes: number) => new Date(Date.UTC(2026, 9, 13, 8, 0) + minutes * 60_000).toISOString()
+  // Newest first: Daniel renamed at 08:10 and 08:06, Marta at 08:00 and 08:04.
+  const renames = [
+    activityEvent(minutesAfter(10), { actor: { id: daniel.id, name: 'Daniel Okafor' } }),
+    activityEvent(minutesAfter(6), { actor: { id: daniel.id, name: 'Daniel Okafor' } }),
+    activityEvent(minutesAfter(4)),
+    activityEvent(minutesAfter(0)),
+  ]
+  const sentence = '“Autumn launch plan” was renamed 4 times'
+  const toggle = (row: HTMLElement) => within(row).getByRole('button', { name: 'Details' })
+  /** What the button unfolds: it is always in the page, and is seen or not. */
+  const people = (row: HTMLElement) => {
+    const list = document.getElementById(toggle(row).getAttribute('aria-controls') ?? '')
+    if (list === null) throw new Error('The button points at nothing')
+    return list
+  }
+
+  it('are one row, with how many there were, and who made each and when only once it is unfolded', async () => {
+    const { user } = renderScreen('/history', { wrap: withPages([renames]) })
+    const row = await findRow(sentence)
+
+    expect(rows()).toHaveLength(1)
+    expect(toggle(row)).toHaveAttribute('aria-expanded', 'false')
+    expect(people(row)).not.toBeVisible()
+
+    await user.click(toggle(row))
+
+    expect(toggle(row)).toHaveAttribute('aria-expanded', 'true')
+    expect(people(row)).toBeVisible()
+    expect(within(people(row)).getAllByText('Daniel Okafor')).toHaveLength(2)
+    expect(within(people(row)).getAllByText('Marta Ruiz')).toHaveLength(2)
+    // The button keeps the focus, so it can be pressed again to fold it.
+    expect(toggle(row)).toHaveFocus()
+
+    await user.click(toggle(row))
+
+    expect(toggle(row)).toHaveAttribute('aria-expanded', 'false')
+    expect(people(row)).not.toBeVisible()
+    expect(toggle(row)).toHaveFocus()
+  })
+
+  it('unfold with the keyboard', async () => {
+    const { user } = renderScreen('/history', { wrap: withPages([renames]) })
+    const row = await findRow(sentence)
+
+    toggle(row).focus()
+    await user.keyboard('{Enter}')
+
+    expect(toggle(row)).toHaveAttribute('aria-expanded', 'true')
+    await user.keyboard(' ')
+    expect(toggle(row)).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('keep the name of the document as the way to it', async () => {
+    renderScreen('/history', { wrap: withPages([renames]) })
+    const row = await findRow(sentence)
+
+    expect(within(row).getByRole('link', { name: 'Autumn launch plan' })).toHaveAttribute(
+      'href',
+      `/documents/${fixtures.launchPlan.id}`,
+    )
+  })
+
+  it('are said in Spanish, with the number as a plural', async () => {
+    localStorage.setItem(localeStorageKey, 'es')
+    renderScreen('/history', { wrap: withPages([renames]) })
+
+    expect(await findRow('«Autumn launch plan» cambió de nombre 4 veces')).toBeInTheDocument()
+  })
+
+  it('are not folded when another event comes between them', async () => {
+    const between = activityEvent(minutesAfter(5), { type: 'thread.created' })
+    renderScreen('/history', {
+      wrap: withPages([[renames[0], between, renames[3]].flatMap((event) => (event ? [event] : []))]),
+    })
+
+    await findRow('commented on')
+    expect(rows()).toHaveLength(3)
+    expect(within(main()).queryByRole('button', { name: 'Details' })).not.toBeInTheDocument()
+  })
+
+  it('are joined when "Load more" brings the rest of a burst the first page cut, and stay unfolded', async () => {
+    const { user } = renderScreen('/history', { wrap: withPages([renames.slice(0, 2), renames.slice(2)]) })
+    const half = await findRow('“Autumn launch plan” was renamed 2 times')
+    await user.click(toggle(half))
+
+    await user.click(within(main()).getByRole('button', { name: 'Load more' }))
+
+    const whole = await findRow(sentence)
+    expect(rows()).toHaveLength(1)
+    expect(toggle(whole)).toHaveAttribute('aria-expanded', 'true')
+    expect(within(people(whole)).getAllByText('Marta Ruiz')).toHaveLength(2)
+  })
+
+  it('take the focus to the burst the last page joined, when "Load more" goes away with it', async () => {
+    const { user } = renderScreen('/history', { wrap: withPages([renames.slice(0, 2), renames.slice(2)]) })
+    await findRow('“Autumn launch plan” was renamed 2 times')
+
+    await user.click(within(main()).getByRole('button', { name: 'Load more' }))
+
+    const whole = await findRow(sentence)
+    await waitFor(() => expect(within(whole).getByRole('link', { name: 'Autumn launch plan' })).toHaveFocus())
+  })
+})
+
+describe('"Load more" of the History screen when it fails', () => {
+  const events = [activityEvent('2026-10-13T09:00:00.000Z', { type: 'thread.created' })]
+  const more = [activityEvent('2026-10-12T09:00:00.000Z', { type: 'thread.created' })]
+
+  it('keeps the timeline, says so, and gets the page when asked again', async () => {
+    let refused = true
+    const { user } = renderScreen('/history', { wrap: withPages([events, more], (page) => page === 1 && refused) })
+    await findRow('commented on')
+
+    await user.click(within(main()).getByRole('button', { name: 'Load more' }))
+
+    expect(await within(main()).findByRole('alert')).toHaveTextContent("We couldn't load more events")
+    expect(rows()).toHaveLength(1)
+    expect(within(main()).queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
+
+    refused = false
+    await user.click(within(main()).getByRole('button', { name: 'Try again' }))
+
+    await waitFor(() => expect(rows()).toHaveLength(2))
+    expect(within(main()).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows the page being asked for on the button while it is on its way', async () => {
+    let answer: () => void = () => undefined
+    const { user } = renderScreen('/history', {
+      wrap: (dataSource) => ({
+        ...withPages([events, more])(dataSource),
+        listWorkspaceActivity: (request) =>
+          request?.params.query?.cursor === undefined
+            ? withPages([events, more])(dataSource).listWorkspaceActivity(request)
+            : new Promise((resolve) => {
+                answer = () => resolve({ items: more, nextCursor: null })
+              }),
+      }),
+    })
+    await findRow('commented on')
+
+    await user.click(within(main()).getByRole('button', { name: 'Load more' }))
+
+    expect(within(main()).queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
+    expect(within(main()).getByRole('button', { name: 'Loading…' })).toHaveAttribute('aria-busy', 'true')
+    answer()
+    await waitFor(() => expect(rows()).toHaveLength(2))
   })
 })
 
@@ -393,7 +514,7 @@ describe('the History screen and the explorer, which share the list of documents
     await screen.findByRole('tree')
 
     await act(() => router.navigate('/history'))
-    await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await findRow(newestSentences[0])
     await user.click(chip('Document'))
     expect(await screen.findByRole('menuitemradio', { name: fixtures.launchPlan.title })).toBeInTheDocument()
     await user.keyboard('{Escape}')
@@ -405,7 +526,7 @@ describe('the History screen and the explorer, which share the list of documents
 
   it('leave the app standing when the History is opened first and a document after it', async () => {
     const { user, router } = renderScreen('/history')
-    await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await findRow(newestSentences[0])
     await user.click(chip('Document'))
     expect(await screen.findByRole('menuitemradio', { name: fixtures.launchPlan.title })).toBeInTheDocument()
     await user.keyboard('{Escape}')
@@ -423,7 +544,7 @@ describe('the History screen with the calls it makes', () => {
   it('asks for the history of the workspace once, with no filter, when nothing is chosen', async () => {
     const calls: Calls = []
     renderScreen('/history', { wrap: watchingHistory(calls) })
-    await within(main()).findByRole('button', { name: sentenceOf(newestSentences[0]) })
+    await findRow(newestSentences[0])
 
     expect(calls.map((call) => call.params.query)).toEqual([{}])
   })
