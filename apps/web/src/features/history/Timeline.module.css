@@ -1,0 +1,267 @@
+/*
+ * The measures of the timeline: the column of the times, the space between it and the entries, and the point of each entry
+ * on the line. The line runs down the middle of the point, so both are placed from the same two lengths.
+ */
+.timeline {
+  --timeline-time-width: 72px;
+  --timeline-gap: var(--space-40);
+  --timeline-line-x: calc(var(--timeline-time-width) + var(--space-12));
+  --timeline-point: var(--space-12);
+  --timeline-line: var(--space-2);
+  --timeline-width: 880px;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-32);
+  max-width: var(--timeline-width);
+  margin-bottom: var(--space-16);
+}
+
+.week {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.weekTitle {
+  margin: 0;
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--color-line);
+  font: var(--font-section);
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.day + .day {
+  margin-top: var(--space-8);
+}
+
+.dayTitle {
+  margin: 0;
+  padding-left: calc(var(--timeline-time-width) + var(--timeline-gap));
+  color: var(--color-muted);
+  font: var(--font-strong);
+}
+
+.list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The line, which fades out at the end of the day so that it does not look like it goes on. */
+.list::before {
+  content: '';
+  position: absolute;
+  top: var(--space-20);
+  bottom: 0;
+  left: calc(var(--timeline-line-x) - var(--timeline-line) / 2);
+  width: var(--timeline-line);
+  background: linear-gradient(to bottom, var(--color-line) calc(100% - var(--space-28)), transparent);
+}
+
+.item,
+.accessItem {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--timeline-time-width) minmax(0, 1fr);
+  column-gap: var(--timeline-gap);
+  align-items: start;
+  padding: var(--space-8) 0;
+}
+
+.item::after,
+.accessItem::after {
+  content: '';
+  position: absolute;
+  top: var(--space-16);
+  left: calc(var(--timeline-line-x) - var(--timeline-point) / 2);
+  box-sizing: border-box;
+  width: var(--timeline-point);
+  height: var(--timeline-point);
+  border: var(--space-2) solid var(--color-muted);
+  border-radius: var(--radius-round);
+  background: var(--color-surface);
+}
+
+.accessItem::after {
+  border-color: var(--color-amber-ink);
+  background: var(--color-amber-bg);
+}
+
+.time,
+.timeSkeleton {
+  padding-top: var(--space-4);
+  color: var(--color-muted);
+  font: var(--font-caption);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.body,
+.bodySkeleton {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+  min-width: 0;
+  min-height: var(--space-28);
+}
+
+.text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-8);
+  min-width: 0;
+  padding-top: var(--space-4);
+  font: var(--font-body);
+  overflow-wrap: anywhere;
+}
+
+.documentLink {
+  color: var(--color-link);
+  /* Colour alone does not tell a link from the words around it (WCAG 1.4.1): the heavier weight of the label does. */
+  font: var(--font-label);
+  text-decoration: none;
+}
+
+.documentLink:hover {
+  text-decoration: underline;
+  text-underline-offset: var(--space-4);
+}
+
+.documentLink:focus-visible,
+.toggle:focus-visible {
+  border-radius: var(--radius-small);
+  outline: var(--focus-ring);
+  outline-offset: var(--space-2);
+}
+
+/* The sentence of a burst flows as text, so a long title wraps like any other; what follows it never splits. */
+.burstText {
+  display: block;
+  min-width: 0;
+  padding-top: var(--space-4);
+  font: var(--font-body);
+  overflow-wrap: anywhere;
+}
+
+/* The separator, the interval and the button stay together: none of them can open a line or fall to one of its own. */
+.burstTail {
+  display: inline-flex;
+  gap: var(--space-8);
+  align-items: center;
+  white-space: nowrap;
+}
+
+.interval {
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+/* Who the change is credited to when nobody is: the clock takes the place of the avatar, as tall and as wide. */
+.automatic {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--avatar-size-small);
+  height: var(--avatar-size-small);
+  color: var(--color-muted);
+}
+
+.burst {
+  flex: 1;
+  min-width: 0;
+}
+
+.toggle {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-4) var(--space-8);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-muted);
+  font: var(--font-label);
+  cursor: pointer;
+}
+
+.toggle:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+.chevron,
+.chevronOpen {
+  transition: transform var(--duration-fast);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron,
+  .chevronOpen {
+    transition: none;
+  }
+}
+
+.chevron {
+  transform: rotate(-90deg);
+}
+
+.people {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin: var(--space-8) 0 var(--space-4) var(--space-12);
+  padding: 0 0 0 var(--space-16);
+  border-left: var(--space-2) solid var(--color-line);
+  list-style: none;
+}
+
+/* `hidden` is the browser's own `display: none`, which the `display: flex` above would otherwise win over. */
+.people[hidden] {
+  display: none;
+}
+
+.person {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  font: var(--font-body);
+}
+
+.personTime {
+  margin-left: var(--space-4);
+  color: var(--color-muted);
+  font: var(--font-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The loading state: the same rows with bars where the words go, as tall as the rows they stand in for. */
+.dayTitleSkeleton {
+  display: inline-block;
+  width: calc(var(--space-64) * 3);
+  border-radius: var(--radius-small);
+  background: var(--color-line);
+}
+
+.timeSkeleton {
+  height: var(--space-16);
+  margin-top: var(--space-4);
+  border-radius: var(--radius-small);
+  background: var(--color-line);
+}
+
+.bodySkeleton {
+  border-radius: var(--radius-small);
+  background: var(--color-line);
+}

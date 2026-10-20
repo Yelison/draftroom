@@ -5,3 +5,16 @@
   align-items: center;
   margin-block: var(--space-24);
 }
+
+/* What stands in for the filters while the workspace they belong to is on its way: as tall as the chips, so nothing moves. */
+.placeholder {
+  min-height: var(--choice-min-height);
+  margin-block: var(--space-24);
+}
+
+/* The chips grow to the touch size in a narrow window (Forma UI's rule): so does the place that stands in for them. */
+@media (width <= 767.98px) {
+  .placeholder {
+    min-height: var(--touch-target);
+  }
+}
