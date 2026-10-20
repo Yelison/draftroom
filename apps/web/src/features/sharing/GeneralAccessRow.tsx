@@ -35,26 +35,28 @@ export function GeneralAccessRow({ value, workspaceName, busy, saving, problem, 
         </span>
         <span className={styles.caption}>{intl.formatMessage({ id: 'sharing.general.caption' })}</span>
       </span>
-      <Select
-        label={
-          <span className="forma-visually-hidden">
-            {intl.formatMessage({ id: 'sharing.general.label' }, { workspace: workspaceName })}
-          </span>
-        }
-        value={value}
-        aria-disabled={busy || undefined}
-        aria-describedby={problem === null ? undefined : problemId}
-        onChange={(event) => {
-          const access = event.target.value
-          if (!busy && isGeneralAccess(access)) onChange(access)
-        }}
-      >
-        {generalAccesses.map((access) => (
-          <option key={access} value={access}>
-            {intl.formatMessage({ id: generalAccessLabelId(access) })}
-          </option>
-        ))}
-      </Select>
+      <div className={styles.everyoneControl}>
+        <Select
+          label={
+            <span className="forma-visually-hidden">
+              {intl.formatMessage({ id: 'sharing.general.label' }, { workspace: workspaceName })}
+            </span>
+          }
+          value={value}
+          aria-disabled={busy || undefined}
+          aria-describedby={problem === null ? undefined : problemId}
+          onChange={(event) => {
+            const access = event.target.value
+            if (!busy && isGeneralAccess(access)) onChange(access)
+          }}
+        >
+          {generalAccesses.map((access) => (
+            <option key={access} value={access}>
+              {intl.formatMessage({ id: generalAccessLabelId(access) })}
+            </option>
+          ))}
+        </Select>
+      </div>
       {problem !== null && (
         <p id={problemId} role="alert" className={styles.problem}>
           {problem}

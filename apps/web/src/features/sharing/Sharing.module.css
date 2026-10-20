@@ -68,6 +68,11 @@
   background: var(--color-bg);
 }
 
+/* The row has no action, so its selector takes that column too: "Only the people above" needs more than a role does. */
+.everyoneControl {
+  grid-column: 3 / -1;
+}
+
 .everyoneMark {
   display: grid;
   place-items: center;
@@ -139,6 +144,7 @@
 }
 
 .skeletonHeading {
+  width: 30%;
   height: 1lh;
   font: var(--font-strong);
 }
@@ -150,8 +156,17 @@
 }
 
 .skeletonField .skeletonBlock:first-child {
+  width: 40%;
   height: 1lh;
   font: var(--font-label);
+}
+
+/* The button that adds: as tall as the real one and as wide as its label and padding. */
+.skeletonAction {
+  align-self: end;
+  width: calc(var(--space-16) * 3);
+  height: var(--button-height);
+  border-radius: var(--radius-control);
 }
 
 .skeletonControl {
@@ -172,11 +187,12 @@
 }
 
 .skeletonLines .skeletonBlock {
+  width: 50%;
   height: 1lh;
   font: var(--font-label);
 }
 
 .skeletonLines .skeletonBlock + .skeletonBlock {
-  width: 60%;
+  width: 35%;
   font: var(--font-caption);
 }

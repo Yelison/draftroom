@@ -17,12 +17,13 @@ export function ShareSkeleton() {
       <div className={styles.section}>
         <span className={block(styles.skeletonHeading)} />
         <div className={styles.add}>
-          {Array.from({ length: 3 }, (_, index) => (
+          {Array.from({ length: 2 }, (_, index) => (
             <div key={index} className={styles.skeletonField}>
               <span className={block()} />
               <span className={block(styles.skeletonControl)} />
             </div>
           ))}
+          <span className={block(styles.skeletonAction)} />
         </div>
       </div>
       <div className={styles.section}>
