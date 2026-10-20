@@ -28,7 +28,7 @@ export function LatestEvent({ latest }: { latest: UseQueryResult<Schema<'Activit
   }
 
   return (
-    <section aria-labelledby="home-latest" className={styles.latest}>
+    <section aria-labelledby={event === undefined ? undefined : 'home-latest'} className={styles.latest}>
       {event === undefined ? (
         <div aria-busy="true" className={styles.latestSkeleton}>
           <p role="status" className="forma-visually-hidden">

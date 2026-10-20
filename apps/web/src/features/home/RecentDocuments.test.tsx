@@ -74,6 +74,7 @@ describe('the documents to pick up on Home', () => {
     await within(recent()).findByRole('link', { name: launchPlan.title })
 
     expect(within(cardOf(launchPlan.title)).getByText('Editor')).toHaveAttribute('data-role', 'editor')
+    expect(within(cardOf(launchPlan.title)).getByRole('link')).toHaveAccessibleDescription(/^Editor /)
     // Daniel made this one himself.
     expect(cardOf(designReview.title).querySelector('[data-role]')).toBeNull()
   })
@@ -87,13 +88,15 @@ describe('the documents to pick up on Home', () => {
     expect(links).toHaveLength(1)
     expect(links[0]).toHaveAttribute('href', `/documents/${launchPlan.id}`)
     expect(links[0]).toHaveAccessibleDescription(expect.stringContaining(launchPlan.excerpt ?? ''))
+    expect(links[0]).toHaveAccessibleDescription(expect.stringMatching(/Product.*Updated Oct 13, 2026/))
   })
 
-  it('shows a short sentence, and no cards, when the person has no documents', async () => {
+  it('says in one sentence, with no section and no cards, that the person has no documents yet', async () => {
     await renderHome({ wrap: overriding({ listDocuments: async () => ({ items: [], nextCursor: null }) }) })
 
-    expect(await within(recent()).findByText(/documents you create/i)).toBeInTheDocument()
-    expect(within(recent()).queryByRole('listitem')).not.toBeInTheDocument()
+    expect(await within(main()).findByText(/documents you create/i)).toBeInTheDocument()
+    expect(within(main()).queryByRole('heading', { name: 'Pick up where you left off' })).not.toBeInTheDocument()
+    expect(within(main()).queryByRole('heading', { level: 3, name: launchPlan.title })).not.toBeInTheDocument()
   })
 
   it.each(['listDocuments', 'listFolders'] as const)(

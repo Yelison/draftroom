@@ -14,28 +14,40 @@ export interface RecentCardProps {
 
 /**
  * A document to pick up, as a card that is one link: the title is the link and stretches over the card, so the name of
- * the link is the title and the rest (what it says, where it is, when it changed) is its description.
+ * the link is the title and the rest (the role, what it says, where it is, when it changed) is its description.
  */
 export function RecentCard({ document, folderName }: RecentCardProps) {
   const intl = useIntl()
-  const detailsId = useId()
+  const id = useId()
+  const roleId = `${id}-role`
+  const excerptId = `${id}-excerpt`
+  const footId = `${id}-foot`
+  const badge = document.role !== 'owner'
 
   return (
     <li className={styles.card}>
       <div className={styles.cardTop}>
         <Icon name="file" className={styles.cardIcon} />
         {/* Owning it is the usual case and says nothing: the badge is for the documents that are somebody else's. */}
-        {document.role !== 'owner' && <Permission role={document.role} />}
+        {badge && (
+          <span id={roleId}>
+            <Permission role={document.role} />
+          </span>
+        )}
       </div>
       <h3 className={styles.cardTitle}>
-        <Link to={`/documents/${document.id}`} className={styles.cardLink} aria-describedby={detailsId}>
+        <Link
+          to={`/documents/${document.id}`}
+          className={styles.cardLink}
+          aria-describedby={`${badge ? `${roleId} ` : ''}${excerptId} ${footId}`}
+        >
           {document.title}
         </Link>
       </h3>
-      <p id={detailsId} className={document.excerpt === null ? styles.cardNoExcerpt : styles.cardExcerpt}>
+      <p id={excerptId} className={document.excerpt === null ? styles.cardNoExcerpt : styles.cardExcerpt}>
         {document.excerpt ?? intl.formatMessage({ id: 'home.recent.noExcerpt' })}
       </p>
-      <p className={styles.cardFoot}>
+      <p id={footId} className={styles.cardFoot}>
         <span>{folderName ?? intl.formatMessage({ id: 'documents.details.noFolder' })}</span>
         <span>
           {intl.formatMessage(

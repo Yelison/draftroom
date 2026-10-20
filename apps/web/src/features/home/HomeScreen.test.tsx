@@ -57,6 +57,7 @@ describe('what Home shows while it loads and when there is nothing yet', () => {
     })
 
     expect(await within(main()).findByText(/documents you create/i)).toBeInTheDocument()
+    expect(within(main()).queryByRole('region', { name: 'Pick up where you left off' })).not.toBeInTheDocument()
     await waitFor(() => expect(within(main()).queryByText('Loading your pinned documents')).not.toBeInTheDocument())
     expect(within(main()).getByRole('region', { name: 'Start something new' })).toBeInTheDocument()
     expect(within(main()).queryByRole('region', { name: 'Pinned' })).not.toBeInTheDocument()

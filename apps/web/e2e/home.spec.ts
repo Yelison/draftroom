@@ -138,6 +138,22 @@ test('keeps two rows of chips, and the button, when the window is zoomed to 200 
   expect(await chips.count()).toBe(4)
 })
 
+test('refolds to two rows of the new columns when the window is zoomed while Home is open', async ({ page }) => {
+  await page.goto('/')
+  await pinEverything(page)
+  const chips = pinned(page).getByRole('link')
+  const toggle = pinned(page).getByRole('button', { name: /^Show all \d+ pinned$/ })
+  await expect(toggle).toBeVisible()
+  const wide = await chips.count()
+
+  await page.setViewportSize({ width: 640, height: 360 })
+
+  await expect(chips).toHaveCount(4)
+  expect(wide).toBeGreaterThan(4)
+  expect(await rowsOf(chips)).toBe(2)
+  await expect(toggle).toBeVisible()
+})
+
 test('lets a card and a chip with a long title grow instead of spilling their text out of them', async ({ page }) => {
   const longTitle = `${'A title that someone wrote at great length '.repeat(3).trim()} and then some more words`
   await page.goto('/documents')
