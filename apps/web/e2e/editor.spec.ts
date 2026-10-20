@@ -1132,6 +1132,18 @@ test.describe('one scroll', () => {
     expect(order.findIndex((card) => card.includes('About the first'))).toBeLessThan(
       order.findIndex((card) => card.includes('About the second')),
     )
+    // Each card is under the one before it, in the flow: none is laid over another.
+    const boxes = await cards.evaluateAll((elements) =>
+      elements.map((element) => {
+        const { top, bottom } = element.getBoundingClientRect()
+        return { top, bottom }
+      }),
+    )
+    for (const [index, box] of boxes.slice(1).entries()) {
+      expect(box.top, `card ${index + 1} starts after the one before it`).toBeGreaterThanOrEqual(
+        boxes[index]?.bottom ?? 0,
+      )
+    }
     // Nothing is cut: each card holds what it says, and none is outside the window.
     const cut = await cards.evaluateAll((elements) =>
       elements.filter((element) => element.scrollWidth > element.clientWidth + 1).map((element) => element.className),
