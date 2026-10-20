@@ -4,7 +4,7 @@ import { expect, test } from './fixtures.ts'
 
 test.use({ locale: 'en-US', colorScheme: 'light' })
 
-const railItems = ['Home', 'Documents', 'Shared', 'History', 'Settings']
+const railItems = ['Home', 'Documents', 'Shared', 'History', 'Members', 'Settings']
 
 /** Opens a page and waits until it is on screen: a key pressed while the app is still mounting would be lost. */
 async function open(page: Page, path: string) {

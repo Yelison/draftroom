@@ -170,6 +170,13 @@
   block-size: var(--choice-min-height);
 }
 
+/* Forma UI's chip is a touch target in a window this narrow. */
+@media (width <= 767.98px) {
+  .skeletonFilters {
+    block-size: var(--touch-target);
+  }
+}
+
 .skeletonHead {
   block-size: calc(var(--space-20) + var(--space-16) + var(--space-1));
   border-block-end: 1px solid var(--color-line);
