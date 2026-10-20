@@ -1,0 +1,104 @@
+/* The navigation's dark surface, as the rail has it: narrow first, the points and the room come with the desktop width. */
+.panel {
+  /* How wide the line of the tagline runs, so that it breaks in the same places whatever the width of the column. */
+  --brand-tagline-measure: 17em;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  min-width: 0;
+  padding: var(--space-24);
+  background: var(--color-nav);
+  color: var(--color-nav-ink);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  inline-size: var(--space-40);
+  block-size: var(--space-40);
+  border-radius: var(--radius-control);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  font: var(--font-section);
+}
+
+.name {
+  font: var(--font-logo);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-48);
+}
+
+.tagline {
+  margin: 0;
+  font: var(--font-section);
+}
+
+.points {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-24);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.point {
+  display: grid;
+  grid-template-columns: var(--space-40) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-16);
+}
+
+.pointIcon {
+  display: grid;
+  place-items: center;
+  inline-size: var(--space-40);
+  block-size: var(--space-40);
+  border-radius: var(--radius-control);
+  background: var(--color-nav-active);
+}
+
+.pointText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--color-nav-text);
+  font: var(--font-body);
+}
+
+.pointText strong {
+  color: var(--color-nav-ink);
+  font: var(--font-strong);
+}
+
+@media (width >= 1280px) {
+  .panel {
+    gap: var(--space-48);
+    padding: var(--space-64);
+  }
+
+  .body {
+    margin-block: auto;
+  }
+
+  .tagline {
+    max-inline-size: var(--brand-tagline-measure);
+    font: var(--font-title);
+  }
+
+  .points {
+    display: flex;
+  }
+}

@@ -1,0 +1,30 @@
+.list {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link {
+  display: block;
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-control);
+  color: var(--color-muted);
+  font: var(--font-label);
+  text-decoration: none;
+}
+
+.link:hover {
+  background: var(--color-surface-hover);
+}
+
+.link[aria-current='page'] {
+  background: var(--color-blue-bg);
+  color: var(--color-blue-ink);
+}
+
+.link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--space-2);
+}

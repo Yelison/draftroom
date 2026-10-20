@@ -2,10 +2,9 @@ import { useMutation } from '@tanstack/react-query'
 import { Button, Input } from '@yelison/forma-ui'
 import { useRef, useState, type SubmitEvent } from 'react'
 import { useIntl } from 'react-intl'
-import { Link, useLocation } from 'react-router'
 import { isApiError } from '../../data/errors.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
-import { AuthCard } from './AuthCard.tsx'
+import { AuthFrame } from './AuthFrame.tsx'
 import { signInFailureMessage } from './authProblem.ts'
 import { emailProblem, maxEmailLength, passwordLimits, signInPasswordProblem } from './validation.ts'
 import { useStartSession } from './useStartSession.tsx'
@@ -14,7 +13,6 @@ import styles from './Auth.module.css'
 /** Signing in with an email and a password. What the server refuses is said by its `code`, in the person's language. */
 export function SignInScreen() {
   const intl = useIntl()
-  const location = useLocation()
   const dataSource = useDataSource()
   const { start, dialogs } = useStartSession()
   const [email, setEmail] = useState('')
@@ -49,20 +47,7 @@ export function SignInScreen() {
   }
 
   return (
-    <AuthCard
-      titleId="auth.signIn.title"
-      descriptionId="auth.signIn.description"
-      footer={intl.formatMessage(
-        { id: 'auth.signIn.toSignUp' },
-        {
-          link: (chunks) => (
-            <Link to="/sign-up" state={location.state}>
-              {chunks}
-            </Link>
-          ),
-        },
-      )}
-    >
+    <AuthFrame titleId="auth.signIn.title" descriptionId="auth.signIn.description">
       <form className={styles.form} onSubmit={submit} noValidate>
         <Input
           ref={emailInput}
@@ -94,16 +79,16 @@ export function SignInScreen() {
               : intl.formatMessage({ id: `auth.password.${problems.password}` }, { max: passwordLimits.max })
           }
         />
+        <Button type="submit" loading={signIn.isPending}>
+          {intl.formatMessage({ id: 'auth.signIn.submit' })}
+        </Button>
         {signIn.error !== null && (
           <p role="alert" className={styles.problem}>
             {intl.formatMessage({ id: signInFailureMessage(signIn.error) })}
           </p>
         )}
-        <Button type="submit" loading={signIn.isPending}>
-          {intl.formatMessage({ id: 'auth.signIn.submit' })}
-        </Button>
       </form>
       {dialogs}
-    </AuthCard>
+    </AuthFrame>
   )
 }

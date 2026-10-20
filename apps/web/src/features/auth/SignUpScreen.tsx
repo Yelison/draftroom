@@ -1,12 +1,11 @@
 import { contractLimits } from '@draftroom/contract'
 import { useMutation } from '@tanstack/react-query'
-import { Button, Input } from '@yelison/forma-ui'
+import { Alert, Button, Input } from '@yelison/forma-ui'
 import { useRef, useState, type SubmitEvent } from 'react'
 import { useIntl } from 'react-intl'
-import { Link, useLocation } from 'react-router'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { textProblem } from '../documents/actions/textProblem.ts'
-import { AuthCard } from './AuthCard.tsx'
+import { AuthFrame } from './AuthFrame.tsx'
 import { signUpFailureMessage } from './authProblem.ts'
 import { emailProblem, maxEmailLength, passwordLimits, signUpPasswordProblem } from './validation.ts'
 import { useStartSession } from './useStartSession.tsx'
@@ -15,7 +14,6 @@ import styles from './Auth.module.css'
 /** Creating an account. An address that was invited to a workspace is claimed by it: the server joins the two. */
 export function SignUpScreen() {
   const intl = useIntl()
-  const location = useLocation()
   const dataSource = useDataSource()
   const { start, dialogs } = useStartSession()
   const [name, setName] = useState('')
@@ -52,20 +50,7 @@ export function SignUpScreen() {
   }
 
   return (
-    <AuthCard
-      titleId="auth.signUp.title"
-      descriptionId="auth.signUp.description"
-      footer={intl.formatMessage(
-        { id: 'auth.signUp.toSignIn' },
-        {
-          link: (chunks) => (
-            <Link to="/sign-in" state={location.state}>
-              {chunks}
-            </Link>
-          ),
-        },
-      )}
-    >
+    <AuthFrame titleId="auth.signUp.title" descriptionId="auth.signUp.description">
       <form className={styles.form} onSubmit={submit} noValidate>
         <Input
           ref={nameInput}
@@ -119,16 +104,19 @@ export function SignUpScreen() {
                 )
           }
         />
+        <Alert role="note" title={intl.formatMessage({ id: 'auth.signUp.workspaceNote.title' })}>
+          {intl.formatMessage({ id: 'auth.signUp.workspaceNote.body' })}
+        </Alert>
+        <Button type="submit" loading={signUp.isPending}>
+          {intl.formatMessage({ id: 'auth.signUp.submit' })}
+        </Button>
         {signUp.error !== null && (
           <p role="alert" className={styles.problem}>
             {intl.formatMessage({ id: signUpFailureMessage(signUp.error) })}
           </p>
         )}
-        <Button type="submit" loading={signUp.isPending}>
-          {intl.formatMessage({ id: 'auth.signUp.submit' })}
-        </Button>
       </form>
       {dialogs}
-    </AuthCard>
+    </AuthFrame>
   )
 }
