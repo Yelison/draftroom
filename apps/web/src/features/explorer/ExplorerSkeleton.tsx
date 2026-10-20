@@ -1,20 +1,13 @@
-import { useIntl } from 'react-intl'
+import { DocumentSectionsSkeleton } from '../documents/sections/SectionSkeleton.tsx'
 import styles from './ExplorerSkeleton.module.css'
 
-const rows = ['recent', 'recent-1', 'recent-2', 'folder', 'folder-1', 'loose', 'loose-1']
-
-/** The explorer while it is on its way: rows of the height of the real ones, so nothing moves when they arrive. */
+/** The explorer while it is on its way: the search and the actions, and the sections with the measures of the real ones. */
 export function ExplorerSkeleton() {
-  const intl = useIntl()
-
   return (
-    <div aria-busy="true" className={styles.skeleton}>
-      {rows.map((row) => (
-        <div key={row} className={styles.row} />
-      ))}
-      <p role="status" className="forma-visually-hidden">
-        {intl.formatMessage({ id: 'documents.loading' })}
-      </p>
+    <div className={styles.skeleton}>
+      <div className={styles.field} />
+      <div className={styles.field} />
+      <DocumentSectionsSkeleton compact />
     </div>
   )
 }
