@@ -4,6 +4,10 @@
   gap: var(--space-16);
 }
 
+.sections[hidden] {
+  display: none;
+}
+
 .section {
   overflow: clip;
   border: 1px solid var(--color-line);

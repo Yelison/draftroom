@@ -1,11 +1,15 @@
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo } from 'react'
+import { queryKeys } from '../../../data/queryKeys.ts'
 import { useDataSource } from '../../../data/useDataSource.ts'
 import { documentListQuery } from '../queries.ts'
 import { sectionPageSize } from './pageSize.ts'
 
 /** The documents a section lists: those of a folder, or those that are in none. */
 export type SectionSource = { folderId: string } | { unfiled: true }
+
+/** What a section asks the server for: its documents, a page at a time. The first page and those after it are one query. */
+const filtersOf = (source: SectionSource) => ({ ...source, limit: sectionPageSize })
 
 /**
  * The documents of one section, a page at a time. A section that is folded asks for nothing.
@@ -16,7 +20,7 @@ export type SectionSource = { folderId: string } | { unfiled: true }
  */
 export function useSectionDocuments(workspaceId: string, source: SectionSource, expanded: boolean) {
   const query = useInfiniteQuery({
-    ...documentListQuery(useDataSource(), workspaceId, { ...source, limit: sectionPageSize }),
+    ...documentListQuery(useDataSource(), workspaceId, filtersOf(source)),
     enabled: expanded,
   })
   const documents = useMemo(
@@ -31,4 +35,27 @@ export function useSectionDocuments(workspaceId: string, source: SectionSource, 
   }, [needsAnotherPage, fetchNextPage])
 
   return { query, documents, firstPageEmpty: query.data?.pages[0]?.items.length === 0 }
+}
+
+/**
+ * Whether the first page of every one of these folders has come in, or failed. The page shows its sections all at once
+ * when they have, and not one after the other as each arrives, which would move everything under it each time. A folder
+ * that is folded asks for nothing and is not waited for.
+ *
+ * Reading the cache does not render again by itself: the number of reads under way is what does, since a read that ends
+ * is a change in what is settled.
+ */
+export function useFirstPagesSettled(
+  workspaceId: string,
+  folderIds: readonly string[],
+  isExpanded: (folderId: string) => boolean,
+) {
+  const queryClient = useQueryClient()
+  useIsFetching({ queryKey: queryKeys.documentLists(workspaceId) })
+
+  return folderIds.every((folderId) => {
+    if (!isExpanded(folderId)) return true
+    const state = queryClient.getQueryState(queryKeys.documentList(workspaceId, filtersOf({ folderId })))
+    return state !== undefined && state.status !== 'pending'
+  })
 }

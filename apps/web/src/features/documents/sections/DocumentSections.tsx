@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 import { focusMainContent } from '../../../app/mainContent.ts'
 import { useDataSource } from '../../../data/useDataSource.ts'
@@ -11,7 +11,7 @@ import { SectionFailure } from './SectionFailure.tsx'
 import { DocumentSectionsSkeleton } from './SectionSkeleton.tsx'
 import { UnfiledSection } from './UnfiledSection.tsx'
 import type { SectionFolds } from './useSectionFolds.ts'
-import { useSectionDocuments } from './useSectionDocuments.ts'
+import { useFirstPagesSettled, useSectionDocuments } from './useSectionDocuments.ts'
 import { StateMessage } from '../StateMessage.tsx'
 import styles from './Sections.module.css'
 
@@ -47,6 +47,17 @@ export function DocumentSections({
     [folders.data],
   )
 
+  const folderList = folders.data?.items
+  const firstPagesIn = useFirstPagesSettled(
+    workspaceId,
+    useMemo(() => folderList?.map((folder) => folder.id) ?? [], [folderList]),
+    folds.isExpanded,
+  )
+  // Once the page has been shown it stays: a folder created later arrives under its own heading, not behind a skeleton.
+  const [arrived, setArrived] = useState(false)
+  const decided = !folders.isPending && !pinned.isPending && !(unfiled.query.isPending && folds.isExpanded('unfiled'))
+  if (!arrived && decided && firstPagesIn) setArrived(true)
+
   const pinnedCount = pinned.data?.items.length ?? 0
   // Until it has been read, "No folder" is drawn (loading or failed); once read, it is drawn only if it lists something.
   const showUnfiled = !unfiled.query.isSuccess || unfiled.documents.length > 0 || unfiled.query.hasNextPage
@@ -61,9 +72,7 @@ export function DocumentSections({
     sectionsShown.current = shown
   }, [shown])
 
-  if (folders.isPending || pinned.isPending || (unfiled.query.isPending && folds.isExpanded('unfiled'))) {
-    return <DocumentSectionsSkeleton />
-  }
+  if (!decided) return <DocumentSectionsSkeleton />
 
   const nothingAtAll =
     folders.isSuccess &&
@@ -83,53 +92,57 @@ export function DocumentSections({
   }
 
   return (
-    <div className={styles.sections}>
-      {pinned.isError && (
-        <div className={styles.section}>
-          <SectionFailure
-            name={intl.formatMessage({ id: 'documents.section.pinned' })}
-            onRetry={() => void pinned.refetch()}
-            retrying={pinned.isFetching}
+    <>
+      {!arrived && <DocumentSectionsSkeleton />}
+      {/* In the page, and so already asking for its documents, but not shown until they are all in. */}
+      <div className={styles.sections} hidden={!arrived}>
+        {pinned.isError && (
+          <div className={styles.section}>
+            <SectionFailure
+              name={intl.formatMessage({ id: 'documents.section.pinned' })}
+              onRetry={() => void pinned.refetch()}
+              retrying={pinned.isFetching}
+            />
+          </div>
+        )}
+        {pinnedCount > 0 && pinned.data !== undefined && (
+          <PinnedSection
+            documents={pinned.data.items}
+            folderNames={folderNames}
+            expanded={folds.isExpanded('pinned')}
+            onToggle={() => folds.toggle('pinned')}
+            {...actions}
           />
-        </div>
-      )}
-      {pinnedCount > 0 && pinned.data !== undefined && (
-        <PinnedSection
-          documents={pinned.data.items}
-          folderNames={folderNames}
-          expanded={folds.isExpanded('pinned')}
-          onToggle={() => folds.toggle('pinned')}
-          {...actions}
-        />
-      )}
-      {folders.isError && (
-        <div className={styles.section}>
-          <SectionFailure
-            name={intl.formatMessage({ id: 'documents.section.folders' })}
-            onRetry={() => void folders.refetch()}
-            retrying={folders.isFetching}
+        )}
+        {folders.isError && (
+          <div className={styles.section}>
+            <SectionFailure
+              name={intl.formatMessage({ id: 'documents.section.folders' })}
+              onRetry={() => void folders.refetch()}
+              retrying={folders.isFetching}
+            />
+          </div>
+        )}
+        {folders.data?.items.map((folder) => (
+          <FolderSection
+            key={folder.id}
+            workspaceId={workspaceId}
+            folder={folder}
+            expanded={folds.isExpanded(folder.id)}
+            onToggle={() => folds.toggle(folder.id)}
+            onRename={onRenameFolder}
+            {...actions}
           />
-        </div>
-      )}
-      {folders.data?.items.map((folder) => (
-        <FolderSection
-          key={folder.id}
-          workspaceId={workspaceId}
-          folder={folder}
-          expanded={folds.isExpanded(folder.id)}
-          onToggle={() => folds.toggle(folder.id)}
-          onRename={onRenameFolder}
-          {...actions}
-        />
-      ))}
-      {showUnfiled && (
-        <UnfiledSection
-          data={unfiled}
-          expanded={folds.isExpanded('unfiled')}
-          onToggle={() => folds.toggle('unfiled')}
-          {...actions}
-        />
-      )}
-    </div>
+        ))}
+        {showUnfiled && (
+          <UnfiledSection
+            data={unfiled}
+            expanded={folds.isExpanded('unfiled')}
+            onToggle={() => folds.toggle('unfiled')}
+            {...actions}
+          />
+        )}
+      </div>
+    </>
   )
 }
