@@ -1,11 +1,12 @@
 /*
  * The measures of what has a height before its data does, in one place: the skeleton wears the same classes as the real
- * thing, so a card, a tile or a chip is as tall loading as it is loaded, and the page does not move. They are above what
- * the usual content takes (a title of one line, a description of two) and a longer one makes its own block taller.
+ * thing, so a card, a tile or a chip is as tall loading as it is loaded, and the page does not move. They cover what the
+ * usual content takes, whatever font draws it (a card with a title of two lines, a tile with a description of two); a
+ * longer one makes its own block taller.
  */
 .sections {
-  --home-card-height: calc(var(--space-64) * 3 + var(--space-16));
-  --home-tile-height: calc(var(--space-64) + var(--space-24));
+  --home-card-height: calc(var(--space-64) * 3 + var(--space-40));
+  --home-tile-height: calc(var(--space-64) + var(--space-24) + var(--space-2));
   --home-chip-height: var(--space-40);
 
   display: flex;
@@ -65,11 +66,10 @@
 }
 
 .startHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-16);
+  align-items: center;
 }
 
 .startTitle {
@@ -86,6 +86,7 @@
 .startButtonSkeleton {
   width: calc(var(--space-64) * 2);
   height: var(--button-height);
+  justify-self: end;
 }
 
 .tilesLabel {
@@ -250,7 +251,6 @@
 
 .cardExcerpt,
 .cardNoExcerpt {
-  flex: 1;
   margin: 0;
   color: var(--color-muted);
   font: var(--font-body);
@@ -269,7 +269,8 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-4) var(--space-8);
-  margin: 0;
+  /* Auto at the top: a card taller than its text keeps its foot at the bottom. */
+  margin: auto 0 0;
   color: var(--color-muted);
   font: var(--font-caption);
   overflow-wrap: anywhere;
@@ -388,6 +389,15 @@
  * query does not read custom properties.
  */
 @container (max-width: 900px) {
+  .startHead {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  .startButtonSkeleton {
+    justify-self: start;
+  }
+
   .tiles,
   .cards {
     grid-template-columns: minmax(0, 1fr);
