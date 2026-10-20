@@ -3,30 +3,60 @@ import { describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { AppProviders } from '../../app/AppProviders.tsx'
+import type { DataSource } from '../../data/DataSource.ts'
 import { DataSourceContext } from '../../data/DataSourceContext.ts'
 import { createMockServer } from '../../data/mock/createMockDataSource.ts'
 import { marta } from '../../data/mock/fixtures/index.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { ShareDialog } from './ShareDialog.tsx'
-import { answer, dialog, interviews, launchPlan, openShare, pathOf, renderScreen } from './testing/openShare.tsx'
+import {
+  answer,
+  dialog,
+  generalAccessOf,
+  interviews,
+  launchPlan,
+  openShare,
+  pathOf,
+  renderScreen,
+  rows,
+} from './testing/openShare.tsx'
 
 describe('the share dialog', () => {
   it('lists the people with a role, each with their email and role, and marks the signed-in person', async () => {
     const { share } = await openShare()
 
-    const list = within(share).getByRole('list')
-    expect(
-      within(list)
-        .getAllByRole('listitem')
-        .map((item) => item.textContent),
-    ).toEqual([
+    expect(rows(share).map((item) => item.textContent)).toEqual([
       expect.stringContaining('Marta Ruiz (you)'),
       expect.stringContaining('Daniel Okafor'),
       expect.stringContaining('Sofía Lindqvist'),
+      expect.stringContaining('Everyone in Harbor Pine'),
     ])
     expect(within(share).getByRole('combobox', { name: 'Role of Daniel Okafor' })).toHaveValue('editor')
     expect(within(share).getByRole('combobox', { name: 'Role of Sofía Lindqvist' })).toHaveValue('commenter')
-    expect(within(share).getByRole('combobox', { name: 'Everyone in the workspace' })).toHaveValue('commenter')
+    expect(generalAccessOf(share)).toHaveValue('commenter')
+  })
+
+  it('puts everyone in the workspace in the same list, as its last row, and offers the four ways to open the document', async () => {
+    const { share } = await openShare()
+
+    const everyone = rows(share).at(-1)
+    expect(everyone).toHaveTextContent('General access')
+    expect(
+      within(generalAccessOf(share))
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Only the people above', 'Can view', 'Can comment', 'Can edit'])
+    expect(within(share).queryByRole('heading', { name: 'General access' })).not.toBeInTheDocument()
+  })
+
+  it('has the row that adds people before the list, with Viewer as the role to begin with', async () => {
+    const { share } = await openShare({ documentId: interviews.id })
+
+    const headings = within(share)
+      .getAllByRole('heading', { level: 3 })
+      .map((heading) => heading.textContent)
+    expect(headings).toEqual(['Add people', 'People with access'])
+    expect(within(share).getByRole('combobox', { name: /^Role$/ })).toHaveValue('viewer')
   })
 
   it('writes its words in Spanish when the app is in Spanish', async () => {
@@ -36,9 +66,10 @@ describe('the share dialog', () => {
     const share = await screen.findByRole('dialog', { name: 'Compartir «Autumn launch plan»' })
     expect(await within(share).findByRole('heading', { name: 'Personas con acceso' })).toBeInTheDocument()
     expect(within(share).getByRole('combobox', { name: 'Rol de Daniel Okafor' })).toHaveDisplayValue('Editor')
-    expect(within(share).getByRole('combobox', { name: 'Todas las personas del espacio' })).toHaveDisplayValue(
-      'Pueden comentar',
-    )
+    expect(
+      within(share).getByRole('combobox', { name: 'Acceso de todas las personas de Harbor Pine' }),
+    ).toHaveDisplayValue('Pueden comentar')
+    expect(within(share).getByText('Todas las personas de Harbor Pine')).toBeInTheDocument()
     expect(within(share).getByRole('button', { name: 'Quitar a Daniel Okafor' })).toBeInTheDocument()
   })
 
@@ -93,6 +124,70 @@ describe('the share dialog', () => {
     const share = await dialog()
 
     expect(await within(share).findByText('Only owners can change who has access')).toBeInTheDocument()
+  })
+})
+
+/** The same list with more people in it than the fixtures have, each with a role of viewer. */
+const withGuests =
+  (count: number) =>
+  (dataSource: DataSource): DataSource => ({
+    ...dataSource,
+    listAccess: async (request) => {
+      const list = await dataSource.listAccess(request)
+      const guests = Array.from({ length: count }, (_, index) => ({
+        userId: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+        email: `guest${index + 1}@harborpine.example`,
+        name: `Guest ${index + 1}`,
+        role: 'viewer' as const,
+        createdAt: '2026-10-13T15:30:00Z',
+      }))
+      return { ...list, items: [...list.items, ...guests] }
+    },
+  })
+
+describe('the states of the share dialog', () => {
+  it('lists one person alone with the row of everyone in the workspace after them, and holds the controls of that owner', async () => {
+    const { share } = await openShare({
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listAccess: async (request) => {
+          const list = await dataSource.listAccess(request)
+          return { ...list, items: list.items.slice(0, 1) }
+        },
+      }),
+    })
+
+    expect(rows(share).map((item) => item.textContent)).toEqual([
+      expect.stringContaining('Marta Ruiz (you)'),
+      expect.stringContaining('Everyone in Harbor Pine'),
+    ])
+    expect(within(share).getByRole('combobox', { name: 'Role of Marta Ruiz' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('keeps the row that adds people, the list with everyone in the workspace last, and Done, in that order, with many people', async () => {
+    const { share } = await openShare({ documentId: interviews.id, wrap: withGuests(15) })
+
+    const added = within(share).getByRole('combobox', { name: 'Person' })
+    const list = within(share).getByRole('list')
+    const done = within(share).getByRole('button', { name: 'Done' })
+    expect(rows(share)).toHaveLength(18)
+    expect(rows(share).at(-1)).toHaveTextContent('Everyone in Harbor Pine')
+    expect(added.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(list.compareDocumentPosition(done) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(list.contains(done)).toBe(false)
+  })
+
+  it('has a list that stands in for the one on its way, without a list or controls to read yet', async () => {
+    renderScreen(pathOf(launchPlan.id), {
+      wrap: (dataSource) => ({ ...dataSource, listAccess: () => new Promise(() => undefined) }),
+    })
+
+    const share = await dialog()
+
+    await within(share).findByText('Loading who has access')
+    expect(share.querySelector('[aria-busy="true"]')).not.toBeNull()
+    expect(within(share).queryByRole('combobox')).not.toBeInTheDocument()
+    expect(within(share).queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
   })
 })
 

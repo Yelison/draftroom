@@ -7,6 +7,7 @@ import { queryKeys } from '../../data/queryKeys.ts'
 import { workspaceFixtures } from '../documents/testing/renderScreen.tsx'
 import {
   answer,
+  generalAccessOf,
   interviews,
   launchPlan,
   openShare,
@@ -14,6 +15,7 @@ import {
   people,
   renderScreen,
   roleOf,
+  rows,
 } from './testing/openShare.tsx'
 
 const workspaceId = workspaceFixtures.harborPine.id
@@ -83,6 +85,22 @@ describe('changing a role in the share dialog', () => {
     expect(roleOf(share, 'Sofía Lindqvist')).toHaveValue('commenter')
     expect(status(share).join('')).toBe('')
   })
+
+  it('says why on the row of the person, and on no other', async () => {
+    const { user, share } = await openShare({
+      wrap: (dataSource) => ({ ...dataSource, setAccess: () => Promise.reject(answer(503, 'unavailable')) }),
+    })
+
+    await user.selectOptions(roleOf(share, 'Sofía Lindqvist'), 'editor')
+
+    const alert = await within(share).findByRole('alert')
+    const [owner, daniel, sofia, everyone] = rows(share)
+    expect(sofia).toContainElement(alert)
+    expect(within(owner!).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(daniel!).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(everyone!).queryByRole('alert')).not.toBeInTheDocument()
+    expect(roleOf(share, 'Sofía Lindqvist')).toHaveAccessibleDescription(alert.textContent)
+  })
 })
 
 describe('a change that is on its way in the share dialog', () => {
@@ -139,6 +157,41 @@ describe('adding someone in the share dialog', () => {
     expect(picker).toHaveDisplayValue('Daniel Okafor')
   })
 
+  it('says why next to the row that adds people, and describes the controls of that row with it', async () => {
+    const { user, share } = await openShare({
+      documentId: interviews.id,
+      wrap: (dataSource) => ({ ...dataSource, setAccess: () => Promise.reject(answer(503, 'unavailable')) }),
+    })
+
+    await user.selectOptions(within(share).getByRole('combobox', { name: 'Person' }), 'Daniel Okafor')
+    await user.click(within(share).getByRole('button', { name: 'Add' }))
+
+    const alert = await within(share).findByRole('alert')
+    const adding = within(share).getByRole('region', { name: 'Add people' })
+    expect(adding).toContainElement(alert)
+    expect(within(share).getByRole('button', { name: 'Add' })).toHaveAccessibleDescription(alert.textContent)
+  })
+
+  it('gives the person the role Viewer when the role is left as it was', async () => {
+    const setAccess = vi.fn()
+    const { user, share } = await openShare({
+      documentId: interviews.id,
+      wrap: (dataSource) => ({
+        ...dataSource,
+        setAccess: (request) => {
+          setAccess(request)
+          return dataSource.setAccess(request)
+        },
+      }),
+    })
+
+    await user.selectOptions(within(share).getByRole('combobox', { name: 'Person' }), 'Daniel Okafor')
+    await user.click(within(share).getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => expect(setAccess).toHaveBeenCalledTimes(1))
+    expect(setAccess).toHaveBeenCalledWith(expect.objectContaining({ body: { role: 'viewer' } }))
+  })
+
   it('does not choose the person again when they are removed after being added', async () => {
     const { user, share } = await openShare({ documentId: interviews.id })
     await user.selectOptions(within(share).getByRole('combobox', { name: 'Person' }), 'Daniel Okafor')
@@ -185,11 +238,52 @@ describe('removing someone in the share dialog', () => {
     expect(invalidatedKeys()).toEqual(keysAfterAccessChange(launchPlan.id))
     await waitFor(() => expect(people(share)).toHaveLength(2))
     expect(within(share).queryByRole('combobox', { name: 'Role of Daniel Okafor' })).not.toBeInTheDocument()
-    await waitFor(() => expect(roleOf(share, 'Marta Ruiz')).toHaveFocus())
+    // The row after the one that went.
+    await waitFor(() => expect(roleOf(share, 'Sofía Lindqvist')).toHaveFocus())
+  })
+
+  it('puts the focus on the row of everyone in the workspace when the last person of the list is the one removed', async () => {
+    const { user, share } = await openShare()
+
+    await user.click(within(share).getByRole('button', { name: 'Remove Sofía Lindqvist' }))
+
+    await waitFor(() => expect(people(share)).toHaveLength(2))
+    await waitFor(() => expect(generalAccessOf(share)).toHaveFocus())
+  })
+
+  it('leaves the focus where it was when the server refuses, and does not move it on a refresh that comes later', async () => {
+    let refuse = true
+    const { user, share } = await openShare({
+      wrap: (dataSource) => ({
+        ...dataSource,
+        removeAccess: (request) =>
+          refuse ? Promise.reject(answer(503, 'unavailable')) : dataSource.removeAccess(request),
+      }),
+    })
+
+    await user.click(within(share).getByRole('button', { name: 'Remove Daniel Okafor' }))
+    await within(share).findByRole('alert')
+    refuse = false
+    await user.selectOptions(generalAccessOf(share), 'viewer')
+    await waitFor(() => expect(status(share)).toContain('General access: Can view.'))
+
+    expect(generalAccessOf(share)).toHaveFocus()
   })
 })
 
 describe('the general access in the share dialog', () => {
+  it('says why on its own row when the server refuses', async () => {
+    const { user, share } = await openShare({
+      wrap: (dataSource) => ({ ...dataSource, setGeneralAccess: () => Promise.reject(answer(503, 'unavailable')) }),
+    })
+
+    await user.selectOptions(generalAccessOf(share), 'editor')
+
+    const alert = await within(share).findByRole('alert')
+    expect(rows(share).at(-1)).toContainElement(alert)
+    expect(generalAccessOf(share)).toHaveValue('commenter')
+  })
+
   it('sets how the workspace can open the document, announces it and makes stale what the table names', async () => {
     const setGeneralAccess = vi.fn()
     const { user, share, invalidatedKeys } = await openShare({
@@ -202,7 +296,7 @@ describe('the general access in the share dialog', () => {
       }),
     })
 
-    await user.selectOptions(within(share).getByRole('combobox', { name: 'Everyone in the workspace' }), 'viewer')
+    await user.selectOptions(generalAccessOf(share), 'viewer')
 
     await waitFor(() => expect(status(share)).toContain('General access: Can view.'))
     expect(setGeneralAccess).toHaveBeenCalledExactlyOnceWith({
@@ -225,6 +319,9 @@ describe('the last owner in the share dialog', () => {
 
     const role = roleOf(share, 'Marta Ruiz')
     const remove = within(share).getByRole('button', { name: 'Remove Marta Ruiz' })
+    // Under the row of that person, and not in the one of anybody else.
+    expect(rows(share)[0]).toHaveTextContent(lastOwnerNote)
+    expect(rows(share)[1]).not.toHaveTextContent(lastOwnerNote)
     expect(role).toHaveAccessibleDescription(lastOwnerNote)
     expect(remove).toHaveAccessibleDescription(lastOwnerNote)
     await user.selectOptions(role, 'viewer')
