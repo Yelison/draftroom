@@ -3,14 +3,13 @@ import { useIntl } from 'react-intl'
 import { focusMainContent } from '../../app/mainContent.ts'
 import { DocumentActionDialogs } from '../documents/actions/DocumentActionDialogs.tsx'
 import { useActionDialogs } from '../documents/actions/useActionDialogs.ts'
-import { DocumentCollection } from '../documents/DocumentCollection.tsx'
-import { DocumentsSkeleton } from '../documents/ListSkeleton.tsx'
 import { WorkspaceGate } from '../documents/WorkspaceGate.tsx'
+import { ResultList, ResultsLoading } from './ResultList.tsx'
 
 /** The documents that match a search, in the workspace of the person, with the actions every list of documents has. */
 export function SearchResults({ term }: { term: string }) {
   return (
-    <WorkspaceGate loading={<DocumentsSkeleton />}>
+    <WorkspaceGate loading={<ResultsLoading />}>
       {(workspaceId) => <Results workspaceId={workspaceId} term={term} />}
     </WorkspaceGate>
   )
@@ -23,11 +22,9 @@ function Results({ workspaceId, term }: { workspaceId: string; term: string }) {
 
   return (
     <>
-      {/* There is a term, so the list never has the empty state of a list nobody searched: it says "no results" itself. */}
-      <DocumentCollection
+      <ResultList
         workspaceId={workspaceId}
         term={term}
-        empty={null}
         onActions={(document) => actions.open({ kind: 'details', document })}
         onArchive={(document) => actions.open({ kind: 'archive', document })}
       />
