@@ -154,11 +154,14 @@ test('lets a card and a chip with a long title grow instead of spilling their te
   await expect(card).toContainText(longTitle)
   const chip = pinned(page).getByRole('link', { name: longTitle })
   for (const box of [card, chip]) {
-    const { scroll, client } = await box.evaluate((element) => ({
-      scroll: element.scrollHeight,
-      client: element.clientHeight,
+    const { scrollHeight, clientHeight, scrollWidth, clientWidth } = await box.evaluate((element) => ({
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
     }))
-    expect(scroll).toBeLessThanOrEqual(client)
+    expect(scrollHeight).toBeLessThanOrEqual(clientHeight)
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth)
   }
 })
 
