@@ -108,6 +108,7 @@ export const routes: readonly RouteCase[] = [
   screen('documents', 'documents'),
   screen('shared with me', 'shared'),
   screen('workspace history', 'history'),
+  screen('members', 'members'),
   screen('trash', 'trash'),
   screen('search results', 'search?q=plan'),
   editor('editor with the comments panel open', document, 'open'),
@@ -124,7 +125,6 @@ export const routes: readonly RouteCase[] = [
   screen('version history', `${document}/versions`),
   screen('settings, profile', 'settings/profile'),
   screen('settings, workspace', 'settings/workspace'),
-  screen('settings, members', 'settings/members'),
   screen('settings, appearance', 'settings/appearance'),
   { name: 'sign in', open: signOut },
   {

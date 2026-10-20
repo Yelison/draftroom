@@ -1,0 +1,204 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-16);
+}
+
+.description {
+  margin: 0;
+  color: var(--color-muted);
+  font: var(--font-body);
+}
+
+.count {
+  margin: 0;
+  color: var(--color-muted);
+  font: var(--font-caption);
+}
+
+.invitePanel {
+  padding: var(--space-16);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+}
+
+.invite {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(var(--space-64) * 3) auto;
+  gap: var(--space-12);
+  align-items: end;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.panel {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+}
+
+.alone {
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-panel);
+}
+
+/* The header sticks to the top of the window, so no ancestor of the table may clip or scroll: the panel's rounded
+ * corners are drawn by the corner cells instead of by an `overflow: hidden`. */
+.table {
+  inline-size: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  padding: var(--space-8) var(--space-12);
+  border-block-end: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font: var(--font-label);
+  text-align: start;
+}
+
+.table th:first-child {
+  border-start-start-radius: var(--radius-panel);
+}
+
+.table th:last-child {
+  border-start-end-radius: var(--radius-panel);
+}
+
+.table td {
+  padding: var(--space-8) var(--space-12);
+  border-block-start: 1px solid var(--color-line);
+  vertical-align: middle;
+}
+
+.table tbody tr:first-child td {
+  border-block-start: 0;
+}
+
+.table tbody tr:hover td {
+  background: var(--color-surface-hover);
+}
+
+/* Columns for a desktop window; a narrower one gives up the date to leave the people their room. */
+.roleColumn {
+  inline-size: calc(var(--space-64) * 2.5);
+}
+
+.statusColumn {
+  inline-size: calc(var(--space-64) * 1.75);
+}
+
+.actionsColumn {
+  inline-size: calc(var(--space-64) * 1.5);
+}
+
+.since {
+  display: none;
+  color: var(--color-muted);
+  font: var(--font-body);
+}
+
+.actions {
+  text-align: end;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  font: var(--font-strong);
+  overflow-wrap: anywhere;
+}
+
+.email {
+  color: var(--color-muted);
+  font: var(--font-caption);
+  overflow-wrap: anywhere;
+}
+
+.role {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reserved {
+  visibility: hidden;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+.skeletonInvite {
+  /* A label, a gap and a control: the height of the invitation once it is there. */
+  block-size: calc(var(--space-20) + var(--space-6) + var(--control-height) + var(--space-32) + var(--space-1) * 2);
+}
+
+.skeletonFilters {
+  block-size: var(--choice-min-height);
+}
+
+.skeletonHead {
+  block-size: calc(var(--space-20) + var(--space-16) + var(--space-1));
+  border-block-end: 1px solid var(--color-line);
+}
+
+.skeletonRow {
+  block-size: var(--space-64);
+  border-block-start: 1px solid var(--color-line);
+}
+
+.skeletonHead + .skeletonRow {
+  border-block-start: 0;
+}
+
+@media (width >= 1280px) {
+  .roleColumn {
+    inline-size: calc(var(--space-64) * 3);
+  }
+
+  .statusColumn {
+    inline-size: calc(var(--space-64) * 2);
+  }
+
+  .actionsColumn {
+    inline-size: calc(var(--space-64) * 1.75);
+  }
+
+  .since {
+    display: table-cell;
+    inline-size: calc(var(--space-64) * 2.5);
+  }
+}

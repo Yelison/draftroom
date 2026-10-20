@@ -7,7 +7,7 @@ test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, heigh
 const main = (page: Page) => page.getByRole('main')
 const tab = (page: Page, name: string) => page.getByRole('tab', { name })
 
-test('walks the four tabs with the arrow keys, and saves in each one with the keyboard', async ({ page }) => {
+test('walks the tabs with the arrow keys, and saves in each one with the keyboard', async ({ page }) => {
   await page.goto('/settings')
   await expect(page).toHaveURL(/\/settings\/profile$/)
   await expect(tab(page, 'Profile')).toHaveAttribute('aria-selected', 'true')

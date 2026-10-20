@@ -1,7 +1,7 @@
 import { useMatches } from 'react-router'
 
 /** The sections of the navigation rail, one per item. */
-export const sections = ['home', 'documents', 'shared', 'history', 'settings'] as const
+export const sections = ['home', 'documents', 'shared', 'history', 'members', 'settings'] as const
 export type Section = (typeof sections)[number]
 
 /** What a route declares about itself for the shell. A route without a section highlights no item of the rail. */

@@ -12,7 +12,7 @@ export const refusal = (status: number, code: ApiError['code']) =>
 
 /** Opens a tab of Settings and waits until its panel has what it came for: the headline of the tab. */
 export async function openTab(
-  tab: 'profile' | 'workspace' | 'members' | 'appearance',
+  tab: 'profile' | 'workspace' | 'appearance',
   heading: string,
   options?: RenderScreenOptions,
 ) {

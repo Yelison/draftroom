@@ -1,5 +1,6 @@
 import type { Schema } from '@draftroom/contract'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '../../data/queryKeys.ts'
 import { useDataSource } from '../../data/useDataSource.ts'
 import { invalidateAfter } from '../documents/invalidate.ts'
 
@@ -39,7 +40,11 @@ export function useMemberChanges({ workspaceId, onDone, onFailed }: MemberChange
     mutationFn: ({ member, role }: { member: Schema<'Member'>; role: WorkspaceRole }) =>
       dataSource.updateMember({ params: { path: { ...path, userId: member.userId } }, body: { role } }),
     onSuccess: async (member) => {
-      await invalidateAfter(queryClient, 'updateMember', { workspaceId })
+      // The role the rail shows the person in comes from the workspace, which the table of mutations does not mark stale.
+      await Promise.all([
+        invalidateAfter(queryClient, 'updateMember', { workspaceId }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspace(workspaceId) }),
+      ])
       onDone({ kind: 'changed', name: member.name ?? member.email, role: member.role })
     },
     onError: onFailed,

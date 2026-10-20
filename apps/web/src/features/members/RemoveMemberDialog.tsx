@@ -24,8 +24,8 @@ export function RemoveMemberDialog({ member, removing, onConfirm, onClose }: Rem
     <Dialog
       open={member !== null}
       onClose={onClose}
-      title={intl.formatMessage({ id: 'settings.members.remove.title' }, { name })}
-      description={intl.formatMessage({ id: 'settings.members.remove.description' }, { name })}
+      title={intl.formatMessage({ id: 'members.remove.title' }, { name })}
+      description={intl.formatMessage({ id: 'members.remove.description' }, { name })}
       footer={
         <>
           <Button variant="secondary" disabled={removing} onClick={onClose}>
@@ -37,7 +37,7 @@ export function RemoveMemberDialog({ member, removing, onConfirm, onClose }: Rem
               if (member !== null) onConfirm(member)
             }}
           >
-            {intl.formatMessage({ id: 'settings.members.remove.confirm' })}
+            {intl.formatMessage({ id: 'members.remove.confirm' })}
           </Button>
         </>
       }
