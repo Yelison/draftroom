@@ -90,15 +90,13 @@ export function History({ workspaceId }: { workspaceId: string }) {
           role="alert"
           title={intl.formatMessage({ id: 'history.loadMore.error.title' })}
           description={intl.formatMessage({ id: 'history.error.description' })}
-        >
-          <Button loading={query.isFetchingNextPage} onClick={fetchNextPage}>
-            {intl.formatMessage({ id: 'history.error.retry' })}
-          </Button>
-        </StateMessage>
+        />
       )}
-      {query.hasNextPage && !query.isError && (
+      {/* One button for "Load more" and for the retry after it failed, in the same place: the focus is on it when the page is
+          asked for, and a button that is replaced by another would hand the focus to the page. */}
+      {query.hasNextPage && (loadMoreFailed || !query.isError) && (
         <Button variant="secondary" loading={query.isFetchingNextPage} onClick={fetchNextPage}>
-          {intl.formatMessage({ id: 'history.loadMore' })}
+          {intl.formatMessage({ id: loadMoreFailed ? 'history.error.retry' : 'history.loadMore' })}
         </Button>
       )}
       {state.applied > 0 && query.isSuccess && (

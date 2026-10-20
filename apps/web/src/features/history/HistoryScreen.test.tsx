@@ -484,12 +484,17 @@ describe('"Load more" of the History screen when it fails', () => {
     expect(await within(main()).findByRole('alert')).toHaveTextContent("We couldn't load more events")
     expect(rows()).toHaveLength(1)
     expect(within(main()).queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
+    // It is the button the person pressed, so the focus is still on it and not handed to the page.
+    const retry = within(main()).getByRole('button', { name: 'Try again' })
+    expect(retry).toHaveFocus()
 
     refused = false
-    await user.click(within(main()).getByRole('button', { name: 'Try again' }))
+    await user.click(retry)
 
     await waitFor(() => expect(rows()).toHaveLength(2))
     expect(within(main()).queryByRole('alert')).not.toBeInTheDocument()
+    // The last page is in and the button is gone: the focus goes to the first event that arrived.
+    expect(within(rows()[1] as HTMLElement).getByRole('link')).toHaveFocus()
   })
 
   it('shows the page being asked for on the button while it is on its way', async () => {

@@ -150,7 +150,8 @@ test('does not move the headline, the filters or the rows when the events arrive
       if (row !== null && seen.before === undefined) {
         seen.before = {
           title: top('h1'),
-          filters: top('[role="group"]'),
+          // What is above the rows: the filters, or the place they take while the workspace is on its way.
+          filters: row.closest('[aria-busy="true"]')?.previousElementSibling?.getBoundingClientRect().top ?? null,
           row: row.getBoundingClientRect().top,
           rowHeight: row.getBoundingClientRect().height,
         }
@@ -170,8 +171,8 @@ test('does not move the headline, the filters or the rows when the events arrive
   })
 
   expect(after.title).toBeCloseTo(seen?.title ?? NaN, 0)
-  // The filters are not there while the workspace is on its way: their place is, and the rows lie under it all the same.
-  if (seen?.filters !== null) expect(after.filters).toBeCloseTo(seen?.filters ?? NaN, 0)
+  expect(seen?.filters, 'the place of the filters was seen').not.toBeNull()
+  expect(after.filters).toBeCloseTo(seen?.filters ?? NaN, 0)
   expect(after.row).toBeCloseTo(seen?.row ?? NaN, 0)
   expect(after.rowHeight).toBeCloseTo(seen?.rowHeight ?? NaN, 0)
 })
