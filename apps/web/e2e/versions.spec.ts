@@ -1,17 +1,9 @@
 /* The version history in the production build, with a real browser: from the editor, to a version, to a restore, and back, by keyboard. */
 import type { Page } from '@playwright/test'
-import { versions } from '../src/data/mock/fixtures/collaboration.ts'
 import { launchPlan } from '../src/data/mock/fixtures/documents.ts'
 import { expect, test } from './fixtures.ts'
 
 test.use({ locale: 'en-US', colorScheme: 'light', viewport: { width: 1280, height: 800 } })
-
-// The name a version has for a screen reader carries the moment it was made, in the browser's time zone, which is this machine's.
-const named = versions.find((version) => version.documentId === launchPlan.id && version.label !== null)
-const namedWhen = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(
-  new Date(named?.createdAt ?? 0),
-)
-const namedName = `Before the pricing review, ${namedWhen}`
 
 const list = (page: Page) => page.getByRole('region', { name: 'Versions' })
 const reader = (page: Page) => page.getByRole('region', { name: 'Version', exact: true })
