@@ -43,6 +43,23 @@ describe('the selection of the trash', () => {
     expect(selectionOf(['c', 'd'], result.current.selectedIndex)).toBe('c')
   })
 
+  it.each([
+    { case: 'the rows before it leave', left: ['c', 'd'], expected: 'c' },
+    { case: 'the rows after it and before it leave', left: ['a', 'd'], expected: 'd' },
+  ])(
+    'does not skip the row that takes its place when several rows leave in the same reading: $case',
+    ({ left, expected }) => {
+      const { result, rerender } = renderHook(({ ids }) => useTrashSelection(ids), {
+        initialProps: { ids: ['a', 'b', 'c', 'd'] as readonly string[] },
+      })
+      act(() => result.current.select('b'))
+
+      rerender({ ids: left })
+
+      expect(selectionOf(left, result.current.selectedIndex)).toBe(expected)
+    },
+  )
+
   it('is nothing when the list is empty', () => {
     const { result } = renderHook(() => useTrashSelection([]))
 

@@ -23,8 +23,9 @@ function indexAfter(key: string, index: number, count: number) {
 
 /**
  * The archived documents, one of them selected. The list is a single stop of the tab order, on the selected row, so that
- * a person with a keyboard gets to the panel without going through every row; the arrow keys, Home and End select the
- * row they move to, and Enter or Space select the row that has the focus (it is a button).
+ * a person with a keyboard gets to the panel without going through every row. The arrow keys, Home and End move the
+ * focus, and the row that gets the focus is the selected one; a click selects too, for the browsers that do not focus a
+ * button when it is clicked.
  */
 export function TrashList({ ref, documents, folderNameOf, selectedIndex, onSelect }: TrashListProps) {
   const move = (event: KeyboardEvent<HTMLUListElement>) => {
