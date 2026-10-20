@@ -11,9 +11,12 @@ export function TimelineSkeleton() {
   return (
     <div aria-busy="true" className={styles.timeline}>
       <div className={styles.week}>
-        <div className={styles.weekTitleSkeleton} />
+        {/* The titles are the real ones in a blank, so their height is the real height whatever the type is. */}
+        <div className={styles.weekTitle}>&nbsp;</div>
         <div className={styles.day}>
-          <div className={styles.dayTitleSkeleton} />
+          <div className={styles.dayTitle}>
+            <span className={styles.dayTitleSkeleton}>&nbsp;</span>
+          </div>
           <ul className={styles.list}>
             {Array.from({ length: skeletonRows }, (_, index) => (
               <li key={index} className={styles.item}>

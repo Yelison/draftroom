@@ -22,8 +22,7 @@
   gap: var(--space-16);
 }
 
-.weekTitle,
-.weekTitleSkeleton {
+.weekTitle {
   margin: 0;
   padding: var(--space-8) 0;
   border-bottom: 1px solid var(--color-line);
@@ -223,14 +222,8 @@
 }
 
 /* The loading state: the same rows with bars where the words go, as tall as the rows they stand in for. */
-.weekTitleSkeleton {
-  height: calc(var(--space-24) + var(--space-8) * 2);
-  box-sizing: border-box;
-}
-
 .dayTitleSkeleton {
-  height: var(--space-20);
-  margin-left: calc(var(--timeline-time-width) + var(--timeline-gap));
+  display: inline-block;
   width: calc(var(--space-64) * 3);
   border-radius: var(--radius-small);
   background: var(--color-line);

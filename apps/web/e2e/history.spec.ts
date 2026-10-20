@@ -1,4 +1,4 @@
-/* The History screen in the production build, with a real browser: the filters with the keyboard, an event opened beside the list, the focus. */
+/* The History screen in the production build, with a real browser: the filters and the timeline with the keyboard, a burst of renames unfolded in place, the way from a sentence to its document, and the page not moving when the events arrive. */
 import type { Page } from '@playwright/test'
 import { daniel } from '../src/data/mock/fixtures/people.ts'
 import { designReview, launchPlan } from '../src/data/mock/fixtures/documents.ts'
@@ -8,10 +8,20 @@ test.use({ locale: 'en-US', timezoneId: 'UTC', colorScheme: 'light', viewport: {
 
 const main = (page: Page) => page.getByRole('main')
 const chip = (page: Page, name: string) => main(page).getByRole('button', { name, exact: true })
-/** The rows of the timeline, which are the buttons that name an event; the filters are buttons too, and are not rows. */
-const rows = (page: Page) => main(page).getByRole('listitem').getByRole('button')
+/** The rows of the timeline: one for each event, and one for a burst of renames. */
+const rows = (page: Page) => main(page).getByRole('listitem')
+/** Renames a document of the explorer, as a person does from its menu. */
+async function rename(page: Page, from: string, to: string) {
+  await main(page)
+    .getByRole('button', { name: `Actions for ${from}` })
+    .click()
+  const dialog = page.getByRole('dialog', { name: 'Rename or move' })
+  await dialog.getByRole('textbox', { name: 'Title' }).fill(to)
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(dialog).toBeHidden()
+}
 
-test('filters the history with the keyboard, opens an event, and gives the focus back when it is closed', async ({
+test('filters the history with the keyboard, and takes the filters off with the focus staying among them', async ({
   page,
 }) => {
   await page.goto('/history')
@@ -48,7 +58,7 @@ test('filters the history with the keyboard, opens an event, and gives the focus
   await expect(chip(page, `Document: ${designReview.title}`)).toBeFocused()
   await expect(rows(page)).toHaveCount(2)
 
-  // Tab runs through the chips and the button that clears them, and then to the first event: Enter opens it beside the list.
+  // Tab runs through the chips and the button that clears them, and then to the link of the first event.
   await page.keyboard.press('Tab')
   await expect(chip(page, `Person: ${daniel.name}`)).toBeFocused()
   await page.keyboard.press('Tab')
@@ -56,26 +66,7 @@ test('filters the history with the keyboard, opens an event, and gives the focus
   await page.keyboard.press('Tab')
   await expect(main(page).getByRole('button', { name: 'Clear filters' })).toBeFocused()
   await page.keyboard.press('Tab')
-  const first = rows(page).first()
-  await expect(first).toBeFocused()
-  await expect(first).toHaveAttribute('aria-expanded', 'false')
-  await page.keyboard.press('Enter')
-
-  const panel = main(page).getByRole('complementary', { name: 'Event details' })
-  await expect(panel).toContainText(`${daniel.name} changed who in the workspace can open “${designReview.title}”`)
-  await expect(panel.getByRole('heading', { level: 2, name: 'Event details' })).toBeFocused()
-  await expect(first).toHaveAttribute('aria-expanded', 'true')
-  await expect(panel.getByRole('link', { name: 'Open document' })).toHaveAttribute(
-    'href',
-    `/documents/${designReview.id}`,
-  )
-
-  // Close is next on the Tab: Enter closes the panel and the focus is on the event again.
-  await page.keyboard.press('Tab')
-  await expect(panel.getByRole('button', { name: 'Close' })).toBeFocused()
-  await page.keyboard.press('Enter')
-  await expect(panel).toBeHidden()
-  await expect(first).toBeFocused()
+  await expect(rows(page).first().getByRole('link', { name: designReview.title })).toBeFocused()
 
   // Everything off from the keyboard: the focus stays among the filters, on the first chip.
   await main(page).getByRole('button', { name: 'Clear filters' }).press('Enter')
@@ -84,13 +75,48 @@ test('filters the history with the keyboard, opens an event, and gives the focus
   await expect(page).toHaveURL(/\/history$/)
 })
 
+test('unfolds a burst of renames with the keyboard, keeps the focus on its button, and opens the document from the sentence', async ({
+  page,
+}) => {
+  await page.goto('/documents')
+  await rename(page, launchPlan.title, 'Autumn launch plan, draft')
+  await rename(page, 'Autumn launch plan, draft', 'Autumn launch plan, second draft')
+  await rename(page, 'Autumn launch plan, second draft', 'Autumn launch plan, final')
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'History' }).click()
+
+  const burst = rows(page).filter({ hasText: 'was renamed 3 times' })
+  await expect(burst).toHaveCount(1)
+  const details = burst.getByRole('button', { name: 'Details' })
+  await expect(details).toHaveAttribute('aria-expanded', 'false')
+  const people = page.locator(`#${await details.getAttribute('aria-controls')}`)
+  await expect(people).toBeHidden()
+
+  await details.focus()
+  await page.keyboard.press('Enter')
+  await expect(details).toHaveAttribute('aria-expanded', 'true')
+  await expect(people).toBeVisible()
+  await expect(people.getByRole('listitem')).toHaveCount(3)
+  await expect(details).toBeFocused()
+
+  await page.keyboard.press('Space')
+  await expect(details).toHaveAttribute('aria-expanded', 'false')
+  await expect(people).toBeHidden()
+  await expect(details).toBeFocused()
+
+  // The name of the document is the way to it: the next stop of the Tab is the link, and Enter opens the editor.
+  await page.keyboard.press('Shift+Tab')
+  await expect(burst.getByRole('link', { name: 'Autumn launch plan, final' })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(new RegExp(`/documents/${launchPlan.id}`))
+  await expect(page.getByRole('tree')).toBeVisible()
+})
+
 test('goes from the History to a document and back, twice, with the filter and the explorer both working', async ({
   page,
 }) => {
   const rail = page.getByRole('navigation', { name: 'Main navigation' })
   const openFirstEvent = async () => {
-    await rows(page).first().click()
-    await main(page).getByRole('complementary').getByRole('link', { name: 'Open document' }).click()
+    await rows(page).first().getByRole('link', { name: launchPlan.title }).click()
   }
 
   await page.goto('/history')
@@ -112,14 +138,51 @@ test('goes from the History to a document and back, twice, with the filter and t
   await expect(page.getByText('Unexpected Application Error')).toHaveCount(0)
 })
 
-test('has no horizontal scroll at 1280 and 1440 px, with the panel open, in either theme', async ({ page }) => {
+test('does not move the headline, the filters or the rows when the events arrive in place of the skeleton', async ({
+  page,
+}) => {
+  // The skeleton is on screen for a moment only: what is where is taken as it appears, before the events replace it.
+  await page.addInitScript(() => {
+    const seen = window as unknown as { before?: Record<string, number | null> }
+    const top = (selector: string) => document.querySelector(selector)?.getBoundingClientRect().top ?? null
+    new MutationObserver(() => {
+      const row = document.querySelector('[aria-busy="true"] li')
+      if (row !== null && seen.before === undefined) {
+        seen.before = {
+          title: top('h1'),
+          filters: top('[role="group"]'),
+          row: row.getBoundingClientRect().top,
+          rowHeight: row.getBoundingClientRect().height,
+        }
+      }
+    }).observe(document, { childList: true, subtree: true })
+  })
+  await page.goto('/history')
+
+  const first = rows(page).first()
+  await expect(first).toContainText('Marta Ruiz')
+  const seen = await page.evaluate(() => (window as unknown as { before?: Record<string, number | null> }).before)
+  expect(seen, 'the skeleton was seen').toBeDefined()
+  const after = await page.evaluate(() => {
+    const top = (selector: string) => document.querySelector(selector)?.getBoundingClientRect().top ?? null
+    const row = document.querySelector('main li[data-entry]')?.getBoundingClientRect()
+    return { title: top('h1'), filters: top('[role="group"]'), row: row?.top ?? null, rowHeight: row?.height ?? null }
+  })
+
+  expect(after.title).toBeCloseTo(seen?.title ?? NaN, 0)
+  // The filters are not there while the workspace is on its way: their place is, and the rows lie under it all the same.
+  if (seen?.filters !== null) expect(after.filters).toBeCloseTo(seen?.filters ?? NaN, 0)
+  expect(after.row).toBeCloseTo(seen?.row ?? NaN, 0)
+  expect(after.rowHeight).toBeCloseTo(seen?.rowHeight ?? NaN, 0)
+})
+
+test('has no horizontal scroll at 1280 and 1440 px in either theme', async ({ page }) => {
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme })
     for (const width of [1280, 1440]) {
       await page.setViewportSize({ width, height: 800 })
       await page.goto('/history')
-      await rows(page).first().click()
-      await expect(main(page).getByRole('complementary')).toBeVisible()
+      await expect(rows(page).first()).toBeVisible()
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       )
@@ -131,15 +194,16 @@ test('has no horizontal scroll at 1280 and 1440 px, with the panel open, in eith
 test.describe('in Spanish', () => {
   test.use({ locale: 'es-ES' })
 
-  test('writes the filters, the days and the events in Spanish, with no horizontal scroll', async ({ page }) => {
+  test('writes the filters, the weeks, the days and the events in Spanish, with no horizontal scroll', async ({
+    page,
+  }) => {
     await page.goto('/history')
 
     await expect(page.getByRole('heading', { level: 1, name: 'Historial' })).toBeVisible()
     await expect(main(page).getByRole('group', { name: 'Filtrar el historial' })).toBeVisible()
-    await expect(
-      main(page).getByRole('button', { name: /Marta Ruiz cambió el nombre de «Autumn launch plan»/ }),
-    ).toBeVisible()
-    await expect(main(page).getByRole('heading', { level: 2 }).first()).toHaveText('martes, 13 de octubre de 2026')
+    await expect(rows(page).first()).toContainText('Marta Ruiz cambió el nombre de «Autumn launch plan»')
+    await expect(main(page).getByRole('heading', { level: 2 }).first()).toHaveText('Semana del 12 oct')
+    await expect(main(page).getByRole('heading', { level: 3 }).first()).toHaveText('martes, 13 de octubre de 2026')
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     )
