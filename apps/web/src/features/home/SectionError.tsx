@@ -1,6 +1,7 @@
 import { Button } from '@yelison/forma-ui'
 import { useIntl } from 'react-intl'
 import type { MessageId } from '../../i18n/messages.ts'
+import { useSessionEnding } from '../documents/useSessionEnding.ts'
 import styles from './Home.module.css'
 
 export interface SectionErrorProps {
@@ -15,6 +16,8 @@ export interface SectionErrorProps {
  */
 export function SectionError({ title, onRetry, retrying }: SectionErrorProps) {
   const intl = useIntl()
+  // An ended session fails every read at once and the app is about to send the person to sign in: saying the connection failed would be false.
+  if (useSessionEnding()) return null
 
   return (
     <div role="alert" className={styles.error}>

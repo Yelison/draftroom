@@ -39,8 +39,9 @@ function watchCreate() {
 
 const openPicker = async (options?: Parameters<typeof renderScreen>[1]) => {
   const view = renderScreen('/documents', options)
-  const trigger = await screen.findByRole('button', { name: 'From a template' })
+  const trigger = await screen.findByRole('button', { name: 'More' })
   await view.user.click(trigger)
+  await view.user.click(await screen.findByRole('menuitem', { name: 'From a template' }))
   return { ...view, trigger, dialog: await screen.findByRole('dialog', { name: 'Choose a template' }) }
 }
 
@@ -69,7 +70,8 @@ describe('choosing a template', () => {
     localStorage.setItem(localeStorageKey, 'es')
     try {
       const view = renderScreen('/documents')
-      await view.user.click(await screen.findByRole('button', { name: 'Desde una plantilla' }))
+      await view.user.click(await screen.findByRole('button', { name: 'Más' }))
+      await view.user.click(await screen.findByRole('menuitem', { name: 'Desde una plantilla' }))
 
       const dialog = await screen.findByRole('dialog', { name: 'Elige una plantilla' })
       expect(await within(dialog).findByRole('link', { name: /Notas de reunión/ })).toBeInTheDocument()

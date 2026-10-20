@@ -6,7 +6,8 @@ import { PinnedDocuments } from './PinnedDocuments.tsx'
 import { RecentDocuments } from './RecentDocuments.tsx'
 import { StartSection } from './StartSection.tsx'
 import { WorkspaceName } from './WorkspaceName.tsx'
-import { latestEventQuery, pinnedDocumentsQuery, recentDocumentsQuery } from './queries.ts'
+import { pinnedDocumentsQuery } from '../documents/queries.ts'
+import { latestEventQuery, recentDocumentsQuery } from './queries.ts'
 import styles from './Home.module.css'
 
 /**

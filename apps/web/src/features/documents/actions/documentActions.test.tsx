@@ -12,6 +12,8 @@ const main = () => screen.getByRole('main')
 
 const actionsOf = (title: string) => screen.findByRole('button', { name: `Actions for ${title}` })
 const renameDialog = () => screen.findByRole('dialog', { name: 'Rename or move' })
+const chooseAction = (user: ReturnType<typeof renderScreen>['user'], action: string) =>
+  screen.findByRole('menuitem', { name: action }).then((item) => user.click(item))
 
 /** Watches what a call sends, without changing what it does. */
 function spyOn<Name extends 'updateDocument' | 'archiveDocument' | 'createDocument'>(name: Name) {
@@ -30,6 +32,7 @@ function spyOn<Name extends 'updateDocument' | 'archiveDocument' | 'createDocume
 async function openRename(title: string, options?: Parameters<typeof renderScreen>[1]) {
   const view = renderScreen('/documents', options)
   await view.user.click(await actionsOf(title))
+  await chooseAction(view.user, 'Rename or move')
   return { ...view, dialog: await renameDialog() }
 }
 
@@ -204,20 +207,47 @@ describe('who is offered the actions', () => {
     expect(screen.queryByRole('button', { name: `Actions for ${budget.title}` })).not.toBeInTheDocument()
   })
 
-  it('offers archiving only to an owner of the document', async () => {
-    const { user } = renderScreen('/documents', { signedInAs: daniel.email })
+  it.each([
+    { who: 'an editor', signedInAs: daniel.email, items: ['Rename or move'] },
+    { who: 'an owner', signedInAs: undefined, items: ['Rename or move', 'Archive'] },
+  ])('offers $who of the document exactly $items', async ({ signedInAs, items }) => {
+    const { user } = renderScreen('/documents', signedInAs === undefined ? {} : { signedInAs })
     await user.click(await actionsOf('Autumn launch plan'))
 
-    const dialog = await renameDialog()
+    const menu = await screen.findByRole('menu')
 
-    expect(within(dialog).queryByRole('button', { name: 'Archive' })).not.toBeInTheDocument()
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(items)
+  })
+})
+
+describe('the archive button of the dialog', () => {
+  it.each([
+    { who: 'an editor', signedInAs: daniel.email, offered: false },
+    { who: 'an owner', signedInAs: undefined, offered: true },
+  ])('is offered to $who of the document: $offered', async ({ signedInAs, offered }) => {
+    const { dialog } = await openRename('Autumn launch plan', signedInAs === undefined ? {} : { signedInAs })
+
+    expect(within(dialog).queryByRole('button', { name: 'Archive' }) !== null).toBe(offered)
+  })
+
+  it('takes an owner from the dialog to the question that asks first', async () => {
+    const { user, dialog } = await openRename('Autumn launch plan')
+
+    await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Archive “Autumn launch plan”?' })).toBeInTheDocument()
   })
 })
 
 describe('archiving a document', () => {
   async function openArchive(title: string, options?: Parameters<typeof renderScreen>[1]) {
-    const view = await openRename(title, options)
-    await view.user.click(within(view.dialog).getByRole('button', { name: 'Archive' }))
+    const view = renderScreen('/documents', options)
+    await view.user.click(await actionsOf(title))
+    await chooseAction(view.user, 'Archive')
     return { ...view, confirmation: await screen.findByRole('dialog', { name: `Archive “${title}”?` }) }
   }
 
@@ -290,7 +320,10 @@ describe('archiving a document', () => {
     await waitFor(() =>
       expect(within(main()).queryByRole('link', { name: 'Autumn launch plan' })).not.toBeInTheDocument(),
     )
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Documents' })).toHaveFocus())
+    // Its row was the first of "Pinned": the focus goes to the one that is first now.
+    await waitFor(() =>
+      expect(within(main()).getByRole('link', { name: 'Customer interview synthesis' })).toHaveFocus(),
+    )
   })
 
   it('says why it could not, in the language of the person, and keeps the document', async () => {

@@ -50,3 +50,11 @@ export const documentListQuery = (dataSource: DataSource, workspaceId: string, f
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     retry: retryTransportOnce,
   })
+
+/** The documents the person pinned and can still read, most recently changed first. The contract does not page them. */
+export const pinnedDocumentsQuery = (dataSource: DataSource, workspaceId: string) =>
+  queryOptions({
+    queryKey: queryKeys.pinned(workspaceId),
+    queryFn: () => dataSource.listPinnedDocuments({ params: { path: { workspaceId } } }),
+    retry: retryTransportOnce,
+  })

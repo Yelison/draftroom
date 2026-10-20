@@ -15,6 +15,7 @@ async function rename(page: Page, from: string, to: string) {
   await main(page)
     .getByRole('button', { name: `Actions for ${from}` })
     .click()
+  await page.getByRole('menuitem', { name: 'Rename or move' }).click()
   const dialog = page.getByRole('dialog', { name: 'Rename or move' })
   await dialog.getByRole('textbox', { name: 'Title' }).fill(to)
   await dialog.getByRole('button', { name: 'Save' }).click()

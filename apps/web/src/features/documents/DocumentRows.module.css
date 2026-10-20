@@ -1,0 +1,181 @@
+/*
+ * The measures of a list of documents and of its rows, in one place. They are literals until the product token layer has
+ * them. The skeleton wears the same classes as the real rows, which is what keeps the page from moving when the rows
+ * arrive: every line of a row is one line (cut with an ellipsis, never wrapped), so the height of a row is a measure and
+ * not a result of the text or the font.
+ */
+.rows {
+  --document-row-height: 72px;
+  --document-row-height-narrow: 112px;
+  --document-created-by-width: 176px;
+  --document-role-width: 96px;
+  --document-updated-width: 176px;
+  /* The star and the menu, with the gap between them: a row with no menu keeps the place, so the columns line up. */
+  --document-actions-width: calc(var(--button-height) * 2 + var(--space-4));
+
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  container-type: inline-size;
+}
+
+/* A list with no section around it (search results, a folder) is a panel of its own. */
+.panel {
+  overflow: clip;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+}
+
+.more {
+  margin-block: var(--space-16);
+}
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns:
+    var(--control-icon-size) minmax(0, 1fr) var(--document-created-by-width) var(--document-role-width)
+    var(--document-updated-width) var(--document-actions-width);
+  gap: var(--space-16);
+  align-items: center;
+  height: var(--document-row-height);
+  padding: 0 var(--space-16);
+  color: var(--color-ink);
+  font: var(--font-body);
+}
+
+.row + .row {
+  border-top: 1px solid var(--color-line);
+}
+
+.row:hover {
+  background: var(--color-surface-hover);
+}
+
+.icon {
+  color: var(--color-muted);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.titleLine {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  min-width: 0;
+}
+
+.title,
+.excerpt,
+.personName,
+.folderName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title {
+  min-width: 0;
+  font: var(--font-strong);
+}
+
+.folderTag {
+  display: inline-flex;
+  flex: 0 1 auto;
+  gap: var(--space-4);
+  align-items: center;
+  min-width: 0;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-small);
+  background: var(--color-bg);
+  color: var(--color-muted);
+  font: var(--font-caption);
+}
+
+.excerpt {
+  color: var(--color-muted);
+  font: var(--font-caption);
+}
+
+.noText {
+  font-style: italic;
+}
+
+/* Who, which role and when: three cells of the row, which a narrow row gathers on a line of their own. */
+.meta {
+  display: contents;
+}
+
+.person {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  min-width: 0;
+}
+
+.updated {
+  white-space: nowrap;
+  color: var(--color-muted);
+  font: var(--font-caption);
+}
+
+.actions {
+  position: relative;
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.skeletonRow {
+  height: var(--document-row-height);
+}
+
+.skeletonRow + .skeletonRow {
+  border-top: 1px solid var(--color-line);
+}
+
+/*
+ * When the list does not have room for the six cells (a narrow window, or the page zoomed), the row is the icon, the
+ * text and the actions, with who made it, the role and the date on a second line. The height is another one then, and the
+ * skeleton's too. The 900px cannot be a variable: a container query does not read custom properties.
+ */
+@container (max-width: 900px) {
+  .row,
+  .skeletonRow {
+    --document-row-height: var(--document-row-height-narrow);
+  }
+
+  .row {
+    grid-template-columns: var(--control-icon-size) minmax(0, 1fr) var(--document-actions-width);
+    row-gap: var(--space-8);
+  }
+
+  .icon,
+  .text,
+  .actions {
+    grid-row: 1;
+  }
+
+  .meta {
+    display: flex;
+    grid-column: 2 / 4;
+    grid-row: 2;
+    gap: var(--space-12);
+    align-items: center;
+    min-width: 0;
+  }
+
+  .person {
+    flex: 0 1 auto;
+  }
+
+  .updated {
+    flex: none;
+    margin-inline-start: auto;
+  }
+}

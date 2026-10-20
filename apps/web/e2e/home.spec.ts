@@ -18,17 +18,28 @@ const rowsOf = (items: Locator) =>
 
 /**
  * Pins every document the Documents screen lists that is not pinned yet, with the keyboard alone, and goes back to Home.
- * The mock lives in the page: a reload would give back its first state, so the screens are reached by their links.
+ * The sections show a few documents at a time, so what they hide is asked for first. The mock lives in the page: a reload
+ * would give back its first state, so the screens are reached by their links.
  */
 async function pinEverything(page: Page) {
   await page.getByRole('link', { name: 'Documents' }).click()
   const loose = main(page).getByRole('button', { name: /^Pin / })
   await expect(loose.first()).toBeVisible()
   const unpinned = loose.and(page.locator('[aria-pressed="false"]'))
-  for (let left = await unpinned.count(); left > 0; left -= 1) {
+  const pinned = loose.and(page.locator('[aria-pressed="true"]'))
+  const showMore = main(page).getByRole('button', { name: /^Show more/ })
+  for (;;) {
+    while ((await showMore.count()) > 0) {
+      await showMore.first().click()
+      await expect
+        .poll(() => showMore.evaluateAll((buttons) => buttons.some((button) => button.ariaBusy === 'true')))
+        .toBe(false)
+    }
+    if ((await unpinned.count()) === 0) break
+    const before = await pinned.count()
     await unpinned.first().focus()
     await page.keyboard.press('Enter')
-    await expect(unpinned).toHaveCount(left - 1)
+    await expect(pinned).toHaveCount(before + 1)
   }
   await page.getByRole('link', { name: 'Home' }).click()
 }
@@ -202,6 +213,7 @@ test('lets a card and a chip with a long title grow instead of spilling their te
   await main(page)
     .getByRole('button', { name: `Actions for ${launchPlan.title}` })
     .click()
+  await page.getByRole('menuitem', { name: 'Rename or move' }).click()
   const dialog = page.getByRole('dialog', { name: 'Rename or move' })
   await dialog.getByRole('textbox', { name: 'Title' }).fill(longTitle)
   await dialog.getByRole('button', { name: 'Save' }).click()

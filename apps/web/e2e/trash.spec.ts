@@ -17,7 +17,7 @@ async function archiveFromDocuments(page: Page, title: string) {
   await main(page)
     .getByRole('button', { name: `Actions for ${title}` })
     .click()
-  await page.getByRole('dialog', { name: 'Rename or move' }).getByRole('button', { name: 'Archive' }).click()
+  await page.getByRole('menuitem', { name: 'Archive' }).click()
   await page
     .getByRole('dialog', { name: `Archive “${title}”?` })
     .getByRole('button', { name: 'Archive' })
@@ -27,7 +27,8 @@ async function archiveFromDocuments(page: Page, title: string) {
 
 /** Goes to the Trash by its link, as a person does; the mock keeps its data until the page is loaded again. */
 async function openTrash(page: Page) {
-  await main(page).getByRole('link', { name: 'Trash' }).click()
+  await main(page).getByRole('button', { name: 'More', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Trash' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Trash' })).toBeFocused()
 }
 

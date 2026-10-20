@@ -1,64 +1,494 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import type { DataSource } from '../../data/DataSource.ts'
 import { ApiError } from '../../data/errors.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { archivedNotice } from './archivedNotice.ts'
 import { fixtures, renderScreen, workspaceFixtures } from './testing/renderScreen.tsx'
 
+const { launchPlan, designReview, weeklyEnglish, weeklySpanish, interviews, interviewsSpanish } = fixtures
 const heading = () => screen.findByRole('heading', { level: 1, name: 'Documents' })
 const main = () => screen.getByRole('main')
 const searchbox = () => within(main()).getByRole('searchbox', { name: 'Search documents' })
+const section = (name: string) => within(main()).findByRole('region', { name })
 /** What the live regions of the work area say now: the notice of an archive is always there, empty until it has something. */
 const spoken = () =>
   within(main())
     .getAllByRole('status')
     .map((region) => region.textContent)
 const unavailable = () => new ApiError({ type: 'about:blank', title: 'Unavailable', status: 503, code: 'unavailable' })
+const linksOf = (region: HTMLElement) =>
+  within(region)
+    .getAllByRole('link')
+    .map((link) => link.textContent)
 
-describe('the Documents screen', () => {
-  it('shows the folders and the documents of the workspace', async () => {
+type Request = Parameters<DataSource['listDocuments']>[0]
+/** Makes a call of `listDocuments` smaller, or fail, for the lists that `matches` says; it leaves the others alone. */
+const changeLists =
+  (matches: (query: NonNullable<Request>['params']['query']) => boolean, change: (request: Request) => Request) =>
+  (dataSource: DataSource): DataSource => ({
+    ...dataSource,
+    listDocuments: (request) => dataSource.listDocuments(matches(request?.params.query) ? change(request) : request),
+  })
+const pagesOf = (limit: number) =>
+  changeLists(
+    () => true,
+    (request) => ({
+      params: {
+        path: { workspaceId: request?.params.path.workspaceId ?? '' },
+        query: { ...request?.params.query, limit },
+      },
+    }),
+  )
+
+describe('the sections of the Documents screen', () => {
+  it('lists the pinned documents first, then a section for each folder, then the documents in no folder', async () => {
     renderScreen('/documents')
     await heading()
 
-    const folders = await screen.findByRole('region', { name: 'Folders' })
-    const links = await within(folders).findAllByRole('link')
-    expect(links.map((link) => link.textContent)).toEqual(['Ideas', 'Operaciones', 'Product', 'Research'])
-    const documents = screen.getByRole('region', { name: 'All documents' })
-    expect(await within(documents).findByRole('link', { name: 'Autumn launch plan' })).toHaveAttribute(
+    await section('No folder')
+    expect(
+      within(main())
+        .getAllByRole('heading', { level: 2 })
+        .map((title) => title.textContent),
+    ).toEqual(['Pinned', 'Ideas', 'Operaciones', 'Product', 'Research', 'No folder'])
+  })
+
+  it('lists a pinned document in "Pinned" only, with the name of its folder, and not again in its folder', async () => {
+    renderScreen('/documents')
+    await heading()
+
+    const pinned = await section('Pinned')
+    expect(linksOf(pinned)).toEqual(['Autumn launch plan', 'Customer interview synthesis'])
+    expect(within(pinned).getByText('In folder Product')).toBeInTheDocument()
+    const product = await section('Product')
+    expect(await within(product).findByRole('link', { name: designReview.title })).toBeInTheDocument()
+    expect(linksOf(product)).toEqual([designReview.title])
+    expect(linksOf(await section('Research'))).toEqual([interviewsSpanish.title])
+  })
+
+  it('links each title to its document', async () => {
+    renderScreen('/documents')
+    await heading()
+
+    expect(await within(await section('Pinned')).findByRole('link', { name: 'Autumn launch plan' })).toHaveAttribute(
       'href',
-      `/documents/${fixtures.launchPlan.id}`,
+      `/documents/${launchPlan.id}`,
     )
+  })
+
+  it('lists the documents that are in no folder under "No folder", asking the server for exactly those', async () => {
+    const queries: unknown[] = []
+    renderScreen('/documents', {
+      wrap: changeLists(
+        (query) => (queries.push(query), false),
+        (request) => request,
+      ),
+    })
+    await heading()
+
+    const unfiled = await section('No folder')
+    await within(unfiled).findAllByRole('link')
+    expect(linksOf(unfiled)).not.toContain(launchPlan.title)
+    expect(linksOf(unfiled)).toContain(weeklyEnglish.title)
+    expect(queries).toContainEqual({ unfiled: true, limit: 5 })
+  })
+
+  it('draws a folder with no documents, with a line that says so, so it can still be seen and used', async () => {
+    renderScreen('/documents')
+    await heading()
+
+    const ideas = await section('Ideas')
+
+    expect(await within(ideas).findByText('No documents yet')).toBeInTheDocument()
+    expect(within(ideas).queryByRole('link')).not.toBeInTheDocument()
   })
 
   it('does not list an archived document', async () => {
     renderScreen('/documents')
     await heading()
 
-    await screen.findByRole('link', { name: 'Autumn launch plan' })
+    await within(await section('Product')).findByRole('link', { name: designReview.title })
     expect(screen.queryByRole('link', { name: 'Old pricing draft' })).not.toBeInTheDocument()
   })
 
-  it('shows cards of the height of the real ones, with a spoken status, while it loads', async () => {
-    let arrive: (() => void) | undefined
+  it('does not draw "Pinned" when nothing is pinned, nor "No folder" when every document is in a folder', async () => {
     renderScreen('/documents', {
       wrap: (dataSource) => ({
         ...dataSource,
-        listDocuments: (request) =>
-          new Promise((resolve) => (arrive = () => resolve(dataSource.listDocuments(request)))),
+        listPinnedDocuments: async () => ({ items: [] }),
+        listDocuments: async (request) => ({
+          items: request?.params.query?.unfiled === true ? [] : (await dataSource.listDocuments(request)).items,
+          nextCursor: null,
+        }),
       }),
     })
     await heading()
 
-    expect(await within(main()).findByRole('status')).toHaveTextContent('Loading documents')
-    expect(within(main()).queryByRole('link', { name: 'Autumn launch plan' })).not.toBeInTheDocument()
-
-    // The call may not have been made yet: the workspace is read first.
-    await waitFor(() => expect(arrive).toBeDefined())
-    await act(async () => arrive?.())
-    expect(await within(main()).findByRole('link', { name: 'Autumn launch plan' })).toBeInTheDocument()
+    await section('Product')
+    expect(screen.queryByRole('heading', { level: 2, name: 'Pinned' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 2, name: 'No folder' })).not.toBeInTheDocument()
   })
 
-  it('shows the loading state, and not "No documents yet", while the folders are still on their way', async () => {
+  it('does not say a folder is empty when everything in it is pinned', async () => {
+    renderScreen('/documents', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        listDocuments: async (request) => {
+          const page = await dataSource.listDocuments(request)
+          return { ...page, items: page.items.map((document) => ({ ...document, pinned: true })) }
+        },
+      }),
+    })
+    await heading()
+
+    const product = await section('Product')
+
+    expect(await within(product).findByText('Everything in this folder is pinned.')).toBeInTheDocument()
+    expect(within(product).queryByText('No documents yet')).not.toBeInTheDocument()
+  })
+})
+
+describe('folding a section', () => {
+  const toggleOf = (name: string) => within(main()).findByRole('button', { name })
+
+  it('hides its documents and says so to a screen reader, and shows them again', async () => {
+    const { user } = renderScreen('/documents')
+    await heading()
+    const toggle = await toggleOf('Research')
+    await within(await section('Research')).findByRole('link')
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(document.getElementById(toggle.getAttribute('aria-controls') ?? '')).toContainElement(
+      screen.getByRole('link', { name: interviewsSpanish.title }),
+    )
+
+    await user.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('link', { name: interviewsSpanish.title })).not.toBeInTheDocument()
+    await user.click(toggle)
+    expect(await screen.findByRole('link', { name: interviewsSpanish.title })).toBeInTheDocument()
+  })
+
+  it('folds with the keyboard, and keeps the focus on its button', async () => {
+    const { user } = renderScreen('/documents')
+    await heading()
+    const toggle = await toggleOf('Research')
+
+    toggle.focus()
+    await user.keyboard('{Enter}')
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle).toHaveFocus()
+  })
+
+  it('asks for nothing while it is folded, even when the lists are read again', async () => {
+    const researchCalls: unknown[] = []
+    let unfiledCalls = 0
+    const { user, queryClient } = renderScreen('/documents', {
+      wrap: changeLists(
+        (query) => {
+          if (query?.folderId === workspaceFixtures.researchFolder.id) researchCalls.push(query)
+          if (query?.unfiled === true) unfiledCalls += 1
+          return false
+        },
+        (request) => request,
+      ),
+    })
+    await heading()
+    await within(await section('Research')).findByRole('link')
+    await user.click(await toggleOf('Research'))
+    const researchBefore = researchCalls.length
+    const unfiledBefore = unfiledCalls
+
+    await act(() => queryClient.invalidateQueries({ queryKey: ['workspaces'] }))
+
+    await waitFor(() => expect(unfiledCalls).toBeGreaterThan(unfiledBefore))
+    expect(researchCalls).toHaveLength(researchBefore)
+  })
+
+  it('keeps what is folded while a search is typed and cleared', async () => {
+    const { user } = renderScreen('/documents')
+    await heading()
+    await user.click(await toggleOf('Research'))
+
+    await user.type(searchbox(), 'weekly')
+    await screen.findByText('Weekly update — October 6')
+    expect(screen.queryByRole('heading', { level: 2, name: 'Research' })).not.toBeInTheDocument()
+    await user.clear(searchbox())
+
+    expect(await toggleOf('Research')).toHaveAttribute('aria-expanded', 'false')
+    expect(await toggleOf('Product')).toHaveAttribute('aria-expanded', 'true')
+  })
+})
+
+describe('the pages of a section', () => {
+  it('asks for the next page when a page brings only pinned documents, and never shows "Show more" over no rows', async () => {
+    const researchPages: unknown[] = []
+    renderScreen('/documents', {
+      wrap: (dataSource) =>
+        pagesOf(1)({
+          ...dataSource,
+          listDocuments: (request) => {
+            if (request?.params.query?.folderId === workspaceFixtures.researchFolder.id) {
+              researchPages.push(request.params.query.cursor)
+            }
+            return dataSource.listDocuments(request)
+          },
+        }),
+    })
+    await heading()
+    const research = await section('Research')
+
+    expect(await within(research).findByRole('link', { name: interviewsSpanish.title })).toBeInTheDocument()
+    expect(within(research).queryByRole('link', { name: interviews.title })).not.toBeInTheDocument()
+    expect(within(research).queryByRole('button', { name: /Show more/ })).not.toBeInTheDocument()
+    expect(researchPages).toHaveLength(2)
+  })
+
+  it('shows more of one section when asked, and moves the focus to the first document that arrived', async () => {
+    const { user } = renderScreen('/documents', { wrap: pagesOf(2) })
+    await heading()
+    const unfiled = await section('No folder')
+    expect(await within(unfiled).findAllByRole('link')).toHaveLength(2)
+
+    await user.click(within(unfiled).getByRole('button', { name: 'Show more in No folder' }))
+
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')).toHaveLength(4))
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')[2]).toHaveFocus())
+  })
+
+  it('loads one section at a time: "Show more" asks for the pages of its own section only', async () => {
+    const afterTheFirstPage: unknown[] = []
+    const { user } = renderScreen('/documents', {
+      wrap: (dataSource) =>
+        pagesOf(2)({
+          ...dataSource,
+          listDocuments: (request) => {
+            if (request?.params.query?.cursor !== undefined) afterTheFirstPage.push(request.params.query.unfiled)
+            return dataSource.listDocuments(request)
+          },
+        }),
+    })
+    await heading()
+    const unfiled = await section('No folder')
+    await user.click(await within(unfiled).findByRole('button', { name: 'Show more in No folder' }))
+
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')).toHaveLength(4))
+    expect(afterTheFirstPage).toEqual([true])
+  })
+
+  it('stops offering more once the last page is in, and keeps the focus on the page', async () => {
+    const { user } = renderScreen('/documents', { wrap: pagesOf(3) })
+    await heading()
+    const unfiled = await section('No folder')
+
+    await user.click(await within(unfiled).findByRole('button', { name: 'Show more in No folder' }))
+
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')).toHaveLength(5))
+    expect(within(unfiled).queryByRole('button', { name: /Show more/ })).not.toBeInTheDocument()
+    expect(document.body).not.toHaveFocus()
+  })
+
+  it('says when more could not be loaded, keeps what is there, and loads it on the next try', async () => {
+    let fail = true
+    const { user } = renderScreen('/documents', {
+      wrap: (dataSource) =>
+        pagesOf(3)({
+          ...dataSource,
+          listDocuments: async (request) => {
+            if (fail && request?.params.query?.cursor !== undefined) throw unavailable()
+            return dataSource.listDocuments(request)
+          },
+        }),
+    })
+    await heading()
+    const unfiled = await section('No folder')
+    await user.click(await within(unfiled).findByRole('button', { name: 'Show more in No folder' }))
+
+    expect(await within(unfiled).findByRole('alert')).toHaveTextContent("We couldn't load more documents.")
+    expect(within(unfiled).getAllByRole('link')).toHaveLength(3)
+    fail = false
+    await user.click(within(unfiled).getByRole('button', { name: 'Show more in No folder' }))
+
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')).toHaveLength(5))
+  })
+
+  it('shows that more is on its way, on the button that asked for it', async () => {
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const { user } = renderScreen('/documents', {
+      wrap: (dataSource) =>
+        pagesOf(3)({
+          ...dataSource,
+          listDocuments: async (request) => {
+            if (request?.params.query?.cursor !== undefined) await held
+            return dataSource.listDocuments(request)
+          },
+        }),
+    })
+    await heading()
+    const unfiled = await section('No folder')
+
+    await user.click(await within(unfiled).findByRole('button', { name: 'Show more in No folder' }))
+
+    expect(within(unfiled).getByRole('button', { name: 'Show more in No folder' })).toHaveAttribute('aria-busy', 'true')
+    await act(async () => release())
+  })
+})
+
+describe('a section with a network that takes its time', () => {
+  /** Every call to the documents takes 30 ms, as a real network would, so the screen renders between ask and answer. */
+  const slow =
+    (limit: number) =>
+    (dataSource: DataSource): DataSource =>
+      pagesOf(limit)({
+        ...dataSource,
+        listDocuments: async (request) => {
+          await new Promise((resolve) => setTimeout(resolve, 30))
+          return dataSource.listDocuments(request)
+        },
+      })
+
+  it('moves the focus to the first document of each page that arrives, and not to the page when the last one does', async () => {
+    const { user } = renderScreen('/documents', { wrap: slow(2) })
+    await heading()
+    const unfiled = await section('No folder')
+    const more = () => within(unfiled).getByRole('button', { name: 'Show more in No folder' })
+    await within(unfiled).findByRole('button', { name: 'Show more in No folder' })
+
+    await user.click(more())
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')).toHaveLength(4))
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')[2]).toHaveFocus())
+
+    await user.click(more())
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')).toHaveLength(5))
+    expect(within(unfiled).queryByRole('button', { name: /Show more/ })).not.toBeInTheDocument()
+    await waitFor(() => expect(within(unfiled).getAllByRole('link')[4]).toHaveFocus())
+  })
+
+  it('never shows "Show more" over a section with no rows while it asks for the page after one of pinned documents', async () => {
+    const seen: { links: number; more: number }[] = []
+    const observer = new MutationObserver(() => {
+      const research = [...document.querySelectorAll('h2')]
+        .find((title) => title.textContent === 'Research')
+        ?.closest('section')
+      if (research === undefined || research === null || research.closest('[hidden]') !== null) return
+      seen.push({
+        links: research.querySelectorAll('a').length,
+        more: [...research.querySelectorAll('button')].filter((button) => /Show more/.test(button.ariaLabel ?? ''))
+          .length,
+      })
+    })
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+    renderScreen('/documents', { wrap: slow(1) })
+    await heading()
+
+    expect(await within(await section('Research')).findByRole('link', { name: interviewsSpanish.title })).toBeVisible()
+    observer.disconnect()
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.filter((state) => state.more > 0 && state.links === 0)).toEqual([])
+  })
+
+  it('never shows "Show more" over no rows when the only row of a section is pinned and more pages are left', async () => {
+    const seen: { links: number; more: number }[] = []
+    const observer = new MutationObserver(() => {
+      const unfiled = [...document.querySelectorAll('h2')]
+        .find((title) => title.textContent === 'No folder')
+        ?.closest('section')
+      if (unfiled === undefined || unfiled === null || unfiled.closest('[hidden]') !== null) return
+      seen.push({
+        links: unfiled.querySelectorAll('a').length,
+        more: [...unfiled.querySelectorAll('button')].filter((button) => /Show more/.test(button.ariaLabel ?? ''))
+          .length,
+      })
+    })
+    const { user } = renderScreen('/documents', { wrap: slow(1) })
+    await heading()
+    const unfiledSection = await section('No folder')
+    // One document is on the page and more are left: pinning it leaves the page with no row to show.
+    await within(unfiledSection).findByRole('link', { name: weeklySpanish.title })
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+
+    await user.click(within(unfiledSection).getByRole('button', { name: `Pin ${weeklySpanish.title}` }))
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('region', { name: 'Pinned' })).getByRole('link', { name: weeklySpanish.title }),
+      ).toBeVisible(),
+    )
+    await waitFor(() => expect(within(unfiledSection).getAllByRole('link').length).toBeGreaterThan(0))
+    observer.disconnect()
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.filter((state) => state.more > 0 && state.links === 0)).toEqual([])
+  })
+})
+
+describe('the folders that are open when the screen opens', () => {
+  const extra = ['Zeta 1', 'Zeta 2', 'Zeta 3', 'Zeta 4'].map((name, index) => ({
+    ...workspaceFixtures.productFolder,
+    id: `00000000-0000-4000-8000-00000000f00${index}`,
+    name,
+  }))
+  const asked: string[] = []
+  const withEightFolders = (dataSource: DataSource): DataSource => ({
+    ...dataSource,
+    listFolders: async (request) => {
+      const page = await dataSource.listFolders(request)
+      return { ...page, items: [...page.items, ...extra] }
+    },
+    listDocuments: async (request) => {
+      const folderId = request?.params.query?.folderId
+      if (folderId !== undefined) asked.push(folderId)
+      if (extra.some((folder) => folder.id === folderId)) return { items: [], nextCursor: null }
+      return dataSource.listDocuments(request)
+    },
+  })
+
+  it('are the first six: the others are folded, and ask for nothing until they are opened', async () => {
+    asked.length = 0
+    const { user } = renderScreen('/documents', { wrap: withEightFolders })
+    await heading()
+    await section('Zeta 4')
+
+    const toggle = (name: string) => within(main()).getByRole('button', { name })
+    expect(toggle('Zeta 2')).toHaveAttribute('aria-expanded', 'true')
+    expect(toggle('Zeta 3')).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle('Zeta 4')).toHaveAttribute('aria-expanded', 'false')
+    expect(asked).toEqual(expect.arrayContaining([workspaceFixtures.productFolder.id, extra[1]?.id]))
+    expect(asked).not.toContain(extra[2]?.id)
+    expect(asked).not.toContain(extra[3]?.id)
+
+    await user.click(toggle('Zeta 3'))
+
+    expect(toggle('Zeta 3')).toHaveAttribute('aria-expanded', 'true')
+    await waitFor(() => expect(asked).toContain(extra[2]?.id))
+    expect(asked).not.toContain(extra[3]?.id)
+    expect(await within(await section('Zeta 3')).findByText('No documents yet')).toBeInTheDocument()
+  })
+
+  it('are fixed by the first list: a folder created ahead of them does not fold one that is open', async () => {
+    asked.length = 0
+    const { user } = renderScreen('/documents', { wrap: withEightFolders })
+    await heading()
+    const lastOpen = () => within(main()).getByRole('button', { name: 'Zeta 2' })
+    await section('Zeta 2')
+    expect(lastOpen()).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(within(main()).getByRole('button', { name: 'More' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'New folder' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New folder' })
+    await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Alpha')
+    await user.click(within(dialog).getByRole('button', { name: 'Create folder' }))
+
+    const alpha = await within(main()).findByRole('button', { name: 'Alpha' })
+    expect(alpha).toHaveAttribute('aria-expanded', 'false')
+    expect(lastOpen()).toHaveAttribute('aria-expanded', 'true')
+  })
+})
+
+describe('the states of the Documents screen', () => {
+  it('shows the shape of the sections, with a spoken status, while the folders are on their way', async () => {
     let called = false
     renderScreen('/documents', {
       wrap: (dataSource) => ({
@@ -76,9 +506,10 @@ describe('the Documents screen', () => {
     await waitFor(() => expect(spoken()).toContain('Loading documents'))
     expect(screen.queryByText('No documents yet')).not.toBeInTheDocument()
     expect(within(main()).queryByRole('region')).not.toBeInTheDocument()
+    expect(main().querySelector('[aria-busy="true"] li')).not.toBeNull()
   })
 
-  it('keeps the headline, and the focus on it, from the loading state to the list', async () => {
+  it('keeps the headline, and the focus on it, from the loading state to the sections', async () => {
     const { router } = renderScreen('/shared')
     await screen.findByRole('heading', { level: 1, name: 'Shared' })
 
@@ -90,40 +521,81 @@ describe('the Documents screen', () => {
     expect(title).toHaveFocus()
   })
 
-  it('invites the person to create the first document when the workspace has none', async () => {
+  it('invites the person to create the first document when the workspace has no folder and no document', async () => {
     renderScreen('/documents', {
       wrap: (dataSource) => ({
         ...dataSource,
         listFolders: async () => ({ items: [] }),
+        listPinnedDocuments: async () => ({ items: [] }),
         listDocuments: async () => ({ items: [], nextCursor: null }),
       }),
     })
     await heading()
 
     expect(await screen.findByText('No documents yet')).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Folders' })).not.toBeInTheDocument()
+    expect(within(main()).queryByRole('region')).not.toBeInTheDocument()
     expect(within(main()).getAllByRole('button', { name: 'New document' })).toHaveLength(2)
   })
 
-  it('says it could not load, and loads again when asked to', async () => {
+  it('says a section could not load, loads it again when asked, and leaves the other sections as they are', async () => {
     let fail = true
     const { user } = renderScreen('/documents', {
       wrap: (dataSource) => ({
         ...dataSource,
         listDocuments: async (request) => {
-          if (fail) throw unavailable()
+          if (fail && request?.params.query?.folderId === workspaceFixtures.productFolder.id) throw unavailable()
           return dataSource.listDocuments(request)
         },
       }),
     })
     await heading()
+    const product = await section('Product')
 
-    expect(await within(main()).findByRole('alert')).toHaveTextContent("We couldn't load your documents")
-
+    expect(await within(product).findByRole('alert')).toHaveTextContent("We couldn't load these documents.")
+    expect(await within(await section('Research')).findByRole('link', { name: interviewsSpanish.title })).toBeVisible()
+    expect(within(await section('Pinned')).getAllByRole('link')).toHaveLength(2)
     fail = false
-    await user.click(within(main()).getByRole('button', { name: 'Try again' }))
+    await user.click(within(product).getByRole('button', { name: 'Try again to load Product' }))
 
-    expect(await within(main()).findByRole('link', { name: 'Autumn launch plan' })).toBeInTheDocument()
+    expect(await within(product).findByRole('link', { name: designReview.title })).toBeInTheDocument()
+    expect(within(product).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    {
+      read: 'the folders',
+      title: 'Folders',
+      retry: 'Try again to load Folders',
+      fails: 'listFolders',
+      stays: 'No folder',
+    },
+    {
+      read: 'the pinned documents',
+      title: 'Pinned',
+      retry: 'Try again to load Pinned',
+      fails: 'listPinnedDocuments',
+      stays: 'No folder',
+    },
+  ] as const)('says $read could not load, and the other sections stay', async ({ retry, fails, stays, title }) => {
+    let fail = true
+    const { user } = renderScreen('/documents', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        [fails]: async (request: never) => {
+          if (fail) throw unavailable()
+          return (dataSource[fails] as (request: never) => Promise<unknown>)(request)
+        },
+      }),
+    })
+    await heading()
+
+    expect(await within(main()).findByRole('alert')).toHaveTextContent("We couldn't load these documents.")
+    expect(await section(stays)).toBeInTheDocument()
+    expect(within(main()).getByRole('heading', { level: 2, name: title })).toBeVisible()
+    fail = false
+    await user.click(within(main()).getByRole('button', { name: retry }))
+
+    await waitFor(() => expect(within(main()).queryByRole('alert')).not.toBeInTheDocument())
   })
 
   it('says it could not load the workspace, and loads again when asked to', async () => {
@@ -147,6 +619,82 @@ describe('the Documents screen', () => {
   })
 })
 
+describe('searching the Documents screen', () => {
+  it('replaces the sections with the documents that match, and says how many', async () => {
+    const { user } = renderScreen('/documents')
+    await heading()
+    await section('Pinned')
+
+    await user.type(searchbox(), 'weekly')
+
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Pinned' })).not.toBeInTheDocument())
+    expect(
+      within(main())
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Weekly update — October 6'])
+    await waitFor(() => expect(spoken()).toContain('1 result'))
+  })
+
+  it('brings the sections back, as they were, when the search is cleared', async () => {
+    const { user } = renderScreen('/documents')
+    await heading()
+    await section('Pinned')
+    await user.type(searchbox(), 'weekly')
+    await screen.findByText('Weekly update — October 6')
+
+    await user.clear(searchbox())
+
+    expect(await section('Pinned')).toBeInTheDocument()
+    expect(await section('No folder')).toBeInTheDocument()
+  })
+
+  it('says so when nothing matches, and keeps the search for the person to change', async () => {
+    const { user } = renderScreen('/documents')
+    await heading()
+    await section('Pinned')
+
+    await user.type(searchbox(), 'zzzz')
+
+    expect(await screen.findByText('No results for “zzzz”')).toBeInTheDocument()
+    expect(searchbox()).toHaveValue('zzzz')
+  })
+
+  it('opens the results page with Enter, and does nothing with Enter on a field with nothing in it', async () => {
+    const { user, router } = renderScreen('/documents')
+    await heading()
+    await section('Pinned')
+    searchbox().focus()
+
+    await user.keyboard('{Enter}')
+    expect(router.state.location.pathname).toBe('/documents')
+    await user.type(searchbox(), 'weekly{Enter}')
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/search'))
+    expect(router.state.location.search).toBe('?q=weekly')
+  })
+
+  it('sends the search without the spaces around it, and never an empty one', async () => {
+    const queries: unknown[] = []
+    const { user } = renderScreen('/documents', {
+      wrap: changeLists(
+        (query) => (queries.push(query?.query), false),
+        (request) => request,
+      ),
+    })
+    await heading()
+    await section('Pinned')
+
+    await user.type(searchbox(), '  weekly  ')
+    await waitFor(() => expect(queries).toContain('weekly'))
+    await user.clear(searchbox())
+    await user.type(searchbox(), '   ')
+
+    expect(queries).not.toContain('  weekly  ')
+    expect(queries).not.toContain('')
+  })
+})
+
 describe('a person who belongs to no workspace', () => {
   it.each([
     { screen: 'Documents', path: '/documents' },
@@ -166,99 +714,6 @@ describe('a person who belongs to no workspace', () => {
     })
 
     expect(await screen.findByText('Aún no estás en ningún espacio de trabajo')).toBeInTheDocument()
-  })
-})
-
-describe('searching the Documents screen', () => {
-  it('lists only the documents that match, without the folders, and says how many', async () => {
-    const { user } = renderScreen('/documents')
-    await heading()
-    await screen.findByRole('link', { name: 'Autumn launch plan' })
-
-    await user.type(searchbox(), 'weekly')
-
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'Folders' })).not.toBeInTheDocument())
-    expect(
-      within(screen.getByRole('region', { name: 'All documents' }))
-        .getAllByRole('link')
-        .map((link) => link.textContent),
-    ).toEqual(['Weekly update — October 6'])
-    await waitFor(() => expect(spoken()).toContain('1 result'))
-  })
-
-  it('says so when nothing matches, and keeps the search for the person to change', async () => {
-    const { user } = renderScreen('/documents')
-    await heading()
-    await screen.findByRole('link', { name: 'Autumn launch plan' })
-
-    await user.type(searchbox(), 'zzzz')
-
-    expect(await screen.findByText('No results for “zzzz”')).toBeInTheDocument()
-    expect(searchbox()).toHaveValue('zzzz')
-  })
-
-  it('sends the search without the spaces around it, and never an empty one', async () => {
-    const queries: unknown[] = []
-    const { user } = renderScreen('/documents', {
-      wrap: (dataSource) => ({
-        ...dataSource,
-        listDocuments: (request) => {
-          queries.push(request?.params.query?.query)
-          return dataSource.listDocuments(request)
-        },
-      }),
-    })
-    await heading()
-    await screen.findByRole('link', { name: 'Autumn launch plan' })
-
-    await user.type(searchbox(), '  weekly  ')
-    await waitFor(() => expect(queries).toContain('weekly'))
-    await user.clear(searchbox())
-    await user.type(searchbox(), '   ')
-
-    expect(queries).not.toContain('  weekly  ')
-    expect(queries).not.toContain('')
-  })
-})
-
-describe('the pages of the Documents screen', () => {
-  const smallPages = (dataSource: Parameters<NonNullable<Parameters<typeof renderScreen>[1]>['wrap'] & object>[0]) => ({
-    ...dataSource,
-    listDocuments: (request: Parameters<typeof dataSource.listDocuments>[0]) =>
-      dataSource.listDocuments({
-        ...request,
-        params: {
-          path: { workspaceId: request?.params.path.workspaceId ?? '' },
-          query: { ...request?.params.query, limit: 4 },
-        },
-      }),
-  })
-
-  it('loads the next page when asked, and moves the focus to the first document that arrived', async () => {
-    const { user } = renderScreen('/documents', { wrap: smallPages })
-    await heading()
-    const documents = await screen.findByRole('region', { name: 'All documents' })
-    expect(await within(documents).findAllByRole('link')).toHaveLength(4)
-
-    await user.click(within(documents).getByRole('button', { name: 'Load more' }))
-
-    await waitFor(() => expect(within(documents).getAllByRole('link').length).toBeGreaterThan(4))
-    await waitFor(() => expect(within(documents).getAllByRole('link')[4]).toHaveFocus())
-  })
-
-  it('stops offering more once the last page is in', async () => {
-    const { user } = renderScreen('/documents', { wrap: smallPages })
-    await heading()
-    const documents = await screen.findByRole('region', { name: 'All documents' })
-
-    // Ten documents in pages of four: two clicks reach the end.
-    await user.click(await within(documents).findByRole('button', { name: 'Load more' }))
-    await waitFor(() => expect(within(documents).getAllByRole('link')).toHaveLength(8))
-    await user.click(within(documents).getByRole('button', { name: 'Load more' }))
-
-    await waitFor(() => expect(within(documents).getAllByRole('link')).toHaveLength(10))
-    expect(within(documents).queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
-    expect(document.body).not.toHaveFocus()
   })
 })
 
@@ -313,41 +768,16 @@ describe('the Documents screen in Spanish', () => {
     const { user } = renderScreen('/documents')
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Documentos' })).toBeInTheDocument()
-    expect(await screen.findByText('Actualizado el 13 oct 2026')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Fijados' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Sin carpeta' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Nuevo documento' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Más' })).toBeInTheDocument()
+    const updated = new Intl.DateTimeFormat('es', { dateStyle: 'medium', timeStyle: 'short' }).format(
+      new Date(launchPlan.updatedAt),
+    )
+    expect(screen.getAllByText(updated).length).toBeGreaterThan(0)
 
     await user.type(screen.getByRole('searchbox', { name: 'Buscar documentos' }), 'semanal')
     await waitFor(() => expect(spoken()).toContain('1 resultado'))
-  })
-})
-
-describe('the search typed while "Load more" is on its way', () => {
-  it('keeps the focus and what was typed in the search field when the results come in', async () => {
-    let release = () => {}
-    const held = new Promise<void>((resolve) => (release = resolve))
-    const { user } = renderScreen('/documents', {
-      wrap: (dataSource) => ({
-        ...dataSource,
-        listDocuments: async (request) => {
-          if (request?.params.query?.cursor !== undefined) await held
-          return dataSource.listDocuments({
-            params: {
-              path: { workspaceId: request?.params.path.workspaceId ?? '' },
-              query: { ...request?.params.query, limit: 4 },
-            },
-          })
-        },
-      }),
-    })
-    const documents = await screen.findByRole('region', { name: 'All documents' })
-    await user.click(await within(documents).findByRole('button', { name: 'Load more' }))
-
-    await user.type(searchbox(), 'weekly')
-
-    await waitFor(() => expect(within(documents).getAllByRole('link')).toHaveLength(1))
-    expect(searchbox()).toHaveValue('weekly')
-    expect(searchbox()).toHaveFocus()
-    await act(async () => release())
-    expect(searchbox()).toHaveFocus()
   })
 })

@@ -6,14 +6,6 @@ import { documentListQuery, retryTransportOnce } from '../documents/queries.ts'
 /** How many documents "Pick up where you left off" shows. */
 export const recentDocumentCount = 3
 
-/** The documents the person pinned and can still read, most recently changed first, each with its excerpt. */
-export const pinnedDocumentsQuery = (dataSource: DataSource, workspaceId: string) =>
-  queryOptions({
-    queryKey: queryKeys.pinned(workspaceId),
-    queryFn: () => dataSource.listPinnedDocuments({ params: { path: { workspaceId } } }),
-    retry: retryTransportOnce,
-  })
-
 /** The documents changed most recently: the first page of the list, which the contract orders by `updatedAt`. */
 export const recentDocumentsQuery = (dataSource: DataSource, workspaceId: string) =>
   documentListQuery(dataSource, workspaceId, { limit: recentDocumentCount })
