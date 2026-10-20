@@ -39,7 +39,7 @@ describe('the sign-in screen', () => {
     const { user, router } = renderSignedOut('/search?q=budget')
     await screen.findByRole('heading', { level: 1, name: 'Sign in' })
 
-    await user.click(screen.getByRole('link', { name: 'Create an account' }))
+    await user.click(screen.getByRole('link', { name: 'Create account' }))
 
     expect(router.state.location.pathname).toBe('/sign-up')
     expect(router.state.location.state).toEqual({ from: '/search?q=budget' })
@@ -192,6 +192,17 @@ describe('what the server refuses', () => {
     expect(emailField()).toHaveValue(marta.email)
   })
 
+  it('says it below the button, so that the fields and the button stay where they were', async () => {
+    const { user } = await open()
+    await user.type(emailField(), marta.email)
+    await user.type(passwordField(), 'not the password at all')
+
+    await user.click(submit())
+
+    const alert = await screen.findByRole('alert')
+    expect(submit().compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('says it again, as an alert, when the second attempt fails in the same way', async () => {
     const { user } = await open()
     await user.type(emailField(), marta.email)
@@ -244,9 +255,13 @@ describe('the sign-in screen in Spanish', () => {
       'Escribe tu correo electrónico.',
     )
     expect(screen.getByLabelText('Contraseña')).toHaveAccessibleDescription('Escribe tu contraseña.')
-    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Crea una cuenta' })).toBeInTheDocument()
-    // Without a grammatical gender, as the rest of the catalogue.
-    expect(screen.getByRole('main')).toHaveTextContent('¿Primera vez en Draftroom?')
+    const pair = screen.getByRole('navigation', { name: 'Entrar o crear una cuenta' })
+    expect(within(pair).getByRole('link', { name: 'Iniciar sesión' })).toHaveAttribute('aria-current', 'page')
+    expect(within(pair).getByRole('link', { name: 'Crear cuenta' })).not.toHaveAttribute('aria-current')
+    expect(
+      screen.getByText('Escribe, comenta y comparte documentos con las personas con las que trabajas.'),
+    ).toBeVisible()
+    expect(screen.getByText('Se guarda cada versión')).toBeInTheDocument()
     localStorage.clear()
   })
 })

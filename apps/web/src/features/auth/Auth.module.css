@@ -1,13 +1,26 @@
-.card {
+/* Narrow first: the brand above the form. From the desktop width they stand side by side, the form with the room it needs. */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.formSide {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-width: 0;
+  padding: var(--space-32) var(--space-24);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+/* Aligned to the top so that what appears in the form moves nothing that was there. */
+.formColumn {
   display: flex;
   flex-direction: column;
   gap: var(--space-24);
-  /* The width the product gives a panel that stands alone on the page. */
   inline-size: min(100%, var(--layout-notice-width));
-  padding: var(--space-32);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-panel);
-  background: var(--color-surface);
 }
 
 .description {
@@ -22,24 +35,19 @@
   gap: var(--space-16);
 }
 
+/* After the button: a refusal arrives below what the person was using, and the fields and the button stay where they were. */
 .problem {
   margin: 0;
   color: var(--color-red-ink);
   font: var(--font-body);
 }
 
-.footer {
-  margin: 0;
-  color: var(--color-muted);
-  font: var(--font-body);
-}
+@media (width >= 1280px) {
+  .split {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  }
 
-.footer a {
-  color: var(--color-link);
-}
-
-.footer a:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: var(--space-2);
-  border-radius: var(--radius-small);
+  .formSide {
+    padding: calc(var(--space-48) * 2) var(--space-48) var(--space-48);
+  }
 }

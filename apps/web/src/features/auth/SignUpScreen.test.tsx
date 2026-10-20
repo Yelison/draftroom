@@ -230,6 +230,8 @@ describe('the sign-up screen in Spanish', () => {
 
     expect(screen.getByRole('textbox', { name: 'Nombre' })).toHaveAccessibleDescription('Escribe tu nombre.')
     expect(screen.getByLabelText('Contraseña')).toHaveAccessibleDescription(/Al menos 12 caracteres/)
+    expect(screen.getByText('Un espacio propio desde el primer día')).toBeInTheDocument()
+    expect(screen.getByText(/Al crear tu cuenta empiezas en un espacio propio, con tu nombre/)).toBeInTheDocument()
     localStorage.clear()
   })
 })
