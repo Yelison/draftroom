@@ -24,14 +24,7 @@ export function CompactThread({ thread, state, onActivate }: CompactThreadProps)
   const replies = Math.max(0, thread.comments.length - 1)
 
   return (
-    <button
-      type="button"
-      className={styles.compact}
-      data-thread-id={thread.id}
-      data-state={state}
-      aria-expanded="false"
-      onClick={onActivate}
-    >
+    <button type="button" className={styles.compact} data-thread-id={thread.id} data-state={state} onClick={onActivate}>
       {state !== 'open' && (
         <Badge tone={state === 'resolved' ? 'green' : 'amber'} className={styles.badge}>
           {intl.formatMessage({ id: `comments.card.state.${state}` })}

@@ -80,6 +80,12 @@ export function renderCommentedDocument({
 export const findMargin = () =>
   screen.findByRole('complementary', { name: /Comments in the margin|Comentarios al margen/ })
 
+/** The compact cards of the margin: the threads that are not the one the person is on, each of which is one button. */
+export const compactThreads = (margin: HTMLElement) =>
+  within(margin)
+    .queryAllByRole('button')
+    .filter((button) => button.dataset['threadId'] !== undefined)
+
 /** The element of a thread that says `text`: its compact card until it is the active one, its whole card after. */
 export const threadOf = (margin: HTMLElement, text: string) =>
   within(margin).getByText(text, { exact: false }).closest<HTMLElement>('[data-thread-id]') as HTMLElement

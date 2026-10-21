@@ -41,6 +41,30 @@ describe('the comments margin showing and hiding', () => {
     expect(screen.getByText('Comments shown')).toBeInTheDocument()
   })
 
+  it('says in its tooltip, which describes it, the key that comments on the selection', async () => {
+    const user = userEvent.setup()
+    renderCommentedDocument({ paragraphs })
+    const button = await toggle()
+
+    await user.hover(button)
+
+    const tooltip = await screen.findByRole('tooltip')
+    expect(tooltip).toHaveTextContent('Hide comments. Ctrl+Alt+M comments on the selected text.')
+    expect(button).toHaveAccessibleDescription(/Ctrl\+Alt\+M comments on the selected text/)
+  })
+
+  it('says it in Spanish too', async () => {
+    localStorage.setItem(localeStorageKey, 'es')
+    const user = userEvent.setup()
+    renderCommentedDocument({ paragraphs })
+
+    await user.hover(await screen.findByRole('button', { name: /^Comentarios/ }))
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Ocultar comentarios. Ctrl+Alt+M comenta el texto seleccionado.',
+    )
+  })
+
   it('says it in Spanish, with the number of open threads in the name of the button', async () => {
     localStorage.setItem(localeStorageKey, 'es')
     const user = userEvent.setup()

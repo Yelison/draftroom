@@ -3,7 +3,9 @@ import { IconButton, Tooltip } from '@yelison/forma-ui'
 import { useState } from 'react'
 import { useIntl } from 'react-intl'
 import { useDataSource } from '../../data/useDataSource.ts'
+import { shortcutLabel } from '../editor/shortcuts.ts'
 import { commentsMarginId, useCommentsView } from './commentsView.ts'
+import { commentShortcut } from './highlightPlugin.ts'
 import { threadsQuery } from './queries.ts'
 import styles from './CommentsToggle.module.css'
 
@@ -26,9 +28,11 @@ export function CommentsToggle({ documentId }: { documentId: string }) {
   return (
     <span className={styles.toggle}>
       <Tooltip
-        content={intl.formatMessage({ id: 'comments.toggle.tooltip' }, { state })}
+        content={intl.formatMessage(
+          { id: 'comments.toggle.tooltip' },
+          { state, shortcut: shortcutLabel(commentShortcut) },
+        )}
         placement="bottom-end"
-        describe={false}
       >
         {(trigger) => (
           <IconButton

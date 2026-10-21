@@ -7,7 +7,13 @@ import { ApiError, TransportError } from '../../data/errors.ts'
 import { sofia } from '../../data/mock/fixtures/index.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { budget, people } from '../editor/testing/renderEditor.tsx'
-import { findMargin, openThread, renderCommentedDocument, threadOf } from './testing/openCommentedDocument.tsx'
+import {
+  compactThreads,
+  findMargin,
+  openThread,
+  renderCommentedDocument,
+  threadOf,
+} from './testing/openCommentedDocument.tsx'
 import { commentsGrace } from './useCommentsArrived.ts'
 
 /** A data source whose threads are what the test says, or whose request fails or waits. */
@@ -99,7 +105,7 @@ describe('the threads of the margin', () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs, fixtureThreads: false, started: [first, second] })
     const margin = await findMargin()
-    await waitFor(() => expect(within(margin).getAllByRole('button', { expanded: false })).toHaveLength(2))
+    await waitFor(() => expect(compactThreads(margin)).toHaveLength(2))
     expect(within(margin).queryByRole('article')).not.toBeInTheDocument()
 
     const card = await openThread(user, margin, 'First thread')
@@ -306,7 +312,7 @@ describe('open and resolved threads, with a filter', () => {
       ['Resolved (1)', 'false'],
       ['All (2)', 'false'],
     ])
-    expect(within(margin).getAllByRole('button', { expanded: false })).toHaveLength(1)
+    expect(compactThreads(margin)).toHaveLength(1)
     expect(within(margin).getByText(signedOff)).toBeInTheDocument()
   })
 
@@ -330,7 +336,7 @@ describe('open and resolved threads, with a filter', () => {
 
     await user.click(await screen.findByRole('button', { name: /^All \(/ }))
 
-    await waitFor(() => expect(within(margin).getAllByRole('button', { expanded: false })).toHaveLength(2))
+    await waitFor(() => expect(compactThreads(margin)).toHaveLength(2))
   })
 
   it('says there are none of the kind the filter asks for, while others exist', async () => {
@@ -346,7 +352,7 @@ describe('open and resolved threads, with a filter', () => {
 
     expect(await within(margin).findByText('No open comments')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open (0)' })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(margin).queryByRole('button', { expanded: false })).not.toBeInTheDocument()
+    expect(compactThreads(margin)).toHaveLength(0)
   })
 })
 
