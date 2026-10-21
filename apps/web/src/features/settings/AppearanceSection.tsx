@@ -64,7 +64,7 @@ export function AppearanceSection({ textSize }: { textSize: Schema<'EditorTextSi
         {spoken === 'theme' &&
           intl.formatMessage({ id: 'settings.appearance.theme.announcement' }, { theme: preference })}
       </p>
-      <FormStatus saved={update.isSuccess ? 'settings.appearance.textSize.saved' : null} failure={null} />
+      <FormStatus saved={update.isSuccess ? 'settings.appearance.textSize.saved' : null} />
     </section>
   )
 }

@@ -7,7 +7,7 @@ export interface FormStatusProps {
   /** What the live region says: set once the server has stored the change, and nothing before. Left out where the screen announces by other means. */
   saved?: MessageId | null
   /** Why the change was not stored; the message is chosen from the refusal's `code`, in the language of the app. */
-  failure: Error | null
+  failure?: Error | null
   /** What a refusal says in this screen's own words instead of the common one (the last owner, a person already in). */
   explain?: (failure: Error) => MessageId | undefined
 }
@@ -26,7 +26,7 @@ export function FormStatus({ saved, failure, explain }: FormStatusProps) {
           {saved !== null && intl.formatMessage({ id: saved })}
         </p>
       )}
-      {failure !== null && (
+      {failure !== null && failure !== undefined && (
         <p role="alert" className={styles.problem}>
           {intl.formatMessage({ id: explain?.(failure) ?? problemMessageId(failure) })}
         </p>

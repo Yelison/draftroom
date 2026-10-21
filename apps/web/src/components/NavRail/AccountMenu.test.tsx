@@ -62,6 +62,16 @@ describe('the menu of the person in the rail', () => {
     expect(screen.queryByRole('dialog', { name: 'Settings' })).not.toBeInTheDocument()
   })
 
+  it('puts the Settings dialog outside the navigation landmark', async () => {
+    const { user } = renderScreen('/documents')
+    await user.click(await person())
+    await user.click(within(await menu()).getByRole('menuitem', { name: 'Settings' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Settings' })
+
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).not.toContainElement(dialog)
+  })
+
   it('ends the session from Sign out, and the person lands on the sign-in page', async () => {
     const { user, router } = renderScreen('/documents')
     await user.click(await person())

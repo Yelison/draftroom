@@ -70,7 +70,7 @@ export function SettingsDialog({ section, onClose }: SettingsDialogProps) {
             <ProfileSection me={data.me} form={form} />
             <AppearanceSection textSize={data.me.editorTextSize} />
             {data.workspace !== null && <WorkspaceSection form={form} />}
-            <FormStatus saved={form.saved ? 'settings.saved' : null} failure={null} />
+            <FormStatus saved={form.saved ? 'settings.saved' : null} />
           </form>
         )}
       </div>
