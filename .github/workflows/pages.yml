@@ -1,4 +1,4 @@
-name: Demo build
+name: Demo build and publish
 
 # Builds the static demo for GitHub Pages and checks it. On a pull request that is all it does. On `main` (a push, or a
 # manual run) the very bundle that was checked is then published to the `github-pages` environment: the deploy job is
@@ -31,9 +31,10 @@ on:
 permissions:
   contents: read
 
+# A newer pull request push replaces the run in progress, but a run on `main` is never cut short: it may be publishing.
 concurrency:
   group: demo-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   demo-build:
@@ -60,13 +61,13 @@ jobs:
           path: apps/web/dist-demo/
           if-no-files-found: error
           retention-days: 7
-      # The Pages artifact is made here, from the directory that was just checked, so the deploy job publishes that
-      # bundle and does not build another. `404.html` is the SPA fallback: Pages serves it for client-side routes.
+      # `404.html` is the SPA fallback: Pages serves it for client-side routes, so a pull request checks it too.
       - name: Check the single-page fallback
-        if: github.event_name != 'pull_request'
         run: cmp apps/web/dist-demo/index.html apps/web/dist-demo/404.html
+      # The Pages artifact is made here, from the directory that was just checked, so the deploy job publishes that
+      # bundle and does not build another. It is made under the same condition as the deploy job.
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
           path: apps/web/dist-demo/
       # Only a failure leaves something to read: the traces Playwright keeps for the tests that failed.
