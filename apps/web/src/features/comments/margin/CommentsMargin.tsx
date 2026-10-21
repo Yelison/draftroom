@@ -116,6 +116,8 @@ export function CommentsMargin({ editor, provider, document, personId, requests 
     trailing,
     labelled: hasOrphans,
     beside: beside && marginShown,
+    // The comment being written is as tall as the active thread and has the same claim to be level with its text.
+    activeId: draft !== null && draftFrom !== null ? draftId : activeThreadId,
   })
 
   const shownCount = arranged.placed.length + arranged.orphaned.length + arranged.waiting.length

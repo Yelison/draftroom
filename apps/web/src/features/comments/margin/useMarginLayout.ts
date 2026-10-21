@@ -24,6 +24,8 @@ export interface MarginLayoutInput {
   labelled: boolean
   /** Whether the margin is beside the text; below the width of a desktop it follows the text and nothing is measured. */
   beside: boolean
+  /** The card of the thread the person is on, or of the comment they are writing: it stays level with its text. */
+  activeId: string | null
 }
 
 /**
@@ -36,7 +38,7 @@ export interface MarginLayoutInput {
  * changes size: a reply being written, the active thread, a line that wraps, the error of the title. The observers measure on the next frame, not inside the
  * notification, which the browser would otherwise report as a loop.
  */
-export function useMarginLayout({ editor, margin, placed, trailing, labelled, beside }: MarginLayoutInput) {
+export function useMarginLayout({ editor, margin, placed, trailing, labelled, beside, activeId }: MarginLayoutInput) {
   const [plan, setPlan] = useState<MarginPlan | null>(null)
   const cards = useRef(new Map<string, HTMLElement>())
   const label = useRef<HTMLElement | null>(null)
@@ -58,6 +60,7 @@ export function useMarginLayout({ editor, margin, placed, trailing, labelled, be
         placed,
         trailing,
         labelled,
+        activeId,
       })
       if (layout === null) return
       if (!sameGaps(appliedGaps.current, layout.gaps)) {
@@ -78,7 +81,7 @@ export function useMarginLayout({ editor, margin, placed, trailing, labelled, be
       return
     }
     measure()
-  }, [editor, margin, placed, trailing, labelled, beside])
+  }, [editor, margin, placed, trailing, labelled, beside, activeId])
 
   useEffect(() => {
     if (!beside || typeof ResizeObserver === 'undefined') return
@@ -142,13 +145,17 @@ function measureMargin({
   placed,
   trailing,
   labelled,
-}: Pick<MarginLayoutInput, 'editor' | 'placed' | 'trailing' | 'labelled'> & {
+  activeId,
+}: Pick<MarginLayoutInput, 'editor' | 'placed' | 'trailing' | 'labelled' | 'activeId'> & {
   element: HTMLElement
   cards: ReadonlyMap<string, HTMLElement>
   label: HTMLElement | null
 }): MarginLayout | null {
   const origin = element.getBoundingClientRect().top
-  const spacing = Number.parseFloat(getComputedStyle(element).rowGap) || 0
+  const style = getComputedStyle(element)
+  const spacing = Number.parseFloat(style.rowGap) || 0
+  // How far a card may be below its text before the text opens room: two lines, which is the token of that size.
+  const tolerance = Number.parseFloat(style.getPropertyValue('--space-48')) || 0
   const opened = [...editor.view.dom.children].flatMap((block) => {
     const gap = Number(block.getAttribute(commentGapAttribute))
     return gap > 0 ? [{ bottom: block.getBoundingClientRect().bottom, gap }] : []
@@ -179,6 +186,8 @@ function measureMargin({
     cards: measured,
     orphans,
     spacing,
+    tolerance,
+    activeId,
     orphanLabelHeight: labelled ? Math.round(label?.offsetHeight ?? 0) : 0,
   })
 }

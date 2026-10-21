@@ -6,8 +6,15 @@ const labelHeight = 24
 
 const card = (id: string, block: number, top: number, height = 80): MarginCard => ({ id, block, top, height })
 
-const place = (cards: MarginCard[], rest: Partial<PlaceMarginInput> = {}) =>
-  placeMargin({ cards, orphans: [], spacing, orphanLabelHeight: labelHeight, ...rest })
+const place = (cards: MarginCard[], rest: Partial<Pick<PlaceMarginInput, 'orphans' | 'tolerance' | 'activeId'>> = {}) =>
+  placeMargin({
+    cards,
+    orphans: rest.orphans ?? [],
+    spacing,
+    tolerance: rest.tolerance ?? 0,
+    activeId: rest.activeId ?? null,
+    orphanLabelHeight: labelHeight,
+  })
 
 const topsOf = (cards: MarginCard[], rest?: Partial<PlaceMarginInput>) => Object.fromEntries(place(cards, rest).tops)
 
@@ -57,6 +64,65 @@ describe('placeMargin', () => {
 
   it('keeps the order of the text for two anchors at the same height', () => {
     expect(topsOf([card('a', 0, 50), card('b', 0, 50)])).toEqual({ a: 50, b: 50 + 80 + spacing })
+  })
+
+  describe('the room above the card the person is on', () => {
+    it('is used before the text opens room below: the cards above go up and the active one stays level with its text', () => {
+      // a ends at 180 and the active card's anchor is at 150: a goes up by the 38 px it is short of, and nothing else moves.
+      const { tops, gaps } = place([card('a', 0, 100), card('b', 1, 150, 200)], { activeId: 'b' })
+
+      expect(Object.fromEntries(tops)).toEqual({ a: 62, b: 150 })
+      expect(gaps.size).toBe(0)
+    })
+
+    it('goes as far up as there is room, and the text gives way only for what is left', () => {
+      // a is 150 px tall and only has 20 px above it: it goes up to the top of the margin, and the other 8 px that the active
+      // card is short of are room that the text opens after the block of a.
+      const { tops, gaps } = place([card('a', 0, 20, 150), card('b', 1, 150, 200)], { activeId: 'b' })
+
+      expect(Object.fromEntries(tops)).toEqual({ a: 0, b: 158 })
+      expect(Object.fromEntries(gaps)).toEqual({ 0: 8 })
+    })
+
+    it('takes with it every card above that is in its way, each as far as the one under it needs', () => {
+      // c is short of 18 px: b goes up by them, and a, which would then be too close to b, goes up 6 px.
+      const { tops, gaps } = place([card('a', 0, 60, 50), card('b', 1, 130, 50), card('c', 2, 170, 100)], {
+        activeId: 'c',
+      })
+
+      expect(Object.fromEntries(tops)).toEqual({ a: 54, b: 112, c: 170 })
+      expect(gaps.size).toBe(0)
+    })
+
+    it('moves nothing above for a card that is not the active one', () => {
+      const { tops } = place([card('a', 0, 100), card('b', 1, 150, 200)], { activeId: 'a' })
+
+      expect(Object.fromEntries(tops)).toEqual({ a: 100, b: 188 })
+    })
+  })
+
+  describe('the push that does not open room', () => {
+    it('lets the next card, of another block, go down by up to the tolerance without opening a gap', () => {
+      const { tops, gaps } = place([card('a', 0, 100), card('b', 1, 150)], { tolerance: 48 })
+
+      expect(Object.fromEntries(tops)).toEqual({ a: 100, b: 188 })
+      expect(gaps.size).toBe(0)
+    })
+
+    it('opens only what is beyond the tolerance', () => {
+      // b is short of 68 px; 48 are the tolerance and the text opens the other 20.
+      const { tops, gaps } = place([card('a', 0, 100), card('b', 1, 120)], { tolerance: 48 })
+
+      expect(Object.fromEntries(tops)).toEqual({ a: 100, b: 188 })
+      expect(Object.fromEntries(gaps)).toEqual({ 0: 20 })
+    })
+
+    it('carries what it opened to the cards after it', () => {
+      const { tops } = place([card('a', 0, 100), card('b', 1, 120), card('c', 2, 400)], { tolerance: 48 })
+
+      // c's anchor went down by the 20 px of the gap.
+      expect(tops.get('c')).toBe(420)
+    })
   })
 
   describe('orphans', () => {
