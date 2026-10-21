@@ -44,6 +44,16 @@ describe('saving the title', () => {
     await waitFor(() => expect(text).toHaveFocus())
   })
 
+  it('is a line of text that wraps, so a line break that is pasted into it becomes a space', async () => {
+    const { user } = await openEditor()
+    await user.clear(title())
+
+    await user.click(title())
+    await user.paste('Winter\nlaunch\r\n  plan')
+
+    expect(title()).toHaveValue('Winter launch plan')
+  })
+
   it('does not send a title that did not change, or only changed in its spaces', async () => {
     const { calls, wrap } = spyOnUpdates()
     const { user } = await openEditor({ wrap })

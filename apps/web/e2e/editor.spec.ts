@@ -900,6 +900,39 @@ test.describe('the band with a wider font', () => {
   }
 })
 
+// The title is the heading of the document, so it is never cut: a title that does not fit in the width of the sheet wraps.
+for (const locale of ['en-US', 'es-ES'] as const) {
+  test.describe(`a long title in ${locale}`, () => {
+    test.use({ locale, viewport: { width: 1280, height: 800 } })
+
+    test('wraps in the sheet that the margin leaves at 1280 px and cuts nothing', async ({ page }) => {
+      await page.goto(documentPath)
+      await textArea(page).waitFor()
+      const title = page.getByRole('textbox', { name: /Document title|Título del documento/ })
+      const oneLine = (await title.boundingBox())?.height ?? Number.NaN
+      await title.fill(
+        'Plan de lanzamiento de otoño para toda la campaña de octubre, con sus fechas y sus responsables',
+      )
+      await title.blur()
+
+      // Wider than the field in one line, so it takes more lines, and what it holds fits in it.
+      const box = await title.evaluate((element) => ({
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+        scrollHeight: element.scrollHeight,
+        clientHeight: element.clientHeight,
+      }))
+      expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth)
+      expect(box.scrollHeight).toBeLessThanOrEqual(box.clientHeight)
+      expect((await title.boundingBox())?.height).toBeGreaterThan(oneLine)
+      // The text does not start under the title, and the cards of the margin follow it down.
+      const text = await textArea(page).boundingBox()
+      const titleBox = await title.boundingBox()
+      expect(text?.y).toBeGreaterThanOrEqual((titleBox?.y ?? 0) + (titleBox?.height ?? 0))
+    })
+  })
+}
+
 test.describe('the layout', () => {
   for (const width of [1440, 1280]) {
     test.describe(`at ${width} px`, () => {

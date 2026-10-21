@@ -91,7 +91,7 @@ export function useMarginLayout({ editor, margin, placed, trailing, labelled, be
     created.observe(editor.view.dom)
     // What is beside the margin, the sheet and what is over the stage: what changes height above the text (the error of the
     // title, a notice) moves the text without changing the size of the text, of a card or of the margin.
-    for (const part of margin.current?.parentElement?.children ?? []) created.observe(part)
+    watchBeside(created, margin)
     for (const card of cards.current.values()) created.observe(card)
     if (label.current !== null) created.observe(label.current)
     return () => {
@@ -99,7 +99,7 @@ export function useMarginLayout({ editor, margin, placed, trailing, labelled, be
       created.disconnect()
       observer.current = null
     }
-  }, [beside, editor])
+  }, [beside, editor, margin])
 
   /** The reference of the element of a card, which the layout measures and watches. */
   const registerCard = useCallback(
@@ -122,6 +122,11 @@ export function useMarginLayout({ editor, margin, placed, trailing, labelled, be
   }, [])
 
   return { plan, registerCard, registerLabel }
+}
+
+/** Watches what is beside the margin in the stage: the sheet, and what is over it. */
+function watchBeside(observer: ResizeObserver, margin: RefObject<HTMLElement | null>) {
+  for (const part of margin.current?.parentElement?.children ?? []) observer.observe(part)
 }
 
 /**
