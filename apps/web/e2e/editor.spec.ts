@@ -1168,15 +1168,14 @@ test.describe('one scroll', () => {
           0,
         ),
       )
-    const compact = await room()
-
     await marginOf(page).locator('[data-thread-id]').filter({ hasText: 'About the second' }).click()
     const active = marginOf(page).getByRole('article')
     await expect(active).toBeVisible()
 
     // The whole card, with its conversation, a reply of one line and Resolve: no taller than a card of the preview with two comments.
     expect((await active.boundingBox())?.height).toBeLessThanOrEqual(240)
-    await expect.poll(room).toBeLessThanOrEqual(compact + 130)
+    // 137 px of room in all with the three rules; 185 without the tolerance and 200 without the room above.
+    await expect.poll(room).toBeLessThanOrEqual(160)
   })
 
   // What changes the height of something above the text (the error of the title) moves the text and nothing the margin watches
