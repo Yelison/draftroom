@@ -132,7 +132,9 @@ export function CommentItem({ comment, mayEdit, mayDelete, isLast, onEdit, onDel
       )}
 
       {mode === 'view' && (mayEdit || mayDelete) && (
-        <div className={styles.actions}>
+        // Over the end of the header, where the date is, while the pointer or the focus is on the comment: they take no row of
+        // their own, and they are in the page and in the order of the Tab key all the same.
+        <div className={styles.rowActions}>
           {mayEdit && (
             <Button
               ref={editButton}

@@ -16,6 +16,11 @@ export interface CommentFieldProps {
   problem: BodyProblem | null
   /** Why the last attempt to send it failed, which is a message of the person's language. */
   failure: string | null
+  /**
+   * A line while it is empty and not in use, which is the height of a reply that is not being written, and its whole height
+   * once it has the focus or something in it. It needs a placeholder: that is how the style knows it is empty.
+   */
+  placeholder?: string
   ref?: Ref<HTMLTextAreaElement>
 }
 
@@ -31,6 +36,7 @@ export function CommentField({
   onSubmit,
   problem,
   failure,
+  placeholder,
   ref,
 }: CommentFieldProps) {
   const intl = useIntl()
@@ -45,8 +51,9 @@ export function CommentField({
         <textarea
           {...control}
           ref={ref}
-          className={styles.field}
-          rows={3}
+          className={placeholder === undefined ? styles.field : `${styles.field} ${styles.collapsible}`}
+          rows={placeholder === undefined ? 3 : 1}
+          {...(placeholder === undefined ? {} : { placeholder })}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {

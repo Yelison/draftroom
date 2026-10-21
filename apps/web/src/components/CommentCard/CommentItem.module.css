@@ -1,4 +1,5 @@
 .comment {
+  position: relative;
   display: grid;
   gap: var(--space-4);
 }
@@ -49,4 +50,21 @@
   margin: 0;
   color: var(--color-red-ink);
   font: var(--font-caption);
+}
+
+/* Edit and Delete: over the end of the header, shown for the pointer and for the keyboard, and as the card has its background. */
+.rowActions {
+  position: absolute;
+  inset-block-start: calc(var(--space-4) * -1);
+  inset-inline-end: 0;
+  display: flex;
+  gap: var(--space-4);
+  padding-inline-start: var(--space-8);
+  background: var(--card-background, var(--color-surface));
+  opacity: 0;
+}
+
+.comment:hover .rowActions,
+.comment:focus-within .rowActions {
+  opacity: 1;
 }

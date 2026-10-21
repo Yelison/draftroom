@@ -202,13 +202,60 @@ describe('replying', () => {
     expect(actions.reply).toHaveBeenCalledWith('Thursday works')
   })
 
-  it('asks for something to send, without calling the server', async () => {
+  describe('the key that takes the person back to the text', () => {
+    it('is announced on the card of a thread that has text to go back to: the key and what it does', () => {
+      renderCard({ onShowInText: vi.fn() })
+
+      const card = screen.getByRole('article')
+
+      expect(card).toHaveAttribute('aria-keyshortcuts', 'Escape')
+      expect(card).toHaveAccessibleDescription('Esc returns to the text')
+    })
+
+    it('is announced in Spanish too', () => {
+      renderCard({ onShowInText: vi.fn() }, actionsThat(), 'es')
+
+      expect(screen.getByRole('article')).toHaveAccessibleDescription('Esc te devuelve al texto')
+    })
+
+    it('is not announced where there is no text to go back to', () => {
+      renderCard({ state: 'orphaned' })
+
+      const card = screen.getByRole('article')
+
+      expect(card).not.toHaveAttribute('aria-keyshortcuts')
+      expect(card).not.toHaveAccessibleDescription(/Esc/)
+    })
+  })
+
+  it('offers the button that sends the reply only once there is something to send', async () => {
+    const { user } = renderCard()
+    const field = screen.getByRole('textbox', { name: 'Reply to this thread' })
+    expect(screen.queryByRole('button', { name: 'Reply' })).not.toBeInTheDocument()
+
+    await user.type(field, '   ')
+    expect(screen.queryByRole('button', { name: 'Reply' })).not.toBeInTheDocument()
+
+    await user.type(field, 'Thursday works')
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeInTheDocument()
+
+    await user.clear(field)
+    expect(screen.queryByRole('button', { name: 'Reply' })).not.toBeInTheDocument()
+  })
+
+  it('asks for something to send, without calling the server, when the person sends it with the keys and there is nothing', async () => {
     const { user, actions } = renderCard()
 
-    await user.click(screen.getByRole('button', { name: 'Reply' }))
+    await user.type(screen.getByRole('textbox', { name: 'Reply to this thread' }), '   {Control>}{Enter}{/Control}')
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Write something before you send it.')
     expect(actions.reply).not.toHaveBeenCalled()
+  })
+
+  it('keeps the field as a line with a placeholder until it is used', () => {
+    renderCard()
+
+    expect(screen.getByRole('textbox', { name: 'Reply to this thread' })).toHaveAttribute('placeholder', 'Reply…')
   })
 
   it('refuses more than 5 000 characters', async () => {

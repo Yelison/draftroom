@@ -1,14 +1,16 @@
 .card {
+  --card-background: var(--color-surface);
+
   display: grid;
   gap: var(--space-12);
   padding: var(--space-16);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-panel);
-  background: var(--color-surface);
+  background: var(--card-background);
 }
 
 .card[data-state='resolved'] {
-  background: var(--color-bg);
+  --card-background: var(--color-bg);
 }
 
 /* The thread the person is on: a heavier border as well as a colour, so it does not depend on seeing one. */
