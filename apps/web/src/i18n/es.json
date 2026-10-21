@@ -291,6 +291,7 @@
   "comments.panel.tabs": "Colaboración",
   "comments.margin.label": "Comentarios al margen",
   "comments.margin.orphans": "Comentarios sobre texto eliminado",
+  "comments.margin.loading": "Cargando los comentarios",
   "comments.compact.replies": "{count, plural, one {# respuesta} other {# respuestas}}",
   "comments.activity.close": "Cerrar la actividad",
   "comments.toggle.label": "{count, plural, =0 {Comentarios} one {Comentarios, # abierto} other {Comentarios, # abiertos}}",

@@ -246,6 +246,11 @@ export function CommentsMargin({ editor, provider, document, personId, requests 
           </Button>
         </StateMessage>
       )}
+      {query.isPending && (
+        <p role="status" className={styles.caption}>
+          {intl.formatMessage({ id: 'comments.margin.loading' })}
+        </p>
+      )}
       {!query.isError && threads.length > 0 && shownCount === 0 && draft === null && (
         <p className={styles.caption}>
           {intl.formatMessage({ id: `comments.emptyFiltered.${filter === 'resolved' ? 'resolved' : 'open'}` })}

@@ -8,6 +8,7 @@ import { sofia } from '../../data/mock/fixtures/index.ts'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { budget, people } from '../editor/testing/renderEditor.tsx'
 import { findMargin, openThread, renderCommentedDocument, threadOf } from './testing/openCommentedDocument.tsx'
+import { commentsGrace } from './useCommentsArrived.ts'
 
 /** A data source whose threads are what the test says, or whose request fails or waits. */
 const threadsThat = (listThreads: DataSource['listThreads']) => (dataSource: DataSource) => ({
@@ -186,6 +187,11 @@ describe('the threads of the margin', () => {
 })
 
 describe('the states of the comments', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    onlineManager.setOnline(true)
+  })
+
   it('holds the text back, as the skeleton of the page, until the comments have arrived, so they open no room under the person’s eyes', async () => {
     let arrive: (() => void) | undefined
     renderCommentedDocument({
@@ -206,6 +212,15 @@ describe('the states of the comments', () => {
 
     expect(await screen.findByRole('textbox', { name: 'Document content' })).toBeInTheDocument()
     expect(screen.queryByText('Loading document')).not.toBeInTheDocument()
+  })
+
+  it('shows the text after a moment when the comments never arrive, and the margin says it is loading them', async () => {
+    renderCommentedDocument({ wrap: threadsThat(() => new Promise(() => {})) })
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Document content' }, { timeout: commentsGrace + 3000 }),
+    ).toBeInTheDocument()
+    expect(within(await findMargin()).getByText('Loading the comments')).toBeInTheDocument()
   })
 
   it('shows the text when the comments could not load, and says so in the margin', async () => {

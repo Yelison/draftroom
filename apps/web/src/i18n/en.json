@@ -291,6 +291,7 @@
   "comments.panel.tabs": "Collaboration",
   "comments.margin.label": "Comments in the margin",
   "comments.margin.orphans": "Comments on removed text",
+  "comments.margin.loading": "Loading the comments",
   "comments.compact.replies": "{count, plural, one {# reply} other {# replies}}",
   "comments.activity.close": "Close the activity",
   "comments.toggle.label": "{count, plural, =0 {Comments} one {Comments, # open} other {Comments, # open}}",
