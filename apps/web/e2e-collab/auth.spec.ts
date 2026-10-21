@@ -3,6 +3,7 @@ import { environment } from './environment.ts'
 import { expect, test } from './fixtures.ts'
 import { demoPassword, people } from './people.ts'
 import { createDocument } from './scene.ts'
+import { person, signOut } from './accountMenu.ts'
 
 /**
  * The screens of sign-in, sign-up and sign-out against the real server: what the mocked suite shows with a mock, shown
@@ -38,7 +39,7 @@ test.describe('signing in and out of the real stack', () => {
     await signedOutTab.getByRole('textbox', { name: 'Email' }).fill(people.daniel)
     await signedOutTab.getByLabel('Password').fill(demoPassword)
     await signedOutTab.getByRole('button', { name: 'Sign in' }).click()
-    await expect(signedOutTab.getByRole('button', { name: 'Sign out' })).toBeVisible()
+    await expect(person(signedOutTab)).toBeVisible()
     const token = (await context.cookies()).find((cookie) => cookie.name === 'dr_session')?.value
     expect(token).toBeDefined()
 
@@ -50,7 +51,7 @@ test.describe('signing in and out of the real stack', () => {
     await expect(editorTab.getByRole('status').filter({ hasText: /^Sync status/ })).toHaveText('Sync status: Synced')
     expect(closedSockets).toEqual([])
 
-    await signedOutTab.getByRole('button', { name: 'Sign out' }).click()
+    await signOut(signedOutTab)
 
     await expect(signedOutTab).toHaveURL(/\/sign-in$/)
     await expect.poll(() => closedSockets.length, 'the server closed the live collaboration socket').toBeGreaterThan(0)
@@ -96,7 +97,7 @@ test.describe('signing in and out of the real stack', () => {
     await page.getByRole('button', { name: 'Create account' }).click()
 
     await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
+    await expect(person(page)).toBeVisible()
     const me = await context.request.get('/api/me')
     expect(await me.json()).toMatchObject({ email, name: 'Lena Fischer' })
     await context.close()
