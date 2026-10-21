@@ -45,7 +45,11 @@ describe('the document screen', () => {
 
     // Compact is the rail without the class of the expanded one.
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).not.toHaveClass('expanded')
-    expect(screen.getAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual(['Documents'])
+    // And the document that is open, in the explorer beside it.
+    expect(screen.getAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual([
+      'Documents',
+      'Autumn launch plan',
+    ])
   })
 
   it('shows a skeleton with a spoken status while the document is on its way, under the headline the page already has', async () => {
@@ -65,15 +69,20 @@ describe('the document screen', () => {
     const { wrap, arrive } = heldDocument()
     const { container } = renderEditor({ wrap })
     await screen.findByRole('heading', { level: 1, name: 'Document' })
-    // The classes of the column's first two children, which carry its measures (the CSS is not loaded in these tests).
-    const layoutOf = () =>
-      [...(container.querySelector('.column')?.children ?? [])].slice(0, 2).map((child) => child.className)
+    // The classes of what carries the measures of the page: the band and the bar, and the sheet in its stage (the CSS is not
+    // loaded in these tests).
+    const classes = (selector: string) => [...container.querySelectorAll(selector)].map((element) => element.className)
+    const layoutOf = () => ({
+      chrome: classes('.page > .chrome > *'),
+      stage: classes('.page > .stage'),
+      sheet: classes('.page > .stage > .sheet'),
+    })
 
     const whileLoading = layoutOf()
     await arrive()
     await textArea()
 
-    expect(whileLoading).toEqual(['band', 'sheet'])
+    expect(whileLoading).toEqual({ chrome: ['band', 'bar'], stage: ['stage withMargin'], sheet: ['sheet'] })
     expect(layoutOf()).toEqual(whileLoading)
   })
 

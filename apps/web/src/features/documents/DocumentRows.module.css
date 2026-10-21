@@ -179,3 +179,56 @@
     margin-inline-start: auto;
   }
 }
+
+/*
+ * The row of one line for a narrow column, the explorer beside a document: the icon and the title, in the height of a compact
+ * button, and the pin and the actions over its end while the pointer or the keyboard is on it. The document that is open is
+ * the one with the accent. They are descendants of the list, so they win over the narrow row above whatever the width.
+ */
+.rows.compact {
+  --document-row-height: var(--button-height-compact);
+}
+
+.compact .row,
+.compact .skeletonRow {
+  --document-row-height: var(--button-height-compact);
+}
+
+.compact .row {
+  grid-template-columns: var(--control-icon-size) minmax(0, 1fr);
+  gap: var(--space-8);
+  padding-inline: var(--space-12);
+}
+
+.compact .row[data-open] {
+  background: var(--color-blue-bg);
+  color: var(--color-blue-ink);
+}
+
+.compact .row[data-open] .icon {
+  color: inherit;
+}
+
+.compact .actions {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--space-4);
+  gap: 0;
+  padding-inline-start: var(--space-8);
+  background: var(--color-surface-hover);
+  opacity: 0;
+}
+
+.compact .row[data-open] .actions {
+  background: var(--color-blue-bg);
+}
+
+.compact .actions button {
+  inline-size: var(--button-height-compact);
+  block-size: var(--button-height-compact);
+}
+
+.compact .row:hover .actions,
+.compact .row:focus-within .actions {
+  opacity: 1;
+}

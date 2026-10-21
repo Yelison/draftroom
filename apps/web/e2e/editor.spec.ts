@@ -487,6 +487,30 @@ test.describe('the title', () => {
     await expect(title(page)).toHaveAttribute('aria-invalid', 'true')
   })
 
+  // A paste of a text with line breaks is made one line, and it is a paste like any other: the caret is after it and the browser
+  // undoes it in one step. It is a real paste, from the clipboard, because that is what the handler is for.
+  test.describe('pasting lines', () => {
+    test.use({ permissions: ['clipboard-read', 'clipboard-write'] })
+
+    test('puts the caret after what was pasted, with its line breaks made spaces, and undoes it in one step', async ({
+      page,
+    }) => {
+      await open(page)
+      const title = page.getByRole('textbox', { name: 'Document title' })
+      await page.evaluate(() => navigator.clipboard.writeText('X\nY'))
+      await title.click()
+      await page.keyboard.press('Home')
+      for (let letter = 0; letter < 6; letter++) await page.keyboard.press('ArrowRight')
+
+      await page.keyboard.press('ControlOrMeta+V')
+
+      await expect(title).toHaveValue('AutumnX Y launch plan')
+      expect(await title.evaluate((element: HTMLTextAreaElement) => element.selectionStart)).toBe(9)
+      await page.keyboard.press('ControlOrMeta+Z')
+      await expect(title).toHaveValue('Autumn launch plan')
+    })
+  })
+
   test('stops at 200 characters, counting an emoji as one', async ({ page }) => {
     await open(page)
 
@@ -580,13 +604,16 @@ test.describe('the keyboard and the focus', () => {
     await textArea(page).waitFor()
     await page.getByRole('textbox', { name: 'Document title' }).focus()
 
-    // The history, the comments and the Share button of an owner sit between the toolbar and the title.
-    await page.keyboard.press('Shift+Tab')
-    await expect(page.getByRole('button', { name: 'Share' })).toBeFocused()
+    // What the bar has for the comments sits between the toolbar and the title: the button of the margin, the selected tab and
+    // the three choices of the filter.
     await page.keyboard.press('Shift+Tab')
     await expect(commentsToggle(page)).toBeFocused()
     await page.keyboard.press('Shift+Tab')
-    await expect(page.getByRole('button', { name: 'Version history' })).toBeFocused()
+    await expect(page.getByRole('tab', { name: 'Comments' })).toBeFocused()
+    for (const choice of [/^All \(/, /^Resolved \(/, /^Open \(/]) {
+      await page.keyboard.press('Shift+Tab')
+      await expect(page.getByRole('button', { name: choice })).toBeFocused()
+    }
     await page.keyboard.press('Shift+Tab')
     await expect(toolbarButton(page, 'Bold')).toBeFocused()
     await expect(toolbarButton(page, 'Bold')).toHaveCSS('outline-style', 'solid')
@@ -595,13 +622,17 @@ test.describe('the keyboard and the focus', () => {
     await page.keyboard.press('End')
     await expect(toolbarButton(page, 'Link')).toBeFocused()
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('button', { name: 'Version history' })).toBeFocused()
-    await page.keyboard.press('Tab')
-    await expect(commentsToggle(page)).toBeFocused()
-    await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: /^Open \(/ })).toBeFocused()
+
+    // The history and Share are in the band, above the toolbar.
+    // The toolbar is one stop, wherever in it the person was: leaving it backwards goes to Share.
+    await toolbarButton(page, 'Link').focus()
+    await page.keyboard.press('Shift+Tab')
     await expect(page.getByRole('button', { name: 'Share' })).toBeFocused()
-    await page.keyboard.press('Tab')
-    await expect(page.getByRole('textbox', { name: 'Document title' })).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(page.getByRole('button', { name: 'Version history' })).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(page.getByRole('navigation', { name: 'Where the document is' }).getByRole('link')).toBeFocused()
   })
 
   test('shows the shortcut in a tooltip on the keyboard focus and hides it with Escape', async ({ page }) => {
@@ -609,7 +640,7 @@ test.describe('the keyboard and the focus', () => {
     await textArea(page).waitFor()
     await page.getByRole('textbox', { name: 'Document title' }).focus()
 
-    for (let stop = 0; stop < 4; stop++) await page.keyboard.press('Shift+Tab')
+    for (let stop = 0; stop < 6; stop++) await page.keyboard.press('Shift+Tab')
 
     await expect(page.getByRole('tooltip')).toHaveText(/^Bold \((Ctrl|⌘)\+?B\)$/)
     await page.keyboard.press('Escape')
@@ -619,13 +650,14 @@ test.describe('the keyboard and the focus', () => {
   test('is reachable end to end with the keyboard, in reading order', async ({ page }) => {
     await page.goto(documentPath)
     await textArea(page).waitFor()
-    // The explorer's rows arrive with its data; the Tab key finds the tree where it will be.
-    await page.getByRole('tree').waitFor()
+    // The explorer's sections arrive with its data; the Tab key finds them where they will be.
+    await page.getByRole('button', { name: 'Pinned' }).waitFor()
     // The count of open threads is in the name of the button once the threads have arrived.
     await expect(page.getByRole('button', { name: 'Comments, 1 open' })).toBeVisible()
 
     const stops: (string | null)[] = []
-    for (let press = 0; press < 18; press++) {
+    const inExplorer: boolean[] = []
+    for (let press = 0; press < 80 && stops.at(-1) !== 'Document content'; press++) {
       await page.keyboard.press('Tab')
       stops.push(
         await page.evaluate(() => {
@@ -639,26 +671,30 @@ test.describe('the keyboard and the focus', () => {
           )
         }),
       )
+      inExplorer.push(
+        await page.evaluate(() => document.activeElement?.closest('aside[aria-label="Explorer"]') != null),
+      )
     }
 
-    expect(stops).toEqual([
-      'Skip to content',
-      'Home',
-      'Documents',
-      'Shared',
-      'History',
-      'Members',
-      'Settings',
-      'Sign out',
-      // The explorer: its search, its two buttons and one stop for the whole tree, which is the open document.
-      'Search documents',
-      'New document',
-      'New folder',
-      'Autumn launch plan',
-      'Bold',
+    // The explorer has a stop for each control of the sections that are open: where it starts and that it is whole is what is fixed.
+    const rail = ['Skip to content', 'Home', 'Documents', 'Shared', 'History', 'Members', 'Settings', 'Sign out']
+    const explorerStart = ['Search documents', 'New document', 'More', 'Pinned']
+    expect(stops.slice(0, rail.length + explorerStart.length)).toEqual([...rail, ...explorerStart])
+    const fromBand = stops.lastIndexOf('Product')
+    expect(fromBand).toBeGreaterThan(rail.length + explorerStart.length)
+    expect(inExplorer.slice(rail.length, fromBand).every(Boolean)).toBe(true)
+    expect(stops.slice(fromBand)).toEqual([
+      // The band: the folder of the document, its history and sharing.
+      'Product',
       'Version history',
-      'Comments, 1 open',
       'Share',
+      // The bar: the toolbar is one stop, the filter, the selected tab and the button of the margin.
+      'Bold',
+      'Open (1)',
+      'Resolved (1)',
+      'All (2)',
+      'Comments',
+      'Comments, 1 open',
       'Document title',
       'Document content',
     ])
@@ -717,78 +753,102 @@ test.describe('the code mark', () => {
   })
 })
 
-// The band above the sheet has two rows, always. In the first, the toolbar and, at its end, the history and the comments; in
-// the second, the people and, at its end, Share and the sync status. Nothing about the text moves when someone comes or goes.
+// The band and the bar above the sheet stay at the top of the window. The band is one row of the header's height (the crumbs, the
+// people, the state, the history and Share) and the bar one of the toolbar's (the toolbar and the comments). Under the width of a
+// desktop each part has a row of its own, so nothing is cut. Nothing about the text moves when someone comes or goes.
 const commentsToggle = (page: Page) => page.getByRole('button', { name: /^(Comments|Comentarios)/ })
-const commentsPanel = (page: Page) =>
-  page.getByRole('complementary', { name: /Comments and activity|Comentarios y actividad/ })
+const marginOf = (page: Page) =>
+  page.getByRole('complementary', { name: /Comments in the margin|Comentarios al margen/ })
+const bandOf = (page: Page) => page.getByRole('button', { name: /^(Share|Compartir)$/ }).locator('xpath=../..')
+const barOf = (page: Page) => page.getByRole('toolbar').locator('xpath=../..')
+const sheetOf = (page: Page) =>
+  page
+    .getByRole('textbox', { name: /Document title|Título del documento/ })
+    .locator('xpath=ancestor::*[contains(@class,"_sheet_")][1]')
+const tokenOf = (page: Page, name: string) =>
+  page.evaluate(
+    (property) => Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(property)),
+    name,
+  )
 
-/** Puts the panel as the test needs it: the person's own choice, which the page remembers. */
-async function setPanel(page: Page, state: 'open' | 'closed') {
+/** Shows or hides the margin as the test needs it: the person's own choice, which the page remembers. */
+async function setMargin(page: Page, state: 'shown' | 'hidden') {
   const toggle = commentsToggle(page)
-  if ((await toggle.getAttribute('aria-expanded')) !== String(state === 'open')) await toggle.click()
-  await expect(toggle).toHaveAttribute('aria-expanded', String(state === 'open'))
+  if ((await toggle.getAttribute('aria-expanded')) !== String(state === 'shown')) await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', String(state === 'shown'))
 }
 
-test.describe('the band above the sheet', () => {
+test.describe('the band and the bar above the sheet', () => {
   for (const locale of ['en-US', 'es-ES'] as const) {
-    // 640 px is a window of 1280 px at a zoom of 200 %: the band has 520 px there, with the panel under the sheet.
+    // 640 px is a window of 1280 px at a zoom of 200 %: the rows are one for each part there, and the margin is under the sheet.
     for (const width of [640, 1280, 1440]) {
-      for (const panel of ['open', 'closed'] as const) {
-        test.describe(`in ${locale} at ${width} px with the comments panel ${panel}`, () => {
+      for (const margin of ['shown', 'hidden'] as const) {
+        test.describe(`in ${locale} at ${width} px with the comments ${margin}`, () => {
           test.use({ locale, viewport: { width, height: 900 } })
 
-          test('holds two rows of the toolbar height, keeps every part inside and does not move the text when people come', async ({
+          test('holds its rows, keeps every part inside and does not move the text when people come', async ({
             page,
           }) => {
             await page.goto(documentPath)
             await textArea(page).waitFor()
-            await setPanel(page, panel)
-            const token = await page.evaluate(() =>
-              Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--layout-toolbar-height')),
-            )
+            await setMargin(page, margin)
+            const toolbarRow = await tokenOf(page, '--layout-toolbar-height')
+            const headerRow = await tokenOf(page, '--layout-header-height')
+            const desktop = width >= 1280
             const topOfText = async () => (await textArea(page).boundingBox())?.y ?? Number.NaN
             const toolbar = page.getByRole('toolbar')
-            // The toolbar sits in the zone of the first row, which sits in the row, which sits in the band.
-            const band = toolbar.locator('xpath=../../..')
 
-            async function expectBandToHold() {
-              const frame = await band.boundingBox()
+            async function expectBandAndBarToHold() {
+              const band = await bandOf(page).boundingBox()
+              const bar = await barOf(page).boundingBox()
               const tools = await toolbar.boundingBox()
+              const crumbs = await page
+                .getByRole('navigation', { name: /Where the document is|Dónde está el documento/ })
+                .boundingBox()
               const history = await page
                 .getByRole('button', { name: /^(Version history|Historial de versiones)$/ })
                 .boundingBox()
-              const comments = await commentsToggle(page).boundingBox()
-              const group = await page
+              const share = await page
                 .getByRole('button', { name: /^(Share|Compartir)$/ })
                 .locator('xpath=..')
                 .boundingBox()
+              const filter = await page.getByRole('group', { name: /Show comments|Mostrar comentarios/ }).boundingBox()
+              const tabs = await page.getByRole('tablist').boundingBox()
+              const toggle = await commentsToggle(page).boundingBox()
               // Nobody else is in the document at first, and the list is not drawn for no one.
               const peopleList = page.getByRole('list', { name: /People in this document|Personas en este documento/ })
               const people = (await peopleList.count()) === 0 ? null : await peopleList.boundingBox()
-              const left = frame?.x ?? 0
-              const right = left + (frame?.width ?? 0)
-              // Two rows of exactly the token, and the line of the band is drawn inside them, so there is nothing to add.
-              expect(frame?.height).toBe(2 * token)
-              expect(tools?.height).toBeLessThanOrEqual(token)
-              expect(tools?.width).toBeGreaterThanOrEqual(396)
-              // Every part is inside the band on both sides: a group wider than its room overflows towards its start.
-              for (const part of [tools, history, comments, group, people]) {
-                if (part === null) continue
-                expect(part?.x).toBeGreaterThanOrEqual(left)
-                expect((part?.x ?? 0) + (part?.width ?? 0)).toBeLessThanOrEqual(right)
+              // One row of the header's height and one of the toolbar's; under a desktop's width, two rows and three.
+              expect(band?.height).toBe(desktop ? headerRow : 2 * toolbarRow)
+              expect(bar?.height).toBe(desktop ? toolbarRow : 3 * toolbarRow)
+              expect(tools?.height).toBeLessThanOrEqual(toolbarRow)
+              expect(tools?.width).toBeGreaterThanOrEqual(7 * 36)
+              // Every part is inside its row on both sides: a group wider than its room overflows towards its start.
+              for (const [frame, parts] of [
+                [band, [crumbs, history, share, people]],
+                [bar, [tools, filter, tabs, toggle]],
+              ] as const) {
+                for (const part of parts) {
+                  if (part === null) continue
+                  expect(part?.x).toBeGreaterThanOrEqual(frame?.x ?? 0)
+                  expect((part?.x ?? 0) + (part?.width ?? 0)).toBeLessThanOrEqual((frame?.x ?? 0) + (frame?.width ?? 0))
+                }
               }
-              // The people end before Share starts: the two share the second row and must not run into each other.
-              if (people !== null) expect((people?.x ?? 0) + (people?.width ?? 0)).toBeLessThanOrEqual(group?.x ?? 0)
-              // History and comments are in the first row, with the toolbar; Share and the people are in the second, under it.
-              expect(history?.y).toBeLessThan((frame?.y ?? 0) + token)
-              expect(comments?.y).toBeLessThan((frame?.y ?? 0) + token)
-              expect(group?.y).toBeGreaterThanOrEqual((frame?.y ?? 0) + token)
+              // The people end before the state starts: the two share a row and must not run into each other.
+              if (people !== null) expect((people?.x ?? 0) + (people?.width ?? 0)).toBeLessThanOrEqual(share?.x ?? 0)
+              // On a desktop the parts of the bar share its row; under it, the filter and the tabs are rows of their own.
+              if (desktop) {
+                expect(Math.abs((filter?.y ?? 0) - (tools?.y ?? 0))).toBeLessThan(toolbarRow)
+                // And they do not run into each other: the toolbar keeps every button, whatever the language.
+                expect((tools?.x ?? 0) + (tools?.width ?? 0)).toBeLessThanOrEqual(filter?.x ?? 0)
+                const link = await toolbar.getByRole('button', { name: /^(Link|Enlace)$/ }).boundingBox()
+                expect((link?.x ?? 0) + (link?.width ?? 0)).toBeLessThanOrEqual((tools?.x ?? 0) + (tools?.width ?? 0))
+              } else expect(filter?.y).toBeGreaterThanOrEqual((tools?.y ?? 0) + toolbarRow)
               expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
             }
 
             const before = await topOfText()
-            await expectBandToHold()
+            await expectBandAndBarToHold()
 
             await page.evaluate(
               async ([documentId, names]) => {
@@ -814,7 +874,7 @@ test.describe('the band above the sheet', () => {
               .toBe(5)
 
             expect(await topOfText()).toBe(before)
-            await expectBandToHold()
+            await expectBandAndBarToHold()
           })
         })
       }
@@ -823,95 +883,110 @@ test.describe('the band above the sheet', () => {
 })
 
 // What the band measures depends on the font the machine draws the text in, and the font of a runner of the CI is wider than the
-// one of a laptop. The second row is built so that its parts never overlap whatever the font is: the people give way to Share
-// and the sync status, and the avatars that do not fit are counted instead. Two amounts of letter-spacing stand for fonts wider
-// than any a machine is likely to fall back to: 0.04 em is some 28 px more in the Spanish row, and 0.1 em some 70.
-test.describe('the second row of the band with a wider font', () => {
+// one of a laptop. The band is built so that its parts never overlap whatever the font is: the people give way to the state, and
+// the avatars that do not fit are counted instead. Two amounts of letter-spacing stand for fonts wider than any a machine is
+// likely to fall back to: 0.04 em is some 28 px more in the Spanish row, and 0.1 em some 70.
+test.describe('the band with a wider font', () => {
   for (const spacing of ['0.04em', '0.1em']) {
     for (const locale of ['en-US', 'es-ES'] as const) {
       for (const width of [640, 1280, 1440]) {
-        for (const panel of ['open', 'closed'] as const) {
-          test.describe(`in ${locale} at ${width} px with the comments panel ${panel}, letters spaced by ${spacing}`, () => {
-            test.use({ locale, viewport: { width, height: 900 } })
+        test.describe(`in ${locale} at ${width} px, letters spaced by ${spacing}`, () => {
+          test.use({ locale, viewport: { width, height: 900 } })
 
-            test('keeps the people apart from Share and inside the band', async ({ page }) => {
-              await page.goto(documentPath)
-              await textArea(page).waitFor()
-              await setPanel(page, panel)
-              await page.addStyleTag({ content: `body, button, input { letter-spacing: ${spacing} !important }` })
-              await page.evaluate(
-                async ([documentId, names]) => {
-                  const mock = Reflect.get(window, 'draftroomMock') as {
-                    addPeople(id: string, names: string[]): Promise<unknown>
-                  }
-                  await mock.addPeople(documentId as string, names as string[])
-                },
-                [launchPlan.id, ['Ines Varga', 'Omar Haddad', 'Lucía Ferrer', 'Tobias Lind', 'Noor Aziz']],
-              )
+          test('keeps the people apart from the state and inside the band', async ({ page }) => {
+            await page.goto(documentPath)
+            await textArea(page).waitFor()
+            await page.addStyleTag({ content: `body, button, input { letter-spacing: ${spacing} !important }` })
+            await page.evaluate(
+              async ([documentId, names]) => {
+                const mock = Reflect.get(window, 'draftroomMock') as {
+                  addPeople(id: string, names: string[]): Promise<unknown>
+                }
+                await mock.addPeople(documentId as string, names as string[])
+              },
+              [launchPlan.id, ['Ines Varga', 'Omar Haddad', 'Lucía Ferrer', 'Tobias Lind', 'Noor Aziz']],
+            )
 
-              const list = page.getByRole('list', { name: /People in this document|Personas en este documento/ })
-              await list.waitFor()
-              const people = await list.boundingBox()
-              const group = await page
-                .getByRole('button', { name: /^(Share|Compartir)$/ })
-                .locator('xpath=..')
-                .boundingBox()
-              const band = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
-              expect((people?.x ?? 0) + (people?.width ?? 0)).toBeLessThanOrEqual(group?.x ?? 0)
-              expect((group?.x ?? 0) + (group?.width ?? 0)).toBeLessThanOrEqual((band?.x ?? 0) + (band?.width ?? 0))
-            })
+            const list = page.getByRole('list', { name: /People in this document|Personas en este documento/ })
+            await list.waitFor()
+            const people = await list.boundingBox()
+            const state = await page
+              .getByRole('button', { name: /^(Share|Compartir)$/ })
+              .locator('xpath=..')
+              .boundingBox()
+            const band = await bandOf(page).boundingBox()
+            expect((people?.x ?? 0) + (people?.width ?? 0)).toBeLessThanOrEqual(state?.x ?? 0)
+            expect((state?.x ?? 0) + (state?.width ?? 0)).toBeLessThanOrEqual((band?.x ?? 0) + (band?.width ?? 0))
           })
-        }
+        })
       }
     }
   }
 })
+
+// The title is the heading of the document, so it is never cut: a title that does not fit in the width of the sheet wraps.
+for (const locale of ['en-US', 'es-ES'] as const) {
+  test.describe(`a long title in ${locale}`, () => {
+    test.use({ locale, viewport: { width: 1280, height: 800 } })
+
+    test('wraps in the sheet that the margin leaves at 1280 px and cuts nothing', async ({ page }) => {
+      await page.goto(documentPath)
+      await textArea(page).waitFor()
+      const title = page.getByRole('textbox', { name: /Document title|Título del documento/ })
+      const oneLine = (await title.boundingBox())?.height ?? Number.NaN
+      await title.fill(
+        'Plan de lanzamiento de otoño para toda la campaña de octubre, con sus fechas y sus responsables',
+      )
+      await title.blur()
+
+      // Wider than the field in one line, so it takes more lines, and what it holds fits in it.
+      const box = await title.evaluate((element) => ({
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+        scrollHeight: element.scrollHeight,
+        clientHeight: element.clientHeight,
+      }))
+      expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth)
+      expect(box.scrollHeight).toBeLessThanOrEqual(box.clientHeight)
+      expect((await title.boundingBox())?.height).toBeGreaterThan(oneLine)
+      // The text does not start under the title, and the cards of the margin follow it down.
+      const text = await textArea(page).boundingBox()
+      const titleBox = await title.boundingBox()
+      expect(text?.y).toBeGreaterThanOrEqual((titleBox?.y ?? 0) + (titleBox?.height ?? 0))
+    })
+  })
+}
 
 test.describe('the layout', () => {
   for (const width of [1440, 1280]) {
     test.describe(`at ${width} px`, () => {
       test.use({ viewport: { width, height: 900 } })
 
-      test('starts as the width allows: the comments panel open from 1440 px, closed below, and the sheet in its width either way', async ({
+      test('starts with the margin beside the sheet, which has the room that is left up to its 708 px', async ({
         page,
       }) => {
         await open(page)
 
-        const sheet = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
-        expect(sheet?.width).toBeLessThanOrEqual(708)
-        expect(sheet?.width).toBeGreaterThan(600)
-        await expect(commentsToggle(page)).toHaveAttribute('aria-expanded', String(width >= 1440))
-        if (width >= 1440) {
-          const panel = await commentsPanel(page).boundingBox()
-          expect((panel?.x ?? 0) + (panel?.width ?? 0)).toBeLessThanOrEqual(width)
-        } else {
-          await expect(commentsPanel(page)).toBeHidden()
-        }
+        const sheet = await sheetOf(page).boundingBox()
+        const margin = await marginOf(page).boundingBox()
+        await expect(commentsToggle(page)).toHaveAttribute('aria-expanded', 'true')
+        // 708 px at 1440; at 1280 the margin keeps its 304 px and the text gives way to 568.
+        expect(margin?.width).toBeCloseTo(304, 0)
+        expect(sheet?.width).toBeCloseTo(width >= 1440 ? 708 : 568, 0)
+        expect((sheet?.x ?? 0) + (sheet?.width ?? 0)).toBeLessThanOrEqual(margin?.x ?? 0)
+        expect((margin?.x ?? 0) + (margin?.width ?? 0)).toBeLessThanOrEqual(width)
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
       })
 
-      test('gives the sheet what the panel leaves when it is opened, and both fit', async ({ page }) => {
-        await open(page)
-        await setPanel(page, 'open')
-
-        // Beside the panel (328 px) the sheet gives way first: 504 px at 1280 and 664 px at 1440.
-        const sheet = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
-        expect(sheet?.width).toBeGreaterThan(480)
-        expect(sheet?.width).toBeLessThanOrEqual(708)
-        const panel = await commentsPanel(page).boundingBox()
-        expect((panel?.x ?? 0) + (panel?.width ?? 0)).toBeLessThanOrEqual(width)
-        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-      })
-
-      test('gives the sheet its 708 px when the panel is closed, and the panel comes back as it was left', async ({
+      test('gives the sheet its 708 px when the margin is hidden, and the margin comes back as it was left', async ({
         page,
       }) => {
         await open(page)
-        await setPanel(page, 'closed')
+        await setMargin(page, 'hidden')
 
-        const sheet = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
+        const sheet = await sheetOf(page).boundingBox()
         expect(sheet?.width).toBe(708)
-        await expect(commentsPanel(page)).toBeHidden()
+        await expect(marginOf(page)).toBeHidden()
 
         await page.reload()
         await textArea(page).waitFor()
@@ -919,8 +994,8 @@ test.describe('the layout', () => {
       })
 
       // The layout-shift score cannot see this: it counts what moves after the page has painted, and the skeleton is painted
-      // before the screen's chunk has arrived. What it shows has to be where the document will put the sheet.
-      test('shows the skeleton with the band where the document will have it, so the sheet does not jump', async ({
+      // before the screen's chunk has arrived. What it shows has to be where the document will put the band, the bar and the sheet.
+      test('shows the skeleton with the band, the bar and the sheet where the document will have them, so nothing jumps', async ({
         page,
       }) => {
         let release: () => void = () => {}
@@ -933,16 +1008,23 @@ test.describe('the layout', () => {
         })
         await page.goto(documentPath, { waitUntil: 'commit' })
         const skeleton = page.locator('[aria-busy="true"]')
-        const skeletonBand = skeleton.locator(':scope > div > div').first()
-        await skeletonBand.waitFor()
-        const waiting = await skeletonBand.boundingBox()
+        const skeletonChrome = skeleton.locator(':scope > div').first()
+        const skeletonSheet = skeleton.locator(':scope > div').nth(1).locator(':scope > div').first()
+        await skeletonChrome.waitFor()
+        const waitingChrome = await skeletonChrome.boundingBox()
+        const waitingSheet = await skeletonSheet.boundingBox()
 
         release()
         await textArea(page).waitFor()
-        const loaded = await page.getByRole('toolbar').locator('xpath=../../..').boundingBox()
+        const loadedChrome = await barOf(page).locator('xpath=..').boundingBox()
+        const loadedSheet = await sheetOf(page).boundingBox()
 
-        // The sheet starts where the band ends, so the band of the skeleton must end where the one of the document does.
-        expect((waiting?.y ?? 0) + (waiting?.height ?? 0)).toBe((loaded?.y ?? 0) + (loaded?.height ?? 0))
+        // The sheet starts where the bar ends, and it is where the skeleton had it, with its width.
+        expect(waitingChrome?.height).toBe(loadedChrome?.height)
+        expect(waitingChrome?.y).toBe(loadedChrome?.y)
+        expect(waitingSheet?.x).toBeCloseTo(loadedSheet?.x ?? 0, 0)
+        expect(waitingSheet?.y).toBeCloseTo(loadedSheet?.y ?? 0, 0)
+        expect(waitingSheet?.width).toBeCloseTo(loadedSheet?.width ?? 0, 0)
       })
 
       test('does not shift while the document arrives', async ({ page }) => {
@@ -952,10 +1034,10 @@ test.describe('the layout', () => {
         expect(await shifts(page)).toBeLessThan(0.01)
       })
 
-      test('does not shift while the document arrives with the panel closed', async ({ page }) => {
+      test('does not shift while the document arrives with the margin hidden', async ({ page }) => {
         await page.goto(documentPath)
         await textArea(page).waitFor()
-        await setPanel(page, 'closed')
+        await setMargin(page, 'hidden')
         await page.reload()
         await textArea(page).waitFor()
 
@@ -964,3 +1046,326 @@ test.describe('the layout', () => {
     })
   }
 })
+
+// One scroll: the page. A document as long as a real one, with many comments, at the two desktop sizes of the plan.
+test.describe('one scroll', () => {
+  const paragraphs = 30
+
+  /** Starts a comment on the first words of paragraph `number` (or on `quote`), as the key does, and sends it. */
+  async function commentOn(page: Page, quote: string, body: string) {
+    await page.evaluate((words) => {
+      const text = document.querySelector('[role="textbox"][aria-label="Document content"]') as
+        | (HTMLElement & {
+            editor: {
+              state: {
+                doc: { descendants(visit: (node: { isText: boolean; text?: string }, at: number) => void): void }
+              }
+              commands: { setTextSelection(range: { from: number; to: number }): void; focus(): void }
+            }
+          })
+        | null
+      if (text === null) throw new Error('The text is not on the page')
+      let range: { from: number; to: number } | null = null
+      text.editor.state.doc.descendants((node, at) => {
+        const index = node.isText ? (node.text ?? '').indexOf(words) : -1
+        if (range === null && index >= 0) range = { from: at + index, to: at + index + words.length }
+      })
+      if (range === null) throw new Error(`"${words}" is not in the text`)
+      text.editor.commands.focus()
+      text.editor.commands.setTextSelection(range)
+    }, quote)
+    // The editor learns of the selection from an event that the browser sends after; the next key reads what it knows.
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    await page.keyboard.press('ControlOrMeta+Alt+m')
+    await page.keyboard.type(body)
+    await page.keyboard.press('Control+Enter')
+    await expect(marginOf(page).locator('[data-thread-id]').filter({ hasText: body }).first()).toBeAttached()
+  }
+
+  for (const [width, height] of [
+    [1280, 800],
+    [1440, 900],
+  ] as const) {
+    test(`at ${width} × ${height}: only the page scrolls, the band and the bar stay, and each comment is level with its text`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000)
+      await page.setViewportSize({ width, height })
+      await page.goto(documentPath)
+      const text = await open(page)
+      await page.keyboard.press('Control+End')
+      for (let paragraph = 1; paragraph <= paragraphs; paragraph++) {
+        await page.keyboard.press('Enter')
+        await page.keyboard.insertText(`Paragraph ${paragraph} of a text that is long enough to be a real one.`)
+      }
+      // Eleven threads, each on a paragraph of its own, and a second one on the same paragraph as one of them.
+      for (const paragraph of [2, 3, 4, 8, 9, 10, 15, 16, 22, 23, 24]) {
+        await commentOn(page, `Paragraph ${paragraph} `, `Thread on ${paragraph}`)
+      }
+      await commentOn(page, 'long enough', 'A second thread on the last paragraph')
+      // The twelve, and the one the launch plan has already, whose text is gone and which is at the end.
+      const cards = marginOf(page).locator('[data-thread-id]')
+      await expect(cards).toHaveCount(13)
+      await text.evaluate((element) => element.blur())
+
+      // The page is what scrolls: nothing else has a scroll of its own, and the explorer fits.
+      const scrollZones = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('body *')]
+          .filter((element) => {
+            const { overflowY } = getComputedStyle(element)
+            return (overflowY === 'auto' || overflowY === 'scroll') && element.scrollHeight > element.clientHeight + 1
+          })
+          .map((element) => element.tagName + '.' + element.className),
+      )
+      expect(scrollZones, 'zones that scroll on their own').toEqual([])
+      const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight)
+      expect(pageHeight, 'the page is longer than the window').toBeGreaterThan(height)
+
+      // Where each card is, and where its text: the card is level with it, and never above it.
+      const placed = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('aside [data-thread-id]')].map((card) => {
+          const id = card.dataset['threadId'] ?? ''
+          const mark = document.querySelector(`mark[data-comment-thread="${id}"]`)
+          const box = card.getBoundingClientRect()
+          return {
+            id,
+            top: box.top + window.scrollY,
+            bottom: box.bottom + window.scrollY,
+            text: (mark?.getBoundingClientRect().top ?? NaN) + window.scrollY,
+          }
+        }),
+      )
+      expect(placed).toHaveLength(13)
+      const onText = placed.filter((card) => !Number.isNaN(card.text))
+      expect(onText).toHaveLength(12)
+      const tolerance = 6
+      for (const card of onText)
+        expect(card.top, `card ${card.id} is not above its text`).toBeGreaterThanOrEqual(card.text - tolerance)
+      // Nothing overlaps: each card ends before the next one starts, in the order of the text.
+      for (const [index, card] of placed.slice(0, -1).entries()) {
+        expect(card.bottom, `card ${index} ends before the next`).toBeLessThanOrEqual(
+          (placed[index + 1]?.top ?? Infinity) + 0.5,
+        )
+      }
+      // None is lower than the tolerance (two lines, 48 px) before the text opens room for it, and the threads that have a card
+      // of their own are level with their text.
+      for (const card of onText)
+        expect(card.top - card.text, `card ${card.id} is not far below its text`).toBeLessThanOrEqual(48 + tolerance)
+      expect(onText.filter((card) => Math.abs(card.top - card.text) <= tolerance).length).toBeGreaterThanOrEqual(4)
+      // Cards that would have overlapped the text under them have had room opened for them.
+      expect(await page.locator('[data-comment-gap]').count()).toBeGreaterThan(0)
+
+      // The band and the bar stay at the top of the window as the page goes by under them.
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+      const band = await bandOf(page).boundingBox()
+      const bar = await barOf(page).boundingBox()
+      expect(band?.y).toBe(0)
+      expect(bar?.y).toBeCloseTo((band?.y ?? 0) + (band?.height ?? 0), 0)
+      await expect(commentsToggle(page)).toBeInViewport()
+      await expect(page.getByRole('button', { name: 'Share' })).toBeInViewport()
+    })
+  }
+
+  // The room the text opens for the thread the person is on is what makes the text jump when they choose one, so it is kept
+  // small: the active card is short (the actions over the header, a reply of one line) and uses the room above it first.
+  test('opens little room in the text for the active thread', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto(documentPath)
+    await open(page)
+    await page.keyboard.press('Control+End')
+    for (const line of [
+      'The first paragraph is short.',
+      'The second paragraph is short too.',
+      'The third paragraph is the next one.',
+    ]) {
+      await page.keyboard.press('Enter')
+      await page.keyboard.insertText(line)
+    }
+    await commentOn(page, 'first paragraph', 'About the first')
+    await commentOn(page, 'second paragraph', 'About the second')
+    await commentOn(page, 'third paragraph', 'About the third')
+    const room = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('[data-comment-gap]')].reduce(
+          (sum, block) => sum + Number(block.dataset['commentGap']),
+          0,
+        ),
+      )
+    await marginOf(page).locator('[data-thread-id]').filter({ hasText: 'About the second' }).click()
+    const active = marginOf(page).getByRole('article')
+    await expect(active).toBeVisible()
+
+    // The whole card, with its conversation, a reply of one line and Resolve: no taller than a card of the preview with two comments.
+    expect((await active.boundingBox())?.height).toBeLessThanOrEqual(240)
+    // 137 px of room in all with the three rules; 185 without the tolerance and 200 without the room above.
+    await expect.poll(room).toBeLessThanOrEqual(160)
+  })
+
+  // What changes the height of something above the text (the error of the title) moves the text and nothing the margin watches
+  // changes size: the cards have to follow it all the same.
+  test('keeps each card level with its text when something above the text changes height', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto(documentPath)
+    await open(page)
+    await page.keyboard.press('Control+End')
+    for (const line of ['The first paragraph, which is commented on.', 'The second paragraph, which is too.']) {
+      await page.keyboard.press('Enter')
+      await page.keyboard.insertText(line)
+    }
+    await commentOn(page, 'first paragraph', 'About the first')
+    await commentOn(page, 'second paragraph', 'About the second')
+    // How far each card is from its text (signed), by thread.
+    const offsets = () =>
+      page.evaluate(() =>
+        Object.fromEntries(
+          [...document.querySelectorAll<HTMLElement>('aside [data-thread-id]')].flatMap((card) => {
+            const id = card.dataset['threadId'] ?? ''
+            const mark = document.querySelector(`mark[data-comment-thread="${id}"]`)
+            return mark === null ? [] : [[id, card.getBoundingClientRect().top - mark.getBoundingClientRect().top]]
+          }),
+        ),
+      )
+    // The page has to be still when the title shows its error: what the cards were waiting for (a card that has just been made,
+    // the focus that leaves the text or reaches the title, which changes the active card) would measure the page again after the
+    // error, and the cards would be level without the margin having noticed it. Still is the same distances for 300 ms.
+    const settle = async () => {
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      await expect
+        .poll(async () => {
+          const first = await offsets()
+          await page.waitForTimeout(300)
+          const second = await offsets()
+          return Math.max(...Object.entries(first).map(([id, offset]) => Math.abs((second[id] ?? Number.NaN) - offset)))
+        })
+        .toBeLessThanOrEqual(1)
+      return offsets()
+    }
+    await textArea(page).evaluate((element) => element.blur())
+    await settle()
+
+    // An empty title is refused when the person leaves it, and says so under it: the text goes down by that much.
+    const title = page.getByRole('textbox', { name: 'Document title' })
+    const topOfText = async () => (await textArea(page).boundingBox())?.y ?? Number.NaN
+    await title.fill('')
+    const settled = await settle()
+    expect(Object.keys(settled)).toHaveLength(2)
+    const before = await topOfText()
+    await title.blur()
+    await expect(page.getByText('Give the document a title.')).toBeVisible()
+    expect(await topOfText()).toBeGreaterThan(before)
+
+    // The text went down and the cards went with it: each is as far from its text as it was.
+    await expect
+      .poll(
+        async () => {
+          const now = await offsets()
+          return Math.max(...Object.entries(settled).map(([id, offset]) => Math.abs((now[id] ?? Number.NaN) - offset)))
+        },
+        { message: 'cards as far from their text as before' },
+      )
+      .toBeLessThanOrEqual(6)
+  })
+
+  // A browser zoomed to 200 % on a window of 1280 px is a window of 640 × 360 CSS px: there is no beside for the margin, which
+  // goes under the sheet with its cards in the order of the text, and the band and the bar go by with the page.
+  test('zoomed to 200 %: the margin is under the sheet, in the order of the text, and nothing is cut', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000)
+    await page.setViewportSize({ width: 640, height: 360 })
+    await page.goto(documentPath)
+    await open(page)
+    await page.keyboard.press('Control+End')
+    for (const line of ['The first paragraph, which is commented on.', 'The second paragraph, which is too.']) {
+      await page.keyboard.press('Enter')
+      await page.keyboard.insertText(line)
+    }
+    await commentOn(page, 'second paragraph', 'About the second')
+    await commentOn(page, 'first paragraph', 'About the first')
+
+    const sheet = await sheetOf(page).boundingBox()
+    const margin = await marginOf(page).boundingBox()
+    // Under the sheet, as wide as the page lets it be, and the page does not scroll sideways.
+    expect(margin?.y).toBeGreaterThanOrEqual((sheet?.y ?? 0) + (sheet?.height ?? 0))
+    expect((margin?.x ?? 0) + (margin?.width ?? 0)).toBeLessThanOrEqual(640)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    // In the order of the text, not of the time they were made in.
+    const cards = marginOf(page).locator('[data-thread-id]')
+    await expect(cards.filter({ hasText: 'About the first' })).toBeAttached()
+    const order = await cards.evaluateAll((elements) => elements.map((element) => element.textContent ?? ''))
+    expect(order.findIndex((card) => card.includes('About the first'))).toBeLessThan(
+      order.findIndex((card) => card.includes('About the second')),
+    )
+    // Each card is under the one before it, in the flow: none is laid over another.
+    const boxes = await cards.evaluateAll((elements) =>
+      elements.map((element) => {
+        const { top, bottom } = element.getBoundingClientRect()
+        return { top, bottom }
+      }),
+    )
+    for (const [index, box] of boxes.slice(1).entries()) {
+      expect(box.top, `card ${index + 1} starts after the one before it`).toBeGreaterThanOrEqual(
+        boxes[index]?.bottom ?? 0,
+      )
+    }
+    // Nothing is cut: each card holds what it says, and none is outside the window.
+    const cut = await cards.evaluateAll((elements) =>
+      elements.filter((element) => element.scrollWidth > element.clientWidth + 1).map((element) => element.className),
+    )
+    expect(cut).toEqual([])
+    // No room was opened in the text, which is measured only beside it.
+    expect(await page.locator('[data-comment-gap]').count()).toBe(0)
+    // The band and the bar are five rows of the toolbar's height: they go by with the page, so the text has the window.
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    expect((await bandOf(page).boundingBox())?.y ?? 0).toBeLessThan(0)
+  })
+})
+
+// The skeleton is on the screen for a moment only: its measures are taken as it appears, before the real ones replace it (the
+// pattern of the other screens of the suite). The band, the bar and the sheet must be where the document will have them.
+for (const width of [1280, 640] as const) {
+  test(`gives the document the band, the bar and the sheet of its skeleton at ${width} px, so nothing moves`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: width === 640 ? 360 : 800 })
+    await page.addInitScript(() => {
+      type Box = { x: number; y: number; width: number; height: number }
+      const seen = window as unknown as { skeleton?: { band: Box; bar: Box; sheet: Box } }
+      const box = (element: Element): Box => {
+        const { x, y, width: w, height: h } = element.getBoundingClientRect()
+        return { x, y, width: w, height: h }
+      }
+      new MutationObserver(() => {
+        const skeleton = document.querySelector('main [aria-busy="true"]')
+        const chrome = skeleton?.firstElementChild
+        const sheet = skeleton?.children[1]?.firstElementChild
+        const [band, bar] = [chrome?.children[0], chrome?.children[1]]
+        if (seen.skeleton === undefined && band && bar && sheet) {
+          seen.skeleton = { band: box(band), bar: box(bar), sheet: box(sheet) }
+        }
+      }).observe(document, { childList: true, subtree: true })
+    })
+    await page.goto(documentPath)
+    await textArea(page).waitFor()
+    await expect(marginOf(page)).toBeAttached()
+
+    const seen = await page.evaluate(
+      () => (window as unknown as { skeleton?: Record<'band' | 'bar' | 'sheet', Record<string, number>> }).skeleton,
+    )
+    expect(seen, 'the skeleton was seen').toBeDefined()
+    const real = {
+      band: await bandOf(page).boundingBox(),
+      bar: await barOf(page).boundingBox(),
+      sheet: await sheetOf(page).boundingBox(),
+    }
+    for (const part of ['band', 'bar', 'sheet'] as const) {
+      expect(real[part]?.x, `${part} x`).toBeCloseTo(seen?.[part]?.['x'] ?? NaN, 0)
+      expect(real[part]?.y, `${part} y`).toBeCloseTo(seen?.[part]?.['y'] ?? NaN, 0)
+      expect(real[part]?.width, `${part} width`).toBeCloseTo(seen?.[part]?.['width'] ?? NaN, 0)
+    }
+    expect(real.band?.height).toBeCloseTo(seen?.band?.['height'] ?? NaN, 0)
+    expect(real.bar?.height).toBeCloseTo(seen?.bar?.['height'] ?? NaN, 0)
+  })
+}

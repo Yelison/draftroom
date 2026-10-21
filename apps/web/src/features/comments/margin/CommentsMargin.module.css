@@ -1,0 +1,74 @@
+/*
+ * The margin beside the sheet. Beside the text its cards are laid out by the page's measures (they are placed with a
+ * `top`), and the margin is at least as tall as the lowest of them; under the width of a desktop there is no beside and the
+ * cards follow the text, one under the other.
+ */
+.margin {
+  position: relative;
+  display: grid;
+  gap: var(--space-8);
+  align-content: start;
+  min-width: 0;
+}
+
+.margin[hidden] {
+  display: none;
+}
+
+.list {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+}
+
+@media (width >= 1280px) {
+  /* The cards leave the flow: `useMarginLayout` says where each goes. */
+  .item {
+    position: absolute;
+    inset-inline: 0;
+  }
+
+  /* Not seen until it is where it goes, which is measured before the browser paints. */
+  .item[data-measuring] {
+    visibility: hidden;
+  }
+}
+
+.label {
+  padding-inline: var(--space-4);
+  color: var(--color-muted);
+  font: var(--font-caption);
+}
+
+@media (width >= 1280px) {
+  .label {
+    position: absolute;
+    inset-inline: 0;
+  }
+}
+
+.caption {
+  margin: 0;
+  padding: var(--space-8) var(--space-4);
+  color: var(--color-muted);
+  font: var(--font-caption);
+}
+
+/* The button that comments on the selection: beside the margin, over the room the sheet has to its right. */
+.selection {
+  display: flex;
+  z-index: 1;
+}
+
+@media (width >= 1280px) {
+  .selection {
+    position: absolute;
+    inset-inline-start: calc(-1 * (var(--space-16) + var(--space-4) + var(--button-height)));
+  }
+}

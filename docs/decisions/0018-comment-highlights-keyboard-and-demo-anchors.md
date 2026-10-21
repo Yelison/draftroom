@@ -33,3 +33,7 @@ T3.2 shows the threads of a document as highlights in the text and lets a person
 - **Register the key with Tiptap and make the text of a commenter editable but inert.** Rejected: it changes what the text is for the browser (a caret, a keyboard on a phone, an editing context for a screen reader) in order to receive a key.
 - **One fixed client for the whole demo.** Rejected: two languages, or two builds, would share items that differ.
 - **A random client and a table of anchors that is rebuilt on every open.** Rejected: the threads of the fixtures belong to the REST world of each tab and cannot know which client wrote the text in another tab.
+
+## Update (0020, 2026-10-20)
+
+The threads are now shown in the margin of the sheet and not in a panel ([0020](0020-comments-in-the-margin-one-scroll.md)). The keyboard flow of this decision is unchanged, and the thread that the key takes the person to is the active one of the margin. The highlight plugin also places the resolved threads without drawing them, so that their cards can be level with their text; the key and the click still reach only the open ones.

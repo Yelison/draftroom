@@ -2,7 +2,9 @@ import { anchorOnText } from '../../../data/mock/collab/seededContent.ts'
 // The test plays the server, which is what writes the starting content of a document from JSON; the client never does.
 // oxlint-disable-next-line no-restricted-imports
 import { jsonToYUpdate } from '@draftroom/editor-schema/convert'
-import { screen } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
+import type { UserEvent } from '@testing-library/user-event'
+import { expect } from 'vitest'
 import * as Y from 'yjs'
 import { people, renderEditor, launchPlan, type RenderEditorOptions } from '../../editor/testing/renderEditor.tsx'
 import type { DataSource } from '../../../data/DataSource.ts'
@@ -74,6 +76,24 @@ export function renderCommentedDocument({
   return view
 }
 
-/** The panel beside the text. */
-export const findPanel = () =>
-  screen.findByRole('complementary', { name: /Comments and activity|Comentarios y actividad/ })
+/** The margin beside the text, where the threads are. */
+export const findMargin = () =>
+  screen.findByRole('complementary', { name: /Comments in the margin|Comentarios al margen/ })
+
+/** The compact cards of the margin: the threads that are not the one the person is on, each of which is one button. */
+export const compactThreads = (margin: HTMLElement) =>
+  within(margin)
+    .queryAllByRole('button')
+    .filter((button) => button.dataset['threadId'] !== undefined)
+
+/** The element of a thread that says `text`: its compact card until it is the active one, its whole card after. */
+export const threadOf = (margin: HTMLElement, text: string) =>
+  within(margin).getByText(text, { exact: false }).closest<HTMLElement>('[data-thread-id]') as HTMLElement
+
+/** Makes the thread that says `text` the active one, as a person does by choosing its compact card, and gives its card. */
+export async function openThread(user: UserEvent, margin: HTMLElement, text: string): Promise<HTMLElement> {
+  const thread = threadOf(margin, text)
+  if (thread.tagName !== 'ARTICLE') await user.click(thread)
+  await waitFor(() => expect(threadOf(margin, text).tagName).toBe('ARTICLE'))
+  return threadOf(margin, text)
+}

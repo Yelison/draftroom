@@ -7,7 +7,7 @@ import type { DataSource } from '../../data/DataSource.ts'
 import { ApiError } from '../../data/errors.ts'
 import { launchPlan, people } from '../editor/testing/renderEditor.tsx'
 import { rangeOf } from './testing/pairedEditors.ts'
-import { findPanel, renderCommentedDocument } from './testing/openCommentedDocument.tsx'
+import { findMargin, renderCommentedDocument } from './testing/openCommentedDocument.tsx'
 
 const paragraphs = ['The launch moves to the second week of November.', 'Marketing prepares the announcement.']
 
@@ -33,23 +33,22 @@ describe('commenting on a selection', () => {
       const user = userEvent.setup()
       renderCommentedDocument({ signedInAs, paragraphs })
       const editor = await editorOf()
-      const panel = await findPanel()
+      const margin = await findMargin()
       expect(await textArea()).toHaveAttribute('contenteditable', editable)
 
-      expect(within(panel).getByText('Select some text to comment on it.')).toBeInTheDocument()
-      expect(within(panel).queryByRole('button', { name: 'Comment on the selected text' })).not.toBeInTheDocument()
+      expect(within(margin).queryByRole('button', { name: 'Comment on the selected text' })).not.toBeInTheDocument()
       await select(editor, 'second week')
 
-      const action = await within(panel).findByRole('button', { name: 'Comment on the selected text' })
+      const action = await within(margin).findByRole('button', { name: 'Comment on the selected text' })
       expect(action).toHaveAttribute('aria-keyshortcuts', 'Control+Alt+M')
       await user.click(action)
-      expect(within(panel).getByRole('region', { name: 'New comment' })).toHaveTextContent('second week')
+      expect(within(margin).getByRole('region', { name: 'New comment' })).toHaveTextContent('second week')
 
       // Whatever the text allows, the thread is the server's: it is created, listed and highlighted.
-      await user.type(within(panel).getByRole('textbox', { name: 'Your comment' }), 'Is this date final?')
-      await user.click(within(panel).getByRole('button', { name: 'Comment' }))
-      expect(await within(panel).findByText('Comment added.')).toBeInTheDocument()
-      expect(within(panel).getByText('Is this date final?')).toBeInTheDocument()
+      await user.type(within(margin).getByRole('textbox', { name: 'Your comment' }), 'Is this date final?')
+      await user.click(within(margin).getByRole('button', { name: 'Comment' }))
+      expect(await within(margin).findByText('Comment added.')).toBeInTheDocument()
+      expect(within(margin).getByText('Is this date final?')).toBeInTheDocument()
       await waitFor(() => expect(document.querySelector('mark')?.textContent).toBe('second week'))
     },
   )
@@ -57,12 +56,11 @@ describe('commenting on a selection', () => {
   it('is not offered for a selection of nothing but blanks, which has no text to quote', async () => {
     renderCommentedDocument({ paragraphs: ['Before    after'] })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
 
     await select(editor, '    ')
 
-    expect(within(panel).getByText('Select some text to comment on it.')).toBeInTheDocument()
-    expect(within(panel).queryByRole('button', { name: 'Comment on the selected text' })).not.toBeInTheDocument()
+    expect(within(margin).queryByRole('button', { name: 'Comment on the selected text' })).not.toBeInTheDocument()
   })
 
   it('creates the thread with an anchor on the selection, the quote and the text, and takes the person to its card', async () => {
@@ -79,12 +77,12 @@ describe('commenting on a selection', () => {
       }),
     })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     await select(editor, 'second week')
 
-    await user.click(await within(panel).findByRole('button', { name: 'Comment on the selected text' }))
-    await user.type(within(panel).getByRole('textbox', { name: 'Your comment' }), 'Is this date final?')
-    await user.click(within(panel).getByRole('button', { name: 'Comment' }))
+    await user.click(await within(margin).findByRole('button', { name: 'Comment on the selected text' }))
+    await user.type(within(margin).getByRole('textbox', { name: 'Your comment' }), 'Is this date final?')
+    await user.click(within(margin).getByRole('button', { name: 'Comment' }))
 
     await waitFor(() => expect(createThread).toHaveBeenCalledOnce())
     const sent = createThread.mock.calls[0]?.[0]
@@ -92,14 +90,14 @@ describe('commenting on a selection', () => {
     expect(sent?.body).toMatchObject({ quote: 'second week', body: 'Is this date final?' })
     await waitFor(() =>
       expect(
-        within(panel)
+        within(margin)
           .getAllByRole('article')
           .find((row) => row.contains(document.activeElement)),
       ).toBeDefined(),
     )
-    expect(within(panel).getByText('Is this date final?')).toBeInTheDocument()
-    expect(within(panel).queryByRole('region', { name: 'New comment' })).not.toBeInTheDocument()
-    expect(within(panel).getByText('Comment added.')).toBeInTheDocument()
+    expect(within(margin).getByText('Is this date final?')).toBeInTheDocument()
+    expect(within(margin).queryByRole('region', { name: 'New comment' })).not.toBeInTheDocument()
+    expect(within(margin).getByText('Comment added.')).toBeInTheDocument()
     await waitFor(() => expect(document.querySelector('mark')?.textContent).toBe('second week'))
   })
 
@@ -117,12 +115,12 @@ describe('commenting on a selection', () => {
       }),
     })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     await select(editor, '😀'.repeat(501))
 
-    await user.click(await within(panel).findByRole('button', { name: 'Comment on the selected text' }))
-    await user.type(within(panel).getByRole('textbox', { name: 'Your comment' }), 'Too long a quote')
-    await user.click(within(panel).getByRole('button', { name: 'Comment' }))
+    await user.click(await within(margin).findByRole('button', { name: 'Comment on the selected text' }))
+    await user.type(within(margin).getByRole('textbox', { name: 'Your comment' }), 'Too long a quote')
+    await user.click(within(margin).getByRole('button', { name: 'Comment' }))
 
     await waitFor(() => expect(createThread).toHaveBeenCalledOnce())
     expect([...(createThread.mock.calls[0]?.[0].body.quote ?? '')]).toHaveLength(500)
@@ -142,19 +140,19 @@ describe('commenting on a selection', () => {
       }),
     })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     await select(editor, 'second week')
 
-    await user.click(await within(panel).findByRole('button', { name: 'Comment on the selected text' }))
-    const field = within(panel).getByRole('textbox', { name: 'Your comment' })
+    await user.click(await within(margin).findByRole('button', { name: 'Comment on the selected text' }))
+    const field = within(margin).getByRole('textbox', { name: 'Your comment' })
     await user.type(field, 'Is this date final?')
-    await user.click(within(panel).getByRole('button', { name: 'Comment' }))
+    await user.click(within(margin).getByRole('button', { name: 'Comment' }))
 
-    expect(await within(panel).findByRole('alert')).toHaveTextContent('Draftroom is unavailable right now.')
+    expect(await within(margin).findByRole('alert')).toHaveTextContent('Draftroom is unavailable right now.')
     expect(field).toHaveValue('Is this date final?')
 
-    await user.click(within(panel).getByRole('button', { name: 'Comment' }))
-    expect(await within(panel).findByText('Comment added.')).toBeInTheDocument()
+    await user.click(within(margin).getByRole('button', { name: 'Comment' }))
+    expect(await within(margin).findByText('Comment added.')).toBeInTheDocument()
   })
 
   it('does not lose the text of the thread when the selection is lost or the text changes while it is written', async () => {
@@ -171,15 +169,15 @@ describe('commenting on a selection', () => {
       }),
     })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     await select(editor, 'second week')
-    await user.click(await within(panel).findByRole('button', { name: 'Comment on the selected text' }))
-    await user.type(within(panel).getByRole('textbox', { name: 'Your comment' }), 'Still here')
+    await user.click(await within(margin).findByRole('button', { name: 'Comment on the selected text' }))
+    await user.type(within(margin).getByRole('textbox', { name: 'Your comment' }), 'Still here')
 
     // Someone types before the commented text, and the selection moves away from it.
     act(() => void editor.commands.insertContentAt(1, 'Note: '))
     act(() => void editor.commands.setTextSelection(1))
-    await user.click(within(panel).getByRole('button', { name: 'Comment' }))
+    await user.click(within(margin).getByRole('button', { name: 'Comment' }))
 
     await waitFor(() => expect(createThread).toHaveBeenCalledOnce())
     await waitFor(() => expect(document.querySelector('mark')?.textContent).toBe('second week'))
@@ -189,12 +187,12 @@ describe('commenting on a selection', () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     const text = await textArea()
     text.focus()
     await select(editor, 'second week')
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
-    const field = await within(panel).findByRole('textbox', { name: 'Your comment' })
+    const field = await within(margin).findByRole('textbox', { name: 'Your comment' })
     await waitFor(() => expect(field).toHaveFocus())
     await user.type(field, 'A long thought about the date')
 
@@ -202,42 +200,42 @@ describe('commenting on a selection', () => {
     await select(editor, 'announcement')
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
 
-    const composer = within(panel).getByRole('region', { name: 'New comment' })
+    const composer = within(margin).getByRole('region', { name: 'New comment' })
     await waitFor(() => expect(composer).toHaveTextContent('announcement'))
     expect(within(composer).getByRole('textbox', { name: 'Your comment' })).toHaveValue('A long thought about the date')
     await waitFor(() => expect(within(composer).getByRole('textbox', { name: 'Your comment' })).toHaveFocus())
-    expect(await within(panel).findByText('The comment now refers to the new selection.')).toBeInTheDocument()
+    expect(await within(margin).findByText('The comment now refers to the new selection.')).toBeInTheDocument()
   })
 
   it('says the selection changed when only the end of it is another', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     const text = await textArea()
     text.focus()
     await select(editor, 'second week')
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
-    await within(panel).findByRole('textbox', { name: 'Your comment' })
+    await within(margin).findByRole('textbox', { name: 'Your comment' })
 
     // Same start, fewer words: "second week" becomes "second".
     text.focus()
     await select(editor, 'second')
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
 
-    expect(await within(panel).findByText('The comment now refers to the new selection.')).toBeInTheDocument()
+    expect(await within(margin).findByText('The comment now refers to the new selection.')).toBeInTheDocument()
   })
 
   it('does not say the selection changed when the person asks again for the same one', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     const text = await textArea()
     text.focus()
     await select(editor, 'second week')
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
-    const field = await within(panel).findByRole('textbox', { name: 'Your comment' })
+    const field = await within(margin).findByRole('textbox', { name: 'Your comment' })
     await user.type(field, 'Still the same words')
 
     text.focus()
@@ -247,37 +245,45 @@ describe('commenting on a selection', () => {
     // The form takes the focus again and keeps the text, and there is nothing to announce: the quote is the same.
     await waitFor(() => expect(field).toHaveFocus())
     expect(field).toHaveValue('Still the same words')
-    expect(within(panel).queryByText('The comment now refers to the new selection.')).not.toBeInTheDocument()
+    expect(within(margin).queryByText('The comment now refers to the new selection.')).not.toBeInTheDocument()
   })
 
   it('does not say the selection changed when the form was not open', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     const text = await textArea()
     text.focus()
     await select(editor, 'second week')
 
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
 
-    await within(panel).findByRole('region', { name: 'New comment' })
-    expect(within(panel).queryByText('The comment now refers to the new selection.')).not.toBeInTheDocument()
+    await within(margin).findByRole('region', { name: 'New comment' })
+    expect(within(margin).queryByText('The comment now refers to the new selection.')).not.toBeInTheDocument()
   })
 
   it('asks for something to send, and gives the focus back to the text when the person cancels', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     await select(editor, 'second week')
-    await user.click(await within(panel).findByRole('button', { name: 'Comment on the selected text' }))
+    await user.click(await within(margin).findByRole('button', { name: 'Comment on the selected text' }))
 
-    await user.click(within(panel).getByRole('button', { name: 'Comment' }))
-    expect(await within(panel).findByRole('alert')).toHaveTextContent('Write something before you send it.')
+    await user.click(within(margin).getByRole('button', { name: 'Comment' }))
+    expect(await within(margin).findByRole('alert')).toHaveTextContent('Write something before you send it.')
+    document.addEventListener('keydown', (e) =>
+      console.log('DOC', e.key, (e.target as Element).outerHTML.slice(0, 120), e.defaultPrevented),
+    )
+    console.log(
+      'ACT',
+      document.activeElement?.outerHTML.slice(0, 100),
+      document.activeElement?.closest('section')?.getAttribute('aria-label'),
+    )
     await user.keyboard('{Escape}')
 
-    expect(within(panel).queryByRole('region', { name: 'New comment' })).not.toBeInTheDocument()
+    expect(within(margin).queryByRole('region', { name: 'New comment' })).not.toBeInTheDocument()
     const text = await textArea()
     await waitFor(() => expect(text).toHaveFocus())
   })
@@ -286,8 +292,8 @@ describe('commenting on a selection', () => {
 describe('what other people do to the comments', () => {
   it('shows what another person wrote without a reload, when the server says the comments changed', async () => {
     const { server } = renderCommentedDocument({ paragraphs })
-    const panel = await findPanel()
-    await within(panel).findAllByRole('article')
+    const margin = await findMargin()
+    await within(margin).findByText('1 reply')
 
     const sofia = server.connect({ signedInAs: people.sofia })
     const { items } = await sofia.listThreads({ params: { path: { documentId: launchPlan.id } } })
@@ -298,6 +304,7 @@ describe('what other people do to the comments', () => {
       server.collaboration.broadcast(documentName(launchPlan.id), { type: 'comments-changed', threadId: thread.id })
     })
 
-    expect(await within(panel).findByText('Moved to Friday.')).toBeInTheDocument()
+    // The thread is compact: what it says of the replies is how many there are.
+    expect(await within(margin).findByText('2 replies')).toBeInTheDocument()
   })
 })

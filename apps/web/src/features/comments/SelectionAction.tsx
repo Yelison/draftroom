@@ -1,33 +1,47 @@
-import { Button } from '@yelison/forma-ui'
+import { IconButton, Tooltip } from '@yelison/forma-ui'
 import { useIntl } from 'react-intl'
 import { ariaKeyShortcuts, shortcutLabel } from '../editor/shortcuts.ts'
 import { commentShortcut } from './highlightPlugin.ts'
-import type { SelectedText } from './useSelectionToComment.ts'
 import styles from './SelectionAction.module.css'
 
 /**
- * How a person starts a comment. With text selected it is the button that comments on it; without, the line that says how
- * to begin, so the row never changes height and nothing below it moves when a selection is made. The shortcut is on the
- * button, and it is explained to the person who has no pointer.
+ * How a person starts a comment with the pointer: a button beside the text they selected. The shortcut is on the button, and
+ * it is explained to the person who has no pointer. It is drawn only while there is a selection to comment on.
  */
-export function SelectionAction({ selection, onStart }: { selection: SelectedText | null; onStart: () => void }) {
+export function SelectionAction({
+  onStart,
+  composing,
+  className,
+}: {
+  onStart: () => void
+  /**
+   * Whether the form of a comment is open. The pointer is still over the button that opened it, and its tooltip would take the
+   * Escape key that closes the form: while it is open the button says nothing.
+   */
+  composing: boolean
+  className?: string
+}) {
   const intl = useIntl()
+  const label = intl.formatMessage({ id: 'comments.action.label' })
 
   return (
-    <div className={styles.row}>
-      {selection === null ? (
-        <p className={styles.hint}>{intl.formatMessage({ id: 'comments.action.hint' })}</p>
-      ) : (
-        <Button
-          size="compact"
-          aria-label={intl.formatMessage({ id: 'comments.action.label' })}
-          aria-keyshortcuts={ariaKeyShortcuts(commentShortcut)}
-          title={intl.formatMessage({ id: 'comments.action.tooltip' }, { shortcut: shortcutLabel(commentShortcut) })}
-          onClick={onStart}
-        >
-          {intl.formatMessage({ id: 'comments.action.start' })}
-        </Button>
-      )}
-    </div>
+    <span className={className === undefined ? styles.action : `${styles.action} ${className}`}>
+      <Tooltip
+        content={intl.formatMessage({ id: 'comments.action.tooltip' }, { shortcut: shortcutLabel(commentShortcut) })}
+        placement="bottom-end"
+        describe={false}
+        disabled={composing}
+      >
+        {(trigger) => (
+          <IconButton
+            {...trigger}
+            icon="comment"
+            label={label}
+            aria-keyshortcuts={ariaKeyShortcuts(commentShortcut)}
+            onClick={onStart}
+          />
+        )}
+      </Tooltip>
+    </span>
   )
 }

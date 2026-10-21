@@ -2,11 +2,12 @@ import type { Schema } from '@draftroom/contract'
 import { IconButton, Menu } from '@yelison/forma-ui'
 import { useIntl } from 'react-intl'
 import { useNavigate } from 'react-router'
+import type { DocumentRowOptions } from '../DocumentListRow.tsx'
 import { SectionFrame } from './SectionFrame.tsx'
-import { SectionRows, type SectionRowsProps } from './SectionRows.tsx'
+import { SectionRows } from './SectionRows.tsx'
 import { useSectionDocuments } from './useSectionDocuments.ts'
 
-export interface FolderSectionProps extends Pick<SectionRowsProps, 'onRenameOrMove' | 'onArchive'> {
+export interface FolderSectionProps extends DocumentRowOptions {
   workspaceId: string
   folder: Schema<'Folder'>
   expanded: boolean
@@ -31,6 +32,7 @@ export function FolderSection({ workspaceId, folder, expanded, onToggle, onRenam
       icon="folder"
       expanded={expanded}
       onToggle={onToggle}
+      compact={actions.compact === true}
       actions={
         <Menu
           label={label}

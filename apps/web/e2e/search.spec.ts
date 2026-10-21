@@ -16,7 +16,7 @@ test('searches from the explorer, sees what matched in the title and the excerpt
   page,
 }) => {
   await page.goto(`/documents/${launchPlan.id}`)
-  await expect(explorer(page).getByRole('tree', { name: 'Documents and folders' })).toBeVisible()
+  await expect(explorer(page).getByRole('button', { name: 'Pinned' })).toBeVisible()
   await tabToExplorerSearch(page)
   const field = explorer(page).getByRole('searchbox', { name: 'Search documents' })
   await expect(field).toBeFocused()

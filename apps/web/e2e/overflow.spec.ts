@@ -139,7 +139,7 @@ test.describe('a window that becomes narrow while someone is working', () => {
 
   test('does not leave the focus on the page when it was in the explorer, which is left out', async ({ page }) => {
     await page.goto(`documents/${launchPlan.id}`)
-    await page.getByRole('tree').waitFor()
+    await page.getByRole('button', { name: 'Pinned' }).waitFor()
     await page.getByRole('searchbox', { name: 'Search documents' }).focus()
 
     await page.setViewportSize({ width: 640, height: 360 })

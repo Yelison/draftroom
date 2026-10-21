@@ -1,7 +1,7 @@
 import { Button } from '@yelison/forma-ui'
 import { useMemo, useRef, type ReactNode } from 'react'
 import { useIntl } from 'react-intl'
-import { DocumentListRow, type DocumentListRowProps } from '../DocumentListRow.tsx'
+import { DocumentListRow, type DocumentRowOptions } from '../DocumentListRow.tsx'
 import { useFocusFirstArrival } from '../useFocusFirstArrival.ts'
 import rows from '../DocumentRows.module.css'
 import { toggleIdOf } from './SectionFrame.tsx'
@@ -11,7 +11,7 @@ import { useFocusAfterRemoval } from './useFocusAfterRemoval.ts'
 import type { useSectionDocuments } from './useSectionDocuments.ts'
 import styles from './Sections.module.css'
 
-export interface SectionRowsProps extends Pick<DocumentListRowProps, 'onRenameOrMove' | 'onArchive'> {
+export interface SectionRowsProps extends DocumentRowOptions {
   sectionKey: string
   /** The name of the section, for the buttons that act on all of it. */
   name: string
@@ -22,6 +22,7 @@ export interface SectionRowsProps extends Pick<DocumentListRowProps, 'onRenameOr
 
 /** The rows of a section, a page at a time: on their way, failed, listed, and the line that says there is nothing. */
 export function SectionRows({ sectionKey, name, data, empty, ...actions }: SectionRowsProps) {
+  const { compact = false } = actions
   const intl = useIntl()
   const { query, documents, firstPageEmpty } = data
   const list = useRef<HTMLUListElement>(null)
@@ -33,7 +34,7 @@ export function SectionRows({ sectionKey, name, data, empty, ...actions }: Secti
   // Pages that hold only pinned documents are asked for one after the other: until there is a row, or no more pages, the
   // section is on its way, and "Show more" over no rows would be a lie.
   const searching = documents.length === 0 && query.hasNextPage && !query.isFetchNextPageError
-  if (query.isPending || searching) return <SectionSkeletonRows />
+  if (query.isPending || searching) return <SectionSkeletonRows compact={compact} />
   // A failed "Show more" or a failed refresh leaves the rows that are there, and says so beside them.
   if (query.isError && query.data === undefined)
     return <SectionFailure name={name} onRetry={() => void query.refetch()} retrying={query.isFetching} />
@@ -44,7 +45,7 @@ export function SectionRows({ sectionKey, name, data, empty, ...actions }: Secti
 
   return (
     <>
-      <ul ref={list} className={rows.rows} onFocus={onFocus}>
+      <ul ref={list} className={compact ? `${rows.rows} ${rows.compact}` : rows.rows} onFocus={onFocus}>
         {documents.map((document) => (
           <DocumentListRow key={document.id} document={document} {...actions} />
         ))}

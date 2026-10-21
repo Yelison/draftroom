@@ -7,6 +7,8 @@ import {
   commentHighlights,
   highlightedThreads,
   placementOf,
+  resolvedThreads,
+  threadAt,
   showHighlights,
   type HighlightedThread,
 } from './highlightPlugin.ts'
@@ -263,6 +265,49 @@ describe('the threads that are shown', () => {
 
     expect(highlighted(editor)).toEqual(['ab'])
     expect(placementOf(editor.state, 'b')).toEqual({ status: 'unresolved' })
+  })
+
+  it('are told apart from the resolved ones by the helpers the screen uses', () => {
+    open = withHighlights('abcdef')
+    const { editor } = open.local
+    const threads = [
+      { ...threadOn(editor, 'a', 'ab'), status: 'open' as const },
+      { ...threadOn(editor, 'b', 'ef'), status: 'resolved' as const },
+    ]
+
+    expect(highlightedThreads(threads).map(({ id }) => id)).toEqual(['a'])
+    expect(resolvedThreads(threads).map(({ id }) => id)).toEqual(['b'])
+  })
+
+  it('place the resolved ones without highlighting them, so the margin can put their cards level with their text', () => {
+    open = withHighlights('abcdef')
+    const { editor } = open.local
+    const resolved = threadOn(editor, 'b', 'ef')
+    showHighlights(editor, [], { handshaken: true, resolved: [resolved] })
+
+    expect(placementOf(editor.state, 'b')).toEqual({ status: 'placed', ...rangeOf(editor, 'ef') })
+    expect(editor.view.dom.querySelector('mark')).toBeNull()
+  })
+
+  it('leave a resolved thread out of what a click or the key reaches, whose text is as good as any other text', () => {
+    open = withHighlights('abcdef')
+    const { editor } = open.local
+    const resolved = threadOn(editor, 'b', 'ef')
+    showHighlights(editor, [], { handshaken: true, resolved: [resolved] })
+
+    expect(threadAt(editor.state, rangeOf(editor, 'ef').from, { caret: true })).toBeNull()
+  })
+
+  it('call a resolved thread whose text is gone orphaned, as an open one', () => {
+    open = withHighlights('abcdef')
+    const { editor } = open.local
+    const resolved = threadOn(editor, 'b', 'ef')
+    const { from, to } = rangeOf(editor, 'ef')
+    editor.commands.deleteRange({ from, to })
+
+    showHighlights(editor, [], { handshaken: true, resolved: [resolved] })
+
+    expect(placementOf(editor.state, 'b')).toEqual({ status: 'orphaned' })
   })
 
   it('are highlighted when the text is read-only, which is how a commenter has it', () => {

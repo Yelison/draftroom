@@ -11,6 +11,16 @@
   resize: vertical;
 }
 
+/* A reply that is not being written is a line, as tall as a button; it opens when it has the focus or something in it. */
+.collapsible {
+  min-block-size: var(--button-height);
+}
+
+.collapsible:focus,
+.collapsible:not(:placeholder-shown) {
+  min-block-size: calc(var(--space-24) * 3);
+}
+
 .field:focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--space-2);

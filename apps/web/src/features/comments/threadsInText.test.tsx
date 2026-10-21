@@ -4,7 +4,7 @@ import type { Editor } from '@tiptap/core'
 import { describe, expect, it } from 'vitest'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { rangeOf } from './testing/pairedEditors.ts'
-import { findPanel, renderCommentedDocument } from './testing/openCommentedDocument.tsx'
+import { findMargin, openThread, renderCommentedDocument, threadOf } from './testing/openCommentedDocument.tsx'
 
 const paragraphs = ['The launch moves to the second week of November.', 'Marketing prepares the announcement.']
 const week = { quote: 'second week', body: 'Is this date final?' }
@@ -16,33 +16,31 @@ async function editorOf(): Promise<Editor> {
 }
 
 const marks = () => [...document.querySelectorAll('mark')].map((mark) => mark.textContent)
-const cardOf = (panel: HTMLElement, text: string) => within(panel).getByText(text).closest('article') as HTMLElement
 
 describe('the highlights of the threads', () => {
   it('mark the text of the open threads, and the card says what the text says', async () => {
     renderCommentedDocument({ paragraphs, started: [week, announcement], fixtureThreads: false })
-    const panel = await findPanel()
+    const margin = await findMargin()
 
     await waitFor(() => expect(marks()).toEqual(['second week', 'the announcement']))
-    expect(
-      within(panel)
-        .getAllByRole('article')
-        .map((card) => card.getAttribute('data-state')),
-    ).toEqual(['open', 'open'])
+    expect([week.body, announcement.body].map((body) => threadOf(margin, body).getAttribute('data-state'))).toEqual([
+      'open',
+      'open',
+    ])
   })
 
   it('are not on the text of a resolved thread, which comes back when the thread is reopened', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs, started: [week, announcement], fixtureThreads: false })
-    const panel = await findPanel()
+    const margin = await findMargin()
     await waitFor(() => expect(marks()).toHaveLength(2))
 
-    await user.click(within(cardOf(panel, week.body)).getByRole('button', { name: 'Resolve' }))
+    await user.click(within(await openThread(user, margin, week.body)).getByRole('button', { name: 'Resolve' }))
     await waitFor(() => expect(marks()).toEqual(['the announcement']))
-    expect(await within(panel).findByText('Thread resolved.')).toBeInTheDocument()
+    expect(await within(margin).findByText('Thread resolved.')).toBeInTheDocument()
 
-    await user.click(within(panel).getByRole('button', { name: /^Resolved \(1\)$/ }))
-    await user.click(within(cardOf(panel, week.body)).getByRole('button', { name: 'Reopen' }))
+    await user.click(screen.getByRole('button', { name: /^Resolved \(1\)$/ }))
+    await user.click(within(await openThread(user, margin, week.body)).getByRole('button', { name: 'Reopen' }))
     await waitFor(() => expect(marks()).toEqual(['second week', 'the announcement']))
   })
 
@@ -61,26 +59,27 @@ describe('the highlights of the threads', () => {
   it('are left alone by a thread whose text was deleted, which becomes orphaned and keeps its quote', async () => {
     renderCommentedDocument({ paragraphs, started: [week], fixtureThreads: false })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     await waitFor(() => expect(marks()).toEqual(['second week']))
 
     act(() => void editor.commands.deleteRange(rangeOf(editor, 'second week')))
 
-    await waitFor(() => expect(within(panel).getByRole('article')).toHaveAttribute('data-state', 'orphaned'))
+    await waitFor(() => expect(threadOf(margin, week.body)).toHaveAttribute('data-state', 'orphaned'))
     expect(marks()).toEqual([])
-    expect(within(panel).getByText('second week')).toBeInTheDocument()
-    expect(within(panel).getByText('Text removed')).toBeInTheDocument()
+    expect(within(margin).getByText('second week')).toBeInTheDocument()
+    expect(within(margin).getByText('Text removed')).toBeInTheDocument()
   })
 
   it('are not made orphaned when the anchors point at text the document has not shown yet: threads made elsewhere are placed once it does', async () => {
     // The fixtures' own threads have anchors that point at nothing, which is what an orphan is once the document is there.
     renderCommentedDocument({ paragraphs })
-    const panel = await findPanel()
+    const margin = await findMargin()
 
     await waitFor(() =>
-      expect(
-        within(panel).getByText('Who signs it off? Finance has not seen the new tiers yet.').closest('article'),
-      ).toHaveAttribute('data-state', 'orphaned'),
+      expect(threadOf(margin, 'Who signs it off? Finance has not seen the new tiers yet.')).toHaveAttribute(
+        'data-state',
+        'orphaned',
+      ),
     )
     expect(marks()).toEqual([])
   })
@@ -91,7 +90,7 @@ describe('moving between the text and its threads with the keyboard', () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs, started: [week, announcement], fixtureThreads: false })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     await waitFor(() => expect(marks()).toHaveLength(2))
     const text = await screen.findByRole('textbox', { name: 'Document content' })
 
@@ -99,9 +98,12 @@ describe('moving between the text and its threads with the keyboard', () => {
     act(() => void editor.commands.setTextSelection(rangeOf(editor, 'the announcement').from + 3))
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
 
-    const card = cardOf(panel, announcement.body)
-    await waitFor(() => expect(card).toHaveFocus())
+    // The thread the key took the person to is the active one: its whole card, with the focus.
+    await waitFor(() => expect(threadOf(margin, announcement.body)).toHaveFocus())
+    const card = threadOf(margin, announcement.body)
+    expect(card.tagName).toBe('ARTICLE')
     expect(card).toHaveAttribute('aria-current', 'true')
+    expect(threadOf(margin, week.body).tagName).toBe('BUTTON')
     expect(document.querySelector('mark[data-active]')?.textContent).toBe('the announcement')
 
     await user.keyboard('{Escape}')
@@ -115,42 +117,60 @@ describe('moving between the text and its threads with the keyboard', () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs, fixtureThreads: false })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     const text = await screen.findByRole('textbox', { name: 'Document content' })
 
     text.focus()
     act(() => void editor.commands.setTextSelection(rangeOf(editor, 'second week')))
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
 
-    const field = await within(panel).findByRole('textbox', { name: 'Your comment' })
+    const field = await within(margin).findByRole('textbox', { name: 'Your comment' })
     await waitFor(() => expect(field).toHaveFocus())
   })
 
-  it('brings the comments back when the text asks for a thread or for a comment from the activity tab', async () => {
+  it('closes the activity when the text asks for a thread or for a comment', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs, started: [week], fixtureThreads: false })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     const text = await screen.findByRole('textbox', { name: 'Document content' })
     await waitFor(() => expect(marks()).toHaveLength(1))
 
-    await user.click(within(panel).getByRole('tab', { name: 'Activity' }))
+    await user.click(screen.getByRole('tab', { name: 'Activity' }))
+    expect(await screen.findByRole('complementary', { name: 'Activity' })).toBeInTheDocument()
     text.focus()
     act(() => void editor.commands.setTextSelection(rangeOf(editor, 'second week').from + 2))
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
-    await waitFor(() =>
-      expect(within(panel).getByRole('tab', { name: 'Comments' })).toHaveAttribute('aria-selected', 'true'),
-    )
-    await waitFor(() => expect(cardOf(panel, week.body)).toHaveFocus())
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Comments' })).toHaveAttribute('aria-selected', 'true'))
+    expect(screen.queryByRole('complementary', { name: 'Activity' })).not.toBeInTheDocument()
+    await waitFor(() => expect(threadOf(margin, week.body)).toHaveFocus())
 
-    await user.click(within(panel).getByRole('tab', { name: 'Activity' }))
+    await user.click(screen.getByRole('tab', { name: 'Activity' }))
     text.focus()
     act(() => void editor.commands.setTextSelection(rangeOf(editor, 'the announcement')))
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Comments' })).toHaveAttribute('aria-selected', 'true'))
+    expect(await within(margin).findByRole('region', { name: 'New comment' })).toBeInTheDocument()
+  })
+
+  it('changes the filter when the text asks for a thread that it hides, so the person is not told to look for what they cannot see', async () => {
+    const user = userEvent.setup()
+    renderCommentedDocument({ paragraphs, started: [week], fixtureThreads: false })
+    const editor = await editorOf()
+    const margin = await findMargin()
+    const text = await screen.findByRole('textbox', { name: 'Document content' })
+    await waitFor(() => expect(marks()).toHaveLength(1))
+    await user.click(screen.getByRole('button', { name: /^Resolved \(/ }))
+    await waitFor(() => expect(within(margin).queryByText(week.body)).not.toBeInTheDocument())
+
+    text.focus()
+    act(() => void editor.commands.setTextSelection(rangeOf(editor, 'second week').from + 2))
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+
     await waitFor(() =>
-      expect(within(panel).getByRole('tab', { name: 'Comments' })).toHaveAttribute('aria-selected', 'true'),
+      expect(screen.getByRole('button', { name: /^Open \(/ })).toHaveAttribute('aria-pressed', 'true'),
     )
-    expect(await within(panel).findByRole('region', { name: 'New comment' })).toBeInTheDocument()
+    await waitFor(() => expect(threadOf(margin, week.body)).toHaveFocus())
   })
 
   it('also works for a commenter, whose text takes no edits', async () => {
@@ -162,7 +182,7 @@ describe('moving between the text and its threads with the keyboard', () => {
       signedInAs: 'sofia@harborpine.example',
     })
     const editor = await editorOf()
-    const panel = await findPanel()
+    const margin = await findMargin()
     await waitFor(() => expect(marks()).toEqual(['second week']))
     const text = await screen.findByRole('textbox', { name: 'Document content' })
     expect(text).toHaveAttribute('tabindex', '0')
@@ -171,65 +191,65 @@ describe('moving between the text and its threads with the keyboard', () => {
     act(() => void editor.commands.setTextSelection(rangeOf(editor, 'second week').from + 2))
     await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
 
-    await waitFor(() => expect(cardOf(panel, week.body)).toHaveFocus())
+    await waitFor(() => expect(threadOf(margin, week.body)).toHaveFocus())
   })
 })
 
-describe('where the focus goes when a card leaves the list', () => {
+describe('where the focus goes when a card leaves the margin', () => {
   it('goes to the next card when a thread is resolved', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs, started: [week, announcement], fixtureThreads: false })
-    const panel = await findPanel()
+    const margin = await findMargin()
     await waitFor(() => expect(marks()).toHaveLength(2))
 
-    await user.click(within(cardOf(panel, week.body)).getByRole('button', { name: 'Resolve' }))
+    await user.click(within(await openThread(user, margin, week.body)).getByRole('button', { name: 'Resolve' }))
 
-    await waitFor(() => expect(cardOf(panel, announcement.body)).toHaveFocus())
+    await waitFor(() => expect(threadOf(margin, announcement.body)).toHaveFocus())
   })
 
   it('goes to the heading of the comments when the last open thread is resolved, never to the page', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs, started: [week], fixtureThreads: false })
-    const panel = await findPanel()
+    const margin = await findMargin()
     await waitFor(() => expect(marks()).toHaveLength(1))
 
-    await user.click(within(cardOf(panel, week.body)).getByRole('button', { name: 'Resolve' }))
+    await user.click(within(await openThread(user, margin, week.body)).getByRole('button', { name: 'Resolve' }))
 
-    await waitFor(() => expect(within(panel).queryByRole('article')).not.toBeInTheDocument())
-    await waitFor(() => expect(within(panel).getByRole('heading', { level: 2, name: 'Comments' })).toHaveFocus())
+    await waitFor(() => expect(within(margin).queryByText(week.body)).not.toBeInTheDocument())
+    await waitFor(() => expect(within(margin).getByRole('heading', { level: 2, name: 'Comments' })).toHaveFocus())
   })
 
   it('goes to the card when one of its comments is deleted and the thread stays', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs, started: [week], fixtureThreads: false })
-    const panel = await findPanel()
+    const margin = await findMargin()
     await waitFor(() => expect(marks()).toHaveLength(1))
-    const card = cardOf(panel, week.body)
+    const card = await openThread(user, margin, week.body)
     await user.type(within(card).getByRole('textbox', { name: 'Reply to this thread' }), 'Yes, it is.')
     await user.click(within(card).getByRole('button', { name: 'Reply' }))
-    await within(panel).findByText('Yes, it is.')
+    await within(margin).findByText('Yes, it is.')
 
-    const [, reply] = within(panel).getAllByRole('button', { name: 'Delete the comment by Marta Ruiz' })
+    const [, reply] = within(margin).getAllByRole('button', { name: 'Delete the comment by Marta Ruiz' })
     await user.click(reply as HTMLElement)
-    await user.click(within(panel).getByRole('button', { name: 'Delete comment' }))
+    await user.click(within(margin).getByRole('button', { name: 'Delete comment' }))
 
-    await waitFor(() => expect(within(panel).queryByText('Yes, it is.')).not.toBeInTheDocument())
-    await waitFor(() => expect(cardOf(panel, week.body)).toHaveFocus())
-    expect(await within(panel).findByText('Comment deleted.')).toBeInTheDocument()
+    await waitFor(() => expect(within(margin).queryByText('Yes, it is.')).not.toBeInTheDocument())
+    await waitFor(() => expect(threadOf(margin, week.body)).toHaveFocus())
+    expect(await within(margin).findByText('Comment deleted.')).toBeInTheDocument()
   })
 })
 
-describe('what the panel says out loud', () => {
+describe('what the margin says out loud', () => {
   it('announces in the language of the person', async () => {
     localStorage.setItem(localeStorageKey, 'es')
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs, started: [week], fixtureThreads: false })
-    const panel = await findPanel()
+    const margin = await findMargin()
     await waitFor(() => expect(marks()).toHaveLength(1))
 
-    await user.click(within(cardOf(panel, week.body)).getByRole('button', { name: 'Resolver' }))
+    await user.click(within(await openThread(user, margin, week.body)).getByRole('button', { name: 'Resolver' }))
 
-    expect(await within(panel).findByText('Hilo resuelto.')).toBeInTheDocument()
+    expect(await within(margin).findByText('Hilo resuelto.')).toBeInTheDocument()
     localStorage.removeItem(localeStorageKey)
   })
 })

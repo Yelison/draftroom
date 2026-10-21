@@ -30,12 +30,12 @@ export function ListSkeleton({ rows, listClassName, label }: ListSkeletonProps) 
 }
 
 /** The skeleton of a list of documents, with the measures of its rows: the one a folder and the search show. */
-export function DocumentsSkeleton() {
+export function DocumentsSkeleton({ compact = false }: { compact?: boolean }) {
   const intl = useIntl()
 
   return (
     <div aria-busy="true">
-      <ul className={`${rows.rows} ${rows.panel}`}>
+      <ul className={`${rows.rows} ${rows.panel} ${compact ? rows.compact : ''}`}>
         {Array.from({ length: 6 }, (_, index) => (
           <li key={index} className={rows.skeletonRow} />
         ))}

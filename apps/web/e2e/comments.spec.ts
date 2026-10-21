@@ -12,12 +12,11 @@ import { watchPolicyViolations } from './policyViolations.ts'
 const documentPath = `/documents/${onboardingChecklist.id}`
 const line = 'Ask your buddy anything: no question is too small.'
 
-/** What each language calls the parts of the panel that these tests use. */
+/** What each language calls the parts of the margin that these tests use. */
 const words = {
   en: {
     locale: 'en-US',
     comment: 'Comment on the selected text',
-    hint: 'Select some text to comment on it.',
     yourComment: 'Your comment',
     replyField: 'Reply to this thread',
     resolve: 'Resolve',
@@ -31,13 +30,13 @@ const words = {
       reopened: 'Thread reopened.',
     },
     text: 'Document content',
-    panel: 'Comments and activity',
+    margin: 'Comments in the margin',
     commentsHeading: 'Comments',
+    activity: 'Activity',
   },
   es: {
     locale: 'es-ES',
     comment: 'Comentar el texto seleccionado',
-    hint: 'Selecciona un texto para comentarlo.',
     yourComment: 'Tu comentario',
     replyField: 'Responder a este hilo',
     resolve: 'Resolver',
@@ -51,8 +50,9 @@ const words = {
       reopened: 'Hilo reabierto.',
     },
     text: 'Contenido del documento',
-    panel: 'Comentarios y actividad',
+    margin: 'Comentarios al margen',
     commentsHeading: 'Comentarios',
+    activity: 'Actividad',
   },
 } as const
 
@@ -80,7 +80,7 @@ for (const [language, said] of Object.entries(words)) {
       await page.goto(documentPath)
       const text = textArea(page, said.text)
       await text.waitFor()
-      const panel = page.getByRole('complementary', { name: said.panel })
+      const margin = page.getByRole('complementary', { name: said.margin })
       await text.focus()
       await page.keyboard.type(line)
       await selectLastWord(page, text)
@@ -92,8 +92,8 @@ for (const [language, said] of Object.entries(words)) {
       await page.keyboard.type('Is that the right word?')
       await page.keyboard.press('Control+Enter')
 
-      // The thread is on the text, announced, and the focus is on its card.
-      const card = panel.getByRole('article')
+      // The thread is on the text, announced, and the focus is on its card: the thread the person is on is the whole one.
+      const card = margin.getByRole('article')
       await expect(card).toBeFocused()
       await expect(card).toHaveAttribute('data-state', 'open')
       await expect(marks(page)).toHaveText('small')
@@ -110,27 +110,31 @@ for (const [language, said] of Object.entries(words)) {
       await expect(textArea(page, said.replyField)).toBeFocused()
       await expect(page.getByRole('status').filter({ hasText: said.announced.replied })).toHaveCount(1)
 
-      // The reply button, then Resolve: the card leaves the open threads and the focus goes to the heading of the panel.
+      // The reply is sent and its field is empty again, so there is no button for it: Resolve is the next stop. The card leaves
+      // the open threads and the focus goes to the heading of the margin.
       await page.keyboard.press('Tab')
-      await page.keyboard.press('Tab')
+      await expect(card.getByRole('button', { name: said.resolve })).toBeFocused()
       await page.keyboard.press('Enter')
-      await expect(panel.getByRole('article')).toHaveCount(0)
+      await expect(margin.getByRole('article')).toHaveCount(0)
       await expect(marks(page)).toHaveCount(0)
-      await expect(panel.getByRole('heading', { level: 2, name: said.commentsHeading })).toBeFocused()
+      await expect(margin.getByRole('heading', { level: 2, name: said.commentsHeading })).toBeFocused()
       await expect(page.getByRole('status').filter({ hasText: said.announced.resolved })).toHaveCount(1)
 
-      // The filter, with the keyboard: the text is still selected, so the button that comments on it comes first, then the
-      // filter. The resolved thread is there, and reopening it puts its highlight back.
+      // The filter is in the bar over the sheet, before the text, and the text is still selected: the button that comments on it
+      // is the next stop of the margin. The filter is chosen with the keyboard, and the resolved thread is there, compact.
       await page.keyboard.press('Tab')
-      await expect(panel.getByRole('button', { name: said.comment })).toBeFocused()
-      await page.keyboard.press('Tab')
-      await page.keyboard.press('Tab')
-      await expect(panel.getByRole('button', { name: said.resolvedFilter })).toBeFocused()
+      await expect(margin.getByRole('button', { name: said.comment })).toBeFocused()
+      const resolvedChoice = page.getByRole('button', { name: said.resolvedFilter })
+      await resolvedChoice.focus()
       await page.keyboard.press('Enter')
-      await expect(panel.getByRole('button', { name: said.resolvedFilter })).toHaveAttribute('aria-pressed', 'true')
-      await expect(panel.getByRole('article')).toHaveAttribute('data-state', 'resolved')
-      // Past the last choice of the filter, the card: the buttons of each of its two comments, then Reopen.
-      await page.keyboard.press('Tab')
+      await expect(resolvedChoice).toHaveAttribute('aria-pressed', 'true')
+      const resolved = margin.locator('[data-thread-id]')
+      await expect(resolved).toHaveAttribute('data-state', 'resolved')
+      // Choosing it with the keyboard makes it the active thread, whole, with the focus: the buttons of each of its two comments,
+      // then Reopen.
+      await resolved.focus()
+      await page.keyboard.press('Enter')
+      await expect(margin.getByRole('article')).toBeFocused()
       for (const [index, name] of [
         /^(Edit|Editar)/,
         /^(Delete|Eliminar)/,
@@ -152,14 +156,14 @@ for (const [language, said] of Object.entries(words)) {
       await page.goto(documentPath)
       const text = textArea(page, said.text)
       await text.waitFor()
-      const panel = page.getByRole('complementary', { name: said.panel })
+      const margin = page.getByRole('complementary', { name: said.margin })
       await text.focus()
       await page.keyboard.type(line)
       await selectLastWord(page, text)
       await page.keyboard.press('ControlOrMeta+Alt+m')
       await page.keyboard.type('Back and forth')
       await page.keyboard.press('Control+Enter')
-      await expect(panel.getByRole('article')).toBeFocused()
+      await expect(margin.getByRole('article')).toBeFocused()
 
       // From the card to the text, with the highlighted word selected.
       await page.keyboard.press('Escape')
@@ -168,11 +172,11 @@ for (const [language, said] of Object.entries(words)) {
 
       // From the text to the card: the caret in the highlight is enough.
       await page.keyboard.press('ArrowLeft')
-      // The panel says there is no selection once the editor has taken the caret in: only then is the key for the thread.
-      await expect(panel.getByText(said.hint)).toBeVisible()
+      // The button that comments goes once the editor has taken the caret in: only then is the key for the thread.
+      await expect(margin.getByRole('button', { name: said.comment })).toHaveCount(0)
       await page.keyboard.press('ControlOrMeta+Alt+m')
-      await expect(panel.getByRole('article')).toBeFocused()
-      await expect(panel.getByRole('article')).toHaveAttribute('aria-current', 'true')
+      await expect(margin.getByRole('article')).toBeFocused()
+      await expect(margin.getByRole('article')).toHaveAttribute('aria-current', 'true')
     })
 
     test('is refused nothing by the content security policy while a person comments', async ({ page }) => {
@@ -180,45 +184,88 @@ for (const [language, said] of Object.entries(words)) {
       await page.goto(documentPath)
       const text = textArea(page, said.text)
       await text.waitFor()
-      const panel = page.getByRole('complementary', { name: said.panel })
+      const margin = page.getByRole('complementary', { name: said.margin })
       await text.focus()
       await page.keyboard.type(line)
       await selectLastWord(page, text)
 
-      // Every part of the panel that is drawn: the form, the card and its highlight, a reply, the other tab, and the filter.
+      // Every part of the margin that is drawn: the form, the card and its highlight, a reply, the activity, and the filter.
       await page.keyboard.press('ControlOrMeta+Alt+m')
       await page.keyboard.type('Is that the right word?')
       await page.keyboard.press('Control+Enter')
       await expect(marks(page)).toHaveText('small')
-      await panel.getByRole('textbox', { name: said.replyField }).fill('Yes.')
+      await margin.getByRole('textbox', { name: said.replyField }).fill('Yes.')
       await page.keyboard.press('Control+Enter')
-      await expect(panel.getByRole('article').getByText('Yes.')).toBeVisible()
-      await panel.getByRole('tab', { name: /^(Activity|Actividad)$/ }).click()
-      await expect(panel.getByRole('heading', { level: 3 }).first()).toBeVisible()
-      await panel.getByRole('tab', { name: /^(Comments|Comentarios)$/ }).click()
-      await panel.getByRole('button', { name: said.resolve, exact: true }).click()
-      await panel.getByRole('button', { name: said.resolvedFilter }).click()
-      await expect(panel.getByRole('article')).toHaveAttribute('data-state', 'resolved')
+      await expect(margin.getByRole('article').getByText('Yes.')).toBeVisible()
+      await page.getByRole('tab', { name: /^(Activity|Actividad)$/ }).click()
+      await expect(
+        page.getByRole('complementary', { name: said.activity }).getByRole('heading', { level: 3 }).first(),
+      ).toBeVisible()
+      await page.getByRole('tab', { name: /^(Comments|Comentarios)$/ }).click()
+      await margin.getByRole('button', { name: said.resolve, exact: true }).click()
+      await page.getByRole('button', { name: said.resolvedFilter }).click()
+      await expect(margin.locator('[data-thread-id]')).toHaveAttribute('data-state', 'resolved')
 
       expect(await violations()).toEqual([])
     })
 
-    test('keeps the layout whole at 1280 px, with no horizontal scroll', async ({ page }) => {
+    test('keeps the layout whole at 1280 px, with the text and the margin side by side and no horizontal scroll', async ({
+      page,
+    }) => {
       await page.setViewportSize({ width: 1280, height: 800 })
       await page.goto(documentPath)
       await textArea(page, said.text).waitFor()
-      const panel = page.getByRole('complementary', { name: said.panel })
-      // Below 1440 px the panel starts closed, to leave the sheet its width; here it is opened, the narrowest the layout gets.
-      await expect(panel).toBeHidden()
-      await page.getByRole('button', { name: /^(Comments|Comentarios)/ }).click()
-      await expect(panel).toBeVisible()
+      const margin = page.getByRole('complementary', { name: said.margin })
+      // With no comment it has no height, and so is not "visible" to the browser; it is in the page, and it has its column.
+      await expect(margin).toBeAttached()
+      await expect(margin).not.toHaveAttribute('hidden')
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       )
       expect(overflow).toBeLessThanOrEqual(0)
-      const box = await panel.boundingBox()
-      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(1280)
+      const marginBox = await margin.boundingBox()
+      const sheetBox = await page.locator('[class*="sheet"]').first().boundingBox()
+      expect((marginBox?.x ?? 0) + (marginBox?.width ?? 0)).toBeLessThanOrEqual(1280)
+      // The margin keeps its 304 px, and the sheet gives way: 568 px, the room between the explorer and the window.
+      expect(marginBox?.width).toBeCloseTo(304, 0)
+      expect(sheetBox?.width).toBeGreaterThanOrEqual(560)
+      expect((sheetBox?.x ?? 0) + (sheetBox?.width ?? 0)).toBeLessThanOrEqual(marginBox?.x ?? 0)
+    })
+  })
+}
+
+// Edit and Delete show over the header of a comment for the pointer that is over it and for the focus that is in it. Where there is
+// no pointer to pass over (a touch screen), they are shown all the time: otherwise they would be there to press and not to see.
+for (const device of [
+  { name: 'a pointer that can hover', touch: false, shown: '0' },
+  { name: 'a device with no hover', touch: true, shown: '1' },
+] as const) {
+  test.describe(`the actions of a comment with ${device.name}`, () => {
+    test.use({ locale: 'en-US', colorScheme: 'light', hasTouch: device.touch, isMobile: device.touch })
+
+    test(`are ${device.touch ? '' : 'not '}shown while nothing is on the comment`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 })
+      await page.goto(documentPath)
+      const text = textArea(page, words.en.text)
+      await text.waitFor()
+      await text.focus()
+      await page.keyboard.type(line)
+      await selectLastWord(page, text)
+      await page.keyboard.press('ControlOrMeta+Alt+m')
+      await page.keyboard.type('Is that the right word?')
+      await page.keyboard.press('Control+Enter')
+      const card = page.getByRole('complementary', { name: words.en.margin }).getByRole('article')
+      await expect(card).toBeFocused()
+      // The focus goes back to the text, and no pointer is over the card: nothing is on the comment.
+      await page.keyboard.press('Escape')
+      await expect(text).toBeFocused()
+
+      const actions = card.getByRole('button', { name: /^Edit/ }).locator('xpath=..')
+      expect(await page.evaluate(() => window.matchMedia('(hover: none)').matches)).toBe(device.touch)
+      await expect(actions).toHaveCSS('opacity', device.shown)
+      // They are in the page and reachable either way.
+      await expect(card.getByRole('button', { name: /^Edit/ })).toBeAttached()
     })
   })
 }

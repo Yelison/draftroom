@@ -18,7 +18,7 @@
 }
 
 .main {
-  padding: var(--space-16);
+  min-width: 0;
 }
 
 @media (width >= 1280px) {
@@ -28,10 +28,6 @@
 
   .explorer {
     display: block;
-  }
-
-  .main {
-    padding: var(--space-32);
   }
 }
 
@@ -47,6 +43,7 @@
 .history .main {
   display: flex;
   flex-direction: column;
+  padding: var(--space-16);
 }
 
 /* The width at which the screen of the history puts the two panels side by side: 720 px of screen, the rail and the margins. */
@@ -64,5 +61,9 @@
 @media (width >= 1280px) {
   .layout.history {
     grid-template-columns: var(--layout-rail-compact-width) minmax(0, 1fr);
+  }
+
+  .history .main {
+    padding: var(--space-32);
   }
 }

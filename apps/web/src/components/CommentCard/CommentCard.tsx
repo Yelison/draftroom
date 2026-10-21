@@ -52,8 +52,12 @@ export function CommentCard({
 }: CommentCardProps) {
   const intl = useIntl()
   const noteId = useId()
+  const hintId = useId()
   const status = useAction()
   const author = thread.comments[0]?.author.name ?? thread.createdBy.name
+  const hasHint = state === 'open' && onShowInText !== undefined
+  const describedBy =
+    [state === 'orphaned' ? noteId : null, hasHint ? hintId : null].filter(Boolean).join(' ') || undefined
 
   return (
     <article
@@ -61,7 +65,8 @@ export function CommentCard({
       tabIndex={-1}
       aria-label={intl.formatMessage({ id: 'comments.card.label' }, { author })}
       aria-current={active ? 'true' : undefined}
-      aria-describedby={state === 'orphaned' ? noteId : undefined}
+      aria-keyshortcuts={onShowInText !== undefined && state === 'open' ? 'Escape' : undefined}
+      aria-describedby={describedBy}
       data-thread-id={thread.id}
       data-state={state}
       data-active={active ? '' : undefined}
@@ -70,6 +75,11 @@ export function CommentCard({
         <Badge tone={state === 'resolved' ? 'green' : 'amber'} className={styles.badge}>
           {intl.formatMessage({ id: `comments.card.state.${state}` })}
         </Badge>
+      )}
+      {state === 'open' && onShowInText !== undefined && (
+        <span id={hintId} className="forma-visually-hidden">
+          {intl.formatMessage({ id: 'comments.card.escapeHint' })}
+        </span>
       )}
       <blockquote className={styles.quote}>{thread.quote}</blockquote>
       {state === 'orphaned' && (

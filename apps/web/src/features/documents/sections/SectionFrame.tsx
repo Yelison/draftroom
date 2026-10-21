@@ -15,6 +15,8 @@ export interface SectionFrameProps {
   onToggle: () => void
   /** Beside the title, outside the button that folds: the menu of a folder. */
   actions?: ReactNode
+  /** The heading is the height of a compact button, for the narrow column of the explorer. */
+  compact?: boolean
   children: ReactNode
 }
 
@@ -22,11 +24,23 @@ export interface SectionFrameProps {
  * A section of the Documents screen: a heading whose button folds what is under it. The body is in the page when it is
  * folded (empty and hidden), so `aria-controls` always names an element.
  */
-export function SectionFrame({ sectionKey, title, icon, expanded, onToggle, actions, children }: SectionFrameProps) {
+export function SectionFrame({
+  sectionKey,
+  title,
+  icon,
+  expanded,
+  onToggle,
+  actions,
+  compact = false,
+  children,
+}: SectionFrameProps) {
   const headingId = `section-${sectionKey}-heading`
 
   return (
-    <section aria-labelledby={headingId} className={styles.section}>
+    <section
+      aria-labelledby={headingId}
+      className={compact ? `${styles.section} ${styles.compactSection}` : styles.section}
+    >
       <div className={styles.head}>
         <h2 id={headingId} className={styles.title}>
           <button

@@ -27,13 +27,34 @@ export interface DocumentListRowProps {
   onArchive?: (document: Schema<'Document'>) => void
   /** How the title and the excerpt are drawn; plain text when left out. A document with no excerpt says so either way. */
   renderText?: DocumentTextRenderer
+  /**
+   * A row of one line for a narrow column (the explorer beside a document): the icon and the title, and the pin and the
+   * actions, which show when the pointer or the keyboard is on the row. The screens of lists draw the whole row.
+   */
+  compact?: boolean
+  /** The document the person has open, whose row is marked as the page they are on. */
+  openDocumentId?: string
 }
+
+/** What a list tells its rows besides the document: the actions they offer and how they look. */
+export type DocumentRowOptions = Pick<
+  DocumentListRowProps,
+  'onRenameOrMove' | 'onArchive' | 'compact' | 'openDocumentId'
+>
 
 /**
  * A document in a list: its title opens it, and the row says who made it, the role of the person when it is not
  * ownership, when it changed, and whether it is pinned. The pin and the actions menu sit above the link that covers the row.
  */
-export function DocumentListRow({ document, folderName, onRenameOrMove, onArchive, renderText }: DocumentListRowProps) {
+export function DocumentListRow({
+  document,
+  folderName,
+  onRenameOrMove,
+  onArchive,
+  renderText,
+  compact = false,
+  openDocumentId,
+}: DocumentListRowProps) {
   const intl = useIntl()
   const pin = usePinDocument()
   const canChange = document.role === 'editor' || document.role === 'owner'
@@ -58,15 +79,21 @@ export function DocumentListRow({ document, folderName, onRenameOrMove, onArchiv
       : []),
   ]
 
+  const isOpen = document.id === openDocumentId
+
   return (
-    <li className={styles.row}>
+    <li className={styles.row} data-open={isOpen ? '' : undefined}>
       <Icon name="file" className={styles.icon} />
       <span className={styles.text}>
         <span className={styles.titleLine}>
-          <DocumentRowLink to={`/documents/${document.id}`} className={styles.title}>
+          <DocumentRowLink
+            to={`/documents/${document.id}`}
+            className={styles.title}
+            {...(isOpen ? { 'aria-current': 'page' as const } : {})}
+          >
             {renderText?.(document.title, 'title') ?? document.title}
           </DocumentRowLink>
-          {folderName !== undefined && (
+          {!compact && folderName !== undefined && (
             <span className={styles.folderTag}>
               <Icon name="folder" />
               {folderName === null ? (
@@ -84,33 +111,37 @@ export function DocumentListRow({ document, folderName, onRenameOrMove, onArchiv
             </span>
           )}
         </span>
-        <span className={styles.excerpt}>
-          {document.excerpt === null ? (
-            <span className={styles.noText}>{intl.formatMessage({ id: 'documents.row.noText' })}</span>
-          ) : (
-            (renderText?.(document.excerpt, 'excerpt') ?? document.excerpt)
-          )}
-        </span>
+        {!compact && (
+          <span className={styles.excerpt}>
+            {document.excerpt === null ? (
+              <span className={styles.noText}>{intl.formatMessage({ id: 'documents.row.noText' })}</span>
+            ) : (
+              (renderText?.(document.excerpt, 'excerpt') ?? document.excerpt)
+            )}
+          </span>
+        )}
       </span>
-      <span className={styles.meta}>
-        <span className={styles.person}>
-          <span className="forma-visually-hidden">{intl.formatMessage({ id: 'documents.row.createdBy' })}</span>
-          <Avatar
-            decorative
-            size="small"
-            name={document.createdBy.name}
-            tone={presenceLookOf(document.createdBy.id).tone}
-          />
-          <span className={styles.personName}>{document.createdBy.name}</span>
+      {!compact && (
+        <span className={styles.meta}>
+          <span className={styles.person}>
+            <span className="forma-visually-hidden">{intl.formatMessage({ id: 'documents.row.createdBy' })}</span>
+            <Avatar
+              decorative
+              size="small"
+              name={document.createdBy.name}
+              tone={presenceLookOf(document.createdBy.id).tone}
+            />
+            <span className={styles.personName}>{document.createdBy.name}</span>
+          </span>
+          <span>{document.role !== 'owner' && <Permission role={document.role} />}</span>
+          <span className={styles.updated}>
+            <span className="forma-visually-hidden">{intl.formatMessage({ id: 'documents.row.updatedLabel' })}</span>
+            <time dateTime={document.updatedAt}>
+              {intl.formatDate(document.updatedAt, { dateStyle: 'medium', timeStyle: 'short' })}
+            </time>
+          </span>
         </span>
-        <span>{document.role !== 'owner' && <Permission role={document.role} />}</span>
-        <span className={styles.updated}>
-          <span className="forma-visually-hidden">{intl.formatMessage({ id: 'documents.row.updatedLabel' })}</span>
-          <time dateTime={document.updatedAt}>
-            {intl.formatDate(document.updatedAt, { dateStyle: 'medium', timeStyle: 'short' })}
-          </time>
-        </span>
-      </span>
+      )}
       <span className={styles.actions}>
         {/* A toggle: the name stays and `aria-pressed` carries the state, which a screen reader says when it changes. */}
         <PinButton

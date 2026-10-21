@@ -191,20 +191,28 @@ describe('moving along the toolbar with the keyboard', () => {
     const title = screen.getByRole('textbox', { name: 'Document title' })
     await user.click(title)
 
-    // The history, the comments and the Share button of an owner sit between the toolbar and the title, in the order of
-    // the two rows of the band.
+    // What the bar has for the comments sits between the toolbar and the title: the three filters, the selected tab and the
+    // button that shows the margin. The history and Share of an owner are in the band above the toolbar.
+    await user.tab({ shift: true })
+    expect(await screen.findByRole('button', { name: 'Comments, 1 open' })).toHaveFocus()
+    // The panels of the tabs are hidden by the stylesheet (the margin and the activity are not in them), and these tests do
+    // not load it: here the empty one is a stop, which in the browser it is not.
+    await user.tab({ shift: true })
+    expect(document.activeElement).toHaveAttribute('role', 'tabpanel')
+    await user.tab({ shift: true })
+    expect(screen.getByRole('tab', { name: 'Comments' })).toHaveFocus()
+    for (const filter of [/^All \(/, /^Resolved \(/, /^Open \(/]) {
+      await user.tab({ shift: true })
+      expect(screen.getByRole('button', { name: filter })).toHaveFocus()
+    }
+    await user.tab({ shift: true })
+    expect(screen.getByRole('button', { name: 'Bold' })).toHaveFocus()
     await user.tab({ shift: true })
     expect(screen.getByRole('button', { name: 'Share' })).toHaveFocus()
     await user.tab({ shift: true })
-    expect(await screen.findByRole('button', { name: 'Comments, 1 open' })).toHaveFocus()
-    await user.tab({ shift: true })
     expect(screen.getByRole('button', { name: 'Version history' })).toHaveFocus()
-    await user.tab({ shift: true })
-    expect(screen.getByRole('button', { name: 'Bold' })).toHaveFocus()
-    await user.tab()
-    await user.tab()
-    await user.tab()
-    await user.tab()
+    // And forward again, past the one stop of the toolbar, to the title.
+    for (let stops = 0; stops < 9; stops++) await user.tab()
     expect(title).toHaveFocus()
   })
 

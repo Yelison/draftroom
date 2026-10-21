@@ -1,30 +1,31 @@
-import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { Button, IconButton, SearchField, Tooltip } from '@yelison/forma-ui'
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import type { Schema } from '@draftroom/contract'
+import { Button, SearchField } from '@yelison/forma-ui'
+import { useDeferredValue, useState } from 'react'
 import { useIntl } from 'react-intl'
-import { useNavigate, useParams } from 'react-router'
-import { useDataSource } from '../../data/useDataSource.ts'
+import { useParams } from 'react-router'
+import { focusMainContent } from '../../app/mainContent.ts'
 import { DocumentActionDialogs } from '../documents/actions/DocumentActionDialogs.tsx'
 import { useActionDialogs } from '../documents/actions/useActionDialogs.ts'
 import { useCreateDocument } from '../documents/actions/useCreateDocument.ts'
+import { DocumentCollection } from '../documents/DocumentCollection.tsx'
+import { MoreMenu } from '../documents/MoreMenu.tsx'
 import { problemMessageId } from '../documents/problemMessage.ts'
-import { QueryFailure } from '../documents/QueryFailure.tsx'
-import { StateMessage } from '../documents/StateMessage.tsx'
-import { WorkspaceGate } from '../documents/WorkspaceGate.tsx'
-import { documentListQuery, foldersQuery } from '../documents/queries.ts'
 import { searchTerm } from '../documents/searchTerm.ts'
+import { DocumentSections } from '../documents/sections/DocumentSections.tsx'
+import { useSectionFolds } from '../documents/sections/useSectionFolds.ts'
+import { WorkspaceGate } from '../documents/WorkspaceGate.tsx'
 import { useSearchSubmit } from '../search/useSearchSubmit.ts'
+import { TemplatePickerDialog } from '../templates/TemplatePickerDialog.tsx'
 import { ExplorerSkeleton } from './ExplorerSkeleton.tsx'
-import { ExplorerTree, type ExplorerTreeHandle } from './tree/ExplorerTree.tsx'
-import { buildTree, type TreeItem } from './tree/treeModel.ts'
 import styles from './Explorer.module.css'
 
-/** The documents of a page the explorer asks for: it lists them all, so it asks for as many as the contract allows. */
-const pageSize = 100
+/** Only "Pinned" is open when a document opens, so opening one asks the server for no folder. */
+const initiallyOpen = { sections: ['pinned'], folders: 0 } as const
 
 /**
- * The column beside a document: search, the recent documents, the folders with theirs and the documents that are in none.
- * The row of the open document is the selected one.
+ * The column beside a document: search, the way to a new document, and the documents of the workspace in the sections of
+ * the Documents screen (the pinned ones, a section for each folder, those in none), folded but for "Pinned", with the
+ * document that is open marked. While a search is typed its results take the place of the sections.
  */
 export function Explorer() {
   const intl = useIntl()
@@ -40,58 +41,23 @@ export function Explorer() {
 
 function Content({ workspaceId }: { workspaceId: string }) {
   const intl = useIntl()
-  const dataSource = useDataSource()
-  const navigate = useNavigate()
   // The layout above the screens sees the parameters of the route below it, so this is the open document.
   const { documentId: openDocumentId } = useParams()
   const [search, setSearch] = useState('')
-  const deferredSearch = useDeferredValue(search)
-  const term = searchTerm(deferredSearch)
-  const submitSearch = useSearchSubmit(search)
-  const tree = useRef<ExplorerTreeHandle>(null)
-  const actions = useActionDialogs(() => tree.current?.focusTabStop())
-  const create = useCreateDocument(workspaceId)
+  const [pickingTemplate, setPickingTemplate] = useState(false)
   const [announcement, setAnnouncement] = useState('')
-
-  const folders = useQuery(foldersQuery(dataSource, workspaceId))
-  const documents = useInfiniteQuery({
-    ...documentListQuery(dataSource, workspaceId, { limit: pageSize, ...(term === undefined ? {} : { query: term }) }),
-    placeholderData: keepPreviousData,
-  })
-  const documentItems = useMemo(() => documents.data?.pages.flatMap((page) => page.items) ?? [], [documents.data])
-  const roots = useMemo(
-    () =>
-      buildTree({
-        folders: folders.data?.items ?? [],
-        documents: documentItems,
-        searching: term !== undefined,
-        recentLabel: intl.formatMessage({ id: 'explorer.recent' }),
-      }),
-    [folders.data, documentItems, term, intl],
-  )
-
-  const change = (item: TreeItem) => {
-    if (item.kind === 'folder') actions.open({ kind: 'rename-folder', folder: item.folder })
-    if (item.kind === 'document' && item.document.role !== 'viewer' && item.document.role !== 'commenter') {
-      actions.open({ kind: 'details', document: item.document })
-    }
+  const term = searchTerm(useDeferredValue(search))
+  const submitSearch = useSearchSubmit(search)
+  const folds = useSectionFolds(initiallyOpen)
+  const actions = useActionDialogs(focusMainContent)
+  const create = useCreateDocument(workspaceId)
+  const createDocument = () => create.mutate({ title: intl.formatMessage({ id: 'documents.untitled' }) })
+  const rowActions = {
+    compact: true,
+    ...(openDocumentId === undefined ? {} : { openDocumentId }),
+    onRenameOrMove: (document: Schema<'Document'>) => actions.open({ kind: 'details', document }),
+    onArchive: (document: Schema<'Document'>) => actions.open({ kind: 'archive', document }),
   }
-  const archive = (item: TreeItem) => {
-    if (item.kind === 'document') actions.open({ kind: 'archive', document: item.document })
-  }
-
-  // "Load more" is gone once the last page is in, and with it the focus: it goes to the tree's tab stop.
-  const loadingMore = useRef(false)
-  useEffect(() => {
-    if (!loadingMore.current || documents.hasNextPage) return
-    loadingMore.current = false
-    if (document.activeElement === null || document.activeElement === document.body) tree.current?.focusTabStop()
-  }, [documents.hasNextPage, documentItems.length])
-
-  const retry = () => void Promise.all([folders.refetch(), documents.refetch()])
-  const failed = folders.isError || documents.isError
-  const loading = folders.isPending || documents.isPending
-  const empty = !loading && !failed && roots.length === 0
 
   return (
     <div className={styles.content}>
@@ -104,23 +70,13 @@ function Content({ workspaceId }: { workspaceId: string }) {
           onKeyDown={submitSearch}
         />
         <div className={styles.actions}>
-          <Button
-            icon="plus"
-            loading={create.isPending}
-            onClick={() => create.mutate({ title: intl.formatMessage({ id: 'documents.untitled' }) })}
-          >
+          <Button loading={create.isPending} icon="plus" onClick={createDocument}>
             {intl.formatMessage({ id: 'documents.new' })}
           </Button>
-          <Tooltip content={intl.formatMessage({ id: 'documents.newFolder' })} placement="bottom-end" describe={false}>
-            {(trigger) => (
-              <IconButton
-                {...trigger}
-                icon="folder"
-                label={intl.formatMessage({ id: 'documents.newFolder' })}
-                onClick={() => actions.open({ kind: 'create-folder', workspaceId })}
-              />
-            )}
-          </Tooltip>
+          <MoreMenu
+            onNewFolder={() => actions.open({ kind: 'create-folder', workspaceId })}
+            onFromTemplate={() => setPickingTemplate(true)}
+          />
         </div>
         {create.isError && (
           <p role="alert" className={styles.problem}>
@@ -128,45 +84,30 @@ function Content({ workspaceId }: { workspaceId: string }) {
           </p>
         )}
       </div>
-      <div className={styles.body}>
-        {loading && <ExplorerSkeleton />}
-        {failed && <QueryFailure onRetry={retry} retrying={folders.isFetching || documents.isFetching} />}
-        {empty &&
-          (term === undefined ? (
-            <StateMessage
-              title={intl.formatMessage({ id: 'documents.empty.title' })}
-              description={intl.formatMessage({ id: 'documents.empty.description' })}
-            />
-          ) : (
-            <StateMessage
-              title={intl.formatMessage({ id: 'documents.noResults.title' }, { query: term })}
-              description={intl.formatMessage({ id: 'documents.noResults.description' })}
-            />
-          ))}
-        {!loading && roots.length > 0 && (
-          <ExplorerTree
-            ref={tree}
-            label={intl.formatMessage({ id: term === undefined ? 'explorer.tree' : 'explorer.results' })}
-            roots={roots}
-            openDocumentId={openDocumentId}
-            onOpenDocument={(documentId) => void navigate(`/documents/${documentId}`)}
-            onChange={change}
-            onArchive={archive}
-          />
-        )}
-        {documents.hasNextPage && (
-          <Button
-            variant="ghost"
-            loading={documents.isFetchingNextPage}
-            onClick={() => {
-              loadingMore.current = true
-              void documents.fetchNextPage()
-            }}
-          >
-            {intl.formatMessage({ id: 'documents.loadMore' })}
-          </Button>
-        )}
-      </div>
+      {term === undefined ? (
+        <DocumentSections
+          workspaceId={workspaceId}
+          folds={folds}
+          onRenameFolder={(folder) => actions.open({ kind: 'rename-folder', folder })}
+          firstDocument={
+            <Button loading={create.isPending} onClick={createDocument}>
+              {intl.formatMessage({ id: 'documents.new' })}
+            </Button>
+          }
+          {...rowActions}
+        />
+      ) : (
+        <DocumentCollection
+          workspaceId={workspaceId}
+          term={term}
+          empty={null}
+          onActions={rowActions.onRenameOrMove}
+          onArchive={rowActions.onArchive}
+          compact
+          {...(openDocumentId === undefined ? {} : { openDocumentId })}
+        />
+      )}
+      <TemplatePickerDialog open={pickingTemplate} onClose={() => setPickingTemplate(false)} />
       <DocumentActionDialogs
         actions={actions}
         onArchived={(document) =>

@@ -5,12 +5,12 @@ import { openEditor } from './testing/renderEditor.tsx'
 
 const linkButton = () => screen.getByRole('button', { name: /^(Link|Enlace)$/ })
 const dialog = (name: string) => screen.findByRole('dialog', { name })
-// The explorer beside the editor has its own live regions: the editor's are the ones in the work area, and the regions of the
-// band, which say where the changes are and what the comments panel did, are not the link's.
+// The explorer beside the editor, the band, the bar and the margin have live regions of their own: the link's is the one that
+// is a direct child of the page of the document.
 const announcement = () =>
   within(screen.getByRole('main'))
     .getAllByRole('status')
-    .find((region) => region.textContent !== 'Loading document' && region.closest('.band') === null)
+    .find((region) => region.textContent !== 'Loading document' && region.parentElement?.className === 'page')
 
 describe('adding a link', () => {
   it('opens a dialog from the toolbar, asks for an address and links the selected text', async () => {

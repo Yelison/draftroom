@@ -90,7 +90,7 @@ describe('the explorer', () => {
     const user = userEvent.setup()
     const { router } = renderApp('/documents/new')
     const explorer = screen.getByRole('complementary', { name: 'Explorer' })
-    const folder = await screen.findByRole('treeitem', { name: 'Operaciones' })
+    const folder = await screen.findByRole('button', { name: 'Operaciones' })
     expect(folder).toHaveAttribute('aria-expanded', 'false')
     await user.click(folder)
     expect(folder).toHaveAttribute('aria-expanded', 'true')
@@ -102,7 +102,7 @@ describe('the explorer', () => {
 
     expect(screen.getByRole('complementary', { name: 'Explorer' })).toBe(explorer)
     expect(explorer.closest('[inert]')).toBeNull()
-    expect(screen.getByRole('treeitem', { name: 'Operaciones' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Operaciones' })).toHaveAttribute('aria-expanded', 'true')
   })
 })
 
@@ -122,7 +122,10 @@ describe('the share route', () => {
 
       expect(await screen.findByRole('dialog', { name: 'Share “Autumn launch plan”' }, arrival)).toBeInTheDocument()
       expectRail('compact')
-      expect(screen.queryAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual(['Documents'])
+      expect(screen.queryAllByRole('link', { current: 'page' }).map((link) => link.textContent)).toEqual([
+        'Documents',
+        'Autumn launch plan',
+      ])
       expect(screen.getByRole('heading', { level: 1, hidden: true })).toHaveTextContent('Autumn launch plan')
     },
     testTimeout,

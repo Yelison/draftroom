@@ -1,0 +1,64 @@
+/*
+ * One row of the header's height, always, whatever the language and whoever is in the document, so nothing under it moves when
+ * the document arrives or when someone comes or goes. It owns its widths: the state keeps its own, and the crumbs and the
+ * people share what is left, each taking the room it is given and not that of its content.
+ */
+.band {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-8);
+  align-items: center;
+  box-sizing: border-box;
+  min-block-size: calc(2 * var(--layout-toolbar-height));
+  padding-inline: var(--space-16);
+  /* The line is drawn inside the row, so it takes no room and the rows are as tall as the tokens say. */
+  box-shadow: inset 0 -1px 0 var(--color-line);
+  background: var(--color-surface);
+}
+
+/* Under the width of a desktop the crumbs have a row of their own, and the people and the state share the next. */
+.crumbs {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  min-width: 0;
+  block-size: var(--layout-toolbar-height);
+}
+
+@media (width >= 1280px) {
+  .band {
+    flex-wrap: nowrap;
+    block-size: var(--layout-header-height);
+    min-block-size: 0;
+  }
+
+  .crumbs {
+    flex: 2 1 0;
+    block-size: auto;
+  }
+}
+
+.people {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  block-size: var(--layout-toolbar-height);
+  overflow: hidden;
+}
+
+.state {
+  display: flex;
+  flex: none;
+  gap: var(--space-8);
+  align-items: center;
+  block-size: var(--layout-toolbar-height);
+}
+
+@media (width >= 1280px) {
+  .people,
+  .state {
+    block-size: auto;
+  }
+}

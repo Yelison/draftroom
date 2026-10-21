@@ -72,7 +72,7 @@ Verified from the published tarball: MIT, ESM, `sideEffects: ["*.css"]`, `engine
 
 ### 1.3 Screens, routes and components [proposed]
 
-Desktop layout at 1440 × 900: rail 88 px, explorer 272 px, work area 1080 px; header 64, toolbar 56, footer 40; document sheet 708 × 716 with a 48 px reading margin; collaboration panel 328 × 716. Overview screens use a 224 px rail with icon and label.
+Desktop layout at 1440 × 900: rail 88 px, explorer 272 px, work area 1080 px; header 64, toolbar 56, footer 40; document sheet 708 × 716 with a 48 px reading margin; the comments go in a 304 px margin beside the sheet, which is 568 px wide at 1280 and keeps its 708 px at 1440, and the activity opens in a 328 px panel at the edge of the window (ADR 0020). Overview screens use a 224 px rail with icon and label.
 
 | Area | Content | Route |
 | --- | --- | --- |
@@ -136,14 +136,14 @@ Every screen is accepted in light and dark, in English and Spanish, at 1280 and 
 | --- | --- |
 | Home | loading skeleton without layout shift; no pinned documents (empty with "New document"); pinned list; activity empty; error with retry |
 | Documents and folders | loading; empty workspace; list; search with no results; archived document hidden; error with retry |
-| Editor | initial load; not found; access denied; viewer (no toolbar, no comment actions); commenter; editor; synchronising; synced (durable); offline with local copy; reconnecting; recoverable error; access revoked; document archived while open |
-| Comments panel | no comments; open; resolved (filtered); orphaned; reply failed; read-only (viewer) |
+| Editor | one scroll (the page; the band and the bar stay at the top); initial load, with the shape of the band, the sheet and the margin; not found; access denied; viewer (no toolbar, no comment actions); commenter; editor; synchronising; synced (durable); offline with local copy; reconnecting; recoverable error; access revoked; document archived while open |
+| Comments margin | no comments (the margin says nothing); the active thread whole and the others compact; resolved (filtered); orphaned (at the end of the margin); reply failed; read-only (viewer); activity open at the edge of the window |
 | Share dialog | loading; members list; adding; role change; removal; last-owner protection; error |
 | Shared with me | loading; empty; filtered empty; list with preview |
 | Workspace history | loading; empty; filtered empty; paginated list; event of a document no longer accessible (hidden) |
 | Version history | loading; no versions; list; preview; restore confirmation; restore in progress; restore failed; not allowed (non-owner sees list and preview without restore) |
 | Settings | each tab with save success, validation error and server error; members: invite, role change, removal, last-owner protection |
-| Below 1280 px | a notice that can be closed and layouts that reflow (compact rail, no explorer beside a document, the comments panel under the sheet), so the screens stay usable at a zoom of 200 % |
+| Below 1280 px | a notice that can be closed and layouts that reflow (compact rail, no explorer beside a document, the comments margin under the sheet), so the screens stay usable at a zoom of 200 % |
 
 ## 3. Architecture
 

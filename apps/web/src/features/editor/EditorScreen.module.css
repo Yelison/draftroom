@@ -1,5 +1,5 @@
 .stateHeading {
-  margin: 0 0 var(--space-16);
+  margin: var(--space-32) var(--space-16) var(--space-16);
   font: var(--font-title);
   text-align: center;
 }

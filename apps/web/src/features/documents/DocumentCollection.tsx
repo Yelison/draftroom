@@ -24,6 +24,10 @@ export interface DocumentCollectionProps {
   onActions: (document: Schema<'Document'>) => void
   /** Opens the dialog that archives one. A list that leaves it out does not offer archiving in its rows' menu. */
   onArchive?: (document: Schema<'Document'>) => void
+  /** How the rows look: whole, or on a line for a narrow column. */
+  compact?: boolean
+  /** The document that is open, whose row is marked. */
+  openDocumentId?: string
 }
 
 /**
@@ -38,6 +42,8 @@ export function DocumentCollection({
   empty,
   onActions,
   onArchive,
+  compact = false,
+  openDocumentId,
 }: DocumentCollectionProps) {
   const intl = useIntl()
   const dataSource = useDataSource()
@@ -54,7 +60,7 @@ export function DocumentCollection({
 
   const loadingMore = useFocusFirstArrival(list, ids, 'a', JSON.stringify([workspaceId, folderId, term]))
 
-  if (query.isPending) return <DocumentsSkeleton />
+  if (query.isPending) return <DocumentsSkeleton compact={compact} />
   if (query.isError) return <QueryFailure onRetry={() => void query.refetch()} retrying={query.isFetching} />
 
   if (documents.length === 0) {
@@ -70,13 +76,15 @@ export function DocumentCollection({
 
   return (
     <>
-      <ul ref={list} className={`${rows.rows} ${rows.panel}`}>
+      <ul ref={list} className={`${rows.rows} ${rows.panel} ${compact ? rows.compact : ''}`}>
         {documents.map((document) => (
           <DocumentListRow
             key={document.id}
             document={document}
             onRenameOrMove={onActions}
             {...(onArchive === undefined ? {} : { onArchive })}
+            compact={compact}
+            {...(openDocumentId === undefined ? {} : { openDocumentId })}
           />
         ))}
       </ul>

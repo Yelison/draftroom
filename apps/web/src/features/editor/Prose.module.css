@@ -30,6 +30,12 @@
   font: var(--font-section);
 }
 
+/* Room the text opens below a block so that the comments of the margin stay level with the text they are about
+ * (`commentGaps`). Padding and not margin: the blocks have none below, but a margin would also collapse with the next one's. */
+.prose > [data-comment-gap] {
+  padding-block-end: var(--comment-gap);
+}
+
 /* A heading that opens the document needs no space above it: the sheet's padding is already there. */
 .prose > :first-child {
   margin-block-start: 0;

@@ -7,23 +7,20 @@ import { useIntl } from 'react-intl'
 import { Link, Outlet } from 'react-router'
 import { presenceLookOf } from '../../collab/presenceColor.ts'
 import type { CollabSession, CollabSnapshot } from '../../collab/session.ts'
-import { Presence, type PresenceEntry } from '../../components/Presence/Presence.tsx'
-import { SyncStatus } from '../../components/SyncStatus/SyncStatus.tsx'
-import { ShareControl } from '../sharing/ShareControl.tsx'
-import { VersionsButton } from '../versions/VersionsButton.tsx'
+import type { PresenceEntry } from '../../components/Presence/Presence.tsx'
 import { useDataSource } from '../../data/useDataSource.ts'
-import { CollaborationPanel } from '../comments/CollaborationPanel.tsx'
-import { CommentsToggle } from '../comments/CommentsToggle.tsx'
-import { useCommentsPanel } from '../comments/commentsPanelState.ts'
+import { useCommentsArrived } from '../comments/useCommentsArrived.ts'
+import { CommentsMargin } from '../comments/margin/CommentsMargin.tsx'
+import { useCommentsView } from '../comments/commentsView.ts'
 import { createCommentRequests } from '../comments/commentRequests.ts'
 import type { CollaboratingPerson } from './CollaborationExtensions.ts'
+import { DocumentBand } from './DocumentBand.tsx'
+import { DocumentBar } from './DocumentBar.tsx'
 import { EditorSkeleton } from './EditorSkeleton.tsx'
 import { EditorStatePanel } from './EditorStatePanel.tsx'
 import { LinkDialog, type LinkRequest } from './LinkDialog.tsx'
 import { OfflineNotice } from './OfflineNotice.tsx'
-import { ReadOnlyNotice } from './ReadOnlyNotice.tsx'
 import { SyncAlerts } from './SyncAlerts.tsx'
-import { Toolbar } from './Toolbar.tsx'
 import { TitleField } from './TitleField.tsx'
 import { canEdit } from './roles.ts'
 import { meQuery } from './meQuery.ts'
@@ -31,7 +28,7 @@ import { useCollabSession } from './useCollabSession.ts'
 import { useDocumentEditor } from './useDocumentEditor.ts'
 import { useFittingLimit } from './useFittingLimit.ts'
 import { duplicateProblemId, useDuplicateDocument } from './useDuplicateDocument.ts'
-import styles from './Sheet.module.css'
+import styles from './DocumentPage.module.css'
 
 type LinkChange = 'added' | 'updated' | 'removed'
 
@@ -124,6 +121,9 @@ function Shown({
   focusHeadline: () => void
 }) {
   const intl = useIntl()
+  // The comments are in the page before the text is: a thread that arrives after it would open room in the text under the
+  // person's eyes. A request that failed does not hold the text back: the margin says so and offers to try again.
+  const commentsArrived = useCommentsArrived(document.id)
   const revoked = snapshot.state === 'revoked'
   const stopped = revoked || (!snapshot.loaded && snapshot.state === 'error')
   // What had the focus (the text, the share dialog) goes with the editor when access is removed: the focus must not fall to
@@ -165,7 +165,7 @@ function Shown({
       </EditorStatePanel>
     )
   }
-  if (!snapshot.loaded) return <EditorSkeleton />
+  if (!snapshot.loaded || !commentsArrived) return <EditorSkeleton />
 
   // A new document and provider mean a new editor: the one that was bound to the old ones is left with them.
   return (
@@ -194,7 +194,7 @@ function EditorWorkspace({
   focusHeadline: () => void
 }) {
   const intl = useIntl()
-  const commentsPanel = useCommentsPanel()
+  const commentsView = useCommentsView()
   // The role says what the screen offers and the connection what the server allows: the text takes edits only when both do.
   // An archived document is read-only for its owners too, and the server refuses to rename it.
   const mayEdit = canEdit(document.role) && document.archivedAt === null
@@ -309,40 +309,40 @@ function EditorWorkspace({
     finishLink('removed')
   }
 
-  const column = (
-    <div className={styles.column}>
-      <div className={styles.band}>
-        <div className={styles.row}>
-          <div className={styles.tools}>
-            {editable && <Toolbar editor={editor} onLinkRequest={requestLink} />}
-            {(document.role === 'viewer' || document.role === 'commenter') && <ReadOnlyNotice role={document.role} />}
-          </div>
-          <div className={styles.documentTools}>
-            <VersionsButton documentId={document.id} />
-            <CommentsToggle documentId={document.id} />
-          </div>
-        </div>
-        <div className={styles.row}>
-          <div ref={peopleZone} className={styles.people}>
-            <Presence people={people} limit={fittingLimit} />
-          </div>
-          <div className={styles.state}>
-            <ShareControl document={document} />
-            <SyncStatus state={snapshot.state} keepsCopy={snapshot.keepsCopy} />
-          </div>
-        </div>
+  return (
+    <div className={styles.page}>
+      <div className={styles.chrome}>
+        <DocumentBand
+          document={document}
+          snapshot={snapshot}
+          people={people}
+          peopleLimit={fittingLimit}
+          peopleZone={peopleZone}
+        />
+        <DocumentBar editor={editor} document={document} editable={editable} onLinkRequest={requestLink} />
       </div>
-      <SyncAlerts
-        snapshot={snapshot}
-        duplicate={{ run: () => duplicating.mutate(), pending: duplicating.isPending, problem: duplicateProblem }}
-        onRetry={retry}
-        onDiscard={discard}
-        onDismissNotice={dismissNotice}
-      />
-      <div className={styles.sheet}>
-        <OfflineNotice snapshot={snapshot} />
-        <TitleField document={document} editable={mayEdit} onEnter={() => editor.commands.focus('start')} />
-        <EditorContent editor={editor} />
+      <div className={commentsView.marginShown ? `${styles.stage} ${styles.withMargin}` : styles.stage}>
+        <div className={styles.alerts}>
+          <SyncAlerts
+            snapshot={snapshot}
+            duplicate={{ run: () => duplicating.mutate(), pending: duplicating.isPending, problem: duplicateProblem }}
+            onRetry={retry}
+            onDiscard={discard}
+            onDismissNotice={dismissNotice}
+          />
+        </div>
+        <div className={styles.sheet}>
+          <OfflineNotice snapshot={snapshot} />
+          <TitleField document={document} editable={mayEdit} onEnter={() => editor.commands.focus('start')} />
+          <EditorContent editor={editor} />
+        </div>
+        <CommentsMargin
+          editor={editor}
+          provider={snapshot.provider}
+          document={document}
+          personId={person.id}
+          requests={commentRequests}
+        />
       </div>
       {/* Where a dialog of the route is shown (sharing): only while the document is, so it goes with it if access is removed. */}
       <Outlet />
@@ -362,19 +362,6 @@ function EditorWorkspace({
       <p role="status" className="forma-visually-hidden">
         {refusals > 0 && <span key={refusals}>{intl.formatMessage({ id: 'editor.paste.tooLarge' })}</span>}
       </p>
-    </div>
-  )
-
-  return (
-    <div className={commentsPanel.open ? styles.workspace : `${styles.workspace} ${styles.withoutPanel}`}>
-      {column}
-      <CollaborationPanel
-        editor={editor}
-        provider={snapshot.provider}
-        document={document}
-        personId={person.id}
-        requests={commentRequests}
-      />
     </div>
   )
 }
