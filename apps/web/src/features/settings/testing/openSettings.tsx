@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { expect } from 'vitest'
 import { ApiError } from '../../../data/errors.ts'
 import { renderScreen, type RenderScreenOptions } from '../../documents/testing/renderScreen.tsx'
