@@ -1,11 +1,23 @@
-name: Demo build
+name: Demo build and publish
 
-# Builds the static demo for GitHub Pages and checks it, and nothing else: it does not publish it. The deployment
-# (a Pages environment, `pages: write` and `id-token: write`) will be added in another task, once the owner authorises
-# publishing. Until then this workflow has read access only and keeps `dist-demo/` as an ordinary artifact.
+# Builds the static demo for GitHub Pages and checks it. On a pull request that is all it does. On `main` (a push, or a
+# manual run) the very bundle that was checked is then published to the `github-pages` environment: the deploy job is
+# the only one with `pages: write` and `id-token: write`, and it needs no secret because Pages authenticates with OIDC.
 
 on:
   workflow_dispatch:
+  # The same paths as for a pull request: a change that cannot alter the demo does not need a new deployment, and a
+  # manual run covers the rest.
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - '.nvmrc'
+      - '.github/workflows/pages.yml'
   pull_request:
     paths:
       - 'apps/web/**'
@@ -19,9 +31,10 @@ on:
 permissions:
   contents: read
 
+# A newer pull request push replaces the run in progress, but a run on `main` is never cut short: it may be publishing.
 concurrency:
   group: demo-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   demo-build:
@@ -48,6 +61,15 @@ jobs:
           path: apps/web/dist-demo/
           if-no-files-found: error
           retention-days: 7
+      # `404.html` is the SPA fallback: Pages serves it for client-side routes, so a pull request checks it too.
+      - name: Check the single-page fallback
+        run: cmp apps/web/dist-demo/index.html apps/web/dist-demo/404.html
+      # The Pages artifact is made here, from the directory that was just checked, so the deploy job publishes that
+      # bundle and does not build another. It is made under the same condition as the deploy job.
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          path: apps/web/dist-demo/
       # Only a failure leaves something to read: the traces Playwright keeps for the tests that failed.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
@@ -58,3 +80,25 @@ jobs:
             apps/web/e2e-demo/playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+
+  # A separate job so that the write permissions exist only here, and only on `main`: a pull request, or a manual run
+  # from another branch, never reaches it.
+  deploy:
+    name: Publish the demo
+    needs: demo-build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    # Never cancel a deployment that is under way: the next one waits its turn.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

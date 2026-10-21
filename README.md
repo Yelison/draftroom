@@ -44,7 +44,7 @@ These pictures and the clip are taken from the real stack by a script (`npm run 
 
 ## Static demo
 
-The repository can build a demo that runs entirely in the browser, with no server (`npm run build:demo -w @draftroom/web`). **Everything in it is simulated in the browser:** the data is in memory and resets when the page reloads, the second person who writes is a script, and tabs of the same browser share a document to stand in for other people. It is meant for a quick look; it is not evidence that the server works. Nothing is published from this repository yet.
+The repository can build a demo that runs entirely in the browser, with no server (`npm run build:demo -w @draftroom/web`). **Everything in it is simulated in the browser:** the data is in memory and resets when the page reloads, the second person who writes is a script, and tabs of the same browser share a document to stand in for other people. It is meant for a quick look; it is not evidence that the server works. It is published at <https://yelison.github.io/draftroom/>.
 
 ## Stack
 

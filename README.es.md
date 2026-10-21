@@ -44,7 +44,7 @@ Estas imágenes y el clip los toma un script del sistema real (`npm run docs:tou
 
 ## Demo estática
 
-El repositorio puede construir una demo que se ejecuta entera en el navegador, sin servidor (`npm run build:demo -w @draftroom/web`). **Todo en ella está simulado en el navegador:** los datos están en memoria y se reinician al recargar la página, la segunda persona que escribe es un guion, y las pestañas del mismo navegador comparten un documento para hacer las veces de otras personas. Sirve para echar un vistazo rápido; no demuestra que el servidor funcione. Por ahora no se publica nada desde este repositorio.
+El repositorio puede construir una demo que se ejecuta entera en el navegador, sin servidor (`npm run build:demo -w @draftroom/web`). **Todo en ella está simulado en el navegador:** los datos están en memoria y se reinician al recargar la página, la segunda persona que escribe es un guion, y las pestañas del mismo navegador comparten un documento para hacer las veces de otras personas. Sirve para echar un vistazo rápido; no demuestra que el servidor funcione. Está publicada en <https://yelison.github.io/draftroom/>.
 
 ## Tecnología
 
