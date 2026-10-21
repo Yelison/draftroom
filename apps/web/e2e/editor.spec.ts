@@ -1142,6 +1142,43 @@ test.describe('one scroll', () => {
     })
   }
 
+  // The room the text opens for the thread the person is on is what makes the text jump when they choose one, so it is kept
+  // small: the active card is short (the actions over the header, a reply of one line) and uses the room above it first.
+  test('opens little room in the text for the active thread', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto(documentPath)
+    await open(page)
+    await page.keyboard.press('Control+End')
+    for (const line of [
+      'The first paragraph is short.',
+      'The second paragraph is short too.',
+      'The third paragraph is the next one.',
+    ]) {
+      await page.keyboard.press('Enter')
+      await page.keyboard.insertText(line)
+    }
+    await commentOn(page, 'first paragraph', 'About the first')
+    await commentOn(page, 'second paragraph', 'About the second')
+    await commentOn(page, 'third paragraph', 'About the third')
+    const room = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('[data-comment-gap]')].reduce(
+          (sum, block) => sum + Number(block.dataset['commentGap']),
+          0,
+        ),
+      )
+    const compact = await room()
+
+    await marginOf(page).locator('[data-thread-id]').filter({ hasText: 'About the second' }).click()
+    const active = marginOf(page).getByRole('article')
+    await expect(active).toBeVisible()
+
+    // The whole card, with its conversation, a reply of one line and Resolve: no taller than a card of the preview with two comments.
+    expect((await active.boundingBox())?.height).toBeLessThanOrEqual(240)
+    await expect.poll(room).toBeLessThanOrEqual(compact + 130)
+  })
+
   // What changes the height of something above the text (the error of the title) moves the text and nothing the margin watches
   // changes size: the cards have to follow it all the same.
   test('keeps each card level with its text when something above the text changes height', async ({ page }) => {
