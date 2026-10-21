@@ -7,7 +7,7 @@ export interface SettingsFailureProps {
   retrying: boolean
 }
 
-/** What a tab says when it could not be read: the way forward is to try again. */
+/** What the dialog says when it could not read what it shows: the way forward is to try again. */
 export function SettingsFailure({ onRetry, retrying }: SettingsFailureProps) {
   const intl = useIntl()
 

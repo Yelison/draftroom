@@ -29,7 +29,11 @@ export function WorkspaceSection({ form }: { form: SettingsForm }) {
         value={form.workspaceName}
         readOnly={!form.canRename}
         onChange={(event) => form.setWorkspaceName(event.target.value)}
-        hint={form.canRename ? undefined : intl.formatMessage({ id: 'settings.workspace.ownersOnly' })}
+        hint={
+          form.canRename || !form.workspaceKnown
+            ? undefined
+            : intl.formatMessage({ id: 'settings.workspace.ownersOnly' })
+        }
         error={error}
       />
     </section>

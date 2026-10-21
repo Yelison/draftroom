@@ -145,6 +145,7 @@ describe('an address that names Settings', () => {
   })
 
   it.each([
+    { section: 'profile', first: 'Name' },
     { section: 'appearance', first: 'Light' },
     { section: 'workspace', first: 'Workspace name' },
   ])('puts the focus on the first control of the section it names: $section', async ({ section, first }) => {
@@ -171,17 +172,18 @@ describe('the sections of the dialog', () => {
     expect(within(dialog()).getByText('Your choices are saved as soon as you make them.')).toBeInTheDocument()
   })
 
-  it('has Save changes available for an account without a language and not once that is stored', async () => {
+  it('has Save changes available once something changed, and not again once it is stored', async () => {
     const { user } = await openSettings()
     const save = () => within(dialog()).getByRole('button', { name: 'Save changes' })
-    expect(save()).not.toHaveAttribute('aria-disabled')
+    expect(save()).toHaveAttribute('aria-disabled', 'true')
 
+    await user.type(within(dialog()).getByRole('textbox', { name: 'Name' }), ' Vega')
+    expect(save()).not.toHaveAttribute('aria-disabled')
     await user.click(save())
 
     expect(await within(dialog()).findByText('Changes saved')).toBeInTheDocument()
     expect(save()).toHaveAttribute('aria-disabled', 'true')
-    await user.type(within(dialog()).getByRole('textbox', { name: 'Name' }), ' Vega')
-    expect(save()).not.toHaveAttribute('aria-disabled')
+    await user.type(within(dialog()).getByRole('textbox', { name: 'Name' }), '!')
     expect(within(dialog()).queryByText('Changes saved')).not.toBeInTheDocument()
   })
 
@@ -242,6 +244,19 @@ describe('the sections of the dialog', () => {
     expect(await within(dialog()).findByRole('button', { name: 'Loading…' })).toHaveAttribute('aria-busy', 'true')
     answer()
     expect(await within(dialog()).findByText('Changes saved')).toBeInTheDocument()
+  })
+
+  it('gives the focus to the headline of the page, not to the body, when it closes with no person to give it to', async () => {
+    const { user } = renderScreen('/?settings=profile', {
+      wrap: (dataSource) => ({ ...dataSource, getMe: () => Promise.reject(refusal(503, 'unavailable')) }),
+    })
+    const open = within(await screen.findByRole('dialog', { name: 'Settings' }))
+    await open.findByRole('alert')
+
+    await user.click(open.getByRole('button', { name: 'Done' }))
+
+    await waitFor(() => expect(settingsDialog()).not.toBeInTheDocument())
+    expect(screen.getByRole('heading', { level: 1, name: 'Home' })).toHaveFocus()
   })
 
   it('keeps the dialog and its Done button while the data is on its way', async () => {

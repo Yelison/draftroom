@@ -10,6 +10,7 @@ import { useSignOut } from '../../features/auth/useSignOut.ts'
 import { meQuery } from '../../features/editor/meQuery.ts'
 import { SettingsDialog } from '../../features/settings/SettingsDialog.tsx'
 import { useSettingsDialog } from '../../features/settings/useSettingsDialog.ts'
+import { focusMainContent } from '../../app/mainContent.ts'
 import styles from './NavRail.module.css'
 
 /**
@@ -30,7 +31,11 @@ export function AccountMenu() {
 
   useEffect(() => {
     // The dialog has closed by the time this runs, which is when the page is no longer inert and the focus can be given.
-    if (wasOpen.current && !open) trigger.current?.focus()
+    // Without the person (the account could not be read) there is no button to give it to, and the page takes it.
+    if (wasOpen.current && !open) {
+      if (trigger.current === null) focusMainContent()
+      else trigger.current.focus()
+    }
     wasOpen.current = open
   }, [open])
 

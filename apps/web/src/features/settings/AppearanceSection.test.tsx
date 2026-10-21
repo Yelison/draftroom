@@ -81,12 +81,14 @@ describe('the Appearance section, editor text size', () => {
     expect(document.documentElement).not.toHaveAttribute('data-editor-text-size')
   })
 
-  it('shows a skeleton with a spoken status while the account is on its way', async () => {
+  it('shows its section with a spoken status, inert, while the account is on its way', async () => {
     renderScreen('/?settings=appearance', {
       wrap: (dataSource) => ({ ...dataSource, getMe: () => new Promise(() => undefined) }),
     })
 
     expect(await within(dialog()).findByText('Loading your settings')).toHaveAttribute('role', 'status')
+    expect(within(dialog()).getByRole('heading', { level: 2, name: 'Appearance' })).toBeInTheDocument()
+    expect(dialog().querySelector('form')).toHaveAttribute('inert')
   })
 
   it('says it could not read the account, and tries again when asked', async () => {

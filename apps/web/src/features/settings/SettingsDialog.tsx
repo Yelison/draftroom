@@ -4,7 +4,6 @@ import { useIntl } from 'react-intl'
 import { AppearanceSection } from './AppearanceSection.tsx'
 import { ProfileSection } from './ProfileSection.tsx'
 import { SettingsFailure } from './SettingsFailure.tsx'
-import { SettingsSkeleton } from './SettingsSkeleton.tsx'
 import { WorkspaceSection } from './WorkspaceSection.tsx'
 import { FormStatus } from './FormStatus.tsx'
 import type { SettingsSection } from './useSettingsDialog.ts'
@@ -15,16 +14,18 @@ import styles from './Settings.module.css'
 const formId = 'settings-form'
 
 export interface SettingsDialogProps {
-  /** Where the dialog opens: the first control of that section takes the focus. */
+  /** Where the dialog opens: the first control of that section takes the focus, which also brings it into view. */
   section: SettingsSection
   onClose: () => void
 }
 
 /**
  * Settings, in one column: the profile, the appearance and the workspace of the person, over the page they were on. The
- * dialog is one element from the first paint to the last, whatever it has to show (a skeleton, a failure, the sections),
- * so the focus the browser keeps for it is never moved by the data arriving. Appearance keeps what is chosen as it is
- * chosen; the text fields are kept together by Save changes, which says nothing is saved until the server has said so.
+ * dialog is one element from the first paint to the last, whatever it has to show (the sections, a failure), so the focus
+ * the browser keeps for it is never moved by the data arriving. While the data is on its way the sections are the real
+ * ones, empty and inert, which measure what the loaded ones measure by construction: nothing moves when it arrives.
+ * Appearance keeps what is chosen as it is chosen; the text fields are kept together by Save changes, which says nothing
+ * is saved until the server has said so. The headline and the buttons stay in sight and only the sections scroll.
  */
 export function SettingsDialog({ section, onClose }: SettingsDialogProps) {
   const intl = useIntl()
@@ -33,17 +34,17 @@ export function SettingsDialog({ section, onClose }: SettingsDialogProps) {
   const form = useSettingsForm(ready ? data.me : undefined, ready ? data.workspace : undefined)
   const body = useRef<HTMLDivElement>(null)
 
-  // The first stop of the dialog is its close button. An address that names a section is a person asking for it, so
-  // the focus goes there, which also brings it into view.
+  // The browser puts the focus on the first thing that can take it, which is the scrolling column while the fields are
+  // inert. Once they are there it goes to the first control of the section the address names (the name, by default).
   useEffect(() => {
-    if (ready && section !== 'profile')
-      body.current?.querySelector<HTMLElement>(`#settings-${section} :is(input, button)`)?.focus()
+    if (ready) body.current?.querySelector<HTMLElement>(`#settings-${section} :is(input, button)`)?.focus()
   }, [ready, section])
 
   return (
     <Dialog
       open
       size="wide"
+      className={styles.dialog ?? ''}
       onClose={onClose}
       title={intl.formatMessage({ id: 'settings.dialog.title' })}
       footer={
@@ -63,15 +64,26 @@ export function SettingsDialog({ section, onClose }: SettingsDialogProps) {
       }
     >
       <div ref={body} className={styles.body}>
-        {data.status === 'loading' && <SettingsSkeleton />}
         {data.status === 'failed' && <SettingsFailure onRetry={data.retry} retrying={data.retrying} />}
-        {data.status === 'ready' && (
-          <form id={formId} className={styles.form} onSubmit={form.save} noValidate>
-            <ProfileSection me={data.me} form={form} />
-            <AppearanceSection textSize={data.me.editorTextSize} />
-            {data.workspace !== null && <WorkspaceSection form={form} />}
+        {data.status !== 'failed' && (
+          <form
+            id={formId}
+            className={styles.form}
+            onSubmit={form.save}
+            noValidate
+            inert={!ready}
+            aria-busy={!ready || undefined}
+          >
+            <ProfileSection email={ready ? data.me.email : ''} form={form} />
+            <AppearanceSection textSize={ready ? data.me.editorTextSize : 'medium'} />
+            {(!ready || data.workspace !== null) && <WorkspaceSection form={form} />}
             <FormStatus saved={form.saved ? 'settings.saved' : null} />
           </form>
+        )}
+        {data.status === 'loading' && (
+          <p role="status" className="forma-visually-hidden">
+            {intl.formatMessage({ id: 'settings.loading' })}
+          </p>
         )}
       </div>
     </Dialog>

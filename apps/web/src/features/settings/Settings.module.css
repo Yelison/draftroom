@@ -46,6 +46,11 @@
   font: var(--font-body);
 }
 
+/* The region exists before its text, so that the text is announced; empty, it is out of the flow and costs no gap. */
+.saved:empty {
+  position: absolute;
+}
+
 .group {
   display: flex;
   flex-direction: column;
@@ -67,29 +72,26 @@
   font: var(--font-label);
 }
 
-/* The skeleton has the measures of what it stands for, in the same stack: a heading, then the rows of the section. */
-.skeleton {
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-}
+/* The headline and the buttons stay in sight; only the sections scroll. A window too short for that (a zoom of 200 %)
+ * scrolls the whole dialog, as Forma UI does. `> *` is the content column of the Dialog, which has no hook of its own. */
+@media (height >= 560px) {
+  .dialog[open] {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
-.skeletonHeading {
-  inline-size: 30%;
-  block-size: var(--space-24);
-}
+  .dialog > * {
+    min-block-size: 0;
+  }
 
-/* A label over a field. */
-.skeletonField {
-  block-size: calc(var(--button-height) + var(--space-24));
-}
-
-/* A legend over three choices, one under the other. */
-.skeletonChoices {
-  block-size: calc(var(--space-24) * 4 + var(--space-8) * 3);
-}
-
-/* A legend over a row of choices. */
-.skeletonRow {
-  block-size: calc(var(--space-24) * 2 + var(--space-16));
+  /* The sides are the dialog's own padding, taken back so that the ring of a focused field is not clipped by the scroll. */
+  .body {
+    flex: 1 1 auto;
+    min-block-size: 0;
+    overflow-y: auto;
+    margin-inline: calc(-1 * var(--space-24));
+    padding: var(--space-16) var(--space-24);
+    border-block: 1px solid var(--color-line);
+  }
 }

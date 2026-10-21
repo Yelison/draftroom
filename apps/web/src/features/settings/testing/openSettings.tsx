@@ -1,4 +1,5 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
+import { expect } from 'vitest'
 import { ApiError } from '../../../data/errors.ts'
 import { renderScreen, type RenderScreenOptions } from '../../documents/testing/renderScreen.tsx'
 
@@ -11,12 +12,11 @@ export const dialog = (name = 'Settings') => screen.getByRole('dialog', { name }
 export const refusal = (status: number, code: ApiError['code']) =>
   new ApiError({ type: 'about:blank', title: 'Refused', status, code })
 
-/** Opens Settings over Home and waits until it has what it came for: the three sections of the person. */
+/** Opens Settings over Home and waits until it has what it came for: the sections, filled in and no longer busy. */
 export async function openSettings(options?: RenderScreenOptions & { path?: string }) {
   const view = renderScreen(options?.path ?? '/?settings=profile', options)
-  await within(await screen.findByRole('dialog', { name: 'Settings' })).findByRole('heading', {
-    level: 2,
-    name: /^(Profile|Perfil)$/,
-  })
+  const open = await screen.findByRole('dialog', { name: 'Settings' })
+  await waitFor(() => expect(open.querySelector('form')).not.toBeNull())
+  await waitFor(() => expect(open.querySelector('form[aria-busy]')).toBeNull())
   return view
 }

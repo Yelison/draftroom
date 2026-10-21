@@ -102,26 +102,31 @@ describe('the Profile section', () => {
     expect(localStorage.getItem(localeStorageKey)).toBe('es')
   })
 
-  it('saves the language already in use when the account has none, and says so', async () => {
+  it('does not count the language in use as a change, and saves it once the person chooses it', async () => {
     localStorage.setItem(localeStorageKey, 'es')
     const { user, server } = renderScreen('/?settings=profile')
     const spanish = within(await screen.findByRole('dialog', { name: 'Configuración' }))
     await spanish.findByRole('heading', { level: 2, name: 'Perfil' })
     expect(spanish.getByRole('radio', { name: 'Español' })).toBeChecked()
+    expect(spanish.getByRole('button', { name: 'Guardar cambios' })).toHaveAttribute('aria-disabled', 'true')
 
+    await user.click(spanish.getByRole('radio', { name: 'English' }))
+    await user.click(spanish.getByRole('radio', { name: 'Español' }))
     await user.click(spanish.getByRole('button', { name: 'Guardar cambios' }))
 
     expect(await spanish.findByText('Cambios guardados')).toBeInTheDocument()
     expect((await server.connect({ signedInAs: 'marta@harborpine.example' }).getMe()).locale).toBe('es')
   })
 
-  it('shows a skeleton with a spoken status while the account is on its way', async () => {
+  it('shows its fields empty and inert, with a spoken status, while the account is on its way', async () => {
     renderScreen('/?settings=profile', {
       wrap: (dataSource) => ({ ...dataSource, getMe: () => new Promise(() => undefined) }),
     })
 
     expect(await within(dialog()).findByText('Loading your settings')).toHaveAttribute('role', 'status')
-    expect(within(dialog()).queryByRole('textbox')).not.toBeInTheDocument()
+    expect(within(dialog()).getByRole('textbox', { name: 'Name' })).toHaveValue('')
+    expect(dialog().querySelector('form')).toHaveAttribute('inert')
+    expect(dialog().querySelector('form')).toHaveAttribute('aria-busy', 'true')
   })
 
   it('says it could not read the account, and tries again when asked', async () => {

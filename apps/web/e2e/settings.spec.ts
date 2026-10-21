@@ -1,5 +1,6 @@
 /* Settings in the production build, with a real browser: a dialog opened from the person in the rail, over the page the person is on. */
 import type { Page } from '@playwright/test'
+import { launchPlan } from '../src/data/mock/fixtures/documents.ts'
 import { person } from './accountMenu.ts'
 import { expect, test } from './fixtures.ts'
 import { signInAsDaniel } from './signInAs.ts'
@@ -131,18 +132,28 @@ test('is closed by the Back button of the browser and the page behind is the one
   await expect(person(page)).toBeFocused()
 })
 
-test('opens over the editor without taking the document from behind it', async ({ page }) => {
-  await open(page, '/documents/new')
-  const headline = page.getByRole('heading', { level: 1 }).first()
-  await headline.evaluate((element) => element.setAttribute('data-kept', 'yes'))
+test('opens over the editor without taking the document from behind it: the same node, with what was typed', async ({
+  page,
+}) => {
+  await page.goto(`/documents/${launchPlan.id}`)
+  const text = page.getByRole('textbox', { name: 'Document content' })
+  await text.click()
+  await page.keyboard.press('ControlOrMeta+End')
+  await page.keyboard.type(' Written before Settings.')
+  await text.evaluate((element) => element.setAttribute('data-kept', 'yes'))
 
   await person(page).click()
   await page.getByRole('menuitem', { name: 'Settings' }).click()
   await expect(dialog(page)).toBeVisible()
   await page.keyboard.press('Escape')
-
   await expect(dialog(page)).toBeHidden()
-  await expect(headline).toHaveAttribute('data-kept', 'yes')
+  await person(page).click()
+  await page.getByRole('menuitem', { name: 'Settings' }).click()
+  await dialog(page).getByRole('button', { name: 'Done' }).click()
+  await expect(dialog(page)).toBeHidden()
+
+  await expect(text).toHaveAttribute('data-kept', 'yes')
+  await expect(text).toContainText('Written before Settings.')
 })
 
 test('does not let a member rename the workspace, and says why', async ({ page }) => {
@@ -168,6 +179,34 @@ test('opens in the language that was saved, and keeps the theme, on the next loa
   await expect(page.locator('html')).toHaveAttribute('lang', 'es')
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   await expect(page.getByRole('dialog', { name: 'Configuración' })).toBeVisible()
+})
+
+test.describe('a window as short as a laptop screen', () => {
+  for (const height of [720, 800]) {
+    test(`keeps the headline and the buttons in sight at 1280 x ${height}, and scrolls only the sections`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1280, height })
+      await page.goto('/?settings=profile')
+      await expect(dialog(page).getByRole('textbox', { name: 'Workspace name' })).toHaveValue('Harbor Pine')
+
+      await expect(dialog(page).getByRole('heading', { level: 2, name: 'Settings' })).toBeInViewport()
+      await expect(dialog(page).getByRole('button', { name: 'Done' })).toBeInViewport()
+      await expect(dialog(page).getByRole('button', { name: 'Save changes' })).toBeInViewport()
+      const box = await dialog(page).boundingBox()
+      expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(height)
+      // At 720 the sections do not fit and scroll inside; the dialog itself does not.
+      const scrolls = await dialog(page).evaluate((element) => ({
+        dialog: element.scrollHeight > element.clientHeight,
+        body: [...element.querySelectorAll('form')].some((form) => {
+          const body = form.parentElement
+          return body !== null && body.scrollHeight > body.clientHeight
+        }),
+      }))
+      expect(scrolls.dialog).toBe(false)
+      if (height === 720) expect(scrolls.body).toBe(true)
+    })
+  }
 })
 
 test.describe('zoomed to 200 % in a window of 1280 px', () => {
@@ -197,7 +236,7 @@ test.describe('zoomed to 200 % in a window of 1280 px', () => {
   })
 })
 
-test('does not move while its data arrives', async ({ page }) => {
+test('keeps its height from the moment it opens to the moment its data is in', async ({ page }) => {
   await open(page, '/')
   await page.evaluate(() => {
     const heights: number[] = []

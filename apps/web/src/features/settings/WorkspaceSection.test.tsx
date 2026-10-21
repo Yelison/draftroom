@@ -86,12 +86,15 @@ describe('the Workspace section', () => {
     expect(nameField()).toHaveValue('Harbor Pine Studio')
   })
 
-  it('shows a skeleton with a spoken status while the workspace is on its way', async () => {
+  it('shows its section with a spoken status, inert, and no reason to read yet, while the workspace is on its way', async () => {
     renderScreen('/?settings=workspace', {
       wrap: (dataSource) => ({ ...dataSource, getWorkspace: () => new Promise(() => undefined) }),
     })
 
     expect(await within(dialog()).findByText('Loading your settings')).toHaveAttribute('role', 'status')
+    expect(within(dialog()).getByRole('textbox', { name: 'Workspace name' })).toHaveValue('')
+    expect(within(dialog()).queryByText('Only owners can rename the workspace.')).not.toBeInTheDocument()
+    expect(dialog().querySelector('form')).toHaveAttribute('inert')
   })
 
   it('says it could not read the workspace, and tries again when asked', async () => {

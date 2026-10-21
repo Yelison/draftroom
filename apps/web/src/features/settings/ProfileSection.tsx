@@ -1,4 +1,4 @@
-import { contractLimits, type Schema } from '@draftroom/contract'
+import { contractLimits } from '@draftroom/contract'
 import { Input } from '@yelison/forma-ui'
 import { useIntl } from 'react-intl'
 import { localeNames, locales } from '../../i18n/locale.ts'
@@ -8,7 +8,7 @@ import type { SettingsForm } from './useSettingsForm.ts'
 import styles from './Settings.module.css'
 
 /** The name, the email (which is read, not changed) and the language of the signed-in person, which their account keeps. */
-export function ProfileSection({ me, form }: { me: Schema<'Me'>; form: SettingsForm }) {
+export function ProfileSection({ email, form }: { email: string; form: SettingsForm }) {
   const intl = useIntl()
   const { problems, failures } = form
   const nameError =
@@ -30,7 +30,7 @@ export function ProfileSection({ me, form }: { me: Schema<'Me'>; form: SettingsF
           onChange={(event) => form.setName(event.target.value)}
           error={nameError}
         />
-        <Input label={intl.formatMessage({ id: 'settings.profile.email.label' })} value={me.email} readOnly />
+        <Input label={intl.formatMessage({ id: 'settings.profile.email.label' })} value={email} readOnly />
       </div>
       <ChoiceGroup
         legend={intl.formatMessage({ id: 'settings.profile.language.legend' })}

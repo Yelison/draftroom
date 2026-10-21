@@ -26,13 +26,13 @@ export function useSettingsForm(me: Schema<'Me'> | undefined, workspace: Schema<
   const [drafts, setDrafts] = useState<{ name?: string; locale?: Locale; workspaceName?: string }>({})
   const [problems, setProblems] = useState<Problems>({ name: null, workspaceName: null })
 
-  // A person who has not chosen a language reads the one the browser gave them, and that is the one the group shows. It
-  // is not saved until they say so: the account stays without a language, and saving writes the one in use.
+  // A person who has not chosen a language reads the one the browser gave them, and that is the one the group shows.
   const name = drafts.name ?? me?.name ?? ''
   const locale = drafts.locale ?? me?.locale ?? appLocale
   const workspaceName = drafts.workspaceName ?? workspace?.name ?? ''
   const nameChanged = me !== undefined && name.trim() !== me.name
-  const localeChanged = me !== undefined && locale !== me.locale
+  // The language in use is not a change: the account keeps none until the person chooses one.
+  const localeChanged = me !== undefined && drafts.locale !== undefined && drafts.locale !== me.locale
   // The server refuses anyone else; the interface only does not offer it.
   const canRename = workspace?.role === 'owner'
   const workspaceChanged = canRename && workspaceName.trim() !== workspace.name
@@ -59,6 +59,8 @@ export function useSettingsForm(me: Schema<'Me'> | undefined, workspace: Schema<
     locale,
     workspaceName,
     canRename,
+    /** Whether the workspace has arrived: before it, nobody can be told what they may not do with it. */
+    workspaceKnown: workspace !== undefined && workspace !== null,
     changed,
     pending,
     problems,
@@ -68,7 +70,7 @@ export function useSettingsForm(me: Schema<'Me'> | undefined, workspace: Schema<
       language: nameChanged ? null : updateMe.error,
       workspaceName: rename.error,
     },
-    saved: (updateMe.isSuccess || rename.isSuccess) && !changed && !updateMe.isError && !rename.isError,
+    saved: (updateMe.isSuccess || rename.isSuccess) && !changed,
     setName(next: string) {
       updateMe.reset()
       setProblems((current) => ({ ...current, name: null }))
