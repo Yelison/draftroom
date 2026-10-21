@@ -3,7 +3,7 @@ import type { HocuspocusProvider } from '@hocuspocus/provider'
 import { useQuery } from '@tanstack/react-query'
 import type { Editor } from '@tiptap/core'
 import { Button } from '@yelison/forma-ui'
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useIntl } from 'react-intl'
 import { useNarrowWindow } from '../../../app/narrowWindow.ts'
 import type { CommentCardState } from '../../../components/CommentCard/CommentCard.tsx'
@@ -120,6 +120,9 @@ export function CommentsMargin({ editor, provider, document, personId, requests 
     activeId: draft !== null && draftFrom !== null ? draftId : activeThreadId,
   })
 
+  // Empty on the render that mounts the region and the message on the next: the pattern of the other live regions that come with
+  // a screen (a deferred value that starts as '').
+  const loading = useDeferredValue(query.isPending ? intl.formatMessage({ id: 'comments.margin.loading' }) : '', '')
   const shownCount = arranged.placed.length + arranged.orphaned.length + arranged.waiting.length
   // What changes what is on the page: a thread comes or goes, changes its state, or loses a comment.
   const signature = [...arranged.placed.map(({ thread }) => thread), ...arranged.orphaned, ...arranged.waiting]
@@ -248,11 +251,10 @@ export function CommentsMargin({ editor, provider, document, personId, requests 
           </Button>
         </StateMessage>
       )}
-      {query.isPending && (
-        <p role="status" className={styles.caption}>
-          {intl.formatMessage({ id: 'comments.margin.loading' })}
-        </p>
-      )}
+      {/* In the page, empty, before it says anything: a live region that arrives with its text is not announced. */}
+      <p role="status" className={loading === '' ? 'forma-visually-hidden' : styles.caption}>
+        {loading}
+      </p>
       {!query.isError && threads.length > 0 && shownCount === 0 && draft === null && (
         <p className={styles.caption}>
           {intl.formatMessage({ id: `comments.emptyFiltered.${filter === 'resolved' ? 'resolved' : 'open'}` })}

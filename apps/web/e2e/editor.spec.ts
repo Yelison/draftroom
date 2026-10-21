@@ -487,6 +487,30 @@ test.describe('the title', () => {
     await expect(title(page)).toHaveAttribute('aria-invalid', 'true')
   })
 
+  // A paste of a text with line breaks is made one line, and it is a paste like any other: the caret is after it and the browser
+  // undoes it in one step. It is a real paste, from the clipboard, because that is what the handler is for.
+  test.describe('pasting lines', () => {
+    test.use({ permissions: ['clipboard-read', 'clipboard-write'] })
+
+    test('puts the caret after what was pasted, with its line breaks made spaces, and undoes it in one step', async ({
+      page,
+    }) => {
+      await open(page)
+      const title = page.getByRole('textbox', { name: 'Document title' })
+      await page.evaluate(() => navigator.clipboard.writeText('X\nY'))
+      await title.click()
+      await page.keyboard.press('Home')
+      for (let letter = 0; letter < 6; letter++) await page.keyboard.press('ArrowRight')
+
+      await page.keyboard.press('ControlOrMeta+V')
+
+      await expect(title).toHaveValue('AutumnX Y launch plan')
+      expect(await title.evaluate((element: HTMLTextAreaElement) => element.selectionStart)).toBe(9)
+      await page.keyboard.press('ControlOrMeta+Z')
+      await expect(title).toHaveValue('Autumn launch plan')
+    })
+  })
+
   test('stops at 200 characters, counting an emoji as one', async ({ page }) => {
     await open(page)
 
@@ -1203,14 +1227,31 @@ test.describe('one scroll', () => {
           }),
         ),
       )
-    const settled = await offsets()
-    expect(Object.keys(settled)).toHaveLength(2)
+    // The page has to be still when the title shows its error: what the cards were waiting for (a card that has just been made,
+    // the focus that leaves the text or reaches the title, which changes the active card) would measure the page again after the
+    // error, and the cards would be level without the margin having noticed it. Still is the same distances for 300 ms.
+    const settle = async () => {
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      await expect
+        .poll(async () => {
+          const first = await offsets()
+          await page.waitForTimeout(300)
+          const second = await offsets()
+          return Math.max(...Object.entries(first).map(([id, offset]) => Math.abs((second[id] ?? Number.NaN) - offset)))
+        })
+        .toBeLessThanOrEqual(1)
+      return offsets()
+    }
+    await textArea(page).evaluate((element) => element.blur())
+    await settle()
 
     // An empty title is refused when the person leaves it, and says so under it: the text goes down by that much.
     const title = page.getByRole('textbox', { name: 'Document title' })
     const topOfText = async () => (await textArea(page).boundingBox())?.y ?? Number.NaN
-    const before = await topOfText()
     await title.fill('')
+    const settled = await settle()
+    expect(Object.keys(settled)).toHaveLength(2)
+    const before = await topOfText()
     await title.blur()
     await expect(page.getByText('Give the document a title.')).toBeVisible()
     expect(await topOfText()).toBeGreaterThan(before)

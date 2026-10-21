@@ -230,12 +230,27 @@ describe('the states of the comments', () => {
   })
 
   it('shows the text after a moment when the comments never arrive, and the margin says it is loading them', async () => {
+    // A live region that arrives with its text is not announced: the one of the margin is in the page empty, and takes the text.
+    const arrivedWithText: string[] = []
+    const watcher = new MutationObserver((records) => {
+      for (const node of records.flatMap((record) => [...record.addedNodes])) {
+        if (!(node instanceof HTMLElement)) continue
+        const regions = node.matches('[role="status"]') ? [node] : [...node.querySelectorAll('[role="status"]')]
+        for (const region of regions)
+          if (region.textContent === 'Loading the comments') arrivedWithText.push('with its text')
+      }
+    })
+    watcher.observe(document.body, { childList: true, subtree: true })
     renderCommentedDocument({ wrap: threadsThat(() => new Promise(() => {})) })
 
     expect(
       await screen.findByRole('textbox', { name: 'Document content' }, { timeout: commentsGrace + 3000 }),
     ).toBeInTheDocument()
-    expect(within(await findMargin()).getByText('Loading the comments')).toBeInTheDocument()
+    const margin = await findMargin()
+    await waitFor(() => expect(within(margin).getByText('Loading the comments')).toBeInTheDocument())
+    watcher.disconnect()
+    expect(within(margin).getByText('Loading the comments')).toHaveAttribute('role', 'status')
+    expect(arrivedWithText).toEqual([])
   })
 
   it('shows the text when the comments could not load, and says so in the margin', async () => {

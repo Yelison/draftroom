@@ -23,6 +23,9 @@ const problemMessage: Record<TitleProblem, MessageId> = {
   failed: 'editor.title.failed',
 }
 
+/** The text as one line: each line break, with the spaces around it, is one space. */
+const oneLine = (text: string) => text.replace(/\s*[\r\n]+\s*/g, ' ')
+
 /**
  * The title of the document, above its text. It is the document's metadata and is saved on its own. A title that does not fit in
  * a line wraps, since it is the heading of the document and must be read whole; it is still one line of text, with no line
@@ -57,10 +60,20 @@ export function TitleField({ document, editable, onEnter }: TitleFieldProps) {
             ref={field}
             rows={1}
             readOnly={!editable}
-            // A line break pasted into the title is a space: the title is a line of text that wraps, not paragraphs. The field
-            // shows what the title is, which is also what the limit allows: it is not controlled (`useGrowingField`).
+            // A line break pasted into the title is a space: the title is a line of text that wraps, not paragraphs. It is made
+            // one line before it goes in, and goes in as a paste does (`insertText`): the caret is after it and the browser
+            // undoes it in one step, which giving the field another value would not.
+            onPaste={(event) => {
+              const pasted = event.clipboardData.getData('text/plain')
+              const line = oneLine(pasted)
+              if (line === pasted) return
+              event.preventDefault()
+              window.document.execCommand('insertText', false, line)
+            }}
+            // The field shows what the title is, which is also what the limit allows: it is not controlled (`useGrowingField`).
+            // What is not pasted (dropped, or put in by a script) is made one line here.
             onChange={(event) => {
-              const shown = change(event.target.value.replace(/\s*[\r\n]+\s*/g, ' '))
+              const shown = change(oneLine(event.target.value))
               if (shown !== event.target.value) event.target.value = shown
             }}
             onBlur={() => void commit()}

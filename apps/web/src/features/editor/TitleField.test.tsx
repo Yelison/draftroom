@@ -1,5 +1,5 @@
 import { focusManager } from '@tanstack/react-query'
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError, TransportError } from '../../data/errors.ts'
 import type { DataSource } from '../../data/DataSource.ts'
@@ -44,12 +44,10 @@ describe('saving the title', () => {
     await waitFor(() => expect(text).toHaveFocus())
   })
 
-  it('is a line of text that wraps, so a line break that is pasted into it becomes a space', async () => {
-    const { user } = await openEditor()
-    await user.clear(title())
+  it('is a line of text that wraps, so a line break that gets in by any way but a paste (a drop) becomes a space', async () => {
+    await openEditor()
 
-    await user.click(title())
-    await user.paste('Winter\nlaunch\r\n  plan')
+    fireEvent.change(title(), { target: { value: 'Winter\nlaunch\r\n  plan' } })
 
     expect(title()).toHaveValue('Winter launch plan')
   })

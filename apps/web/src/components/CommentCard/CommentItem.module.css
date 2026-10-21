@@ -68,3 +68,11 @@
 .comment:focus-within .rowActions {
   opacity: 1;
 }
+
+/* With no pointer to pass over the comment (a touch screen) they are shown all the time: hidden, they would be there to press and
+ * not to see. */
+@media (hover: none) {
+  .rowActions {
+    opacity: 1;
+  }
+}

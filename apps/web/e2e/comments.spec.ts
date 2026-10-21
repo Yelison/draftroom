@@ -234,3 +234,38 @@ for (const [language, said] of Object.entries(words)) {
     })
   })
 }
+
+// Edit and Delete show over the header of a comment for the pointer that is over it and for the focus that is in it. Where there is
+// no pointer to pass over (a touch screen), they are shown all the time: otherwise they would be there to press and not to see.
+for (const device of [
+  { name: 'a pointer that can hover', touch: false, shown: '0' },
+  { name: 'a device with no hover', touch: true, shown: '1' },
+] as const) {
+  test.describe(`the actions of a comment with ${device.name}`, () => {
+    test.use({ locale: 'en-US', colorScheme: 'light', hasTouch: device.touch, isMobile: device.touch })
+
+    test(`are ${device.touch ? '' : 'not '}shown while nothing is on the comment`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 })
+      await page.goto(documentPath)
+      const text = textArea(page, words.en.text)
+      await text.waitFor()
+      await text.focus()
+      await page.keyboard.type(line)
+      await selectLastWord(page, text)
+      await page.keyboard.press('ControlOrMeta+Alt+m')
+      await page.keyboard.type('Is that the right word?')
+      await page.keyboard.press('Control+Enter')
+      const card = page.getByRole('complementary', { name: words.en.margin }).getByRole('article')
+      await expect(card).toBeFocused()
+      // The focus goes back to the text, and no pointer is over the card: nothing is on the comment.
+      await page.keyboard.press('Escape')
+      await expect(text).toBeFocused()
+
+      const actions = card.getByRole('button', { name: /^Edit/ }).locator('xpath=..')
+      expect(await page.evaluate(() => window.matchMedia('(hover: none)').matches)).toBe(device.touch)
+      await expect(actions).toHaveCSS('opacity', device.shown)
+      // They are in the page and reachable either way.
+      await expect(card.getByRole('button', { name: /^Edit/ })).toBeAttached()
+    })
+  })
+}
