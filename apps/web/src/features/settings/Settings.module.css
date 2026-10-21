@@ -1,12 +1,18 @@
-.screen {
-  max-width: var(--layout-sheet-width);
-}
-
-.panel {
+.form {
   display: flex;
   flex-direction: column;
   gap: var(--space-24);
-  padding-block: var(--space-24);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.section + .section {
+  padding-block-start: var(--space-24);
+  border-block-start: 1px solid var(--color-line);
 }
 
 .heading {
@@ -14,27 +20,18 @@
   font: var(--font-section);
 }
 
-.heading:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: var(--space-4);
-  border-radius: var(--radius-small);
-}
-
-.description {
-  margin: var(--space-4) 0 0;
-  color: var(--color-muted);
-  font: var(--font-body);
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+/* Two fields, or two groups of choices, side by side: they take half of the dialog each, and one is never wider than the
+ * other, whatever it holds. */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-16);
 }
 
-.form > * {
-  max-width: 100%;
+.note {
+  margin: 0;
+  color: var(--color-muted);
+  font: var(--font-caption);
 }
 
 .problem {
@@ -49,13 +46,24 @@
   font: var(--font-body);
 }
 
+/* The region exists before its text, so that the text is announced; empty, it is out of the flow and costs no gap. */
+.saved:empty {
+  position: absolute;
+}
+
 .group {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: var(--space-4);
+  min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
+}
+
+.inline {
+  flex-flow: row wrap;
+  gap: var(--space-8) var(--space-24);
 }
 
 .legend {
@@ -64,16 +72,26 @@
   font: var(--font-label);
 }
 
-.skeletons {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-16);
-  padding-block: var(--space-24);
-}
+/* The headline and the buttons stay in sight; only the sections scroll. A window too short for that (a zoom of 200 %)
+ * scrolls the whole dialog, as Forma UI does. `> *` is the content column of the Dialog, which has no hook of its own. */
+@media (height >= 560px) {
+  .dialog[open] {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
-.skeleton {
-  height: var(--button-height);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
+  .dialog > * {
+    min-block-size: 0;
+  }
+
+  /* The sides are the dialog's own padding, taken back so that the ring of a focused field is not clipped by the scroll. */
+  .body {
+    flex: 1 1 auto;
+    min-block-size: 0;
+    overflow-y: auto;
+    margin-inline: calc(-1 * var(--space-24));
+    padding: var(--space-16) var(--space-24);
+    border-block: 1px solid var(--color-line);
+  }
 }

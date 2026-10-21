@@ -64,13 +64,14 @@ test('goes from the rail to Members, filters, invites, changes a role and remove
   await expect(page.getByRole('heading', { level: 1, name: 'Members' })).toBeFocused()
 })
 
-test('reaches Members from Settings, which no longer has it as a tab', async ({ page }) => {
+test('reaches Members from the old address in Settings, which no longer has it as a part', async ({ page }) => {
   await page.goto('/settings/members')
 
   await expect(page).toHaveURL(/\/members$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Members' })).toBeVisible()
   await page.goto('/settings/profile')
-  await expect(page.getByRole('tab', { name: 'Members' })).toHaveCount(0)
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible()
+  await expect(page.getByRole('dialog').getByRole('heading', { name: 'Members' })).toHaveCount(0)
 })
 
 interface Boxes {

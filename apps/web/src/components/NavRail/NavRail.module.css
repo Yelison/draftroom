@@ -85,9 +85,46 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-12);
+  inline-size: 100%;
   min-width: 0;
   padding: var(--space-8) var(--space-0);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
   color: var(--color-nav-ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.person:hover,
+.person[aria-expanded='true'] {
+  background: var(--color-nav-active);
+}
+
+.person[aria-busy='true'] {
+  cursor: progress;
+}
+
+.person:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* The arrow says the row opens something; the compact rail has the room of an avatar only. */
+.personChevron {
+  display: none;
+  flex: none;
+  margin-inline-start: auto;
+}
+
+/* Why the session could not be ended: under the person, where the button that tried is. */
+.failed {
+  margin: 0;
+  padding-inline: var(--space-4);
+  color: var(--color-nav-ink);
+  font: var(--font-caption);
+  overflow-wrap: anywhere;
 }
 
 .personName {
@@ -175,6 +212,10 @@
   .expanded .person {
     justify-content: flex-start;
     padding-inline: var(--space-12);
+  }
+
+  .expanded .personChevron {
+    display: block;
   }
 
   .expanded .names,

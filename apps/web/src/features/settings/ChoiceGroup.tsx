@@ -1,5 +1,5 @@
 import { Radio } from '@yelison/forma-ui'
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import styles from './Settings.module.css'
 
 export interface ChoiceGroupProps<Value extends string> {
@@ -10,6 +10,10 @@ export interface ChoiceGroupProps<Value extends string> {
   options: readonly { value: Value; label: ReactNode }[]
   /** A change is on its way: the choice stays as it is, still reachable, until the answer comes. */
   busy?: boolean
+  /** The choices side by side, for a group of few short words, instead of one under the other. */
+  inline?: boolean
+  /** Why the choice was not stored, tied to the group so that it is read with it and said when it appears. */
+  error?: string | undefined
   onChange: (value: Value) => void
 }
 
@@ -20,10 +24,17 @@ export function ChoiceGroup<Value extends string>({
   value,
   options,
   busy = false,
+  inline = false,
+  error,
   onChange,
 }: ChoiceGroupProps<Value>) {
+  const errorId = useId()
+
   return (
-    <fieldset className={styles.group}>
+    <fieldset
+      className={inline ? `${styles.group} ${styles.inline}` : styles.group}
+      aria-describedby={error === undefined ? undefined : errorId}
+    >
       <legend className={styles.legend}>{legend}</legend>
       {options.map((option) => (
         <Radio
@@ -38,6 +49,11 @@ export function ChoiceGroup<Value extends string>({
           label={option.label}
         />
       ))}
+      {error !== undefined && (
+        <p id={errorId} role="alert" className={styles.problem}>
+          {error}
+        </p>
+      )}
     </fieldset>
   )
 }

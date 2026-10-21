@@ -1,7 +1,7 @@
 import { useMatches } from 'react-router'
 
 /** The sections of the navigation rail, one per item. */
-export const sections = ['home', 'documents', 'shared', 'history', 'members', 'settings'] as const
+export const sections = ['home', 'documents', 'shared', 'history', 'members'] as const
 export type Section = (typeof sections)[number]
 
 /** What a route declares about itself for the shell. A route without a section highlights no item of the rail. */
@@ -12,11 +12,6 @@ export interface RouteHandle {
    * page: the focus is the dialog's to take and to give back, not the headline's.
    */
   dialog?: boolean | undefined
-  /**
-   * The route is one tab of its parent's screen, which stays on screen. Going from one tab to another is the person
-   * moving along the tab list, so the focus stays on the tab they chose and not on the headline.
-   */
-  tab?: boolean | undefined
 }
 
 const isSection = (value: unknown): value is Section => sections.some((section) => section === value)

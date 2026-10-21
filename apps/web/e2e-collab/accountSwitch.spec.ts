@@ -3,6 +3,7 @@ import { environment } from './environment.ts'
 import { expect, Participant, test } from './fixtures.ts'
 import { demoPassword, people, restAs } from './people.ts'
 import { createDocument } from './scene.ts'
+import { person } from './accountMenu.ts'
 
 const lucia = 'lucia.fernandez@almazara.example'
 
@@ -31,7 +32,7 @@ test.describe('a change of account in one tab of the browser', () => {
     const daniel = new Participant('daniel', context, first)
     daniel.toleratesConnectionErrors()
     await signInThroughTheScreen(first, people.daniel)
-    await expect(first.getByRole('button', { name: 'Sign out' })).toBeVisible()
+    await expect(person(first)).toBeVisible()
 
     // Daniel writes with the collaboration connection cut, so that what he wrote is on this device and nowhere else, and goes
     // back to Home without reloading: the page keeps believing it is Daniel's.

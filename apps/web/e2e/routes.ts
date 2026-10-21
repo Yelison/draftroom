@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import { launchPlan } from '../src/data/mock/fixtures/documents.ts'
+import { openAccountMenu, openSettings, signOut as signOutFromMenu } from './accountMenu.ts'
 
 /**
  * The screens and states the accessibility, overflow and zoom specs go through: one list, so a screen that is added is
@@ -69,11 +70,11 @@ function editor(name: string, path: string, panel: 'open' | 'closed'): RouteCase
   }
 }
 
-/** Signs out from the foot of the rail, which is the only button of the navigation. */
+/** Signs out from the menu of the person at the foot of the rail. */
 async function signOut(page: Page) {
   await visit(page, '')
   await settled(page)
-  await page.getByRole('navigation').getByRole('button').click()
+  await signOutFromMenu(page)
   await expect(page).toHaveURL(/sign-in$/)
   await settled(page)
 }
@@ -123,9 +124,34 @@ export const routes: readonly RouteCase[] = [
     },
   },
   screen('version history', `${document}/versions`),
-  screen('settings, profile', 'settings/profile'),
-  screen('settings, workspace', 'settings/workspace'),
-  screen('settings, appearance', 'settings/appearance'),
+  {
+    name: 'account menu',
+    open: async (page) => {
+      await visit(page, '')
+      await settled(page)
+      await openAccountMenu(page)
+    },
+  },
+  {
+    name: 'settings dialog over home',
+    open: async (page) => {
+      await visit(page, '')
+      await settled(page)
+      await openSettings(page)
+      await expect(page.getByRole('dialog').locator('[aria-busy="true"]')).toHaveCount(0)
+    },
+  },
+  {
+    name: 'settings dialog over the editor',
+    open: async (page) => {
+      await page.addInitScript(() => localStorage.setItem('draftroom.commentsPanel', 'closed'))
+      await visit(page, document)
+      await page.locator('[contenteditable]').first().waitFor()
+      await settled(page)
+      await openSettings(page)
+      await expect(page.getByRole('dialog').locator('[aria-busy="true"]')).toHaveCount(0)
+    },
+  },
   { name: 'sign in', open: signOut },
   {
     name: 'sign up',

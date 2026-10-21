@@ -18,25 +18,27 @@ describe('the navigation rail', () => {
     expect(within(workspace).getByText('H')).toHaveAttribute('aria-hidden', 'true')
     const person = within(rail()).getByTitle(marta.name ?? '')
     expect(within(person).getByText(marta.name ?? '')).toBeInTheDocument()
-    expect(within(rail()).getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 
-  it('offers Members after History and before Settings, with Settings still the last item', async () => {
+  it('offers Home, Documents, Shared, History and Members, with Settings and Sign out in the menu of the person', async () => {
     renderScreen('/documents')
 
     expect(
       within(rail())
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Home', 'Documents', 'Shared', 'History', 'Members', 'Settings'])
+    ).toEqual(['Home', 'Documents', 'Shared', 'History', 'Members'])
     expect(await within(rail()).findByText('Owner')).toBeInTheDocument()
   })
 
-  it('has one button only, which ends the session: the person is not a control yet', async () => {
+  it('has one button only, the person, who opens the menu of the account', async () => {
     renderScreen('/documents')
     await within(rail()).findByText('Owner')
 
-    expect(within(rail()).getAllByRole('button')).toHaveLength(1)
+    const buttons = within(rail()).getAllByRole('button')
+
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0]).toHaveAccessibleName(marta.name ?? '')
   })
 
   it('says a member is a member', async () => {

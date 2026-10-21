@@ -19,7 +19,13 @@ import { rememberAccount, rememberedAccount } from './lastAccount.ts'
 const leaving = vi.hoisted(() => ({ leaveAccount: vi.fn() }))
 vi.mock('../../collab/leaveAccount.ts', () => ({ leaveAccount: leaving.leaveAccount, UNSTORED_WAIT_MS: 5_000 }))
 
-const signOutButton = () => screen.getByRole('button', { name: 'Sign out' })
+const person = () => screen.getByRole('button', { name: 'Marta Ruiz' })
+
+/** Signing out is an item of the menu of the person at the foot of the rail: open the menu and choose it. */
+async function chooseSignOut(user: ReturnType<typeof userEvent.setup>, name = 'Sign out') {
+  await user.click(await screen.findByRole('button', { name: 'Marta Ruiz' }))
+  await user.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name }))
+}
 const order: string[] = []
 
 beforeEach(() => {
@@ -53,17 +59,19 @@ function open(options: { signOutFails?: boolean | 'ended' } = {}) {
 describe('signing out from the app', () => {
   it('is offered on every page of the app, which is where a person looks for it', async () => {
     const home = open()
-    expect(await screen.findByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+    await home.user.click(await screen.findByRole('button', { name: 'Marta Ruiz' }))
+    expect(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
     home.unmount()
 
-    renderScreen('/documents/new')
-    expect(await screen.findByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+    const editor = renderScreen('/documents/new')
+    await editor.user.click(await screen.findByRole('button', { name: 'Marta Ruiz' }))
+    expect(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
   })
 
   it('clears what this browser kept of the account first, for the account that is signed in, and then ends the session', async () => {
     const { user, router } = open()
 
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
     expect(order).toEqual(['leaveAccount', 'signOut'])
@@ -73,7 +81,7 @@ describe('signing out from the app', () => {
   it('does not send the next person to the page this one was on: nobody is told where they were going', async () => {
     const { user, router } = open()
 
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
     await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
     // Let whatever the pages still on screen asked for come back before looking.
     await new Promise((resolve) => setTimeout(resolve, 50))
@@ -92,10 +100,9 @@ describe('signing out from the app', () => {
         }),
     )
     const { user } = open()
-    const button = await screen.findByRole('button', { name: 'Sign out' })
 
-    await user.click(button)
-    await user.click(button)
+    await chooseSignOut(user)
+    await chooseSignOut(user)
 
     expect(order).toEqual(['leaveAccount'])
     release()
@@ -104,7 +111,7 @@ describe('signing out from the app', () => {
   it('leaves the person on the sign-in page, with the focus on its headline and not on a page that is gone', async () => {
     const { user, router } = open()
 
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
     await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
 
     await waitFor(() => expect(document.activeElement?.tagName).toBe('H1'))
@@ -113,10 +120,10 @@ describe('signing out from the app', () => {
 
   it('keeps nothing that was read for the account that was left', async () => {
     const { user, queryClient, router } = open()
-    await screen.findByRole('button', { name: 'Sign out' })
+    await screen.findByRole('button', { name: 'Marta Ruiz' })
     expect(queryClient.getQueryCache().getAll().length).toBeGreaterThan(0)
 
-    await user.click(signOutButton())
+    await chooseSignOut(user)
     await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
 
     // `SavedPreferences` stays on to ask who is signed in, and is told nobody is: what is left holds no data.
@@ -134,7 +141,7 @@ describe('signing out from the app', () => {
     rememberAccount(marta.id)
     const { user, router } = open()
 
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
     await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
 
     expect(rememberedAccount()).toBeNull()
@@ -143,16 +150,18 @@ describe('signing out from the app', () => {
   it('counts a session that had already ended as signed out, which is what the person asked for', async () => {
     const { user, router } = open({ signOutFails: 'ended' })
 
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
   })
 
   it('is said in the language of the person', async () => {
     localStorage.setItem(localeStorageKey, 'es')
-    open()
+    const { user } = open()
 
-    expect(await screen.findByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Marta Ruiz' }))
+
+    expect(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Cerrar sesión' })).toBeInTheDocument()
   })
 })
 
@@ -167,7 +176,7 @@ describe('signing out with changes that were never stored', () => {
   it('says how many documents are at stake and waits for the person before it ends the session', async () => {
     const { user } = open()
 
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('2 documents have changes that were never stored')).toBeInTheDocument()
@@ -176,7 +185,7 @@ describe('signing out with changes that were never stored', () => {
 
   it('ends the session when the person agrees to lose them', async () => {
     const { user, router } = open()
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
 
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Leave and lose them' }))
 
@@ -186,7 +195,7 @@ describe('signing out with changes that were never stored', () => {
 
   it('keeps the person signed in, with their copies, when they choose to stay', async () => {
     const { user, router } = open()
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
 
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Stay' }))
 
@@ -194,7 +203,7 @@ describe('signing out with changes that were never stored', () => {
     expect(router.state.location.pathname).toBe('/')
     expect(order).toEqual(['leaveAccount'])
     // The focus goes back to what opened the dialog, so a keyboard does not lose its place.
-    expect(document.activeElement).toBe(signOutButton())
+    expect(document.activeElement).toBe(person())
   })
 })
 
@@ -207,7 +216,7 @@ describe('signing out in a browser that cannot clear what it keeps', () => {
     const written = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const { user } = open()
 
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText("This browser can't clear your saved copies")).toBeInTheDocument()
@@ -222,7 +231,7 @@ describe('signing out in a browser that cannot clear what it keeps', () => {
   it('signs out without the purge when the person chooses to, and is not left half signed out', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const { user, router } = open()
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
 
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Sign out anyway' }))
 
@@ -233,7 +242,7 @@ describe('signing out in a browser that cannot clear what it keeps', () => {
   it('stays signed in when the person chooses to', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const { user, router } = open()
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
 
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Stay signed in' }))
 
@@ -247,13 +256,13 @@ describe('signing out when the server cannot be reached', () => {
   it('says so as an alert and keeps the person on the page, who can try again', async () => {
     const { user, router } = open({ signOutFails: true })
 
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       "We couldn't sign you out. Check your connection and try again.",
     )
     expect(router.state.location.pathname).toBe('/')
-    expect(signOutButton()).not.toHaveAttribute('aria-busy', 'true')
+    expect(person()).not.toHaveAttribute('aria-busy', 'true')
   })
 })
 
@@ -269,7 +278,7 @@ describe('signing out with the providers of the app', () => {
       </DataSourceContext>,
     )
 
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await chooseSignOut(user)
     await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
     await new Promise((resolve) => setTimeout(resolve, 100))
 

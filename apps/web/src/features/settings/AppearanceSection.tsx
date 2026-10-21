@@ -1,33 +1,22 @@
 import type { Schema } from '@draftroom/contract'
-import { useQuery } from '@tanstack/react-query'
 import { useTheme, type ThemePreference } from '@yelison/forma-ui'
 import { useState } from 'react'
 import { useIntl } from 'react-intl'
-import { useDataSource } from '../../data/useDataSource.ts'
 import { themeStore } from '../../theme.ts'
-import { retryTransportOnce } from '../documents/queries.ts'
-import { meQuery } from '../editor/meQuery.ts'
+import { problemMessageId } from '../documents/problemMessage.ts'
 import { ChoiceGroup } from './ChoiceGroup.tsx'
 import { FormStatus } from './FormStatus.tsx'
-import { SettingsFailure } from './SettingsFailure.tsx'
-import { SettingsSkeleton } from './SettingsSkeleton.tsx'
 import { useUpdateMe } from './useUpdateMe.ts'
 import styles from './Settings.module.css'
 
 const themes = ['light', 'dark', 'system'] as const satisfies readonly ThemePreference[]
 const textSizes = ['small', 'medium', 'large'] as const satisfies readonly Schema<'EditorTextSize'>[]
 
-/** The theme of the app, which the browser remembers, and the size of the editor text, which the account keeps. */
-export function AppearanceTab() {
-  const dataSource = useDataSource()
-  const me = useQuery({ ...meQuery(dataSource), retry: retryTransportOnce })
-
-  if (me.isError) return <SettingsFailure onRetry={() => void me.refetch()} retrying={me.isFetching} />
-  if (me.data === undefined) return <SettingsSkeleton />
-  return <Appearance textSize={me.data.editorTextSize} />
-}
-
-function Appearance({ textSize }: { textSize: Schema<'EditorTextSize'> }) {
+/**
+ * The theme of the app, which the browser remembers, and the size of the editor text, which the account keeps. A choice is
+ * kept as it is made, so this section has no Save of its own and says so.
+ */
+export function AppearanceSection({ textSize }: { textSize: Schema<'EditorTextSize'> }) {
   const intl = useIntl()
   const { preference, setPreference } = useTheme(themeStore)
   const update = useUpdateMe()
@@ -35,14 +24,11 @@ function Appearance({ textSize }: { textSize: Schema<'EditorTextSize'> }) {
   const [spoken, setSpoken] = useState<'theme' | null>(null)
 
   return (
-    <section className={styles.panel} aria-labelledby="settings-appearance-heading">
-      <div>
-        <h2 id="settings-appearance-heading" className={styles.heading}>
-          {intl.formatMessage({ id: 'settings.appearance.title' })}
-        </h2>
-        <p className={styles.description}>{intl.formatMessage({ id: 'settings.appearance.description' })}</p>
-      </div>
-      <div className={styles.form}>
+    <section id="settings-appearance" className={styles.section} aria-labelledby="settings-appearance-heading">
+      <h2 id="settings-appearance-heading" className={styles.heading}>
+        {intl.formatMessage({ id: 'settings.appearance.title' })}
+      </h2>
+      <div className={styles.pair}>
         <ChoiceGroup
           legend={intl.formatMessage({ id: 'settings.appearance.theme.legend' })}
           name="theme"
@@ -66,17 +52,19 @@ function Appearance({ textSize }: { textSize: Schema<'EditorTextSize'> }) {
             setSpoken(null)
             update.mutate({ editorTextSize: next })
           }}
+          error={update.error === null ? undefined : intl.formatMessage({ id: problemMessageId(update.error) })}
           options={textSizes.map((option) => ({
             value: option,
             label: intl.formatMessage({ id: `settings.appearance.textSize.${option}` }),
           }))}
         />
-        <p role="status" className="forma-visually-hidden">
-          {spoken === 'theme' &&
-            intl.formatMessage({ id: 'settings.appearance.theme.announcement' }, { theme: preference })}
-        </p>
-        <FormStatus saved={update.isSuccess ? 'settings.appearance.textSize.saved' : null} failure={update.error} />
       </div>
+      <p className={styles.note}>{intl.formatMessage({ id: 'settings.appearance.autosave' })}</p>
+      <p role="status" className="forma-visually-hidden">
+        {spoken === 'theme' &&
+          intl.formatMessage({ id: 'settings.appearance.theme.announcement' }, { theme: preference })}
+      </p>
+      <FormStatus saved={update.isSuccess ? 'settings.appearance.textSize.saved' : null} />
     </section>
   )
 }
