@@ -4,6 +4,7 @@ import { SignInScreen } from '../features/auth/SignInScreen.tsx'
 import { SignUpScreen } from '../features/auth/SignUpScreen.tsx'
 import { DocumentsScreen } from '../features/documents/DocumentsScreen.tsx'
 import { FolderScreen } from '../features/documents/FolderScreen.tsx'
+import layout from '../features/documents/ListLayout.module.css'
 import { EditorSkeleton } from '../features/editor/EditorSkeleton.tsx'
 import { HistoryScreen } from '../features/history/HistoryScreen.tsx'
 import { HomeScreen } from '../features/home/HomeScreen.tsx'
@@ -22,10 +23,17 @@ import { OverviewLayout } from './layouts/OverviewLayout.tsx'
 import type { RouteHandle, Section } from './sections.ts'
 import { SessionGate } from './SessionGate.tsx'
 
-/** A route for a screen that has not arrived yet: its headline and nothing else, in the section it belongs to. */
+/** A route for a screen that has not arrived yet: its headline and nothing else, in the section it belongs to and in the column of the screens that list. */
 function screen(titleId: MessageId, section?: Section): Pick<RouteObject, 'element' | 'handle'> {
   const handle: RouteHandle = { section }
-  return { element: <PageTitle titleId={titleId} />, handle }
+  return {
+    element: (
+      <div className={layout.screen}>
+        <PageTitle titleId={titleId} />
+      </div>
+    ),
+    handle,
+  }
 }
 
 /**

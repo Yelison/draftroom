@@ -1,6 +1,6 @@
 /*
- * Where the content of a page sits in the work area. On a wide window the column of a list screen is centred, so the room
- * left of it and the room right of it are the same; at a desktop width it is as wide as the work area lets it be.
+ * Where the content of a page sits in the work area. On a wide window the column of a page is centred, so the room left
+ * of it and the room right of it are the same; at a desktop width it is as wide as the work area lets it be.
  */
 import type { Page } from '@playwright/test'
 import { launchPlan } from '../src/data/mock/fixtures/documents.ts'
@@ -18,19 +18,34 @@ const overviewScreens = [
   'search results',
   'members',
 ]
-const overviews = routes.filter((route) => overviewScreens.includes(route.name))
-// The screens that are not lists but sit in a column of their own: the history of a document and the page of a template.
-const columns = [
-  ...routes.filter((route) => route.name === 'version history'),
-  {
-    name: 'template',
+/** A route case of the suite by its name: one that is renamed or removed there stops this spec instead of shrinking it. */
+function routeNamed(name: string) {
+  const found = routes.find((route) => route.name === name)
+  if (!found) throw new Error(`routes.ts has no case named "${name}"`)
+  return found
+}
+
+/** Opens an address the way a person does and waits until nothing is left to arrive. */
+function address(name: string, path: string) {
+  return {
+    name,
     open: async (page: Page) => {
-      await visit(page, 'templates/meeting-notes')
+      await visit(page, path)
       await expect(page.getByRole('heading', { level: 1 })).toBeAttached()
       await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
     },
-  },
+  }
+}
+
+// Every page whose column is the one of the list screens: the lists, a folder, a template and the page that is not found.
+const listColumns = [
+  ...overviewScreens.map(routeNamed),
+  address('folder', 'folders/design-team'),
+  address('template', 'templates/meeting-notes'),
+  address('not found', 'no/such/page'),
 ]
+// The history of a document has a column of its own, wider than the lists'.
+const versionsColumn = routeNamed('version history')
 
 /** The room on each side of the column of the page inside the work area (the padding of the area is not room). */
 function roomAround(page: Page) {
@@ -47,41 +62,43 @@ function roomAround(page: Page) {
   })
 }
 
-test.describe('the list screens on a wide window', () => {
+test.describe('the content column on a wide window', () => {
   for (const [width, height] of [
     [1920, 1080],
     [2560, 1440],
   ] as const) {
-    for (const route of [...overviews, ...columns]) {
-      test(`centre their column in the work area at ${width} × ${height}: ${route.name}`, async ({ page }) => {
+    for (const [route, widest] of [
+      ...listColumns.map((route) => [route, 1080] as const),
+      [versionsColumn, 1280] as const,
+    ]) {
+      test(`is centred in the work area at ${width} × ${height}: ${route.name}`, async ({ page }) => {
         await page.setViewportSize({ width, height })
         await route.open(page)
 
-        const { before, after, area } = await roomAround(page)
+        const { before, after, area, width: measured } = await roomAround(page)
         expect(area, 'there is room to spare').toBeGreaterThan(1280)
+        // A column as wide as the area would be centred too, and say nothing about where its content starts.
+        expect(measured, 'the column is no wider than the page').toBeLessThanOrEqual(widest)
         expect(Math.abs(before - after), `room left ${before}, room right ${after}`).toBeLessThanOrEqual(2)
       })
     }
   }
 })
 
-test.describe('the list screens at a desktop width', () => {
-  // The column is as wide as the work area allows, up to 1080 px: 960 px of area at 1280, and 1120 px at 1440.
+test.describe('the content column at a desktop width', () => {
+  // The column is as wide as the work area allows, up to 1080 px: 960 px of area at 1280, and 1120 px at 1440, where 20 px are left on each side.
   for (const [width, columnWidth] of [
     [1280, 960],
     [1440, 1080],
   ] as const) {
-    for (const route of overviews) {
-      test(`keep the width of their column at ${width}: ${route.name}`, async ({ page }) => {
+    for (const route of listColumns) {
+      test(`keeps its width and has the same room on both sides at ${width}: ${route.name}`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 })
         await route.open(page)
 
-        const { before, width: measured } = await roomAround(page)
+        const { before, after, width: measured } = await roomAround(page)
         expect(measured).toBeCloseTo(columnWidth, 0)
-        expect(
-          before,
-          'the column starts at the edge of the work area unless there is room to spare',
-        ).toBeGreaterThanOrEqual(0)
+        expect(Math.abs(before - after), `room left ${before}, room right ${after}`).toBeLessThanOrEqual(2)
       })
     }
   }

@@ -1,6 +1,6 @@
-.screen {
+/* The column is the page's, so the headline is where it is on the other screens; what the template says is narrower. */
+.content {
   max-width: var(--layout-notice-width);
-  margin-inline: auto;
 }
 
 .description {

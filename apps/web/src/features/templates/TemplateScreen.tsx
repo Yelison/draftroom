@@ -6,6 +6,7 @@ import type { Locale } from '../../i18n/locale.ts'
 import { PageTitle } from '../../components/PageTitle/PageTitle.tsx'
 import { useCreateDocument } from '../documents/actions/useCreateDocument.ts'
 import { problemMessageId } from '../documents/problemMessage.ts'
+import layout from '../documents/ListLayout.module.css'
 import { StateMessage } from '../documents/StateMessage.tsx'
 import { WorkspaceGate } from '../documents/WorkspaceGate.tsx'
 import { TemplatesFailure } from './TemplatesFailure.tsx'
@@ -20,28 +21,30 @@ export function TemplateScreen() {
   const template = query.data?.items.find((row) => row.id === templateId)
 
   return (
-    <div className={styles.screen}>
+    <div className={layout.screen}>
       {template === undefined ? <PageTitle titleId="screen.template" /> : <PageTitle title={template.name} />}
-      {query.isPending && <TemplateLoading />}
-      {query.isError && <TemplatesFailure onRetry={() => void query.refetch()} retrying={query.isFetching} />}
-      {query.isSuccess && template === undefined && (
-        <StateMessage
-          title={intl.formatMessage({ id: 'templates.notFound.title' })}
-          description={intl.formatMessage({ id: 'templates.notFound.description' })}
-        >
-          <BackToDocuments />
-        </StateMessage>
-      )}
-      {template !== undefined && (
-        <>
-          <p className={styles.description}>{template.description}</p>
-          <WorkspaceGate loading={<div className={styles.actionsPlaceholder} />}>
-            {(workspaceId) => (
-              <UseTemplate workspaceId={workspaceId} template={{ id: template.id, name: template.name, locale }} />
-            )}
-          </WorkspaceGate>
-        </>
-      )}
+      <div className={styles.content}>
+        {query.isPending && <TemplateLoading />}
+        {query.isError && <TemplatesFailure onRetry={() => void query.refetch()} retrying={query.isFetching} />}
+        {query.isSuccess && template === undefined && (
+          <StateMessage
+            title={intl.formatMessage({ id: 'templates.notFound.title' })}
+            description={intl.formatMessage({ id: 'templates.notFound.description' })}
+          >
+            <BackToDocuments />
+          </StateMessage>
+        )}
+        {template !== undefined && (
+          <>
+            <p className={styles.description}>{template.description}</p>
+            <WorkspaceGate loading={<div className={styles.actionsPlaceholder} />}>
+              {(workspaceId) => (
+                <UseTemplate workspaceId={workspaceId} template={{ id: template.id, name: template.name, locale }} />
+              )}
+            </WorkspaceGate>
+          </>
+        )}
+      </div>
     </div>
   )
 }
