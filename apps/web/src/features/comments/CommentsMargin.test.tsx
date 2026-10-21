@@ -115,6 +115,15 @@ describe('the threads of the margin', () => {
     expect(threadOf(margin, 'Second thread').tagName).toBe('BUTTON')
   })
 
+  it('does not announce a compact card as collapsed: choosing it replaces it, there is nothing there that expands', async () => {
+    renderCommentedDocument({ paragraphs, fixtureThreads: false, started: [first] })
+    const margin = await findMargin()
+    await within(margin).findByText('First thread')
+
+    expect(compactThreads(margin)).toHaveLength(1)
+    expect(compactThreads(margin)[0]).not.toHaveAttribute('aria-expanded')
+  })
+
   it('gives the card back to its compact form when another thread is chosen', async () => {
     const user = userEvent.setup()
     renderCommentedDocument({ paragraphs, fixtureThreads: false, started: [first, second] })
