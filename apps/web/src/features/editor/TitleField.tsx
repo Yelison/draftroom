@@ -4,7 +4,7 @@ import { Field } from '@yelison/forma-ui'
 import type { KeyboardEvent } from 'react'
 import { useIntl } from 'react-intl'
 import type { MessageId } from '../../i18n/messages.ts'
-import { useGrowingHeight } from './useGrowingHeight.ts'
+import { useGrowingField } from './useGrowingField.ts'
 import { useTitleSave, type TitleProblem } from './useTitleSave.ts'
 import styles from './TitleField.module.css'
 
@@ -31,7 +31,7 @@ const problemMessage: Record<TitleProblem, MessageId> = {
 export function TitleField({ document, editable, onEnter }: TitleFieldProps) {
   const intl = useIntl()
   const { value, problem, change, commit } = useTitleSave(document)
-  const field = useGrowingHeight(value)
+  const field = useGrowingField(value)
 
   function enter(event: KeyboardEvent<HTMLTextAreaElement>) {
     // Enter that picks a composed character (an IME) is not the person asking to leave the field.
@@ -56,10 +56,13 @@ export function TitleField({ document, editable, onEnter }: TitleFieldProps) {
             {...control}
             ref={field}
             rows={1}
-            value={value}
             readOnly={!editable}
-            // A line break pasted into the title is a space: the title is a line of text that wraps, not paragraphs.
-            onChange={(event) => change(event.target.value.replace(/\s*[\r\n]+\s*/g, ' '))}
+            // A line break pasted into the title is a space: the title is a line of text that wraps, not paragraphs. The field
+            // shows what the title is, which is also what the limit allows: it is not controlled (`useGrowingField`).
+            onChange={(event) => {
+              const shown = change(event.target.value.replace(/\s*[\r\n]+\s*/g, ' '))
+              if (shown !== event.target.value) event.target.value = shown
+            }}
             onBlur={() => void commit()}
             onKeyDown={enter}
             autoComplete="off"

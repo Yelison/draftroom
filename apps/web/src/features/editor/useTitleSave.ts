@@ -89,7 +89,8 @@ export function useTitleSave(document: DocumentMeta) {
     },
   })
 
-  function change(next: string) {
+  /** Takes what the person typed, and answers the title that is in the field: the one the limit allows. */
+  function change(next: string): string {
     const clipped = clipToCodePoints(next, contractLimits.documentTitle.max)
     if (typed === null) {
       const { revision, title } = queryClient.getQueryData(query.queryKey) ?? document
@@ -97,6 +98,7 @@ export function useTitleSave(document: DocumentMeta) {
     }
     setTyped(clipped)
     setProblem(clipped === next ? null : 'tooLong')
+    return clipped
   }
 
   /** Hands the typed title over for saving. It answers `false` when the title is not one that can be saved. */

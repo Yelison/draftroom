@@ -110,9 +110,10 @@ for (const [language, said] of Object.entries(words)) {
       await expect(textArea(page, said.replyField)).toBeFocused()
       await expect(page.getByRole('status').filter({ hasText: said.announced.replied })).toHaveCount(1)
 
-      // The reply button, then Resolve: the card leaves the open threads and the focus goes to the heading of the margin.
+      // The reply is sent and its field is empty again, so there is no button for it: Resolve is the next stop. The card leaves
+      // the open threads and the focus goes to the heading of the margin.
       await page.keyboard.press('Tab')
-      await page.keyboard.press('Tab')
+      await expect(card.getByRole('button', { name: said.resolve })).toBeFocused()
       await page.keyboard.press('Enter')
       await expect(margin.getByRole('article')).toHaveCount(0)
       await expect(marks(page)).toHaveCount(0)

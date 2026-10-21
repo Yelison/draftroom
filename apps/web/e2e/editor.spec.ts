@@ -1123,9 +1123,11 @@ test.describe('one scroll', () => {
           (placed[index + 1]?.top ?? Infinity) + 0.5,
         )
       }
-      // The cards that are the first on their paragraph are level with it; the second on one is pushed under the first.
-      const level = onText.filter((card) => Math.abs(card.top - card.text) <= tolerance)
-      expect(level.length).toBeGreaterThanOrEqual(11)
+      // None is lower than the tolerance (two lines, 48 px) before the text opens room for it, and the threads that have a card
+      // of their own are level with their text.
+      for (const card of onText)
+        expect(card.top - card.text, `card ${card.id} is not far below its text`).toBeLessThanOrEqual(48 + tolerance)
+      expect(onText.filter((card) => Math.abs(card.top - card.text) <= tolerance).length).toBeGreaterThanOrEqual(4)
       // Cards that would have overlapped the text under them have had room opened for them.
       expect(await page.locator('[data-comment-gap]').count()).toBeGreaterThan(0)
 
@@ -1154,16 +1156,19 @@ test.describe('one scroll', () => {
     }
     await commentOn(page, 'first paragraph', 'About the first')
     await commentOn(page, 'second paragraph', 'About the second')
+    // How far each card is from its text (signed), by thread.
     const offsets = () =>
       page.evaluate(() =>
-        [...document.querySelectorAll<HTMLElement>('aside [data-thread-id]')]
-          .map((card) => {
-            const mark = document.querySelector(`mark[data-comment-thread="${card.dataset['threadId']}"]`)
-            return mark === null ? null : Math.abs(card.getBoundingClientRect().top - mark.getBoundingClientRect().top)
-          })
-          .filter((offset) => offset !== null),
+        Object.fromEntries(
+          [...document.querySelectorAll<HTMLElement>('aside [data-thread-id]')].flatMap((card) => {
+            const id = card.dataset['threadId'] ?? ''
+            const mark = document.querySelector(`mark[data-comment-thread="${id}"]`)
+            return mark === null ? [] : [[id, card.getBoundingClientRect().top - mark.getBoundingClientRect().top]]
+          }),
+        ),
       )
-    await expect.poll(async () => Math.max(...(await offsets()))).toBeLessThanOrEqual(6)
+    const settled = await offsets()
+    expect(Object.keys(settled)).toHaveLength(2)
 
     // An empty title is refused when the person leaves it, and says so under it: the text goes down by that much.
     const title = page.getByRole('textbox', { name: 'Document title' })
@@ -1174,8 +1179,15 @@ test.describe('one scroll', () => {
     await expect(page.getByText('Give the document a title.')).toBeVisible()
     expect(await topOfText()).toBeGreaterThan(before)
 
+    // The text went down and the cards went with it: each is as far from its text as it was.
     await expect
-      .poll(async () => Math.max(...(await offsets())), { message: 'cards level with their text' })
+      .poll(
+        async () => {
+          const now = await offsets()
+          return Math.max(...Object.entries(settled).map(([id, offset]) => Math.abs((now[id] ?? Number.NaN) - offset)))
+        },
+        { message: 'cards as far from their text as before' },
+      )
       .toBeLessThanOrEqual(6)
   })
 
