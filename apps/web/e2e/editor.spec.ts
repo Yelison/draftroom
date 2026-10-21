@@ -1107,6 +1107,45 @@ test.describe('one scroll', () => {
     })
   }
 
+  // What changes the height of something above the text (the error of the title) moves the text and nothing the margin watches
+  // changes size: the cards have to follow it all the same.
+  test('keeps each card level with its text when something above the text changes height', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto(documentPath)
+    await open(page)
+    await page.keyboard.press('Control+End')
+    for (const line of ['The first paragraph, which is commented on.', 'The second paragraph, which is too.']) {
+      await page.keyboard.press('Enter')
+      await page.keyboard.insertText(line)
+    }
+    await commentOn(page, 'first paragraph', 'About the first')
+    await commentOn(page, 'second paragraph', 'About the second')
+    const offsets = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('aside [data-thread-id]')]
+          .map((card) => {
+            const mark = document.querySelector(`mark[data-comment-thread="${card.dataset['threadId']}"]`)
+            return mark === null ? null : Math.abs(card.getBoundingClientRect().top - mark.getBoundingClientRect().top)
+          })
+          .filter((offset) => offset !== null),
+      )
+    await expect.poll(async () => Math.max(...(await offsets()))).toBeLessThanOrEqual(6)
+
+    // An empty title is refused when the person leaves it, and says so under it: the text goes down by that much.
+    const title = page.getByRole('textbox', { name: 'Document title' })
+    const topOfText = async () => (await textArea(page).boundingBox())?.y ?? Number.NaN
+    const before = await topOfText()
+    await title.fill('')
+    await title.blur()
+    await expect(page.getByText('Give the document a title.')).toBeVisible()
+    expect(await topOfText()).toBeGreaterThan(before)
+
+    await expect
+      .poll(async () => Math.max(...(await offsets())), { message: 'cards level with their text' })
+      .toBeLessThanOrEqual(6)
+  })
+
   // A browser zoomed to 200 % on a window of 1280 px is a window of 640 × 360 CSS px: there is no beside for the margin, which
   // goes under the sheet with its cards in the order of the text, and the band and the bar go by with the page.
   test('zoomed to 200 %: the margin is under the sheet, in the order of the text, and nothing is cut', async ({

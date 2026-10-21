@@ -32,8 +32,8 @@ export interface MarginLayoutInput {
  * before taken out again, so measuring a page that has them gives the answer it gave before and the layout settles instead
  * of feeding on itself.
  *
- * It measures when what it lists changes and, through observers, when a card, the text or the label changes size: a reply
- * being written, the active thread, a line that wraps. The observers measure on the next frame, not inside the
+ * It measures when what it lists changes and, through observers, when a card, the text, the sheet around it or the label
+ * changes size: a reply being written, the active thread, a line that wraps, the error of the title. The observers measure on the next frame, not inside the
  * notification, which the browser would otherwise report as a loop.
  */
 export function useMarginLayout({ editor, margin, placed, trailing, labelled, beside }: MarginLayoutInput) {
@@ -89,6 +89,9 @@ export function useMarginLayout({ editor, margin, placed, trailing, labelled, be
     const created = new ResizeObserver(schedule)
     observer.current = created
     created.observe(editor.view.dom)
+    // What is beside the margin, the sheet and what is over the stage: what changes height above the text (the error of the
+    // title, a notice) moves the text without changing the size of the text, of a card or of the margin.
+    for (const part of margin.current?.parentElement?.children ?? []) created.observe(part)
     for (const card of cards.current.values()) created.observe(card)
     if (label.current !== null) created.observe(label.current)
     return () => {
