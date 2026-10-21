@@ -83,45 +83,69 @@ async function positionsOf(page: Page) {
   return { title: await titleField(page).boundingBox(), text: await textArea(page).boundingBox() }
 }
 
-for (const { locale, colorScheme, notice } of [
-  { locale: 'en-US', colorScheme: 'light', notice: /stays on this device until the connection is back/ },
-  { locale: 'es-ES', colorScheme: 'dark', notice: /se queda en este dispositivo hasta que vuelva la conexión/ },
-] as const) {
-  for (const width of [640, 1280, 1440]) {
-    test.describe(`the notice about working offline, in ${locale} at ${width} px`, () => {
-      test.use({ locale, colorScheme, viewport: { width, height: 900 } })
+// Run with the font of the app and with a wide one (what a machine without Inter falls back to: DejaVu Sans on a CI runner),
+// at the widths where the sheet is narrow too: how many lines the notice takes depends on the font and on the width, and it
+// must not cover the title in any of them.
+for (const { font, css } of [
+  { font: 'the font of the app', css: null },
+  {
+    font: 'a wide fallback font',
+    css: '*, *::before, *::after { font-family: "DejaVu Sans", sans-serif !important; }',
+  },
+]) {
+  for (const { locale, colorScheme, notice } of [
+    { locale: 'en-US', colorScheme: 'light', notice: /stays on this device until the connection is back/ },
+    { locale: 'es-ES', colorScheme: 'dark', notice: /se queda en este dispositivo hasta que vuelva la conexión/ },
+  ] as const) {
+    for (const width of [375, 640, 1280, 1440]) {
+      test.describe(`the notice about working offline, in ${locale} at ${width} px, with ${font}`, () => {
+        test.use({ locale, colorScheme, viewport: { width, height: 900 } })
 
-      test('is laid over the top of the sheet, above the title, and moves nothing when the network goes or comes back', async ({
-        page,
-        context,
-      }) => {
-        await page.goto(documentPath)
-        await textArea(page).click()
-        await expect(syncRegion(page)).toHaveText(/Synced|Sincronizado/)
-        const before = await positionsOf(page)
+        test('is laid over the top of the sheet, above the title, and moves nothing when the network goes or comes back', async ({
+          page,
+          context,
+        }) => {
+          await page.goto(documentPath)
+          if (css !== null) await page.addStyleTag({ content: css })
+          await textArea(page).click()
+          await expect(syncRegion(page)).toHaveText(/Synced|Sincronizado/)
+          const before = await positionsOf(page)
+          const overflowOf = () =>
+            page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+          const overflowBefore = await overflowOf()
 
-        await context.setOffline(true)
-        const shown = page.getByText(notice)
-        await expect(shown).toBeVisible()
-        await page.keyboard.type('Written offline')
+          await context.setOffline(true)
+          const shown = page.getByText(notice)
+          await expect(shown).toBeVisible()
+          await page.keyboard.type('Written offline')
 
-        // Nothing under it moved, it does not cover the title, and it fits the room above the title.
-        expect(await positionsOf(page)).toEqual(before)
-        const box = await shown.boundingBox()
-        expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(before.title?.y ?? 0)
-        // One line at a desktop width: the panel is closed at 1280 px, so the sheet is not narrow there. At 640 px, a zoom of
-        // 200 % on 1280, the sheet is 520 px wide and the text takes two lines, in the 48 px of room above the title.
-        expect(box?.height).toBeLessThanOrEqual(width === 640 ? 48 : 34)
-        const overflow = await page.evaluate(
-          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        )
-        expect(overflow).toBeLessThanOrEqual(0)
+          // Nothing under it moved.
+          expect(await positionsOf(page)).toEqual(before)
+          // Wherever it is, in whatever font: it does not cover the title, and it does not reach the bar above the stage.
+          const { lines, top, bottom, stageTop } = await shown.evaluate((element) => {
+            const range = document.createRange()
+            range.selectNodeContents(element)
+            const box = element.getBoundingClientRect()
+            return {
+              lines: range.getClientRects().length,
+              top: box.top,
+              bottom: box.bottom,
+              stageTop: element.closest('[class*="sheet"]')?.parentElement?.getBoundingClientRect().top ?? Number.NaN,
+            }
+          })
+          expect(bottom).toBeLessThanOrEqual(before.title?.y ?? 0)
+          expect(top).toBeGreaterThanOrEqual(stageTop)
+          // Two lines is what the room of the sheet holds; a third one, on a phone, is taken from the stage above it.
+          expect(lines).toBeLessThanOrEqual(width < 640 ? 3 : 2)
+          // It adds no width to the page (a phone's width has some of its own, which the notice does not make worse).
+          expect(await overflowOf()).toBeLessThanOrEqual(overflowBefore)
 
-        await context.setOffline(false)
-        await expect(shown).toBeHidden()
-        await expect(syncRegion(page)).toHaveText(/Synced|Sincronizado/, { timeout: 15_000 })
-        expect(await positionsOf(page)).toEqual(before)
+          await context.setOffline(false)
+          await expect(shown).toBeHidden()
+          await expect(syncRegion(page)).toHaveText(/Synced|Sincronizado/, { timeout: 15_000 })
+          expect(await positionsOf(page)).toEqual(before)
+        })
       })
-    })
+    }
   }
 }

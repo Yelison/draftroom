@@ -4,7 +4,7 @@ import styles from './OfflineNotice.module.css'
 
 /**
  * Where what the person writes without a connection is: on this device, or only in this tab when the device keeps no copy
- * and closing the tab would lose it. It is one short line laid over the top of the sheet, where the sheet has room, so that
+ * and closing the tab would lose it. It is a line or two laid over the room above the title, where the sheet has room, so that
  * the text never moves when the connection goes and comes back. It is not a live region: the sync status announces the
  * change of state, and a region that arrives with its text may go unheard.
  *

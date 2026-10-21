@@ -1,15 +1,16 @@
 /*
- * Laid over the padding at the top of the sheet, which is the room the title leaves above itself: the notice takes none of
- * the sheet's height, so the title and the text stay where they are whether it is there or not. The room is 48 px, which
- * holds two lines of this type with their padding: beside the comments panel the sheet is 504 px at 1280, and the Spanish
- * message takes two lines there.
+ * Laid over the room the title leaves above itself, and anchored by its bottom edge, 4 px over the title: the notice takes none
+ * of the sheet's height, so the title and the text stay where they are whether it is there or not, and what it needs for more
+ * lines (the Spanish message, a font that is wider than the one of the app, a narrow sheet) is taken from the top, not from
+ * the title. The room is the 48 px of the sheet's padding, which holds two lines of this type, and the 16 px of the stage above
+ * the sheet, so three lines fit without reaching the bar. It is a little wider than the sheet's text so that it wraps late.
  */
 .notice {
   position: absolute;
-  inset-block-start: var(--space-4);
-  inset-inline: var(--space-12);
+  inset-block-end: calc(100% - var(--space-48) + var(--space-4));
+  inset-inline: var(--space-4);
   margin: 0;
-  padding: var(--space-2) var(--space-12);
+  padding: var(--space-2) var(--space-8);
   border-radius: var(--radius-small);
   background: var(--color-amber-bg);
   color: var(--color-amber-ink);
