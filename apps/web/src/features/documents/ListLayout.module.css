@@ -9,4 +9,6 @@
   --list-search-width: 480px;
 
   max-width: var(--list-page-width);
+  /* In a work area wider than the page the column sits in the middle of it, and at a desktop width it still fills it. */
+  margin-inline: auto;
 }

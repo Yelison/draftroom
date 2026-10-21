@@ -1,5 +1,6 @@
 .screen {
   max-width: var(--layout-notice-width);
+  margin-inline: auto;
 }
 
 .description {
