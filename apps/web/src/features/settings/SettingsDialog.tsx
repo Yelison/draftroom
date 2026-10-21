@@ -35,9 +35,14 @@ export function SettingsDialog({ section, onClose }: SettingsDialogProps) {
   const body = useRef<HTMLDivElement>(null)
 
   // The browser puts the focus on the first thing that can take it, which is the scrolling column while the fields are
-  // inert. Once they are there it goes to the first control of the section the address names (the name, by default).
+  // inert. Once they are there it goes to the first control of the section the address names (the name, by default),
+  // unless the person has already moved it while the data was on its way.
   useEffect(() => {
-    if (ready) body.current?.querySelector<HTMLElement>(`#settings-${section} :is(input, button)`)?.focus()
+    const active = document.activeElement
+    const where = body.current
+    const untouched =
+      active === null || active === document.body || active === where || active === where?.closest('dialog')
+    if (ready && untouched) where?.querySelector<HTMLElement>(`#settings-${section} :is(input, button)`)?.focus()
   }, [ready, section])
 
   return (

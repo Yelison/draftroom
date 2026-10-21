@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { localeStorageKey } from '../../i18n/locale.ts'
 import { dialog, openSettings, refusal, renderScreen } from './testing/openSettings.tsx'
@@ -106,7 +106,8 @@ describe('the Profile section', () => {
     localStorage.setItem(localeStorageKey, 'es')
     const { user, server } = renderScreen('/?settings=profile')
     const spanish = within(await screen.findByRole('dialog', { name: 'Configuración' }))
-    await spanish.findByRole('heading', { level: 2, name: 'Perfil' })
+    // The account has arrived when its name is in the field: before that the sections are there, empty and inert.
+    await waitFor(() => expect(spanish.getByRole('textbox', { name: 'Nombre' })).toHaveValue('Marta Ruiz'))
     expect(spanish.getByRole('radio', { name: 'Español' })).toBeChecked()
     expect(spanish.getByRole('button', { name: 'Guardar cambios' })).toHaveAttribute('aria-disabled', 'true')
 

@@ -259,6 +259,24 @@ describe('the sections of the dialog', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Home' })).toHaveFocus()
   })
 
+  it('does not take the focus from where the person put it while the data was on its way', async () => {
+    let release: () => void = () => undefined
+    renderScreen('/?settings=profile', {
+      wrap: (dataSource) => ({
+        ...dataSource,
+        getMe: () => new Promise((resolve) => (release = () => resolve(dataSource.getMe()))),
+      }),
+    })
+    const open = within(await screen.findByRole('dialog', { name: 'Settings' }))
+    const done = open.getByRole('button', { name: 'Done' })
+    done.focus()
+
+    release()
+    await waitFor(() => expect(open.getByRole('textbox', { name: 'Name' })).toHaveValue('Marta Ruiz'))
+
+    expect(done).toHaveFocus()
+  })
+
   it('keeps the dialog and its Done button while the data is on its way', async () => {
     renderScreen('/?settings=profile', {
       wrap: (dataSource) => ({ ...dataSource, getMe: () => new Promise(() => undefined) }),
