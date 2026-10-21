@@ -24,9 +24,9 @@ describe('the focus when the person navigates', () => {
   })
 
   it('does not take the focus on the first load of a redirected address either', async () => {
-    renderApp('/settings')
+    renderApp('/settings/members')
 
-    await screen.findByRole('heading', { level: 1, name: 'Home' })
+    await screen.findByRole('heading', { level: 1, name: 'Members' })
     expect(document.body).toHaveFocus()
     await userEvent.tab()
     expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveFocus()
@@ -48,7 +48,7 @@ describe('the focus when the person navigates', () => {
   it.each([
     { to: '/documents/d1/versions', page: 'a page with an id', heading: 'Version history' },
     { to: '/documents/new', page: 'a page of the other layout', heading: 'New document' },
-    { to: '/settings', page: 'an address that redirects', heading: 'Home' },
+    { to: '/settings/members', page: 'an address that redirects', heading: 'Members' },
     { to: '/no/such/page', page: 'a page that does not exist', heading: 'Page not found' },
   ])('moves to the headline of $page, and never to the body', async ({ to, heading }) => {
     const { router } = renderApp('/history')
