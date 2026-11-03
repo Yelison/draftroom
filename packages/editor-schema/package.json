@@ -8,11 +8,11 @@
     "./convert": "./src/convert.ts"
   },
   "dependencies": {
-    "@tiptap/core": "3.31.4",
-    "@tiptap/extension-link": "3.31.4",
-    "@tiptap/pm": "3.31.4",
-    "@tiptap/starter-kit": "3.31.4",
-    "@tiptap/y-tiptap": "3.0.10",
+    "@tiptap/core": "3.32.2",
+    "@tiptap/extension-link": "3.32.2",
+    "@tiptap/pm": "3.32.2",
+    "@tiptap/starter-kit": "3.32.2",
+    "@tiptap/y-tiptap": "3.0.12",
     "yjs": "13.6.33"
   }
 }
